@@ -63,7 +63,7 @@ to the other section, and drag an item to carry it. Tap a recipe to craft it, ho
 | Move a single item | Mouse wheel over a slot |
 | Swap with a hotbar slot | 1-9 over a slot |
 | Drop | Q (Shift+Q for the whole stack), or click outside the window |
-| Craft | Click a recipe once per batch, then take it from the result slot (shift-click crafts all) |
+| Craft | Click a recipe once per batch, then take it from the result slot; ingredients are only used when you take it (shift-click crafts all) |
 | Scroll lists | Mouse wheel |
 
 
