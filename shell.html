@@ -104,6 +104,10 @@
                 else if (locked() && document.exitPointerLock) document.exitPointerLock();
                 updateHint();
             };
+            Module.mcMenuOpen = function () {
+                if (Module.mcResumePending) return;
+                if (wanted || locked()) Module.mcPointerWanted(0);
+            };
 
             window.addEventListener('mousedown', function (e) {
                 if (e.target !== canvas || !wanted || locked() || !pcMode() || !supported()) return;
@@ -123,15 +127,15 @@
                 var r = Module.mcResumeRect;
                 if (e.button !== 0 || !r || e.target !== canvas || locked() || !pcMode() || !supported()) return;
                 var b = canvas.getBoundingClientRect();
-                var x = (e.clientX - b.left) * canvas.width / b.width;
-                var y = (e.clientY - b.top) * canvas.height / b.height;
+                var gw = r[4] || canvas.width, gh = r[5] || canvas.height;
+                var x = (e.clientX - b.left) * gw / b.width;
+                var y = (e.clientY - b.top) * gh / b.height;
                 if (x < r[0] || y < r[1] || x >= r[0] + r[2] || y >= r[1] + r[3]) return;
                 e.stopImmediatePropagation();
                 wanted = true;
                 clickAttemptAt = Date.now();
                 tryLock();
-                var unwound = typeof Asyncify !== 'undefined' && Asyncify.currData;
-                if (!unwound && Module._mcResumeFromPause) Module._mcResumeFromPause();
+                Module.mcResumePending = 1;
             }, true);
 
             document.addEventListener('pointerlockchange', function () {
