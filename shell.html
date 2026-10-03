@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <title>Minecraft</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            /* Prevent browser scroll/zoom on touch */
+        }
+
+        canvas.emscripten {
+            /* Fills the whole window - the C++ renderer sets its
+               resolution from window.innerWidth/Height dynamically */
+            display: block;
+            outline: none;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+    <script type='text/javascript'>
+        var Module = {
+            canvas: (function () { return document.getElementById('canvas'); })()
+        };
+
+        (function () {
+            var canvas = document.getElementById('canvas');
+            var wanted = false;
+            var disabled = false;
+            var swallowUp = -1;
+            var clickAttemptAt = 0;
+            var failures = 0, firstFailureAt = 0;
+            var hint = null;
+
+            function supported() {
+                return !disabled && 'pointerLockElement' in document && !!canvas.requestPointerLock;
+            }
+            function pcMode() {
+                if (!Module.calledRun) return true;
+                return !(Module._mcIsTouchMode && Module._mcIsTouchMode());
+            }
+            function locked() {
+                return document.pointerLockElement === canvas;
+            }
+            function tryLock() {
+                if (!wanted || locked() || !pcMode() || !supported()) return;
+                try {
+                    var p = canvas.requestPointerLock();
+                    if (p && p.catch) p.catch(function () {   });
+                } catch (e) {   }
+            }
+            function updateHint() {
+                var show = wanted && !locked() && pcMode() && supported();
+                if (show && !hint) {
+                    hint = document.createElement('div');
+                    hint.textContent = 'Click to play';
+                    hint.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);' +
+                        'z-index:9997;pointer-events:none;font:16px/1.4 monospace;color:#fff;' +
+                        'background:rgba(0,0,0,.55);padding:8px 16px;border-radius:3px';
+                    document.body.appendChild(hint);
+                }
+                if (hint) hint.style.display = show ? 'block' : 'none';
+            }
+
+            Module.mcPointerWanted = function (on) {
+                wanted = !!on;
+                if (wanted) tryLock();
+                else if (locked() && document.exitPointerLock) document.exitPointerLock();
+                updateHint();
+            };
+
+            window.addEventListener('mousedown', function (e) {
+                if (e.target !== canvas || !wanted || locked() || !pcMode() || !supported()) return;
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                swallowUp = e.button;
+                clickAttemptAt = Date.now();
+                tryLock();
+            }, true);
+            window.addEventListener('mouseup', function (e) {
+                if (e.button !== swallowUp) return;
+                swallowUp = -1;
+                e.stopImmediatePropagation();
+            }, true);
+
+            document.addEventListener('pointerlockchange', function () {
+                if (locked()) failures = 0;
+                updateHint();
+            });
+            document.addEventListener('pointerlockerror', function () {
+                var now = Date.now();
+                if (now - clickAttemptAt < 1000) {
+                    if (failures++ === 0) firstFailureAt = now;
+                    if (failures >= 3 && now - firstFailureAt > 2000) {
+                        disabled = true;
+                        console.warn('Cursor lock unavailable; using drag-to-look controls.');
+                    }
+                }
+                updateHint();
+            });
+            setInterval(updateHint, 500);
+        })();
+
+        (function () {
+            var canvas = document.getElementById('canvas');
+
+            canvas.addEventListener('touchstart', function (e) {
+                e.preventDefault();
+            }, { passive: false });
+
+            // Block document-level default touch behaviours (scroll / zoom),
+            // but only for non-input elements (the existing rule).
+            document.addEventListener('touchstart', function (e) {
+                var t = e.target.tagName;
+                if (t !== 'INPUT' && t !== 'TEXTAREA' && t !== 'BUTTON' && t !== 'SELECT' && t !== 'OPTION') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('mousedown', function (e) {
+                if (e.button === 1) e.preventDefault();
+            });
+        })();
+    </script>
+    <script type='text/javascript'>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    }, err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+    <script src="saves.js"></script>
+    {{{ SCRIPT }}}
+</body>
+
+</html>
