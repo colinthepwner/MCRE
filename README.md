@@ -54,7 +54,7 @@ the in-game Options. On a touchscreen the on-screen controls (and auto-jump) com
 | Move a single item | Mouse wheel over a slot |
 | Swap with a hotbar slot | 1-9 over a slot |
 | Drop | Q (Shift+Q for the whole stack), or click outside the window |
-| Craft | Pick a recipe, then click the result (shift-click crafts all) |
+| Craft | Click a recipe, then click it again (shift-click crafts all) |
 | Scroll lists | Mouse wheel |
 
 
