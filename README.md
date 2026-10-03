@@ -36,7 +36,7 @@ Worlds removed in-game go to `saves\.trash` rather than being deleted.
 | Hotbar | 1-9 or mouse wheel |
 | Inventory | E |
 | Crafting | Q |
-| Pause and free the cursor | Esc |
+| Pause and free the cursor | Esc (the pause menu has Options, including FOV) |
 
 The cursor is only captured while playing; menus always use a normal cursor. Mouse sensitivity is in
 the in-game Options.
@@ -47,8 +47,9 @@ Play in landscape. Drag anywhere on the lower left of the screen to walk; tap th
 second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
 tap to place or use, and hold to break.
 
-In the inventory: tap to pick up and put down, hold for half (or one), double-tap to move an item
-to the other section, and drag an item to carry it. Tap a recipe to craft it, hold it to craft all.
+In the inventory: tap an item to select it, then tap where it should go. Hold to select half (or,
+with something selected, to put one down), double-tap to move an item to the other section, and drag
+an item to carry it. Tap a recipe to craft it, hold it to craft all.
 
 ### Inventory, chests and furnaces
 
