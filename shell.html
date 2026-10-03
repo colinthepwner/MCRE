@@ -23,12 +23,31 @@
         }
 
         canvas.emscripten {
-            /* Fills the whole window - the C++ renderer sets its
-               resolution from window.innerWidth/Height dynamically */
+            /* Pinned to the visible window. 100vw/100vh is the *large* viewport on phones (as
+               if the address bar were hidden), which differs from what's actually on screen,
+               so the picture was stretched or pushed off-centre. The C++ side sizes the
+               drawing buffer from this element's real size (see the resize sync below). */
             display: block;
             outline: none;
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #mc-rotate {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            color: #fff;
+            font: 18px/1.4 monospace;
+            text-align: center;
+            padding: 24px;
         }
     </style>
 </head>
@@ -101,6 +120,20 @@
                 e.stopImmediatePropagation();
             }, true);
 
+            window.addEventListener('mouseup', function (e) {
+                var r = Module.mcResumeRect;
+                if (e.button !== 0 || !r || e.target !== canvas || locked() || !pcMode() || !supported()) return;
+                var b = canvas.getBoundingClientRect();
+                var x = (e.clientX - b.left) * canvas.width / b.width;
+                var y = (e.clientY - b.top) * canvas.height / b.height;
+                if (x < r[0] || y < r[1] || x >= r[0] + r[2] || y >= r[1] + r[3]) return;
+                e.stopImmediatePropagation();
+                wanted = true;
+                clickAttemptAt = Date.now();
+                tryLock();
+                if (Module._mcResumeFromPause) Module._mcResumeFromPause();
+            }, true);
+
             document.addEventListener('pointerlockchange', function () {
                 if (locked()) failures = 0;
                 updateHint();
@@ -138,6 +171,57 @@
             canvas.addEventListener('mousedown', function (e) {
                 if (e.button === 1) e.preventDefault();
             });
+        })();
+
+        (function () {
+            var canvas = document.getElementById('canvas');
+            function mobileNow() {
+                if (Module.calledRun && Module._mcIsTouchMode && Module._mcIsTouchMode()) return true;
+                var touchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+                return touchDevice && coarse;
+            }
+
+            var overlay = document.createElement('div');
+            overlay.id = 'mc-rotate';
+            overlay.textContent = 'Turn your device sideways to play';
+            document.body.appendChild(overlay);
+
+            function portrait() { return window.innerHeight > window.innerWidth; }
+            function updateOverlay() { overlay.style.display = (mobileNow() && portrait()) ? 'flex' : 'none'; }
+
+            function goLandscape() {
+                if (!mobileNow()) return;
+                var el = document.documentElement;
+                var p = null;
+                try {
+                    if (!document.fullscreenElement && el.requestFullscreen) p = el.requestFullscreen({ navigationUI: 'hide' });
+                } catch (e) {   }
+                Promise.resolve(p).then(function () {
+                    if (screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape');
+                }).catch(function () {   });
+            }
+            window.addEventListener('touchend', goLandscape, true);
+
+            var lastW = 0, lastH = 0;
+            function sync() {
+                updateOverlay();
+                var b = canvas.getBoundingClientRect();
+                var dpr = window.devicePixelRatio || 1;
+                var w = Math.round(b.width * dpr), h = Math.round(b.height * dpr);
+                if (w < 1 || h < 1) return;
+                if (w === canvas.width && h === canvas.height) { lastW = w; lastH = h; return; }
+                if (w === lastW && h === lastH) return;
+                lastW = w; lastH = h;
+                window.dispatchEvent(new Event('resize'));
+            }
+            function settle() { sync(); setTimeout(sync, 150); setTimeout(sync, 500); setTimeout(sync, 1200); }
+            window.addEventListener('orientationchange', settle);
+            window.addEventListener('resize', function () { setTimeout(sync, 50); });
+            if (window.visualViewport) window.visualViewport.addEventListener('resize', settle);
+            document.addEventListener('fullscreenchange', settle);
+            setInterval(sync, 1000);
+            updateOverlay();
         })();
     </script>
     <script type='text/javascript'>

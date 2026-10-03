@@ -39,7 +39,13 @@ Worlds removed in-game go to `saves\.trash` rather than being deleted.
 | Pause and free the cursor | Esc |
 
 The cursor is only captured while playing; menus always use a normal cursor. Mouse sensitivity is in
-the in-game Options. On a touchscreen the on-screen controls (and auto-jump) come back automatically.
+the in-game Options.
+
+### Touchscreen
+
+Play in landscape. Drag anywhere on the lower left of the screen to walk; tap there to jump (hold a
+second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
+tap to place or use, and hold to break.
 
 ### Inventory, chests and furnaces
 
@@ -54,7 +60,7 @@ the in-game Options. On a touchscreen the on-screen controls (and auto-jump) com
 | Move a single item | Mouse wheel over a slot |
 | Swap with a hotbar slot | 1-9 over a slot |
 | Drop | Q (Shift+Q for the whole stack), or click outside the window |
-| Craft | Click a recipe, then click it again (shift-click crafts all) |
+| Craft | Click a recipe once per batch, then take it from the result slot (shift-click crafts all) |
 | Scroll lists | Mouse wheel |
 
 
