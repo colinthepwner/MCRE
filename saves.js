@@ -7,6 +7,8 @@
     var LARGE_FILE_BYTES = 1024 * 1024;
     var SMALL_CHANGE_DEBOUNCE_MS = 4000;
     var LARGE_FILE_INTERVAL_MS = 60000;
+    var BLOCK_BYTES = 64 * 1024;
+    var BLOCK_DB = 'mcre-big-files';
     var MTIME_SLOP_MS = 1500;
 
     var Module = window.Module = window.Module || {};
@@ -107,12 +109,174 @@
         }
     }
 
-    function persistIdb() {
+    function syncIdbOnce() {
         return new Promise(function (resolve) {
             origSyncfs.call(fs, false, function (err) {
                 if (err) console.warn('[saves] IndexedDB save failed:', err);
                 resolve(!err);
             });
+        });
+    }
+
+    function persistIdb() {
+        return syncIdbOnce().then(function (ok) {
+            if (ok) return true;
+            resetIdbConnections();
+            return syncIdbOnce();
+        });
+    }
+
+    function resetIdbConnections() {
+        try {
+            if (typeof IDBFS !== 'undefined' && IDBFS.dbs) {
+                Object.keys(IDBFS.dbs).forEach(function (k) {
+                    try { IDBFS.dbs[k].close(); } catch (e) {   }
+                    delete IDBFS.dbs[k];
+                });
+            }
+        } catch (e) {   }
+        closeBlockDb();
+    }
+
+    function patchIdbfs() {
+        if (typeof IDBFS === 'undefined' || IDBFS.__mcreBig) return;
+        IDBFS.__mcreBig = true;
+        var orig = IDBFS.getLocalSet;
+        IDBFS.getLocalSet = function (mount, callback) {
+            return orig.call(IDBFS, mount, function (err, set) {
+                if (!err && set && set.entries) {
+                    Object.keys(set.entries).forEach(function (path) {
+                        try {
+                            var st = fs.stat(path);
+                            if (fs.isFile(st.mode) && st.size >= LARGE_FILE_BYTES) delete set.entries[path];
+                        } catch (e) {   }
+                    });
+                }
+                callback(err, set);
+            });
+        };
+    }
+
+    var bdb = null;
+    var stored = {};
+
+    function openBlockDb() {
+        if (bdb) return Promise.resolve(bdb);
+        return new Promise(function (resolve, reject) {
+            var rq = indexedDB.open(BLOCK_DB, 1);
+            rq.onupgradeneeded = function () {
+                rq.result.createObjectStore('meta');
+                rq.result.createObjectStore('blocks');
+            };
+            rq.onsuccess = function () {
+                bdb = rq.result;
+                bdb.onclose = function () { bdb = null; };
+                bdb.onversionchange = function () { closeBlockDb(); };
+                resolve(bdb);
+            };
+            rq.onerror = function () { reject(rq.error); };
+        });
+    }
+
+    function closeBlockDb() {
+        if (bdb) { try { bdb.close(); } catch (e) {   } }
+        bdb = null;
+    }
+
+    function hashRange(data, start, end) {
+        var h = 0x811c9dc5;
+        for (var i = start; i < end; i++) h = Math.imul(h ^ data[i], 0x01000193);
+        return h >>> 0;
+    }
+
+    function hashesOf(data) {
+        var out = [];
+        for (var i = 0; i * BLOCK_BYTES < data.length; i++)
+            out.push(hashRange(data, i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES)));
+        return out;
+    }
+
+    function loadBig() {
+        return openBlockDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(['meta', 'blocks'], 'readonly');
+                var blocks = tx.objectStore('blocks');
+                var files = {};
+                tx.objectStore('meta').openCursor().onsuccess = function (e) {
+                    var c = e.target.result;
+                    if (!c) return;
+                    var meta = c.value, path = c.key;
+                    var f = files[path] = { meta: meta, buf: new Uint8Array(meta.s), got: 0 };
+                    for (var i = 0; i < meta.n; i++) (function (i) {
+                        blocks.get(path + '#' + i).onsuccess = function (ev) {
+                            var v = ev.target.result;
+                            if (v) { f.buf.set(new Uint8Array(v), i * meta.b); f.got++; }
+                        };
+                    })(i);
+                    c.continue();
+                };
+                tx.oncomplete = function () {
+                    keys(files).forEach(function (p) {
+                        var f = files[p];
+                        if (f.got !== f.meta.n) {
+                            console.warn('[saves] incomplete copy of ' + p + ' in browser storage; not restoring it');
+                            return;
+                        }
+                        var cur = null;
+                        try { cur = fs.stat(MOUNT + '/' + p); } catch (e) {   }
+                        if (cur && toMs(cur.mtime) > f.meta.m) return;
+                        writeLocal(p, f.buf, f.meta.m);
+                        stored[p] = { m: f.meta.m, s: f.meta.s, hashes: hashesOf(f.buf) };
+                    });
+                    resolve();
+                };
+                tx.onerror = tx.onabort = function () { reject(tx.error); };
+            });
+        });
+    }
+
+    function persistBig(local) {
+        var todo = keys(local).filter(function (p) {
+            var l = local[p], st = stored[p];
+            return l.s >= LARGE_FILE_BYTES && !(st && st.m === l.m && st.s === l.s);
+        });
+        var gone = keys(stored).filter(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
+        if (!todo.length && !gone.length) return Promise.resolve(true);
+        return openBlockDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(['meta', 'blocks'], 'readwrite');
+                var metas = tx.objectStore('meta'), blocks = tx.objectStore('blocks');
+                var next = {};
+                todo.forEach(function (p) {
+                    var full = MOUNT + '/' + p;
+                    var st = fs.stat(full);
+                    var data = fs.readFile(full);
+                    var prev = stored[p];
+                    var hashes = hashesOf(data);
+                    for (var i = 0; i < hashes.length; i++) {
+                        if (prev && prev.hashes[i] === hashes[i]) continue;
+                        blocks.put(data.slice(i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES)), p + '#' + i);
+                    }
+                    if (prev) for (var j = hashes.length; j < prev.hashes.length; j++) blocks.delete(p + '#' + j);
+                    var m = toMs(st.mtime);
+                    metas.put({ s: data.length, m: m, n: hashes.length, b: BLOCK_BYTES }, p);
+                    next[p] = { m: m, s: data.length, hashes: hashes };
+                });
+                gone.forEach(function (p) {
+                    metas.delete(p);
+                    for (var i = 0; i < stored[p].hashes.length; i++) blocks.delete(p + '#' + i);
+                });
+                tx.oncomplete = function () {
+                    keys(next).forEach(function (p) { stored[p] = next[p]; });
+                    gone.forEach(function (p) { delete stored[p]; });
+                    resolve(true);
+                };
+                tx.onerror = tx.onabort = function () { reject(tx.error); };
+            });
+        }).then(null, function (err) {
+            console.warn('[saves] saving big files to browser storage failed:', err);
+            closeBlockDb();
+            return false;
         });
     }
 
@@ -242,26 +406,36 @@
         return chain.then(function () { storeSynced(); return true; });
     }
 
-    var lastPersist = 0;
+    var lastIdb = 0, lastDisk = 0;
+    var forceQueued = false;
 
     function tick(force) {
-        if (!ready || busy) return Promise.resolve();
-        var local = scan();
-        var idbChanges = changedPaths(idbSnap || {}, local);
-        var diskBehind = disk.enabled && !disk.down && changedPaths(disk.synced, local).length > 0;
-        if (!idbChanges.length && !diskBehind) return Promise.resolve();
-
-        var since = Date.now() - lastPersist;
-        var small = idbChanges.some(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
-        if (!force && since < LARGE_FILE_INTERVAL_MS && !(small && since >= SMALL_CHANGE_DEBOUNCE_MS))
+        if (!ready) return Promise.resolve();
+        if (busy) {
+            if (force) forceQueued = true;
             return Promise.resolve();
+        }
+        var local = scan();
+        var now = Date.now();
+        var idbChanges = changedPaths(idbSnap || {}, local);
+        var useDisk = disk.enabled && !disk.down;
+        var diskChanges = useDisk ? changedPaths(disk.synced, local) : [];
+        var diskSmall = diskChanges.some(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
+
+        var idbDue = idbChanges.length > 0 && (force || now - lastIdb >= SMALL_CHANGE_DEBOUNCE_MS);
+        var diskDue = diskChanges.length > 0 && (force || now - lastDisk >= LARGE_FILE_INTERVAL_MS ||
+            (diskSmall && now - lastDisk >= SMALL_CHANGE_DEBOUNCE_MS));
+        if (!idbDue && !diskDue) return Promise.resolve();
 
         busy = true;
-        lastPersist = Date.now();
-        var useDisk = disk.enabled && !disk.down;
+        if (idbDue) lastIdb = now;
+        if (diskDue) lastDisk = now;
+        useDisk = useDisk && diskDue;
 
-        var idbJob = idbChanges.length
-            ? persistIdb().then(function (ok) { if (ok) idbSnap = local; return ok; })
+        var idbJob = idbDue
+            ? persistBig(local).then(function (bigOk) {
+                return persistIdb().then(function (ok) { if (ok && bigOk) idbSnap = local; return ok && bigOk; });
+            })
             : Promise.resolve(false);
         var diskJob = !useDisk ? Promise.resolve(false) : pushChanges(local).then(null, function (err) {
             disk.down = true;
@@ -277,8 +451,14 @@
         });
 
         return Promise.all([idbJob, diskJob]).then(function (r) {
-            if (useDisk ? r[1] : r[0]) toast('Saved');
-        }).finally(function () { busy = false; });
+            if (useDisk ? r[1] : (r[0] && force)) toast('Saved');
+        }).finally(function () {
+            busy = false;
+            if (forceQueued) {
+                forceQueued = false;
+                setTimeout(function () { tick(true); }, 0);
+            }
+        });
     }
 
     var watching = false;
@@ -336,8 +516,11 @@
         setInterval(function () { tick(false); }, SCAN_MS);
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'hidden') flush();
+            else resetIdbConnections();
         });
         window.addEventListener('pagehide', flush);
+        window.addEventListener('pageshow', function (e) { if (e.persisted) resetIdbConnections(); });
+        document.addEventListener('freeze', flush);
 
         var lastEarlyFlush = 0;
         function earlyFlush() {
@@ -370,9 +553,16 @@
 
             if (populate && first) {
                 first = false;
+                patchIdbfs();
                 return origSyncfs.call(fs, true, function (err) {
                     if (err) console.warn('[saves] IndexedDB load error:', err);
-                    reconcile().then(function () {
+                    loadBig().then(null, function (e) {
+                        console.warn('[saves] could not read big files from browser storage:', e);
+                    }).then(function () {
+                        return persistBig(scan());
+                    }).then(function () {
+                        return reconcile();
+                    }).then(function () {
                         return persistIdb();
                     }, function (e) {
                         console.log('[saves] saves folder not available, using browser storage only (' + e.message + ')');

@@ -47,6 +47,9 @@ Play in landscape. Drag anywhere on the lower left of the screen to walk; tap th
 second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
 tap to place or use, and hold to break.
 
+In the inventory: tap to pick up and put down, hold for half (or one), double-tap to move an item
+to the other section, and drag an item to carry it. Tap a recipe to craft it, hold it to craft all.
+
 ### Inventory, chests and furnaces
 
 | Action | Mouse / key |

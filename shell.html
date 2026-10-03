@@ -73,8 +73,7 @@
                 return !disabled && 'pointerLockElement' in document && !!canvas.requestPointerLock;
             }
             function pcMode() {
-                if (!Module.calledRun) return true;
-                return !(Module._mcIsTouchMode && Module._mcIsTouchMode());
+                return Module.mcTouchMode !== 1;
             }
             function locked() {
                 return document.pointerLockElement === canvas;
@@ -131,7 +130,8 @@
                 wanted = true;
                 clickAttemptAt = Date.now();
                 tryLock();
-                if (Module._mcResumeFromPause) Module._mcResumeFromPause();
+                var unwound = typeof Asyncify !== 'undefined' && Asyncify.currData;
+                if (!unwound && Module._mcResumeFromPause) Module._mcResumeFromPause();
             }, true);
 
             document.addEventListener('pointerlockchange', function () {
@@ -176,7 +176,7 @@
         (function () {
             var canvas = document.getElementById('canvas');
             function mobileNow() {
-                if (Module.calledRun && Module._mcIsTouchMode && Module._mcIsTouchMode()) return true;
+                if (Module.mcTouchMode === 1) return true;
                 var touchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
                 var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
                 return touchDevice && coarse;
