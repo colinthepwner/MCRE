@@ -280,6 +280,20 @@
             };
         })();
 
+        (function () {
+            function track(e) {
+                var ids = [];
+                for (var i = 0; i < e.touches.length; i++) ids.push(e.touches[i].identifier);
+                Module.mcTouchIds = ids;
+            }
+            ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (t) {
+                window.addEventListener(t, track, { capture: true, passive: true });
+            });
+            function none() { Module.mcTouchIds = []; }
+            window.addEventListener('blur', none);
+            document.addEventListener('visibilitychange', function () { if (document.hidden) none(); });
+        })();
+
         window.addEventListener('keydown', function (e) {
             if ((e.key === 'F5' || e.keyCode === 116) && Module.mcInWorld === 1 && !e.ctrlKey) e.preventDefault();
         }, true);
