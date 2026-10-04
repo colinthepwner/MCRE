@@ -34,8 +34,8 @@ Worlds removed in-game go to `saves\.trash` rather than being deleted.
 | Fly (Creative) | Double-tap Space; hold Space to rise, Shift to descend |
 | Sneak | Shift |
 | Hotbar | 1-9 or mouse wheel |
-| Inventory | E |
-| Crafting | Q |
+| Inventory and crafting | E |
+| Drop item | Q (Ctrl+Q for the whole stack) |
 | Pause and free the cursor | Esc (the pause menu has Options, including FOV) |
 
 The cursor is only captured while playing; menus always use a normal cursor. Mouse sensitivity is in
@@ -64,8 +64,15 @@ an item to carry it. Tap a recipe to craft it, hold it to craft all.
 | Move a single item | Mouse wheel over a slot |
 | Swap with a hotbar slot | 1-9 over a slot |
 | Drop | Q (Shift+Q for the whole stack), or click outside the window |
-| Craft | Click a recipe once per batch, then take it from the result slot; ingredients are only used when you take it (shift-click crafts all) |
+| Craft | Put items in the crafting grid (3x3 at a crafting table) and take the result; shift-click the result to craft as many as you can |
 | Scroll lists | Mouse wheel |
+
+
+### New worlds
+
+When creating a world you can pick its size (up to Extreme, or Infinite, on a computer), an
+Indev-style world type (Island, Inland, Floating or Flat) and theme (Hell, Paradise or Woods), and
+1.5-style biomes or the classic Pocket Edition terrain.
 
 
 ## Build

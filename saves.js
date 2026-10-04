@@ -184,8 +184,14 @@
     }
 
     function hashRange(data, start, end) {
-        var h = 0x811c9dc5;
-        for (var i = start; i < end; i++) h = Math.imul(h ^ data[i], 0x01000193);
+        var h = 0x811c9dc5, i = start;
+        if (((data.byteOffset + start) & 3) === 0) {
+            var words = (end - start) >> 2;
+            var w = new Int32Array(data.buffer, data.byteOffset + start, words);
+            for (var k = 0; k < words; k++) h = Math.imul(h ^ w[k], 0x01000193);
+            i = start + words * 4;
+        }
+        for (; i < end; i++) h = Math.imul(h ^ data[i], 0x01000193);
         return h >>> 0;
     }
 
@@ -242,37 +248,45 @@
         });
         var gone = keys(stored).filter(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
         if (!todo.length && !gone.length) return Promise.resolve(true);
-        return openBlockDb().then(function (db) {
+        function yieldTask() { return new Promise(function (r) { setTimeout(r, 0); }); }
+        function persistOne(db, p) {
             return new Promise(function (resolve, reject) {
+                var full = MOUNT + '/' + p;
+                var st, data;
+                try { st = fs.stat(full); data = fs.readFile(full); } catch (e) { resolve(); return; }
                 var tx = db.transaction(['meta', 'blocks'], 'readwrite');
                 var metas = tx.objectStore('meta'), blocks = tx.objectStore('blocks');
-                var next = {};
-                todo.forEach(function (p) {
-                    var full = MOUNT + '/' + p;
-                    var st = fs.stat(full);
-                    var data = fs.readFile(full);
-                    var prev = stored[p];
-                    var hashes = hashesOf(data);
-                    for (var i = 0; i < hashes.length; i++) {
-                        if (prev && prev.hashes[i] === hashes[i]) continue;
-                        blocks.put(data.slice(i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES)), p + '#' + i);
-                    }
-                    if (prev) for (var j = hashes.length; j < prev.hashes.length; j++) blocks.delete(p + '#' + j);
-                    var m = toMs(st.mtime);
-                    metas.put({ s: data.length, m: m, n: hashes.length, b: BLOCK_BYTES }, p);
-                    next[p] = { m: m, s: data.length, hashes: hashes };
-                });
-                gone.forEach(function (p) {
-                    metas.delete(p);
-                    for (var i = 0; i < stored[p].hashes.length; i++) blocks.delete(p + '#' + i);
-                });
-                tx.oncomplete = function () {
-                    keys(next).forEach(function (p) { stored[p] = next[p]; });
-                    gone.forEach(function (p) { delete stored[p]; });
-                    resolve(true);
-                };
+                var prev = stored[p];
+                var hashes = hashesOf(data);
+                for (var i = 0; i < hashes.length; i++) {
+                    if (prev && prev.hashes[i] === hashes[i]) continue;
+                    blocks.put(data.slice(i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES)), p + '#' + i);
+                }
+                if (prev) for (var j = hashes.length; j < prev.hashes.length; j++) blocks.delete(p + '#' + j);
+                var m = toMs(st.mtime);
+                metas.put({ s: data.length, m: m, n: hashes.length, b: BLOCK_BYTES }, p);
+                tx.oncomplete = function () { stored[p] = { m: m, s: data.length, hashes: hashes }; resolve(); };
                 tx.onerror = tx.onabort = function () { reject(tx.error); };
             });
+        }
+        return openBlockDb().then(function (db) {
+            var chain = Promise.resolve();
+            todo.forEach(function (p) {
+                chain = chain.then(yieldTask).then(function () { return persistOne(db, p); });
+            });
+            return chain.then(function () {
+                if (!gone.length) return;
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction(['meta', 'blocks'], 'readwrite');
+                    var metas = tx.objectStore('meta'), blocks = tx.objectStore('blocks');
+                    gone.forEach(function (p) {
+                        metas.delete(p);
+                        for (var i = 0; i < stored[p].hashes.length; i++) blocks.delete(p + '#' + i);
+                    });
+                    tx.oncomplete = function () { gone.forEach(function (p) { delete stored[p]; }); resolve(); };
+                    tx.onerror = tx.onabort = function () { reject(tx.error); };
+                });
+            }).then(function () { return true; });
         }).then(null, function (err) {
             console.warn('[saves] saving big files to browser storage failed:', err);
             closeBlockDb();
