@@ -303,32 +303,39 @@
         }, true);
 
         (function () {
-            var INDEX = 'https://launchermeta.mojang.com/v1/packages/3d8e55480977e32acd9844e545177e69a52f594b/pre-1.6.json';
-            var RES = 'https://resources.download.minecraft.net/';
+            var INDEX = 'sounds/index.json';
             var probe = document.createElement('audio');
             var vorbis = probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"');
             if (!vorbis) return;
 
             var groups = {}, tracks = [], pools = {}, playing = new Set();
-            function url(o) { return RES + o.hash.slice(0, 2) + '/' + o.hash; }
+            function url(k) { return 'sounds/' + k.split('/').map(encodeURIComponent).join('/'); }
+            function add(name, k) { (groups[name] = groups[name] || []).push(url(k)); }
+            var VILLAGER_152 = { idle: 'default', hit: 'defaulthurt', death: 'defaultdeath' };
 
             fetch(INDEX).then(function (r) { return r.json(); }).then(function (idx) {
-                var objs = idx.objects || {};
-                Object.keys(objs).forEach(function (k) {
+                var files = idx.files || [], beta = {};
+                files.forEach(function (k) {
                     var m = /^newsound\/(.+?)\d*\.ogg$/.exec(k);
-                    var st = /^sound3\/mob\/(\w+)\/step\d*\.ogg$/.exec(k);
-                    var nm = !st && /^sound3\/mob\/(bat|blaze|cat|endermen|irongolem|magmacube|silverfish|villager|slime)\/([a-z]+?)\d*\.ogg$/.exec(k);
                     if (m) {
                         var name = m[1].split('/').join('.');
-                        (groups[name] = groups[name] || []).push(url(objs[k]));
-                    } else if (st) {
-                        var sname = 'mob.' + st[1] + '.step';
-                        (groups[sname] = groups[sname] || []).push(url(objs[k]));
-                    } else if (nm) {
-                        var mname = 'mob.' + nm[1] + '.' + nm[2];
-                        (groups[mname] = groups[mname] || []).push(url(objs[k]));
+                        add(name, k);
+                        beta[name] = 1;
                     } else if (/^(music|newmusic)\/[^\/]+\.ogg$/.test(k)) {
-                        tracks.push(url(objs[k]));
+                        tracks.push(url(k));
+                    }
+                });
+                files.forEach(function (k) {
+                    var m = /^sound3\/(.+?)\d*\.ogg$/.exec(k);
+                    if (m) {
+                        var name = m[1].split('/').join('.');
+                        if (!beta[name]) add(name, k);
+                        return;
+                    }
+                    var v = /^sound\/mob\/villager\/([a-z]+?)\d*\.ogg$/.exec(k);
+                    if (v) {
+                        add('mob.villager.' + v[1], k);
+                        if (VILLAGER_152[v[1]]) add('mob.villager.' + VILLAGER_152[v[1]], k);
                     }
                 });
                 Module.mcPlaySound = play;

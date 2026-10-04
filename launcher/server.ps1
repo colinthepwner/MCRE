@@ -85,6 +85,7 @@ $Mime = @{
     '.jpg'  = 'image/jpeg'
     '.svg'  = 'image/svg+xml'
     '.ico'  = 'image/x-icon'
+    '.ogg'  = 'audio/ogg'
     '.txt'  = 'text/plain; charset=utf-8'
     '.md'   = 'text/plain; charset=utf-8'
 }
