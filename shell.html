@@ -241,14 +241,19 @@
                 var objs = idx.objects || {};
                 Object.keys(objs).forEach(function (k) {
                     var m = /^newsound\/(.+?)\d*\.ogg$/.exec(k);
+                    var st = /^sound3\/mob\/(\w+)\/step\d*\.ogg$/.exec(k);
                     if (m) {
                         var name = m[1].split('/').join('.');
                         (groups[name] = groups[name] || []).push(url(objs[k]));
+                    } else if (st) {
+                        var sname = 'mob.' + st[1] + '.step';
+                        (groups[sname] = groups[sname] || []).push(url(objs[k]));
                     } else if (/^(music|newmusic)\/[^\/]+\.ogg$/.test(k)) {
                         tracks.push(url(objs[k]));
                     }
                 });
                 Module.mcPlaySound = play;
+                Module.mcHasSound = function (name) { return !!(groups[name] && groups[name].length); };
             }).catch(function (e) { console.warn('[sound] classic sounds unavailable:', e); });
 
             function setPitch(a, pitch) {
