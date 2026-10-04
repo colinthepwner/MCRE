@@ -5,6 +5,7 @@
     var SCAN_MS = 3000;
     var API = 'api/';
     var LARGE_FILE_BYTES = 1024 * 1024;
+    function isBig(path, size) { return size >= LARGE_FILE_BYTES || path.indexOf('region/') >= 0; }
     var SMALL_CHANGE_DEBOUNCE_MS = 4000;
     var LARGE_FILE_INTERVAL_MS = 60000;
     var BLOCK_BYTES = 64 * 1024;
@@ -148,7 +149,7 @@
                     Object.keys(set.entries).forEach(function (path) {
                         try {
                             var st = fs.stat(path);
-                            if (fs.isFile(st.mode) && st.size >= LARGE_FILE_BYTES) delete set.entries[path];
+                            if (fs.isFile(st.mode) && isBig(path, st.size)) delete set.entries[path];
                         } catch (e) {   }
                     });
                 }
@@ -244,49 +245,49 @@
     function persistBig(local) {
         var todo = keys(local).filter(function (p) {
             var l = local[p], st = stored[p];
-            return l.s >= LARGE_FILE_BYTES && !(st && st.m === l.m && st.s === l.s);
+            return isBig(p, l.s) && !(st && st.m === l.m && st.s === l.s);
         });
-        var gone = keys(stored).filter(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
+        var gone = keys(stored).filter(function (p) { return !local[p] || !isBig(p, local[p].s); });
         if (!todo.length && !gone.length) return Promise.resolve(true);
         function yieldTask() { return new Promise(function (r) { setTimeout(r, 0); }); }
-        function persistOne(db, p) {
+        var work = [];
+        function prepare(p) {
+            var full = MOUNT + '/' + p;
+            var st, data;
+            try { st = fs.stat(full); data = fs.readFile(full); } catch (e) { return; }
+            var prev = stored[p];
+            var hashes = hashesOf(data);
+            var puts = [];
+            for (var i = 0; i < hashes.length; i++) {
+                if (prev && prev.hashes[i] === hashes[i]) continue;
+                puts.push([p + '#' + i, data.slice(i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES))]);
+            }
+            var dels = [];
+            if (prev) for (var j = hashes.length; j < prev.hashes.length; j++) dels.push(p + '#' + j);
+            work.push({ p: p, puts: puts, dels: dels, meta: { s: data.length, m: toMs(st.mtime), n: hashes.length, b: BLOCK_BYTES }, hashes: hashes });
+        }
+        var chain = Promise.resolve();
+        todo.forEach(function (p) { chain = chain.then(yieldTask).then(function () { prepare(p); }); });
+        return chain.then(openBlockDb).then(function (db) {
             return new Promise(function (resolve, reject) {
-                var full = MOUNT + '/' + p;
-                var st, data;
-                try { st = fs.stat(full); data = fs.readFile(full); } catch (e) { resolve(); return; }
                 var tx = db.transaction(['meta', 'blocks'], 'readwrite');
                 var metas = tx.objectStore('meta'), blocks = tx.objectStore('blocks');
-                var prev = stored[p];
-                var hashes = hashesOf(data);
-                for (var i = 0; i < hashes.length; i++) {
-                    if (prev && prev.hashes[i] === hashes[i]) continue;
-                    blocks.put(data.slice(i * BLOCK_BYTES, Math.min(data.length, (i + 1) * BLOCK_BYTES)), p + '#' + i);
-                }
-                if (prev) for (var j = hashes.length; j < prev.hashes.length; j++) blocks.delete(p + '#' + j);
-                var m = toMs(st.mtime);
-                metas.put({ s: data.length, m: m, n: hashes.length, b: BLOCK_BYTES }, p);
-                tx.oncomplete = function () { stored[p] = { m: m, s: data.length, hashes: hashes }; resolve(); };
+                work.forEach(function (w) {
+                    w.puts.forEach(function (kv) { blocks.put(kv[1], kv[0]); });
+                    w.dels.forEach(function (k) { blocks.delete(k); });
+                    metas.put(w.meta, w.p);
+                });
+                gone.forEach(function (p) {
+                    metas.delete(p);
+                    for (var i = 0; i < stored[p].hashes.length; i++) blocks.delete(p + '#' + i);
+                });
+                tx.oncomplete = function () {
+                    work.forEach(function (w) { stored[w.p] = { m: w.meta.m, s: w.meta.s, hashes: w.hashes }; });
+                    gone.forEach(function (p) { delete stored[p]; });
+                    resolve(true);
+                };
                 tx.onerror = tx.onabort = function () { reject(tx.error); };
             });
-        }
-        return openBlockDb().then(function (db) {
-            var chain = Promise.resolve();
-            todo.forEach(function (p) {
-                chain = chain.then(yieldTask).then(function () { return persistOne(db, p); });
-            });
-            return chain.then(function () {
-                if (!gone.length) return;
-                return new Promise(function (resolve, reject) {
-                    var tx = db.transaction(['meta', 'blocks'], 'readwrite');
-                    var metas = tx.objectStore('meta'), blocks = tx.objectStore('blocks');
-                    gone.forEach(function (p) {
-                        metas.delete(p);
-                        for (var i = 0; i < stored[p].hashes.length; i++) blocks.delete(p + '#' + i);
-                    });
-                    tx.oncomplete = function () { gone.forEach(function (p) { delete stored[p]; }); resolve(); };
-                    tx.onerror = tx.onabort = function () { reject(tx.error); };
-                });
-            }).then(function () { return true; });
         }).then(null, function (err) {
             console.warn('[saves] saving big files to browser storage failed:', err);
             closeBlockDb();
@@ -410,7 +411,7 @@
             }
             return diskDelete(w[1]).then(function () { delete disk.synced[w[1]]; });
         }
-        function isLarge(w) { return w[0] === 'put' && local[w[1]].s >= LARGE_FILE_BYTES; }
+        function isLarge(w) { return w[0] === 'put' && isBig(w[1], local[w[1]].s); }
 
         var first = Promise.all(work.filter(function (w) { return !isLarge(w); }).map(run));
         var chain = first;
@@ -434,7 +435,7 @@
         var idbChanges = changedPaths(idbSnap || {}, local);
         var useDisk = disk.enabled && !disk.down;
         var diskChanges = useDisk ? changedPaths(disk.synced, local) : [];
-        var diskSmall = diskChanges.some(function (p) { return !local[p] || local[p].s < LARGE_FILE_BYTES; });
+        var diskSmall = diskChanges.some(function (p) { return !local[p] || !isBig(p, local[p].s); });
 
         var idbDue = idbChanges.length > 0 && (force || now - lastIdb >= SMALL_CHANGE_DEBOUNCE_MS);
         var diskDue = diskChanges.length > 0 && (force || now - lastDisk >= LARGE_FILE_INTERVAL_MS ||

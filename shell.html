@@ -228,6 +228,63 @@
         })();
 
         (function () {
+            var open = null;
+            Module.mcAskText = function (title, hint, current, maxLen, pendingKey) {
+                if (open) return;
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                var overlay = open = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:9999;font-family:monospace;padding:16px';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:24px;width:100%;' +
+                    'max-width:360px;box-sizing:border-box;color:#eee;text-align:center';
+                var h = document.createElement('h2');
+                h.style.cssText = 'margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px';
+                h.textContent = title;
+                var pEl = document.createElement('p');
+                pEl.style.cssText = 'margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4';
+                pEl.textContent = hint;
+                var input = document.createElement('input');
+                input.type = 'text'; input.maxLength = maxLen || 32;
+                input.autocomplete = 'off'; input.spellcheck = false;
+                input.style.cssText = 'width:100%;box-sizing:border-box;padding:8px;background:#222;color:#fff;' +
+                    'border:1px solid #666;font-size:16px;font-family:monospace;margin-bottom:16px';
+                input.value = current || '';
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:10px;justify-content:center';
+                function btn(label, bg) {
+                    var b = document.createElement('button');
+                    b.textContent = label;
+                    b.style.cssText = 'padding:10px 24px;background:' + bg + ';color:#fff;border:none;' +
+                        'cursor:pointer;font-size:15px;font-family:monospace';
+                    row.appendChild(b);
+                    return b;
+                }
+                var ok = btn('OK', '#4a8a4a'), no = btn('Cancel', '#555');
+                box.appendChild(h); box.appendChild(pEl); box.appendChild(input); box.appendChild(row);
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel',
+                 'touchstart', 'touchend'].forEach(function (t) {
+                    overlay.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); open = null; }
+                function save() { Module[pendingKey] = input.value.trim(); close(); }
+                ok.addEventListener('click', save);
+                no.addEventListener('click', close);
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') save();
+                    if (e.key === 'Escape') close();
+                });
+                setTimeout(function () { input.focus(); input.select(); }, 50);
+            };
+        })();
+
+        window.addEventListener('keydown', function (e) {
+            if ((e.key === 'F5' || e.keyCode === 116) && Module.mcInWorld === 1 && !e.ctrlKey) e.preventDefault();
+        }, true);
+
+        (function () {
             var INDEX = 'https://launchermeta.mojang.com/v1/packages/3d8e55480977e32acd9844e545177e69a52f594b/pre-1.6.json';
             var RES = 'https://resources.download.minecraft.net/';
             var probe = document.createElement('audio');
