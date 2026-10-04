@@ -45,7 +45,8 @@ the in-game Options.
 
 Play in landscape. Drag anywhere on the lower left of the screen to walk; tap there to jump (hold a
 second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
-tap to place or use, and hold to break.
+tap to place or use, and hold to break. Options > Controls switches between this joystick, a D-pad
+with a jump button, or an invisible joystick.
 
 In the inventory: tap an item to select it, then tap where it should go. Hold to select half (or,
 with something selected, to put one down), double-tap to move an item to the other section, and drag
@@ -71,8 +72,13 @@ an item to carry it. Tap a recipe to craft it, hold it to craft all.
 ### New worlds
 
 When creating a world you can pick its size (up to Extreme, or Infinite, on a computer), an
-Indev-style world type (Island, Inland, Floating or Flat) and theme (Hell, Paradise or Woods), and
-1.5-style biomes or the classic Pocket Edition terrain.
+Indev-style world type (Island, Inland, Floating or Flat) and theme (Hell, Paradise or Woods),
+1.5-style biomes or the classic Pocket Edition terrain, and a seed.
+
+### From Java 1.5
+
+The Nether, villages, the 1.5 mobs, weather, hunger, maps, enchanting, anvils, experience, potions
+and brewing, and the 1.5 redstone blocks, alongside a tabbed creative inventory.
 
 
 ## Build
