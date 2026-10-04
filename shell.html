@@ -291,7 +291,7 @@
             var vorbis = probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"');
             if (!vorbis) return;
 
-            var groups = {}, tracks = [], pools = {}, live = 0;
+            var groups = {}, tracks = [], pools = {}, playing = new Set();
             function url(o) { return RES + o.hash.slice(0, 2) + '/' + o.hash; }
 
             fetch(INDEX).then(function (r) { return r.json(); }).then(function (idx) {
@@ -320,22 +320,31 @@
             function play(name, volume, pitch) {
                 var list = groups[name];
                 if (!list || !list.length) return false;
-                if (live > 24) return true;
+                if (playing.size > 24) return true;
                 var u = list[(Math.random() * list.length) | 0];
                 var pool = pools[u] || (pools[u] = []);
                 var a = null;
                 for (var i = 0; i < pool.length; i++) if (pool[i].paused || pool[i].ended) { a = pool[i]; break; }
                 if (!a) {
                     if (pool.length >= 4) a = pool[0];
-                    else { a = new Audio(u); a.preload = 'auto'; pool.push(a); a.addEventListener('ended', function () { live--; }); }
+                    else {
+                        a = new Audio(u); a.preload = 'auto'; pool.push(a);
+                        (function (el) {
+                            function done() { playing.delete(el); }
+                            el.addEventListener('ended', done);
+                            el.addEventListener('pause', done);
+                            el.addEventListener('error', done);
+                            el.addEventListener('playing', function () { playing.add(el); });
+                        })(a);
+                    }
                 }
                 try {
                     a.currentTime = 0;
                     a.volume = Math.max(0, Math.min(1, volume));
                     setPitch(a, pitch);
                     var p = a.play();
-                    live++;
-                    if (p && p.catch) p.catch(function () { live--; });
+                    playing.add(a);
+                    if (p && p.catch) p.catch(function () { playing.delete(a); });
                 } catch (e) {   }
                 return true;
             }
