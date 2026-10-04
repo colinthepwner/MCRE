@@ -206,16 +206,17 @@
             }
             window.addEventListener('touchend', goLandscape, true);
 
-            var lastW = 0, lastH = 0;
+            var lastW = 0, lastH = 0, lastAsk = 0;
             function sync() {
                 updateOverlay();
                 var b = canvas.getBoundingClientRect();
                 var dpr = window.devicePixelRatio || 1;
                 var w = Math.round(b.width * dpr), h = Math.round(b.height * dpr);
                 if (w < 1 || h < 1) return;
-                if (w === canvas.width && h === canvas.height) { lastW = w; lastH = h; return; }
-                if (w === lastW && h === lastH) return;
-                lastW = w; lastH = h;
+                if (w === canvas.width && h === canvas.height) return;
+                var now = Date.now();
+                if (w === lastW && h === lastH && now - lastAsk < 700) return;
+                lastW = w; lastH = h; lastAsk = now;
                 window.dispatchEvent(new Event('resize'));
             }
             function settle() { sync(); setTimeout(sync, 150); setTimeout(sync, 500); setTimeout(sync, 1200); }
@@ -223,6 +224,9 @@
             window.addEventListener('resize', function () { setTimeout(sync, 50); });
             if (window.visualViewport) window.visualViewport.addEventListener('resize', settle);
             document.addEventListener('fullscreenchange', settle);
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) settle(); });
+            window.addEventListener('focus', settle);
+            window.addEventListener('pageshow', settle);
             setInterval(sync, 1000);
             updateOverlay();
         })();
