@@ -7,7 +7,7 @@ mergeInto(LibraryManager.library, {
         var overlay = document.createElement('div');
         overlay.id = 'mc-create-world';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-            'background:rgba(0,0,0,0.8);display:flex;align-items:center;' +
+            'background:rgba(0,0,0,0.5);display:flex;align-items:center;' +
             'justify-content:center;z-index:9999;font-family:monospace';
 
         var box = document.createElement('div');

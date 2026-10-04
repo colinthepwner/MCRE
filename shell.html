@@ -131,7 +131,6 @@
                 var x = (e.clientX - b.left) * gw / b.width;
                 var y = (e.clientY - b.top) * gh / b.height;
                 if (x < r[0] || y < r[1] || x >= r[0] + r[2] || y >= r[1] + r[3]) return;
-                e.stopImmediatePropagation();
                 wanted = true;
                 clickAttemptAt = Date.now();
                 tryLock();
@@ -226,6 +225,322 @@
             document.addEventListener('fullscreenchange', settle);
             setInterval(sync, 1000);
             updateOverlay();
+        })();
+
+        (function () {
+            var INDEX = 'https://launchermeta.mojang.com/v1/packages/3d8e55480977e32acd9844e545177e69a52f594b/pre-1.6.json';
+            var RES = 'https://resources.download.minecraft.net/';
+            var probe = document.createElement('audio');
+            var vorbis = probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"');
+            if (!vorbis) return;
+
+            var groups = {}, tracks = [], pools = {}, live = 0;
+            function url(o) { return RES + o.hash.slice(0, 2) + '/' + o.hash; }
+
+            fetch(INDEX).then(function (r) { return r.json(); }).then(function (idx) {
+                var objs = idx.objects || {};
+                Object.keys(objs).forEach(function (k) {
+                    var m = /^newsound\/(.+?)\d*\.ogg$/.exec(k);
+                    if (m) {
+                        var name = m[1].split('/').join('.');
+                        (groups[name] = groups[name] || []).push(url(objs[k]));
+                    } else if (/^(music|newmusic)\/[^\/]+\.ogg$/.test(k)) {
+                        tracks.push(url(objs[k]));
+                    }
+                });
+                Module.mcPlaySound = play;
+            }).catch(function (e) { console.warn('[sound] classic sounds unavailable:', e); });
+
+            function setPitch(a, pitch) {
+                a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = false;
+                a.playbackRate = Math.max(0.25, Math.min(4, pitch || 1));
+            }
+            function play(name, volume, pitch) {
+                var list = groups[name];
+                if (!list || !list.length) return false;
+                if (live > 24) return true;
+                var u = list[(Math.random() * list.length) | 0];
+                var pool = pools[u] || (pools[u] = []);
+                var a = null;
+                for (var i = 0; i < pool.length; i++) if (pool[i].paused || pool[i].ended) { a = pool[i]; break; }
+                if (!a) {
+                    if (pool.length >= 4) a = pool[0];
+                    else { a = new Audio(u); a.preload = 'auto'; pool.push(a); a.addEventListener('ended', function () { live--; }); }
+                }
+                try {
+                    a.currentTime = 0;
+                    a.volume = Math.max(0, Math.min(1, volume));
+                    setPitch(a, pitch);
+                    var p = a.play();
+                    live++;
+                    if (p && p.catch) p.catch(function () { live--; });
+                } catch (e) {   }
+                return true;
+            }
+
+            var music = null, nextAt = Date.now() + (30 + Math.random() * 60) * 1000;
+            setInterval(function () {
+                var vol = typeof Module.mcMusicVolume === 'number' ? Module.mcMusicVolume : 1;
+                var want = Module.mcInWorld === 1 && vol > 0 && !document.hidden && tracks.length;
+                if (music) {
+                    if (!want) { music.pause(); }
+                    else { music.volume = vol; if (music.paused && !music.ended) music.play().catch(function () {}); }
+                    if (music.ended) { music = null; nextAt = Date.now() + (10 + Math.random() * 10) * 60 * 1000; }
+                    return;
+                }
+                if (want && Date.now() >= nextAt) {
+                    music = new Audio(tracks[(Math.random() * tracks.length) | 0]);
+                    music.volume = vol;
+                    music.play().catch(function () { music = null; nextAt = Date.now() + 30000; });
+                }
+            }, 1000);
+        })();
+
+        (function () {
+            var CACHE_KEY = 'mcre-skin-v1';
+            var overlay = null, askedThisLoad = false, loadedFor = null, serial = 0;
+
+            function valid(n) { return /^[A-Za-z0-9_]{3,16}$/.test(n); }
+
+            function fetchJson(url) {
+                return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); });
+            }
+            function httpsUrl(u) { return u ? String(u).replace(/^http:/, 'https:') : null; }
+
+            function lookup(name) {
+                var enc = encodeURIComponent(name);
+                return fetchJson('https://playerdb.co/api/player/minecraft/' + enc).then(function (r) {
+                    if (!r || r.code !== 'player.found') {
+                        if (r && r.code) return { skin: null, cape: null, slim: false };
+                        throw new Error('playerdb: bad reply');
+                    }
+                    var props = (r.data && r.data.player && r.data.player.properties) || [];
+                    for (var i = 0; i < props.length; i++) {
+                        if (props[i].name !== 'textures') continue;
+                        var t = JSON.parse(atob(props[i].value)).textures || {};
+                        return {
+                            skin: httpsUrl(t.SKIN && t.SKIN.url),
+                            slim: !!(t.SKIN && t.SKIN.metadata && t.SKIN.metadata.model === 'slim'),
+                            cape: httpsUrl(t.CAPE && t.CAPE.url)
+                        };
+                    }
+                    return { skin: null, cape: null, slim: false };
+                }).catch(function () {
+                    return fetchJson('https://api.ashcon.app/mojang/v2/user/' + enc).then(function (a) {
+                        if (!a || !a.textures) throw new Error('ashcon: bad reply');
+                        return {
+                            skin: httpsUrl(a.textures.skin && a.textures.skin.url),
+                            slim: !!a.textures.slim,
+                            cape: httpsUrl(a.textures.cape && a.textures.cape.url)
+                        };
+                    });
+                }).catch(function () {
+                    return { skin: 'https://mc-heads.net/skin/' + enc, cape: null, slim: false };
+                });
+            }
+
+            function loadImage(url) {
+                return new Promise(function (res, rej) {
+                    var img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function () { res(img); };
+                    img.onerror = function () { rej(new Error('image failed: ' + url)); };
+                    img.src = url;
+                });
+            }
+            function canvasBytes(c) {
+                return new Promise(function (res, rej) {
+                    c.toBlob(function (b) {
+                        if (!b) { rej(new Error('toBlob failed')); return; }
+                        b.arrayBuffer().then(function (ab) { res(new Uint8Array(ab)); }, rej);
+                    }, 'image/png');
+                });
+            }
+
+            function convertSkin(img, slim) {
+                var c = document.createElement('canvas');
+                c.width = 64; c.height = 32;
+                var g = c.getContext('2d');
+                g.imageSmoothingEnabled = false;
+                var sc = img.width / 64;
+                var legacy = img.height * 2 === img.width;
+                g.drawImage(img, 0, 0, 64 * sc, 32 * sc, 0, 0, 64, 32);
+                if (slim && !legacy) {
+                    var R = [[44, 16, 3, 4, 44, 16, 4, 4], [47, 16, 3, 4, 48, 16, 4, 4],
+                             [40, 20, 4, 12, 40, 20, 4, 12], [44, 20, 3, 12, 44, 20, 4, 12],
+                             [47, 20, 4, 12, 48, 20, 4, 12], [51, 20, 3, 12, 52, 20, 4, 12]];
+                    g.clearRect(40, 16, 16, 16);
+                    R.forEach(function (r) {
+                        g.drawImage(img, r[0] * sc, r[1] * sc, r[2] * sc, r[3] * sc, r[4], r[5], r[6], r[7]);
+                    });
+                }
+                var d = g.getImageData(0, 0, 64, 32), px = d.data;
+                function each(x0, y0, x1, y1, fn) {
+                    for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) fn((y * 64 + x) * 4);
+                }
+                each(0, 0, 32, 16, function (i) { px[i + 3] = 255; });
+                each(0, 16, 64, 32, function (i) { px[i + 3] = 255; });
+                var hatSeeThrough = false;
+                each(32, 0, 64, 16, function (i) { if (px[i + 3] < 128) hatSeeThrough = true; });
+                if (!hatSeeThrough) each(32, 0, 64, 16, function (i) { px[i + 3] = 0; });
+                g.putImageData(d, 0, 0);
+                return canvasBytes(c);
+            }
+
+            function convertCape(img) {
+                var c = document.createElement('canvas');
+                c.width = 64; c.height = 32;
+                var g = c.getContext('2d');
+                g.imageSmoothingEnabled = false;
+                if (img.width >= 64 && img.width % 64 === 0) {
+                    var sc = img.width / 64;
+                    g.drawImage(img, 0, 0, 64 * sc, 32 * sc, 0, 0, 64, 32);
+                } else {
+                    g.drawImage(img, 0, 0);
+                }
+                return canvasBytes(c);
+            }
+
+            function toB64(bytes) {
+                if (!bytes) return null;
+                var s = '';
+                for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+                return btoa(s);
+            }
+            function fromB64(b) {
+                if (!b) return null;
+                var s = atob(b), out = new Uint8Array(s.length);
+                for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+                return out;
+            }
+            function cacheGet(name) {
+                try {
+                    var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+                    if (c && c.name === name.toLowerCase()) return c;
+                } catch (e) {   }
+                return null;
+            }
+            function cachePut(name, skin, cape) {
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({ name: name.toLowerCase(), skin: toB64(skin), cape: toB64(cape) }));
+                } catch (e) {   }
+            }
+
+            function install(skin, cape) {
+                if (typeof FS === 'undefined') return false;
+                serial++;
+                try { FS.mkdirTree('/data/images/mob'); } catch (e) {   }
+                try {
+                    if (skin) {
+                        var sp = 'mob/web_skin_' + serial + '.png';
+                        FS.writeFile('/data/images/' + sp, skin);
+                        Module.mcSkinPending = sp;
+                    } else {
+                        Module.mcSkinPending = '';
+                    }
+                    if (cape) {
+                        var cp = 'mob/web_cape_' + serial + '.png';
+                        FS.writeFile('/data/images/' + cp, cape);
+                        Module.mcCapePending = cp;
+                    } else {
+                        Module.mcCapePending = '';
+                    }
+                } catch (e) {
+                    console.warn('[skin] could not install:', e);
+                    return false;
+                }
+                return true;
+            }
+
+            function loadProfile(name) {
+                var key = name.toLowerCase();
+                loadedFor = key;
+                var cached = cacheGet(name);
+                if (cached) install(fromB64(cached.skin), fromB64(cached.cape));
+                lookup(name).then(function (t) {
+                    return Promise.all([
+                        t.skin ? loadImage(t.skin).then(function (img) { return convertSkin(img, t.slim); }) : null,
+                        t.cape ? loadImage(t.cape).then(convertCape).catch(function () { return null; }) : null
+                    ]);
+                }).then(function (r) {
+                    if (loadedFor !== key) return;
+                    install(r[0], r[1]);
+                    cachePut(name, r[0], r[1]);
+                }).catch(function (e) {
+                    console.warn('[skin] lookup failed for ' + name + (cached ? ' (using the saved one)' : '') + ':', e);
+                });
+            }
+
+            function closePrompt() {
+                if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                overlay = null;
+            }
+            function ask(current, canCancel) {
+                if (overlay) return;
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:9999;font-family:monospace;padding:16px';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:24px;width:100%;' +
+                    'max-width:360px;box-sizing:border-box;color:#eee;text-align:center';
+                box.innerHTML =
+                    '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Choose a username</h2>' +
+                    '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Your Minecraft skin and cape ' +
+                    'are looked up from this name. You can change it later in Options &gt; Game.</p>' +
+                    '<input type="text" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+                    'style="width:100%;box-sizing:border-box;padding:8px;background:#222;color:#fff;' +
+                    'border:1px solid #666;font-size:16px;font-family:monospace">' +
+                    '<div data-err style="min-height:18px;margin:6px 0 10px;font-size:12px;color:#ff7070"></div>' +
+                    '<div style="display:flex;gap:10px;justify-content:center">' +
+                    '<button data-ok style="padding:10px 24px;background:#4a8a4a;color:#fff;border:none;' +
+                    'cursor:pointer;font-size:15px;font-family:monospace">Save</button>' +
+                    '<button data-no style="padding:10px 24px;background:#555;color:#fff;border:none;' +
+                    'cursor:pointer;font-size:15px;font-family:monospace">' + (canCancel ? 'Cancel' : 'Skip') + '</button>' +
+                    '</div>';
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel',
+                 'touchstart', 'touchend'].forEach(function (t) {
+                    overlay.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+
+                var input = box.querySelector('input'), err = box.querySelector('[data-err]');
+                input.value = current || '';
+                input.addEventListener('input', function () {
+                    var v = input.value.replace(/[^A-Za-z0-9_]/g, '');
+                    if (v !== input.value) input.value = v;
+                    err.textContent = '';
+                });
+                function save() {
+                    var n = input.value.trim();
+                    if (!valid(n)) { err.textContent = '3 to 16 letters, numbers or _'; return; }
+                    Module.mcUsernamePending = n;
+                    Module.mcUsername = n;
+                    Module.mcUsernameSet = 1;
+                    closePrompt();
+                    loadProfile(n);
+                }
+                box.querySelector('[data-ok]').onclick = save;
+                box.querySelector('[data-no]').onclick = closePrompt;
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') save();
+                    if (e.key === 'Escape') closePrompt();
+                });
+                setTimeout(function () { input.focus(); input.select(); }, 50);
+            }
+
+            Module.mcAskUsername = function () { ask(Module.mcUsernameSet === 1 ? Module.mcUsername : '', true); };
+
+            setInterval(function () {
+                if (Module.mcUsernameSet === 0 && !askedThisLoad && !overlay) {
+                    askedThisLoad = true;
+                    ask('', false);
+                }
+                if (Module.mcUsernameSet === 1 && Module.mcUsername && loadedFor !== Module.mcUsername.toLowerCase())
+                    loadProfile(Module.mcUsername);
+            }, 500);
         })();
     </script>
     <script type='text/javascript'>
