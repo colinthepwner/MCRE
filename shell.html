@@ -317,12 +317,16 @@
                 Object.keys(objs).forEach(function (k) {
                     var m = /^newsound\/(.+?)\d*\.ogg$/.exec(k);
                     var st = /^sound3\/mob\/(\w+)\/step\d*\.ogg$/.exec(k);
+                    var nm = !st && /^sound3\/mob\/(bat|blaze|cat|endermen|irongolem|magmacube|silverfish|villager|slime)\/([a-z]+?)\d*\.ogg$/.exec(k);
                     if (m) {
                         var name = m[1].split('/').join('.');
                         (groups[name] = groups[name] || []).push(url(objs[k]));
                     } else if (st) {
                         var sname = 'mob.' + st[1] + '.step';
                         (groups[sname] = groups[sname] || []).push(url(objs[k]));
+                    } else if (nm) {
+                        var mname = 'mob.' + nm[1] + '.' + nm[2];
+                        (groups[mname] = groups[mname] || []).push(url(objs[k]));
                     } else if (/^(music|newmusic)\/[^\/]+\.ogg$/.test(k)) {
                         tracks.push(url(objs[k]));
                     }
