@@ -60,6 +60,16 @@
             canvas: (function () { return document.getElementById('canvas'); })()
         };
 
+        Module.mcPixelRatio = function () {
+            var dpr = window.devicePixelRatio || 1;
+            var o = Module.mcRenderScaleOption | 0;
+            if (o === 0) {
+                var phone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+                return phone ? Math.min(dpr, 1.5) : dpr;
+            }
+            return dpr * ([1, 1, 0.75, 0.5, 0.35][o] || 1);
+        };
+
         (function () {
             var canvas = document.getElementById('canvas');
             var wanted = false;
@@ -210,7 +220,7 @@
             function sync() {
                 updateOverlay();
                 var b = canvas.getBoundingClientRect();
-                var dpr = window.devicePixelRatio || 1;
+                var dpr = Module.mcPixelRatio();
                 var w = Math.round(b.width * dpr), h = Math.round(b.height * dpr);
                 if (w < 1 || h < 1) return;
                 if (w === canvas.width && h === canvas.height) return;
@@ -230,6 +240,31 @@
             setInterval(sync, 1000);
             updateOverlay();
         })();
+
+        Module.mcInstallWorld = function (src, dst, flagKey) {
+            Module[flagKey] = 0;
+            fetch(src + 'files.json', { cache: 'no-cache' }).then(function (r) {
+                if (!r.ok) throw new Error('files.json ' + r.status);
+                return r.json();
+            }).then(function (files) {
+                return Promise.all(files.map(function (rel) {
+                    return fetch(src + rel).then(function (r) {
+                        if (!r.ok) throw new Error(rel + ' ' + r.status);
+                        return r.arrayBuffer();
+                    }).then(function (buf) { return { rel: rel, data: new Uint8Array(buf) }; });
+                }));
+            }).then(function (all) {
+                all.forEach(function (fobj) {
+                    var path = dst + '/' + fobj.rel;
+                    FS.mkdirTree(path.substring(0, path.lastIndexOf('/')));
+                    FS.writeFile(path, fobj.data);
+                });
+                Module[flagKey] = 1;
+            }).catch(function (e) {
+                console.warn('world install failed:', e);
+                Module[flagKey] = -1;
+            });
+        };
 
         (function () {
             var open = null;
@@ -349,22 +384,38 @@
             function play(name, volume, pitch) {
                 var list = groups[name];
                 if (!list || !list.length) return false;
-                if (playing.size > 24) return true;
+                if (playing.size > 24) {
+                    playing.forEach(function (el) { if (el.paused || el.ended || el.error) playing.delete(el); });
+                    if (playing.size > 24) return true;
+                }
                 var u = list[(Math.random() * list.length) | 0];
                 var pool = pools[u] || (pools[u] = []);
+                for (var j = pool.length - 1; j >= 0; j--) if (pool[j].error) { playing.delete(pool[j]); pool.splice(j, 1); }
                 var a = null;
-                for (var i = 0; i < pool.length; i++) if (pool[i].paused || pool[i].ended) { a = pool[i]; break; }
+                for (var i = 0; i < pool.length; i++) if (pool[i].paused || pool[i].ended) {
+                    a = pool[i];
+                    pool.splice(i, 1);
+                    pool.push(a);
+                    break;
+                }
                 if (!a) {
-                    if (pool.length >= 4) a = pool[0];
+                    if (pool.length >= 4) {
+                        a = pool.shift();
+                        pool.push(a);
+                    }
                     else {
                         a = new Audio(u); a.preload = 'auto'; pool.push(a);
-                        (function (el) {
+                        (function (el, key) {
                             function done() { playing.delete(el); }
                             el.addEventListener('ended', done);
                             el.addEventListener('pause', done);
-                            el.addEventListener('error', done);
+                            el.addEventListener('error', function () {
+                                playing.delete(el);
+                                var p = pools[key], k = p ? p.indexOf(el) : -1;
+                                if (k >= 0) p.splice(k, 1);
+                            });
                             el.addEventListener('playing', function () { playing.add(el); });
-                        })(a);
+                        })(a, u);
                     }
                 }
                 try {
