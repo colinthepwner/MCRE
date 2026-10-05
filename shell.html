@@ -789,8 +789,11 @@
                     return t > 0 && Date.now() - t < 3 * 24 * 3600 * 1000;
                 } catch (e) { return false; }
             }
+            var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent)
+                || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
             function canThread() {
                 if (/[?&]mt=0(&|$)/.test(query)) return false;
+                if (appleTouch && !/[?&]mt=1(&|$)/.test(query)) return false;
                 if (!window.crossOriginIsolated) return false;
                 if (typeof SharedArrayBuffer !== 'function' || typeof Atomics !== 'object') return false;
                 try {
@@ -837,6 +840,26 @@
             window.addEventListener('error', function (e) {
                 if (e && e.filename && e.filename.indexOf(threaded) !== -1) giveUp(e.message || 'error');
             });
+            var STALL_MS = 30000;
+            var lastProgress = Date.now();
+            function progress() { lastProgress = Date.now(); }
+            var prevStatus = Module.setStatus;
+            Module.setStatus = function (text) {
+                progress();
+                if (prevStatus) return prevStatus.apply(this, arguments);
+            };
+            var prevDeps = Module.monitorRunDependencies;
+            Module.monitorRunDependencies = function (left) {
+                progress();
+                if (prevDeps) return prevDeps.apply(this, arguments);
+            };
+            var watchdog = setInterval(function () {
+                if (started || settled) { clearInterval(watchdog); return; }
+                if (Date.now() - lastProgress > STALL_MS) {
+                    clearInterval(watchdog);
+                    giveUp('no progress for ' + (STALL_MS / 1000) + ' s');
+                }
+            }, 1000);
             add(threaded, function () {
                 if (started || settled) return;
                 settled = true;
