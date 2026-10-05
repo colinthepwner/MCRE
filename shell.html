@@ -772,7 +772,79 @@
         }
     </script>
     <script src="saves.js"></script>
-    {{{ SCRIPT }}}
+    <template id="mcre-game-script">{{{ SCRIPT }}}</template>
+    <script type='text/javascript'>
+        (function () {
+            var FAIL_KEY = 'mcre-mt-failed';
+            var tpl = document.getElementById('mcre-game-script');
+            var tag = tpl && tpl.content ? tpl.content.querySelector('script') : null;
+            var normal = (tag && tag.getAttribute('src')) || 'index.js';
+            var threaded = normal.replace(/\.js$/, '_mt.js');
+            var query = location.search;
+
+            function recentFailure() {
+                if (/[?&]mt=1(&|$)/.test(query)) return false;
+                try {
+                    var t = +localStorage.getItem(FAIL_KEY);
+                    return t > 0 && Date.now() - t < 3 * 24 * 3600 * 1000;
+                } catch (e) { return false; }
+            }
+            function canThread() {
+                if (/[?&]mt=0(&|$)/.test(query)) return false;
+                if (!window.crossOriginIsolated) return false;
+                if (typeof SharedArrayBuffer !== 'function' || typeof Atomics !== 'object') return false;
+                try {
+                    var mem = new WebAssembly.Memory({ initial: 1, maximum: 2, shared: true });
+                    if (typeof mem.toResizableBuffer !== 'function') return false;
+                    mem.toResizableBuffer();
+                } catch (e) { return false; }
+                return !recentFailure();
+            }
+            function add(src, onFail) {
+                var el = document.createElement('script');
+                el.src = src;
+                el.async = true;
+                if (onFail) el.onerror = onFail;
+                document.body.appendChild(el);
+            }
+
+            if (!canThread()) {
+                Module.mcThreaded = 0;
+                add(normal);
+                return;
+            }
+            var cores = navigator.hardwareConcurrency || 2;
+            var phone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            Module.mcMeshThreads = Math.max(1, Math.min(phone ? 2 : 3, cores - 1));
+            Module.mcThreaded = 1;
+
+            var started = false, settled = false;
+            Module.postRun = Module.postRun || [];
+            if (typeof Module.postRun === 'function') Module.postRun = [Module.postRun];
+            Module.postRun.push(function () { started = true; });
+            function giveUp(why) {
+                if (started || settled) return;
+                settled = true;
+                console.warn('Threaded build failed to start (' + why + '); switching to the normal build.');
+                try { localStorage.setItem(FAIL_KEY, String(Date.now())); } catch (e) { }
+                location.reload();
+            }
+            var prevAbort = Module.onAbort;
+            Module.onAbort = function (what) {
+                if (prevAbort) { try { prevAbort(what); } catch (e) { } }
+                giveUp('abort: ' + what);
+            };
+            window.addEventListener('error', function (e) {
+                if (e && e.filename && e.filename.indexOf(threaded) !== -1) giveUp(e.message || 'error');
+            });
+            add(threaded, function () {
+                if (started || settled) return;
+                settled = true;
+                Module.mcThreaded = 0;
+                add(normal);
+            });
+        })();
+    </script>
 </body>
 
 </html>
