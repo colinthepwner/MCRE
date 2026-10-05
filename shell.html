@@ -219,6 +219,7 @@
             var lastW = 0, lastH = 0, lastAsk = 0;
             function sync() {
                 updateOverlay();
+                if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
                 var b = canvas.getBoundingClientRect();
                 var dpr = Module.mcPixelRatio();
                 var w = Math.round(b.width * dpr), h = Math.round(b.height * dpr);
