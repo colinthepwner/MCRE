@@ -58,6 +58,21 @@ function soundResponse(request) {
     });
 }
 
+function needsIsolation(request) {
+    return request.mode === 'navigate' || request.destination === 'worker' || request.destination === 'sharedworker';
+}
+
+function withIsolation(response) {
+    if (!response || response.status === 0 || response.type === 'opaque' || response.type === 'opaqueredirect' ||
+        response.type === 'cors' || response.type === 'error') {
+        return response;
+    }
+    const headers = new Headers(response.headers);
+    headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: headers });
+}
+
 // Install event: cache core assets
 self.addEventListener('install', event => {
     event.waitUntil(
@@ -95,12 +110,13 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    const isolate = needsIsolation(event.request);
     event.respondWith(
         fetch(event.request)
             .then(response => {
                 // Check if we received a valid response
                 if (!response || response.status !== 200 || response.type !== 'basic') {
-                    return response;
+                    return isolate ? withIsolation(response) : response;
                 }
 
                 // IMPORTANT: Clone the response. A response is a stream
@@ -114,13 +130,13 @@ self.addEventListener('fetch', event => {
                         cache.put(event.request, responseToCache);
                     });
 
-                return response;
+                return isolate ? withIsolation(response) : response;
             })
             .catch(() => {
                 // If network fails, fallback to cache
                 return caches.match(event.request).then(response => {
                     if (response) {
-                        return response;
+                        return isolate ? withIsolation(response) : response;
                     }
                     // Could return a fallback offline page here if needed
                 });

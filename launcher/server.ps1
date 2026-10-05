@@ -257,6 +257,8 @@ function Invoke-Static($ctx) {
     $res.StatusCode = 200
     $res.ContentType = $type
     $res.Headers['Cache-Control'] = 'no-cache'
+    $res.Headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    $res.Headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
     $fs = [IO.File]::OpenRead($full)
     try {
         $res.ContentLength64 = $fs.Length
