@@ -65,7 +65,7 @@
             var o = Module.mcRenderScaleOption | 0;
             if (o === 0) {
                 var phone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-                return phone ? Math.min(dpr, 1.5) : dpr;
+                return phone ? Math.max(1, dpr * 0.5) : dpr;
             }
             return dpr * ([1, 1, 0.75, 0.5, 0.35][o] || 1);
         };
