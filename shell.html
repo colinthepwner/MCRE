@@ -85,6 +85,30 @@
             var failures = 0, firstFailureAt = 0;
             var hint = null;
 
+            var exitAsked = false;
+            var escHeld = false, escDownAt = -1e9;
+            var unlockedAt = -1e9, unlockFlagged = false;
+            if (document.exitPointerLock) {
+                var nativeExit = document.exitPointerLock;
+                document.exitPointerLock = function () {
+                    if (document.pointerLockElement) exitAsked = true;
+                    return nativeExit.apply(document, arguments);
+                };
+            }
+            window.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape' || e.repeat) return;
+                escHeld = true;
+                escDownAt = Date.now();
+            }, true);
+            window.addEventListener('keyup', function (e) {
+                if (e.key !== 'Escape') return;
+                if (!escHeld && !unlockFlagged && Date.now() - unlockedAt < 1500) {
+                    unlockFlagged = true;
+                    Module.mcLockLostByPlayer = 1;
+                }
+                escHeld = false;
+            }, true);
+
             function supported() {
                 return !disabled && 'pointerLockElement' in document && !!canvas.requestPointerLock;
             }
@@ -154,7 +178,16 @@
             }, true);
 
             document.addEventListener('pointerlockchange', function () {
-                if (locked()) failures = 0;
+                if (locked()) {
+                    failures = 0;
+                    exitAsked = false;
+                    if (!wanted && document.exitPointerLock) document.exitPointerLock();
+                } else {
+                    unlockedAt = Date.now();
+                    unlockFlagged = !exitAsked && unlockedAt - escDownAt > 500;
+                    if (unlockFlagged) Module.mcLockLostByPlayer = 1;
+                    exitAsked = false;
+                }
                 updateHint();
             });
             document.addEventListener('pointerlockerror', function () {
