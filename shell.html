@@ -408,27 +408,42 @@
                     buffers[u] = buf;
                     var pend = pendingPlay[u];
                     delete pendingPlay[u];
-                    if (pend && Date.now() - pend[2] < 250) playBuffer(buf, pend[0], pend[1]);
+                    if (pend && Date.now() - pend[2] < 600) playBuffer(buf, pend[0], pend[1]);
                 }).catch(function () { buffers[u] = 'failed'; delete pendingPlay[u]; });
             }
             function playBuffer(buf, volume, pitch) {
+                if (actx.state !== 'running') {
+                    if (actx.resume) actx.resume().catch(function () {});
+                    return;
+                }
                 if (liveSources > 32) return;
                 var src = actx.createBufferSource();
                 src.buffer = buf;
-                src.playbackRate.value = Math.max(0.25, Math.min(4, pitch || 1));
+                var rate = Math.max(0.25, Math.min(4, pitch || 1));
+                src.playbackRate.value = rate;
                 var g = actx.createGain();
-                g.gain.value = Math.max(0, Math.min(1, volume));
+                var vol = Math.max(0, Math.min(1, volume)), t = actx.currentTime;
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(vol, t + 0.004);
                 src.connect(g);
                 g.connect(actx.destination);
                 liveSources++;
-                src.onended = function () { liveSources--; try { src.disconnect(); g.disconnect(); } catch (e) { } };
-                src.start();
+                var counted = true;
+                function done() {
+                    if (!counted) return;
+                    counted = false;
+                    liveSources--;
+                    try { src.disconnect(); g.disconnect(); } catch (e) { }
+                }
+                src.onended = done;
+                setTimeout(done, (buf.duration / rate) * 1000 + 1000);
+                src.start(t);
             }
             function preloadCommon() {
                 if (!actx) return;
                 var urls = [];
                 Object.keys(groups).forEach(function (n) {
-                    if (/^(step|dig)\./.test(n) || n === 'random.click' || n === 'random.pop' || n === 'random.hurt' || /\.step$/.test(n))
+                    if (/^(step|dig|random|damage|liquid|fire|tile)\./.test(n) || /\.step$/.test(n))
                         groups[n].forEach(function (u) { urls.push(u); });
                 });
                 (function next() {
@@ -452,6 +467,7 @@
                     if (playing.size > 24) return true;
                 }
                 var u = list[(Math.random() * list.length) | 0];
+                if (actx) for (var w = 0; w < list.length; w++) loadBuffer(list[w]);
                 if (actx) {
                     var b = buffers[u];
                     if (b && b !== 'loading' && b !== 'failed') { playBuffer(b, volume, pitch); return true; }
