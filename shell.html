@@ -937,6 +937,45 @@
             });
         })();
     </script>
+    <script>
+        (function () {
+            var KEY = 'mcre.noticeSeen';
+            try { if (localStorage.getItem(KEY)) return; } catch (e) { }
+            function show() {
+                var o = document.createElement('div');
+                o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:10000;font-family:monospace;padding:16px';
+                var b = document.createElement('div');
+                b.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:22px;width:100%;' +
+                    'max-width:420px;max-height:90vh;overflow:auto;box-sizing:border-box;color:#ddd;' +
+                    'font-size:13px;line-height:1.5';
+                b.innerHTML =
+                    '<h2 style="margin:0 0 10px;color:#fff;font-size:19px;text-align:center">Hey there!</h2>' +
+                    '<p style="margin:0 0 10px">MCRE is an <b>unofficial, non-commercial fan project</b>, made ' +
+                    'out of love for old Pocket Edition. It is not affiliated with, endorsed by, or connected to ' +
+                    'Mojang Studios or Microsoft.</p>' +
+                    '<p style="margin:0 0 10px">Minecraft is a trademark of Mojang Synergies AB, and the game, its ' +
+                    'art and its sounds belong to their owners. Nothing here is sold, and no money is made from it.</p>' +
+                    '<p style="margin:0 0 10px">Mojang and Microsoft: if you would like anything changed or taken ' +
+                    'down, please just ask and it will be handled right away.</p>' +
+                    '<p style="margin:0 0 16px">If you enjoy this, please support the real thing and ' +
+                    '<b>buy Minecraft</b>!</p>' +
+                    '<div style="text-align:center"><button data-ok style="padding:10px 28px;background:#4a8a4a;' +
+                    'color:#fff;border:none;cursor:pointer;font-size:15px;font-family:monospace">Got it</button></div>';
+                o.appendChild(b);
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel',
+                 'touchstart', 'touchend'].forEach(function (t) {
+                    o.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                b.querySelector('[data-ok]').addEventListener('click', function () {
+                    try { localStorage.setItem(KEY, '1'); } catch (e) { }
+                    if (o.parentNode) o.parentNode.removeChild(o);
+                });
+                document.body.appendChild(o);
+            }
+            if (document.body) show(); else window.addEventListener('DOMContentLoaded', show);
+        })();
+    </script>
 </body>
 
 </html>

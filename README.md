@@ -8,6 +8,13 @@ Touchscreens still get the original Pocket Edition controls.
 
 Based on [MCPEweb](https://github.com/sangraphic/MCPEweb).
 
+> **Disclaimer:** MCRE is an unofficial, non-commercial fan project made out of love for old Pocket
+> Edition. It is not affiliated with, endorsed by, or connected to Mojang Studios or Microsoft.
+> Minecraft is a trademark of Mojang Synergies AB, and the game, its art and its sounds belong to
+> their owners. Nothing here is sold and no money is made from it. Mojang and Microsoft: if you would
+> like anything changed or taken down, please open an issue and it will be handled right away. If you
+> enjoy this, please support the real thing and buy Minecraft!
+
 
 ## Play on Windows
 
@@ -43,7 +50,7 @@ the in-game Options.
 
 ### Touchscreen
 
-Play in landscape. Drag anywhere on the lower left of the screen to walk; tap there to jump (hold a
+Play in landscape. Drag anywhere on the lower left of the screen to walk (flick it forward to sprint); double-tap there to jump (hold a
 second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
 tap to place or use, and hold to break. Options > Controls switches between this joystick, a D-pad
 with a jump button, or an invisible joystick.
