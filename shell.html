@@ -88,6 +88,7 @@
             var exitAsked = false;
             var escHeld = false, escDownAt = -1e9;
             var lockAfterEsc = false;
+            var lockAskedAt = 0;
             var unlockedAt = -1e9, unlockFlagged = false;
             if (document.exitPointerLock) {
                 var nativeExit = document.exitPointerLock;
@@ -128,12 +129,14 @@
                 if (!wanted || locked() || !pcMode() || !supported()) return;
                 if (escHeld) { lockAfterEsc = true; return; }
                 try {
+                    lockAskedAt = Date.now();
                     var p = canvas.requestPointerLock();
                     if (p && p.catch) p.catch(function () {   });
                 } catch (e) {   }
             }
             function updateHint() {
-                var show = wanted && !locked() && pcMode() && supported();
+                var waiting = lockAfterEsc || (lockAskedAt && Date.now() - lockAskedAt < 1500);
+                var show = wanted && !locked() && pcMode() && supported() && !waiting;
                 if (show && !hint) {
                     hint = document.createElement('div');
                     hint.textContent = 'Click to play';
@@ -186,18 +189,21 @@
 
             document.addEventListener('pointerlockchange', function () {
                 if (locked()) {
+                    lockAskedAt = 0;
                     failures = 0;
                     exitAsked = false;
                     if (!wanted && document.exitPointerLock) document.exitPointerLock();
                 } else {
                     unlockedAt = Date.now();
                     unlockFlagged = !exitAsked && unlockedAt - escDownAt > 500;
+                    lockAskedAt = 0;
                     if (unlockFlagged) Module.mcLockLostByPlayer = 1;
                     exitAsked = false;
                 }
                 updateHint();
             });
             document.addEventListener('pointerlockerror', function () {
+                lockAskedAt = 0;
                 var now = Date.now();
                 if (now - clickAttemptAt < 1000) {
                     if (failures++ === 0) firstFailureAt = now;
