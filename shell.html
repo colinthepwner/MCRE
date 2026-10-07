@@ -87,6 +87,7 @@
 
             var exitAsked = false;
             var escHeld = false, escDownAt = -1e9;
+            var lockAfterEsc = false;
             var unlockedAt = -1e9, unlockFlagged = false;
             if (document.exitPointerLock) {
                 var nativeExit = document.exitPointerLock;
@@ -107,7 +108,12 @@
                     Module.mcLockLostByPlayer = 1;
                 }
                 escHeld = false;
+                if (lockAfterEsc) {
+                    lockAfterEsc = false;
+                    setTimeout(tryLock, 0);
+                }
             }, true);
+            window.addEventListener('blur', function () { escHeld = false; lockAfterEsc = false; });
 
             function supported() {
                 return !disabled && 'pointerLockElement' in document && !!canvas.requestPointerLock;
@@ -120,6 +126,7 @@
             }
             function tryLock() {
                 if (!wanted || locked() || !pcMode() || !supported()) return;
+                if (escHeld) { lockAfterEsc = true; return; }
                 try {
                     var p = canvas.requestPointerLock();
                     if (p && p.catch) p.catch(function () {   });
