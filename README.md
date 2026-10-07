@@ -82,6 +82,9 @@ When creating a world you can pick its size (up to Extreme, or Infinite, on a co
 Indev-style world type (Island, Inland, Floating or Flat) and theme (Hell, Paradise or Woods),
 1.5-style biomes or the classic Pocket Edition terrain, and a seed.
 
+Besides Survival and Creative there are two more game modes: the 404 Challenge, and Skyblock - a
+small start island over the void, with islands of every biome to bridge out to.
+
 ### From Java 1.5
 
 The Nether, villages, the 1.5 mobs, weather, hunger, maps, enchanting, anvils, experience, potions
