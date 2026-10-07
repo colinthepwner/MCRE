@@ -942,29 +942,45 @@
             var KEY = 'mcre.noticeSeen';
             try { if (localStorage.getItem(KEY)) return; } catch (e) { }
             function show() {
+                var css = document.createElement('style');
+                css.textContent =
+                    '.mcre-notice{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;' +
+                    'justify-content:center;z-index:10000;font-family:monospace;padding:12px;box-sizing:border-box}' +
+                    '.mcre-notice .box{background:#3c3c3c;border:2px solid #888;width:100%;max-width:420px;' +
+                    'max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);display:flex;flex-direction:column;' +
+                    'box-sizing:border-box;color:#ddd;font-size:13px;line-height:1.5}' +
+                    '.mcre-notice .text{overflow:auto;padding:20px 22px 6px;min-height:0;-webkit-overflow-scrolling:touch}' +
+                    '.mcre-notice h2{margin:0 0 10px;color:#fff;font-size:19px;text-align:center}' +
+                    '.mcre-notice p{margin:0 0 10px}' +
+                    '.mcre-notice .ok{padding:10px 22px 18px;text-align:center;flex:none}' +
+                    '.mcre-notice button{padding:10px 28px;background:#4a8a4a;color:#fff;border:none;cursor:pointer;' +
+                    'font-size:15px;font-family:monospace}' +
+                    '@media (max-height:520px){.mcre-notice .box{max-width:640px;font-size:12px;line-height:1.35}' +
+                    '.mcre-notice .text{padding:12px 16px 2px}.mcre-notice h2{font-size:16px;margin-bottom:6px}' +
+                    '.mcre-notice p{margin-bottom:6px}.mcre-notice .ok{padding:6px 16px 10px}' +
+                    '.mcre-notice button{padding:8px 24px}}';
+                document.head.appendChild(css);
                 var o = document.createElement('div');
-                o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;' +
-                    'align-items:center;justify-content:center;z-index:10000;font-family:monospace;padding:16px';
+                o.className = 'mcre-notice';
                 var b = document.createElement('div');
-                b.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:22px;width:100%;' +
-                    'max-width:420px;max-height:90vh;overflow:auto;box-sizing:border-box;color:#ddd;' +
-                    'font-size:13px;line-height:1.5';
+                b.className = 'box';
                 b.innerHTML =
-                    '<h2 style="margin:0 0 10px;color:#fff;font-size:19px;text-align:center">Hey there!</h2>' +
-                    '<p style="margin:0 0 10px">MCRE is an <b>unofficial, non-commercial fan project</b>, made ' +
+                    '<div class="text">' +
+                    '<h2>Hey there!</h2>' +
+                    '<p>MCRE is an <b>unofficial, non-commercial fan project</b>, made ' +
                     'out of love for old Pocket Edition. It is not affiliated with, endorsed by, or connected to ' +
                     'Mojang Studios or Microsoft.</p>' +
-                    '<p style="margin:0 0 10px">Minecraft is a trademark of Mojang Synergies AB, and the game, its ' +
+                    '<p>Minecraft is a trademark of Mojang Synergies AB, and the game, its ' +
                     'art and its sounds belong to their owners. Nothing here is sold, and no money is made from it.</p>' +
-                    '<p style="margin:0 0 10px">Mojang and Microsoft: if you would like anything changed or taken ' +
+                    '<p>Mojang and Microsoft: if you would like anything changed or taken ' +
                     'down, please just ask and it will be handled right away.</p>' +
-                    '<p style="margin:0 0 16px">If you enjoy this, please support the real thing and ' +
+                    '<p style="margin-bottom:0">If you enjoy this, please support the real thing and ' +
                     '<b>buy Minecraft</b>!</p>' +
-                    '<div style="text-align:center"><button data-ok style="padding:10px 28px;background:#4a8a4a;' +
-                    'color:#fff;border:none;cursor:pointer;font-size:15px;font-family:monospace">Got it</button></div>';
+                    '</div>' +
+                    '<div class="ok"><button data-ok>Got it</button></div>';
                 o.appendChild(b);
                 ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel',
-                 'touchstart', 'touchend'].forEach(function (t) {
+                 'touchstart', 'touchmove', 'touchend'].forEach(function (t) {
                     o.addEventListener(t, function (e) { e.stopPropagation(); });
                 });
                 b.querySelector('[data-ok]').addEventListener('click', function () {
