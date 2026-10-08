@@ -414,7 +414,7 @@
                     }
                 });
                 files.forEach(function (k) {
-                    var m = /^sound3\/(.+?)\d*\.ogg$/.exec(k);
+                    var m = /^sound[34]\/(.+?)\d*\.ogg$/.exec(k);
                     if (m) {
                         var name = m[1].split('/').join('.');
                         if (!beta[name]) add(name, k);
