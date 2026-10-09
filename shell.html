@@ -757,6 +757,30 @@
                 }).catch(function () { done('', ''); });
             };
 
+            Module.mcSaveThumb = function (rgba, w, h, path) {
+                try {
+                    var src = document.createElement('canvas');
+                    src.width = w; src.height = h;
+                    var sc = src.getContext('2d');
+                    var img = sc.createImageData(w, h);
+                    for (var y = 0; y < h; y++) img.data.set(rgba.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+                    for (var i = 3; i < img.data.length; i += 4) img.data[i] = 255;
+                    sc.putImageData(img, 0, 0);
+                    var out = document.createElement('canvas');
+                    out.width = 128; out.height = 128;
+                    var oc = out.getContext('2d');
+                    oc.imageSmoothingEnabled = true;
+                    oc.imageSmoothingQuality = 'high';
+                    oc.drawImage(src, 0, 0, w, h, 0, 16, 128, 96);
+                    out.toBlob(function (b) {
+                        if (!b) return;
+                        b.arrayBuffer().then(function (ab) {
+                            try { FS.writeFile(path, new Uint8Array(ab)); } catch (e) { console.warn('[thumb] ' + e); }
+                        });
+                    }, 'image/png');
+                } catch (e) { console.warn('[thumb] ' + e); }
+            };
+
             function loadProfile(name) {
                 var key = name.toLowerCase();
                 loadedFor = key;
@@ -1001,6 +1025,7 @@
                 var c = (id === 1 && server) ? server : conns.get(id);
                 if (c && c.open) queueSend(c, b);
             };
+            net.isOpen = function (id) { var c = conns.get(id); return !!(c && c.open); };
             net.broadcast = function (except, b) {
                 conns.forEach(function (c, id) {
                     if (id !== except && c.open) queueSend(c, b);
