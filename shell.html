@@ -397,6 +397,8 @@
             if (!vorbis) return;
 
             var groups = {}, tracks = [], pools = {}, playing = new Set();
+            var overrides = {};
+            Module.mcSetSoundOverrides = function (m) { overrides = m || {}; };
             function url(k) { return 'sounds/' + k.split('/').map(encodeURIComponent).join('/'); }
             function add(name, k) { (groups[name] = groups[name] || []).push(url(k)); }
             var VILLAGER_152 = { idle: 'default', hit: 'defaulthurt', death: 'defaultdeath' };
@@ -427,7 +429,7 @@
                     }
                 });
                 Module.mcPlaySound = play;
-                Module.mcHasSound = function (name) { return !!(groups[name] && groups[name].length); };
+                Module.mcHasSound = function (name) { return !!((groups[name] && groups[name].length) || (overrides[name] && overrides[name].length)); };
             }).catch(function (e) { console.warn('[sound] classic sounds unavailable:', e); });
 
             var AC = window.AudioContext || window.webkitAudioContext;
@@ -506,7 +508,7 @@
                 a.playbackRate = Math.max(0.25, Math.min(4, pitch || 1));
             }
             function play(name, volume, pitch) {
-                var list = groups[name];
+                var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name];
                 if (!list || !list.length) return false;
                 if (playing.size > 24) {
                     playing.forEach(function (el) { if (el.paused || el.ended || el.error) playing.delete(el); });
@@ -931,8 +933,43 @@
                 c._recvQ = (c._recvQ || Promise.resolve()).then(function () { return unzip(b); }).then(then)
                     .catch(function (e) { console.warn('[net] bad message', e); });
             }
+            var CTL_PART = 60000;
+            var enc = new TextEncoder(), dec = new TextDecoder();
+            function sendCtl(c, obj) {
+                var j = enc.encode(JSON.stringify(obj)), b = new Uint8Array(j.length + 2);
+                b[0] = 253; b[1] = 1; b.set(j, 2);
+                queueSend(c, b);
+            }
+            function sendFile(c, id, bytes) {
+                var ib = enc.encode(id), parts = Math.max(1, Math.ceil(bytes.length / CTL_PART));
+                for (var i = 0; i < parts; i++) {
+                    var piece = bytes.subarray(i * CTL_PART, Math.min(bytes.length, (i + 1) * CTL_PART));
+                    var b = new Uint8Array(3 + ib.length + 8 + piece.length), dv = new DataView(b.buffer);
+                    b[0] = 253; b[1] = 2; b[2] = ib.length; b.set(ib, 3);
+                    dv.setUint32(3 + ib.length, i, true); dv.setUint32(7 + ib.length, parts, true);
+                    b.set(piece, 11 + ib.length);
+                    queueSend(c, b);
+                }
+            }
+            function readCtl(b) {
+                if (b[1] === 1) { try { return { json: JSON.parse(dec.decode(b.subarray(2))) }; } catch (e) { return null; } }
+                if (b[1] === 2) {
+                    var n = b[2], dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+                    return { part: { id: dec.decode(b.subarray(3, 3 + n)), i: dv.getUint32(3 + n, true), of: dv.getUint32(7 + n, true), data: b.slice(11 + n) } };
+                }
+                return null;
+            }
+            function hostCtl(c, msg) {
+                if (msg && msg.json && msg.json.t === 'get' && Array.isArray(msg.json.ids) && Module.mcMods) {
+                    msg.json.ids.slice(0, 64).forEach(function (id) {
+                        var bytes = Module.mcMods.fileOf(String(id));
+                        if (bytes) sendFile(c, String(id), bytes);
+                    });
+                }
+            }
             function reset() {
                 if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
+                if (net.state === 'in' || net.state === 'mods') { if (Module.mcMods && Module.mcMods.endSession) Module.mcMods.endSession(); }
                 try { if (peer) peer.destroy(); } catch (e) { }
                 peer = null; server = null; conns = new Map(); nextId = 2;
                 net.state = 'idle'; net.code = ''; net.error = '';
@@ -961,12 +998,19 @@
                         c.on('open', function () {
                             opened = true;
                             conns.set(id, c);
-                            c.send(new Uint8Array([255, id & 255, (id >> 8) & 255, (id >> 16) & 255, (id >>> 24) & 255]).buffer);
+                            var withMods = !!(Module.mcMods && Module.mcMods.hasEnabled && Module.mcMods.hasEnabled());
+                            c.send(new Uint8Array([255, id & 255, (id >> 8) & 255, (id >> 16) & 255, (id >>> 24) & 255, withMods ? 1 : 0]).buffer);
+                            if (withMods) Module.mcMods.offer().then(function (list) { sendCtl(c, { t: 'mods', list: list }); })
+                                .catch(function () { sendCtl(c, { t: 'mods', list: [] }); });
                             ev({ t: 'open', p: id });
                         });
                         c.on('data', function (d) {
                             var b = bytes(d);
-                            if (b) queueRecv(c, b, function (u) { if (conns.has(id)) ev({ t: 'data', p: id, b: u }); });
+                            if (b) queueRecv(c, b, function (u) {
+                                if (!conns.has(id)) return;
+                                if (u[0] === 253) { hostCtl(c, readCtl(u)); return; }
+                                ev({ t: 'data', p: id, b: u });
+                            });
                         });
                         function gone() { if (conns.delete(id) && opened) ev({ t: 'close', p: id }); }
                         c.on('close', gone);
@@ -981,8 +1025,9 @@
                 net.state = 'joining';
                 var failed = false;
                 function fail(m) {
-                    if (failed || net.state !== 'joining') return;
+                    if (failed || (net.state !== 'joining' && net.state !== 'mods')) return;
                     failed = true;
+                    if (net.closePrompt) { net.closePrompt(); net.closePrompt = null; }
                     reset();
                     ev({ t: 'fail', m: m });
                 }
@@ -1002,17 +1047,66 @@
                             var raw = bytes(d);
                             if (raw) queueRecv(c, raw, onData);
                         });
+                        var myId = 0, want = null, got = {}, parts = {}, prompt = null;
+                        function enter() {
+                            if (prompt) { prompt.close(); prompt = null; }
+                            net.state = 'in';
+                            ev({ t: 'joined', p: myId });
+                        }
                         function onData(b) {
                             if (net.state === 'joining' && b.length >= 5 && b[0] === 255) {
                                 if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
-                                net.state = 'in';
-                                ev({ t: 'joined', p: (b[1] | (b[2] << 8) | (b[3] << 16) | (b[4] << 24)) >>> 0 });
+                                myId = (b[1] | (b[2] << 8) | (b[3] << 16) | (b[4] << 24)) >>> 0;
+                                if (b.length >= 6 && b[5] === 1 && Module.mcMods && Module.mcMods.askJoin) {
+                                    net.state = 'mods';
+                                    joinTimer = setTimeout(function () { fail('mods'); }, 30000);
+                                    return;
+                                }
+                                enter();
+                                return;
+                            }
+                            if (net.state === 'mods' && b[0] === 253) {
+                                var msg = readCtl(b);
+                                if (!msg) return;
+                                if (msg.json && msg.json.t === 'mods' && !want) {
+                                    if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
+                                    var list = Array.isArray(msg.json.list) ? msg.json.list.slice(0, 64) : [];
+                                    if (!list.length) { enter(); return; }
+                                    net.closePrompt = function () { if (prompt) { prompt.close(); prompt = null; } };
+                                    prompt = Module.mcMods.askJoin(list, function (yes, keep, ui) {
+                                        if (!yes) { prompt = null; fail('declined'); return; }
+                                        Module.mcMods.missing(list).then(function (ids) {
+                                            want = { list: list, keep: keep, ids: ids };
+                                            if (!ids.length) return finish();
+                                            ui.progress('Downloading ' + ids.length + ' mod(s)...');
+                                            sendCtl(c, { t: 'get', ids: ids });
+                                            joinTimer = setTimeout(function () { fail('mods'); }, 120000);
+                                        }).catch(function () { fail('mods'); });
+                                    });
+                                } else if (msg.part && want) {
+                                    var p = msg.part, slot = parts[p.id] = parts[p.id] || { n: p.of, have: 0, bits: [] };
+                                    if (!slot.bits[p.i]) { slot.bits[p.i] = p.data; slot.have++; }
+                                    if (slot.have === slot.n) {
+                                        var len = slot.bits.reduce(function (s, x) { return s + x.length; }, 0), all = new Uint8Array(len), o = 0;
+                                        slot.bits.forEach(function (x) { all.set(x, o); o += x.length; });
+                                        got[p.id] = all;
+                                    }
+                                    var done = want.ids.filter(function (id) { return got[id]; }).length;
+                                    if (prompt) prompt.progress('Downloading mods... ' + done + ' of ' + want.ids.length);
+                                    if (done === want.ids.length) finish();
+                                }
                                 return;
                             }
                             if (net.state === 'in') ev({ t: 'data', p: 1, b: b });
                         }
+                        function finish() {
+                            if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
+                            if (prompt) prompt.progress('Turning the mods on...');
+                            Module.mcMods.startSession(want.list, got, want.keep).then(enter, function () { fail('mods'); });
+                        }
                         function gone() {
-                            if (net.state === 'in') { net.state = 'idle'; ev({ t: 'close', p: 1 }); }
+                            if (prompt) { prompt.close(); prompt = null; }
+                            if (net.state === 'in') { net.state = 'idle'; if (Module.mcMods && Module.mcMods.endSession) Module.mcMods.endSession(); ev({ t: 'close', p: 1 }); }
                             else fail('network');
                         }
                         c.on('close', gone);
@@ -1095,6 +1189,497 @@
                 });
                 setTimeout(function () { input.focus(); }, 50);
             };
+        })();
+
+        (function () {
+            var LIB = '/games/mods', STATE = LIB + '/state.json', BUNDLED = '/data/mods';
+            var MAX_ZIP = 64 * 1024 * 1024, MAX_FILES = 5000;
+            var mods = [];
+            var originals = {};
+            var soundUrls = [];
+            var names = null;
+            var status = '', version = 0, busy = false, again = false;
+            var api = Module.mcMods = {};
+            var session = null;
+
+            function bump(msg) { if (msg !== undefined) status = msg; version++; }
+            function exists(p) { try { FS.stat(p); return true; } catch (e) { return false; } }
+            function readState() {
+                try { return JSON.parse(new TextDecoder().decode(FS.readFile(STATE))); } catch (e) { return { order: [], enabled: {} }; }
+            }
+            function writeState() {
+                var s = { order: mods.map(function (x) { return x.id; }), enabled: {} };
+                mods.forEach(function (x) { s.enabled[x.id] = !!x.enabled; });
+                try { FS.mkdirTree(LIB); FS.writeFile(STATE, JSON.stringify(s)); } catch (e) { console.warn('[mods] state', e); }
+                if (Module._syncSaves) Module._syncSaves();
+            }
+
+            function inflate(data) {
+                return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()
+                    .then(function (ab) { return new Uint8Array(ab); });
+            }
+            function readZip(bytes) {
+                var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), n = bytes.length, eocd = -1;
+                for (var i = n - 22; i >= Math.max(0, n - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+                if (eocd < 0) return Promise.reject(new Error("isn't a .zip file"));
+                var count = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true);
+                if (count > MAX_FILES) return Promise.reject(new Error('has too many files'));
+                var jobs = [], out = {}, dec = new TextDecoder();
+                for (var k = 0; k < count; k++) {
+                    if (p + 46 > n || dv.getUint32(p, true) !== 0x02014b50) return Promise.reject(new Error('is a damaged .zip'));
+                    var method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+                    var nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+                    var off = dv.getUint32(p + 42, true), flags = dv.getUint16(p + 8, true);
+                    var name = dec.decode(bytes.subarray(p + 46, p + 46 + nl));
+                    p += 46 + nl + el + cl;
+                    if (name.charAt(name.length - 1) === '/') continue;
+                    if (flags & 1) return Promise.reject(new Error('is password protected'));
+                    if (off + 30 > n || dv.getUint32(off, true) !== 0x04034b50) return Promise.reject(new Error('is a damaged .zip'));
+                    var start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+                    var data = bytes.subarray(start, start + csize);
+                    if (method === 0) out[name] = data.slice();
+                    else if (method === 8) jobs.push((function (nm, d) { return inflate(d).then(function (u) { out[nm] = u; }); })(name, data));
+                    else return Promise.reject(new Error('uses an unsupported compression'));
+                }
+                return Promise.all(jobs).then(function () { return out; });
+            }
+
+            function normalise(files) {
+                var keys = Object.keys(files), root = '';
+                keys.forEach(function (k) {
+                    var b = k.split('/').pop();
+                    if (b === 'manifest.json' || b === 'pack.mcmeta') {
+                        var r = k.slice(0, k.length - b.length);
+                        if (!root || r.length < root.length) root = r;
+                    }
+                });
+                var out = {};
+                keys.forEach(function (k) {
+                    if (k.indexOf(root) !== 0) return;
+                    var r = k.slice(root.length);
+                    if (r.indexOf('assets/minecraft/') === 0) r = r.slice(17);
+                    out[r] = files[k];
+                });
+                return out;
+            }
+
+            function slug(s) {
+                return String(s || '').toLowerCase().replace(/\.zip$/, '').replace(/[^a-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 48);
+            }
+            function usable(files) {
+                return Object.keys(files).some(function (k) {
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/)/i.test(k);
+                });
+            }
+            function manifestOf(files, fallbackName) {
+                var dec = new TextDecoder(), m = {}, notes = [];
+                var base = String(fallbackName || 'mod').replace(/\.zip$/i, '');
+                if (files['manifest.json']) {
+                    try { m = JSON.parse(dec.decode(files['manifest.json'])) || {}; } catch (e) { m = {}; notes.push('broken manifest.json'); }
+                    if (typeof m !== 'object' || Array.isArray(m)) m = {};
+                } else if (files['pack.mcmeta']) {
+                    try { var mc = JSON.parse(dec.decode(files['pack.mcmeta'])); m = { description: mc.pack && mc.pack.description }; } catch (e) { }
+                }
+                if (m.format !== undefined && m.format !== 1) throw new Error('needs a newer version of the game');
+                if (m.type !== undefined && m.type !== 'resource') throw new Error('is a "' + String(m.type).slice(0, 24) + '" mod - this version only runs resource packs');
+                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds or lang)');
+                var str = function (v, max) { return typeof v === 'string' ? v.trim().slice(0, max) : ''; };
+                var id = typeof m.id === 'string' && /^[a-z0-9_.-]{1,48}$/.test(m.id) ? m.id : '';
+                if (!id) {
+                    if (m.id !== undefined) notes.push('bad id');
+                    id = slug(m.name) || slug(base) || 'mod';
+                }
+                return { id: id, name: str(m.name, 48) || base.slice(0, 48) || id, version: str(m.version, 16), author: str(m.author, 48),
+                         description: str(m.description, 200), notes: notes };
+            }
+
+            function iconOf(id, files) {
+                if (!files['pack.png']) return '';
+                var p = 'web_mods/' + id + '.png';
+                try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, files['pack.png']); return p; } catch (e) { return ''; }
+            }
+
+            function load() {
+                var st = readState(), found = {};
+                var add = function (dir, bundled) {
+                    var list = [];
+                    try { list = FS.readdir(dir); } catch (e) { return; }
+                    list.forEach(function (f) {
+                        if (!/\.zip$/i.test(f)) return;
+                        var file = dir + '/' + f, id = f.replace(/\.zip$/i, '');
+                        if (found[id]) return;
+                        found[id] = { id: id, file: file, bundled: bundled, enabled: bundled ? false : true, m: { name: id }, err: '', icon: '' };
+                    });
+                };
+                add(LIB, false);
+                add(BUNDLED, true);
+                Object.keys(found).forEach(function (id) {
+                    if (st.enabled && id in st.enabled) found[id].enabled = !!st.enabled[id];
+                });
+                var order = (st.order || []).filter(function (id) { return found[id]; });
+                Object.keys(found).sort().forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
+                mods = order.map(function (id) { return found[id]; });
+                return mods.reduce(function (pr, x) {
+                    return pr.then(function () {
+                        return readZip(FS.readFile(x.file)).then(function (files) {
+                            files = normalise(files);
+                            x.m = manifestOf(files, x.id + '.zip');
+                            x.m.id = x.id;
+                            x.icon = iconOf(x.id, files);
+                            x.err = '';
+                        }).catch(function (e) { x.err = 'This mod ' + e.message; x.enabled = false; });
+                    });
+                }, Promise.resolve());
+            }
+
+            function keepOriginal(p) {
+                if (p in originals) return;
+                originals[p] = exists(p) ? FS.readFile(p) : null;
+            }
+            function restore() {
+                Object.keys(originals).forEach(function (p) {
+                    try {
+                        if (originals[p] === null) { if (exists(p)) FS.unlink(p); }
+                        else FS.writeFile(p, originals[p]);
+                    } catch (e) { }
+                });
+            }
+            function decodeImage(bytes) {
+                return createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+            }
+            function sheet(path) {
+                return decodeImage(FS.readFile(path)).then(function (img) {
+                    var c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    c.getContext('2d').drawImage(img, 0, 0);
+                    return c;
+                });
+            }
+            function canvasPng(c) {
+                return new Promise(function (res) { c.toBlob(res, 'image/png'); })
+                    .then(function (b) { return b.arrayBuffer(); }).then(function (ab) { return new Uint8Array(ab); });
+            }
+            function cellsFor(kind, name) {
+                var m = /^cell_(\d+)$/.exec(name);
+                if (m) return [parseInt(m[1], 10)];
+                var t = names && names[kind];
+                return (t && t[name]) || [];
+            }
+
+            function applyAll() {
+                restore();
+                if (soundUrls.length) { soundUrls.forEach(function (u) { URL.revokeObjectURL(u); }); soundUrls = []; }
+                var sheets = {};
+                var changed = { blocks: {}, items: {} };
+                var sounds = {};
+                var lang = [];
+                var unknown = 0;
+                var on = mods.filter(function (x) { return x.enabled && !x.err; }).reverse();
+                if (session) on = session.slice().reverse().concat(on);
+                return on.reduce(function (pr, x) {
+                    return pr.then(function () { return readZip(x.bytes || FS.readFile(x.file)); }).then(function (files) {
+                        files = normalise(files);
+                        var jobs = Promise.resolve();
+                        Object.keys(files).sort().forEach(function (path) {
+                            var data = files[path], m;
+                            if (/^images\/.+\.(png|json|txt)$/i.test(path) && path.indexOf('..') < 0) {
+                                var fp = '/data/' + path;
+                                keepOriginal(fp);
+                                try { FS.mkdirTree(fp.slice(0, fp.lastIndexOf('/'))); FS.writeFile(fp, data); } catch (e) { }
+                                if (sheets[fp]) delete sheets[fp];
+                                if (fp === '/data/images/terrain.png') changed.blocks['*'] = 1;
+                                if (fp === '/data/images/gui/items.png') changed.items['*'] = 1;
+                            } else if ((m = /^textures\/(blocks?|items?)\/([^\/]+)\.png$/.exec(path))) {
+                                var items = m[1].charAt(0) === 'i';
+                                var fp2 = items ? '/data/images/gui/items.png' : '/data/images/terrain.png';
+                                var cells = cellsFor(items ? 'items' : 'blocks', m[2]);
+                                if (!cells.length) { unknown++; return; }
+                                cells.forEach(function (c) { changed[items ? 'items' : 'blocks'][c] = 1; });
+                                jobs = jobs.then(function () {
+                                    keepOriginal(fp2);
+                                    return (sheets[fp2] ? Promise.resolve(sheets[fp2]) : sheet(fp2)).then(function (c) {
+                                        sheets[fp2] = c;
+                                        return decodeImage(data).then(function (img) {
+                                            var g = c.getContext('2d');
+                                            var s = Math.min(img.width, img.height);
+                                            g.imageSmoothingEnabled = s > 16;
+                                            g.imageSmoothingQuality = 'high';
+                                            cells.forEach(function (cell) {
+                                                var x0 = (cell % 16) * 16, y0 = Math.floor(cell / 16) * 16;
+                                                if (y0 + 16 > c.height) return;
+                                                g.clearRect(x0, y0, 16, 16);
+                                                g.drawImage(img, 0, 0, s, s, x0, y0, 16, 16);
+                                            });
+                                        });
+                                    });
+                                }).catch(function () { unknown++; });
+                            } else if ((m = /^sounds\/(.+?)\d*\.(ogg|mp3|wav)$/i.exec(path))) {
+                                var sn = m[1].split('/').join('.');
+                                var u = URL.createObjectURL(new Blob([data], { type: 'audio/' + (m[2].toLowerCase() === 'mp3' ? 'mpeg' : m[2].toLowerCase()) }));
+                                soundUrls.push(u);
+                                if (!sounds[sn] || sounds[sn].from !== x.id) { sounds[sn] = []; sounds[sn].from = x.id; }
+                                sounds[sn].push(u);
+                            } else if (/^lang\/en_us\.lang$/i.test(path)) {
+                                lang.push(new TextDecoder().decode(data));
+                            }
+                        });
+                        return jobs;
+                    }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); });
+                }, Promise.resolve()).then(function () {
+                    return Object.keys(sheets).reduce(function (pr, fp) {
+                        return pr.then(function () { return canvasPng(sheets[fp]); }).then(function (png) { FS.writeFile(fp, png); });
+                    }, Promise.resolve());
+                }).then(function () {
+                    if (lang.length) {
+                        var lp = '/data/lang/en_US.lang';
+                        keepOriginal(lp);
+                        var base = originals[lp] ? new TextDecoder().decode(originals[lp]) : '';
+                        FS.writeFile(lp, base + '\n' + lang.join('\n') + '\n');
+                    }
+                    if (Module.mcSetSoundOverrides) Module.mcSetSoundOverrides(sounds);
+                    try {
+                        FS.mkdirTree('/data/images/web_mods');
+                        FS.writeFile('/data/images/web_mods/changed_cells.txt',
+                            'blocks:' + Object.keys(changed.blocks).join(',') + '\nitems:' + Object.keys(changed.items).join(',') + '\n');
+                    } catch (e) { }
+                    return unknown;
+                });
+            }
+
+            function reapply(tell) {
+                if (busy) { again = true; return Promise.resolve(); }
+                var keep = status;
+                busy = true; bump('Applying mods...');
+                return applyAll().then(function (unknown) {
+                    busy = false;
+                    bump(unknown ? unknown + ' texture(s) in your mods have names this game doesn\'t know' : keep);
+                    if (tell && Module._mcModsApplied) Module._mcModsApplied();
+                    if (again) { again = false; return reapply(tell); }
+                }).catch(function (e) { busy = false; bump('Mods: ' + (e && e.message || e)); });
+            }
+
+            api.startup = function (done) {
+                var finished = false;
+                var go = function () { if (!finished) { finished = true; done(); } };
+                setTimeout(go, 8000);
+                try { names = JSON.parse(new TextDecoder().decode(FS.readFile('/data/images/atlas_names.json'))); } catch (e) { names = null; }
+                if (typeof DecompressionStream === 'undefined' || typeof createImageBitmap === 'undefined') { bump('Mods need a newer browser'); go(); return; }
+                load().then(function () {
+                    return mods.some(function (x) { return x.enabled && !x.err; }) ? reapply(false) : null;
+                }).then(go, go);
+            };
+            api.version = function () { return version; };
+            api.status = function () { return status; };
+            api.list = function () {
+                var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
+                return mods.map(function (x) {
+                    return [x.id, x.m.name, x.m.version, x.m.author, x.m.description, x.enabled ? 1 : 0, x.bundled ? 1 : 0, x.icon, x.err].map(clean).join('\t');
+                }).join('\n');
+            };
+            function find(id) { for (var i = 0; i < mods.length; i++) if (mods[i].id === id) return i; return -1; }
+            api.toggle = function (id) {
+                var i = find(id);
+                if (i < 0 || mods[i].err) return;
+                mods[i].enabled = !mods[i].enabled;
+                writeState(); bump(); reapply(true);
+            };
+            api.remove = function (id) {
+                var i = find(id);
+                if (i < 0 || mods[i].bundled) return;
+                var x = mods.splice(i, 1)[0];
+                try { FS.unlink(x.file); } catch (e) { }
+                writeState(); bump('Removed ' + x.m.name);
+                if (x.enabled) reapply(true);
+            };
+            api.download = function (id) {
+                var i = find(id);
+                if (i < 0) return;
+                var bytes = FS.readFile(mods[i].file);
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+                a.download = mods[i].id + '.zip';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+            };
+            function install(file) {
+                if (!file) return;
+                if (file.size > MAX_ZIP) { bump(file.name + ' is too big (64 MB at most)'); return; }
+                bump('Adding ' + file.name + '...');
+                file.arrayBuffer().then(function (ab) {
+                    var bytes = new Uint8Array(ab);
+                    return readZip(bytes).then(function (files) {
+                        files = normalise(files);
+                        var m = manifestOf(files, file.name);
+                        var i = find(m.id);
+                        if (i >= 0 && (mods[i].bundled || mods[i].m.name !== m.name || mods[i].m.author !== m.author)) {
+                            var base = m.id.slice(0, 44), n = 2, same = -1;
+                            mods.forEach(function (x, k) {
+                                if (!x.bundled && x.id.indexOf(base + '-') === 0 && /^\d+$/.test(x.id.slice(base.length + 1))
+                                    && x.m.name === m.name && x.m.author === m.author) same = k;
+                            });
+                            if (same >= 0) { m.id = mods[same].id; i = same; }
+                            else {
+                                while (find(base + '-' + n) >= 0) n++;
+                                m.notes.push('id was taken: ' + m.id + ', now ' + base + '-' + n);
+                                m.id = base + '-' + n;
+                                i = -1;
+                            }
+                        }
+                        FS.mkdirTree(LIB);
+                        FS.writeFile(LIB + '/' + m.id + '.zip', bytes);
+                        if (i >= 0) mods.splice(i, 1);
+                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files) });
+                        writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
+                        return reapply(true);
+                    });
+                }).catch(function (e) { bump(file.name + ' ' + (e && e.message || 'could not be added')); });
+            }
+            function sha(bytes) {
+                return crypto.subtle.digest('SHA-256', bytes).then(function (h) {
+                    return Array.prototype.map.call(new Uint8Array(h), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+                });
+            }
+            function hashOf(x) {
+                if (x.hash) return Promise.resolve(x.hash);
+                return sha(FS.readFile(x.file)).then(function (h) { x.hash = h; return h; });
+            }
+            api.hasEnabled = function () { return mods.some(function (x) { return x.enabled && !x.err; }); };
+            api.offer = function () {
+                var on = mods.filter(function (x) { return x.enabled && !x.err; });
+                return Promise.all(on.map(function (x) {
+                    return hashOf(x).then(function (h) {
+                        return { id: x.id, name: x.m.name, version: x.m.version, author: x.m.author, size: FS.stat(x.file).size, hash: h };
+                    });
+                }));
+            };
+            api.fileOf = function (id) { var i = find(id); return i < 0 ? null : FS.readFile(mods[i].file); };
+            api.missing = function (list) {
+                return Promise.all(mods.map(hashOf)).then(function () {
+                    return list.filter(function (o) { return !mods.some(function (x) { return x.hash === o.hash; }); }).map(function (o) { return o.id; });
+                });
+            };
+            api.startSession = function (list, got, keep) {
+                return Promise.all(mods.map(hashOf)).then(function () {
+                    session = list.map(function (o) {
+                        if (got[o.id]) return { id: o.id, bytes: got[o.id] };
+                        var mine = mods.filter(function (x) { return x.hash === o.hash; })[0];
+                        return mine ? { id: o.id, file: mine.file } : null;
+                    }).filter(Boolean);
+                    if (keep) {
+                        Object.keys(got).forEach(function (id) {
+                            var o = list.filter(function (e) { return e.id === id; })[0];
+                            var nid = id, n = 2;
+                            while (find(nid) >= 0) nid = id.slice(0, 44) + '-' + (n++);
+                            try {
+                                FS.mkdirTree(LIB);
+                                FS.writeFile(LIB + '/' + nid + '.zip', got[id]);
+                                mods.push({ id: nid, file: LIB + '/' + nid + '.zip', bundled: false, enabled: false,
+                                            m: { id: nid, name: (o && o.name) || nid, version: (o && o.version) || '', author: (o && o.author) || '', description: 'Kept from a game you joined' },
+                                            err: '', icon: '' });
+                            } catch (e) { }
+                        });
+                        writeState();
+                        load().then(function () { bump(); });
+                    }
+                    bump('Using ' + session.length + ' mod(s) from the game you joined');
+                    return reapply(true);
+                });
+            };
+            api.endSession = function () {
+                if (!session) return;
+                session = null;
+                bump('');
+                reapply(true);
+            };
+            api.askJoin = function (list, done) {
+                var box = document.createElement('div');
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:10000;font-family:monospace;padding:16px';
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:22px;width:100%;' +
+                    'max-width:420px;box-sizing:border-box;color:#eee;text-align:left';
+                var esc = function (s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+                var total = list.reduce(function (s, o) { return s + (o.size || 0); }, 0);
+                box.innerHTML =
+                    '<h2 style="margin:0 0 10px;color:#fff;font-size:19px;text-align:center">This game uses mods</h2>' +
+                    '<p style="margin:0 0 10px;font-size:13px;color:#ccc;line-height:1.45">Joining will download and turn on ' +
+                    'these mods while you play there. Mods change how the game looks and sounds. ' +
+                    '<b style="color:#ffd27a">Only join games from people you trust.</b></p>' +
+                    '<div style="max-height:150px;overflow:auto;background:#262626;border:1px solid #555;padding:6px 8px;margin-bottom:10px;font-size:13px">' +
+                    list.map(function (o) {
+                        return '<div style="padding:2px 0">' + esc(o.name) + (o.version ? ' <span style="color:#999">' + esc(o.version) + '</span>' : '') +
+                            (o.author ? ' <span style="color:#999">by ' + esc(o.author) + '</span>' : '') + '</div>';
+                    }).join('') + '</div>' +
+                    '<div style="font-size:12px;color:#999;margin-bottom:10px">' + list.length + ' mod(s), up to ' + Math.max(1, Math.round(total / 1024)) + ' KB</div>' +
+                    '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:14px;cursor:pointer">' +
+                    '<input type="checkbox" data-keep> Keep these mods after I leave (added to my Mods, switched off)</label>' +
+                    '<div data-msg style="min-height:16px;font-size:12px;color:#aaa;margin-bottom:8px;text-align:center"></div>' +
+                    '<div style="display:flex;gap:10px;justify-content:center">' +
+                    '<button data-ok style="padding:10px 24px;background:#4a8a4a;color:#fff;border:none;cursor:pointer;font-size:15px;font-family:monospace">Join</button>' +
+                    '<button data-no style="padding:10px 24px;background:#555;color:#fff;border:none;cursor:pointer;font-size:15px;font-family:monospace">Cancel</button>' +
+                    '</div>';
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend'].forEach(function (t) {
+                    ov.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                var msg = box.querySelector('[data-msg]'), ok = box.querySelector('[data-ok]'), no = box.querySelector('[data-no]');
+                var finished = false;
+                var close = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+                var api2 = {
+                    progress: function (t) { msg.textContent = t; },
+                    close: close
+                };
+                ok.onclick = function () {
+                    if (finished) return;
+                    finished = true;
+                    ok.disabled = true; ok.style.opacity = '0.5';
+                    msg.textContent = 'Getting the mods...';
+                    done(true, box.querySelector('[data-keep]').checked, api2);
+                };
+                no.onclick = function () { if (finished && ok.disabled === false) return; finished = true; close(); done(false, false, api2); };
+                return api2;
+            };
+
+            var overlay = null;
+            function closeBox() { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); overlay = null; }
+            api.pick = function () {
+                closeBox();
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:9999;font-family:monospace;padding:16px';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:24px;width:100%;' +
+                    'max-width:380px;box-sizing:border-box;color:#eee;text-align:center';
+                box.innerHTML =
+                    '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Add a mod</h2>' +
+                    '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Choose a mod file (.zip), or drop it here. ' +
+                    'Java resource packs work too.</p>' +
+                    '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +
+                    'Choose file<input type="file" accept=".zip,application/zip" style="display:none"></label>' +
+                    '<button data-no style="padding:10px 24px;background:#555;color:#fff;border:none;' +
+                    'cursor:pointer;font-size:15px;font-family:monospace">Cancel</button>';
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend'].forEach(function (t) {
+                    overlay.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                overlay.addEventListener('dragover', function (e) { e.preventDefault(); });
+                overlay.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                    closeBox(); install(f);
+                });
+                box.querySelector('input').addEventListener('change', function (e) {
+                    var f = e.target.files && e.target.files[0];
+                    closeBox(); install(f);
+                });
+                box.querySelector('[data-no]').onclick = closeBox;
+                overlay.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
+            };
+            api.closePick = closeBox;
         })();
     </script>
     <script type='text/javascript'>
