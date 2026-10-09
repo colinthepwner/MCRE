@@ -737,6 +737,26 @@
                 return true;
             }
 
+            var remoteSerial = 0;
+            Module.mcRemoteSkinQueue = [];
+            Module.mcRequestRemoteSkin = function (name) {
+                var done = function (skin, cape) { Module.mcRemoteSkinQueue.push(name + '\n' + (skin || '') + '\n' + (cape || '')); };
+                var account = String(name).replace(/_[0-9]+$/, '');
+                if (!valid(account) || typeof FS === 'undefined') { done('', ''); return; }
+                lookup(account).then(function (t) {
+                    return Promise.all([
+                        t.skin ? loadImage(t.skin).then(function (img) { return convertSkin(img, t.slim); }) : null,
+                        t.cape ? loadImage(t.cape).then(convertCape).catch(function () { return null; }) : null
+                    ]);
+                }).then(function (r) {
+                    var n = ++remoteSerial, sp = '', cp = '';
+                    try { FS.mkdirTree('/data/images/mob'); } catch (e) {   }
+                    if (r[0]) { sp = 'mob/web_rskin_' + n + '.png'; FS.writeFile('/data/images/' + sp, r[0]); }
+                    if (r[1]) { cp = 'mob/web_rcape_' + n + '.png'; FS.writeFile('/data/images/' + cp, r[1]); }
+                    done(sp, cp);
+                }).catch(function () { done('', ''); });
+            };
+
             function loadProfile(name) {
                 var key = name.toLowerCase();
                 loadedFor = key;
