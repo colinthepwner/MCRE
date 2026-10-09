@@ -829,6 +829,230 @@
         })();
     </script>
     <script type='text/javascript'>
+        (function () {
+            var LIB = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+            var PREFIX = 'mcre-room-';
+            var ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            var libPromise = null;
+            function loadLib() {
+                if (!libPromise) libPromise = new Promise(function (res, rej) {
+                    if (window.Peer) { res(); return; }
+                    var s = document.createElement('script');
+                    s.src = LIB;
+                    s.crossOrigin = 'anonymous';
+                    s.onload = function () { res(); };
+                    s.onerror = function () { libPromise = null; rej(new Error('lib')); };
+                    document.head.appendChild(s);
+                });
+                return libPromise;
+            }
+            var net = Module.mcNet = { state: 'idle', code: '', error: '', events: [], cur: null };
+            var peer = null, conns = new Map(), nextId = 2, server = null, joinTimer = 0;
+            function ev(e) { net.events.push(e); }
+            function newCode() {
+                var s = '';
+                for (var i = 0; i < 5; i++) s += ALPHABET[(Math.random() * ALPHABET.length) | 0];
+                return s;
+            }
+            function bytes(d) {
+                if (d instanceof ArrayBuffer) return new Uint8Array(d);
+                if (ArrayBuffer.isView(d)) return new Uint8Array(d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength));
+                return null;
+            }
+            var ZIP_MIN = 600;
+            var canZip = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+            function zip(b) {
+                if (!canZip || b.length < ZIP_MIN) return Promise.resolve(b);
+                return new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('deflate-raw')))
+                    .arrayBuffer().then(function (ab) {
+                        if (ab.byteLength + 1 >= b.length) return b;
+                        var out = new Uint8Array(ab.byteLength + 1);
+                        out[0] = 254; out.set(new Uint8Array(ab), 1);
+                        return out;
+                    }).catch(function () { return b; });
+            }
+            function unzip(b) {
+                if (b[0] !== 254) return Promise.resolve(b);
+                return new Response(new Blob([b.subarray(1)]).stream().pipeThrough(new DecompressionStream('deflate-raw')))
+                    .arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+            }
+            function queueSend(c, b) {
+                c._sendQ = (c._sendQ || Promise.resolve()).then(function () { return zip(b); }).then(function (x) {
+                    if (!c.open) return;
+                    var ab = (x.byteOffset === 0 && x.byteLength === x.buffer.byteLength) ? x.buffer : x.slice().buffer;
+                    try { c.send(ab); } catch (e) { }
+                });
+            }
+            function queueRecv(c, b, then) {
+                c._recvQ = (c._recvQ || Promise.resolve()).then(function () { return unzip(b); }).then(then)
+                    .catch(function (e) { console.warn('[net] bad message', e); });
+            }
+            function reset() {
+                if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
+                try { if (peer) peer.destroy(); } catch (e) { }
+                peer = null; server = null; conns = new Map(); nextId = 2;
+                net.state = 'idle'; net.code = ''; net.error = '';
+            }
+
+            net.host = function () {
+                if (net.state === 'opening' || net.state === 'open') return;
+                reset();
+                net.state = 'opening';
+                loadLib().then(function tryOpen() {
+                    if (net.state !== 'opening') return;
+                    var code = newCode();
+                    var p = new Peer(PREFIX + code, { debug: 0 });
+                    p.on('open', function () {
+                        if (net.state !== 'opening') { p.destroy(); return; }
+                        peer = p; net.code = code; net.state = 'open';
+                    });
+                    p.on('error', function (err) {
+                        if (err && err.type === 'unavailable-id') { p.destroy(); tryOpen(); return; }
+                        if (net.state === 'opening') { net.state = 'error'; net.error = (err && err.type) || 'network'; try { p.destroy(); } catch (e) { } }
+                    });
+                    p.on('disconnected', function () { try { if (!p.destroyed) p.reconnect(); } catch (e) { } });
+                    p.on('connection', function (c) {
+                        var id = nextId++;
+                        var opened = false;
+                        c.on('open', function () {
+                            opened = true;
+                            conns.set(id, c);
+                            c.send(new Uint8Array([255, id & 255, (id >> 8) & 255, (id >> 16) & 255, (id >>> 24) & 255]).buffer);
+                            ev({ t: 'open', p: id });
+                        });
+                        c.on('data', function (d) {
+                            var b = bytes(d);
+                            if (b) queueRecv(c, b, function (u) { if (conns.has(id)) ev({ t: 'data', p: id, b: u }); });
+                        });
+                        function gone() { if (conns.delete(id) && opened) ev({ t: 'close', p: id }); }
+                        c.on('close', gone);
+                        c.on('error', gone);
+                    });
+                }).catch(function () { net.state = 'error'; net.error = 'lib'; });
+            };
+
+            net.join = function (code) {
+                reset();
+                code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                net.state = 'joining';
+                var failed = false;
+                function fail(m) {
+                    if (failed || net.state !== 'joining') return;
+                    failed = true;
+                    reset();
+                    ev({ t: 'fail', m: m });
+                }
+                joinTimer = setTimeout(function () { fail('timeout'); }, 20000);
+                loadLib().then(function () {
+                    if (net.state !== 'joining') return;
+                    var p = new Peer({ debug: 0 });
+                    peer = p;
+                    p.on('error', function (err) {
+                        if (net.state === 'joining') fail(err && err.type === 'peer-unavailable' ? 'notfound' : 'network');
+                        else if (net.state === 'in' && server) {   }
+                    });
+                    p.on('open', function () {
+                        var c = p.connect(PREFIX + code, { reliable: true, serialization: 'raw' });
+                        server = c;
+                        c.on('data', function (d) {
+                            var raw = bytes(d);
+                            if (raw) queueRecv(c, raw, onData);
+                        });
+                        function onData(b) {
+                            if (net.state === 'joining' && b.length >= 5 && b[0] === 255) {
+                                if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
+                                net.state = 'in';
+                                ev({ t: 'joined', p: (b[1] | (b[2] << 8) | (b[3] << 16) | (b[4] << 24)) >>> 0 });
+                                return;
+                            }
+                            if (net.state === 'in') ev({ t: 'data', p: 1, b: b });
+                        }
+                        function gone() {
+                            if (net.state === 'in') { net.state = 'idle'; ev({ t: 'close', p: 1 }); }
+                            else fail('network');
+                        }
+                        c.on('close', gone);
+                        c.on('error', gone);
+                    });
+                }).catch(function () { fail('lib'); });
+            };
+
+            net.send = function (id, b) {
+                var c = (id === 1 && server) ? server : conns.get(id);
+                if (c && c.open) queueSend(c, b);
+            };
+            net.broadcast = function (except, b) {
+                conns.forEach(function (c, id) {
+                    if (id !== except && c.open) queueSend(c, b);
+                });
+            };
+            net.close = function () { reset(); net.events = []; net.cur = null; };
+            var TYPES = { open: 1, close: 2, data: 3, joined: 4, fail: 5 };
+            net.next = function () {
+                net.cur = net.events.length ? net.events.shift() : null;
+                return net.cur ? TYPES[net.cur.t] : 0;
+            };
+            net.failReason = function () { return (net.cur && net.cur.m) || ''; };
+        })();
+
+        (function () {
+            var overlay = null;
+            function close() { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); overlay = null; }
+            Module.mcHideRoomCode = close;
+            Module.mcAskRoomCode = function (message) {
+                close();
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;' +
+                    'align-items:center;justify-content:center;z-index:9999;font-family:monospace;padding:16px';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:24px;width:100%;' +
+                    'max-width:360px;box-sizing:border-box;color:#eee;text-align:center';
+                box.innerHTML =
+                    '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Join a game</h2>' +
+                    '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Type the code the host sees ' +
+                    'after choosing Open to friends in their game menu.</p>' +
+                    '<input type="text" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
+                    'style="width:100%;box-sizing:border-box;padding:8px;background:#222;color:#fff;text-align:center;' +
+                    'letter-spacing:6px;border:1px solid #666;font-size:22px;font-family:monospace;text-transform:uppercase">' +
+                    '<div data-err style="min-height:18px;margin:6px 0 10px;font-size:12px;color:#ff7070"></div>' +
+                    '<div style="display:flex;gap:10px;justify-content:center">' +
+                    '<button data-ok style="padding:10px 24px;background:#4a8a4a;color:#fff;border:none;' +
+                    'cursor:pointer;font-size:15px;font-family:monospace">Join</button>' +
+                    '<button data-no style="padding:10px 24px;background:#555;color:#fff;border:none;' +
+                    'cursor:pointer;font-size:15px;font-family:monospace">Cancel</button>' +
+                    '</div>';
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel',
+                 'touchstart', 'touchend'].forEach(function (t) {
+                    overlay.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                var input = box.querySelector('input'), err = box.querySelector('[data-err]');
+                err.textContent = message || '';
+                input.addEventListener('input', function () {
+                    var v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (v !== input.value) input.value = v;
+                    err.textContent = '';
+                });
+                function ok() {
+                    var c = input.value.trim().toUpperCase();
+                    if (c.length !== 5) { err.textContent = 'Codes are 5 letters and numbers'; return; }
+                    Module.mcRoomCodeInput = c;
+                    close();
+                }
+                function no() { Module.mcRoomCodeInput = ''; close(); }
+                box.querySelector('[data-ok]').onclick = ok;
+                box.querySelector('[data-no]').onclick = no;
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') ok();
+                    if (e.key === 'Escape') no();
+                });
+                setTimeout(function () { input.focus(); }, 50);
+            };
+        })();
+    </script>
+    <script type='text/javascript'>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
