@@ -936,16 +936,52 @@
                 return new Response(new Blob([b.subarray(1)]).stream().pipeThrough(new DecompressionStream('deflate-raw')))
                     .arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
             }
-            function queueSend(c, b) {
+            function sendNow(c, b) {
                 c._sendQ = (c._sendQ || Promise.resolve()).then(function () { return zip(b); }).then(function (x) {
                     if (!c.open) return;
                     var ab = (x.byteOffset === 0 && x.byteLength === x.buffer.byteLength) ? x.buffer : x.slice().buffer;
                     try { c.send(ab); } catch (e) { }
                 });
             }
+            var BATCH_MAX = 60000;
+            function flushConn(c) {
+                var out = c._out;
+                c._out = null; c._outLen = 0;
+                if (!out || !out.length) return;
+                if (out.length === 1) { sendNow(c, out[0]); return; }
+                var len = 1;
+                out.forEach(function (b) { len += 4 + b.length; });
+                var batch = new Uint8Array(len), dv = new DataView(batch.buffer), o = 1;
+                batch[0] = 252;
+                out.forEach(function (b) { dv.setUint32(o, b.length, true); batch.set(b, o + 4); o += 4 + b.length; });
+                sendNow(c, batch);
+            }
+            var pendingFlush = [];
+            function queueSend(c, b) {
+                if (b.length >= BATCH_MAX) { flushConn(c); sendNow(c, b); return; }
+                if (c._outLen + b.length + 4 > BATCH_MAX) flushConn(c);
+                if (!c._out) {
+                    c._out = []; c._outLen = 0;
+                    if (!pendingFlush.length) Promise.resolve().then(function () {
+                        var list = pendingFlush; pendingFlush = [];
+                        list.forEach(flushConn);
+                    });
+                    pendingFlush.push(c);
+                }
+                c._out.push(b);
+                c._outLen += b.length + 4;
+            }
             function queueRecv(c, b, then) {
-                c._recvQ = (c._recvQ || Promise.resolve()).then(function () { return unzip(b); }).then(then)
-                    .catch(function (e) { console.warn('[net] bad message', e); });
+                c._recvQ = (c._recvQ || Promise.resolve()).then(function () { return unzip(b); }).then(function (u) {
+                    if (u[0] !== 252) { then(u); return; }
+                    var dv = new DataView(u.buffer, u.byteOffset, u.byteLength), o = 1;
+                    while (o + 4 <= u.length) {
+                        var n = dv.getUint32(o, true);
+                        if (o + 4 + n > u.length) break;
+                        then(u.subarray(o + 4, o + 4 + n));
+                        o += 4 + n;
+                    }
+                }).catch(function (e) { console.warn('[net] bad message', e); });
             }
             var CTL_PART = 60000;
             var enc = new TextEncoder(), dec = new TextDecoder();
