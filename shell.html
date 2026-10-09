@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <meta name="mcre-build" content="dev">
     <title>Minecraft RE</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
@@ -65,6 +66,19 @@
         var Module = {
             canvas: (function () { return document.getElementById('canvas'); })()
         };
+
+        var MCRE_BUILD = (function () {
+            var m = document.querySelector('meta[name="mcre-build"]');
+            return (m && m.getAttribute('content')) || 'dev';
+        })();
+        Module.mcBuild = MCRE_BUILD;
+        (function () {
+            var tag = document.createElement('div');
+            tag.textContent = MCRE_BUILD;
+            tag.style.cssText = 'position:fixed;left:4px;bottom:2px;font:10px monospace;color:rgba(255,255,255,.5);' +
+                'text-shadow:1px 1px 0 rgba(0,0,0,.6);pointer-events:none;user-select:none;z-index:5';
+            document.body.appendChild(tag);
+        })();
 
         Module.mcPixelRatio = function () {
             var dpr = window.devicePixelRatio || 1;
@@ -959,7 +973,11 @@
                 }
                 return null;
             }
-            function hostCtl(c, msg) {
+            function hostCtl(c, msg, id) {
+                if (msg && msg.json && (msg.json.t === 'cmd' || msg.json.t === 'guiev')) {
+                    if (Module.mcScripts) Module.mcScripts.fromJoiner(id, msg.json);
+                    return;
+                }
                 if (msg && msg.json && msg.json.t === 'get' && Array.isArray(msg.json.ids) && Module.mcMods) {
                     msg.json.ids.slice(0, 64).forEach(function (id) {
                         var bytes = Module.mcMods.fileOf(String(id));
@@ -999,7 +1017,10 @@
                             opened = true;
                             conns.set(id, c);
                             var withMods = !!(Module.mcMods && Module.mcMods.hasEnabled && Module.mcMods.hasEnabled());
-                            c.send(new Uint8Array([255, id & 255, (id >> 8) & 255, (id >> 16) & 255, (id >>> 24) & 255, withMods ? 1 : 0]).buffer);
+                            var tag = enc.encode(MCRE_BUILD), hello = new Uint8Array(6 + tag.length);
+                            hello.set([255, id & 255, (id >> 8) & 255, (id >> 16) & 255, (id >>> 24) & 255, withMods ? 1 : 0]);
+                            hello.set(tag, 6);
+                            c.send(hello.buffer);
                             if (withMods) Module.mcMods.offer().then(function (list) { sendCtl(c, { t: 'mods', list: list, map: Module.mcMods.mapText() }); })
                                 .catch(function () { sendCtl(c, { t: 'mods', list: [] }); });
                             ev({ t: 'open', p: id });
@@ -1008,7 +1029,15 @@
                             var b = bytes(d);
                             if (b) queueRecv(c, b, function (u) {
                                 if (!conns.has(id)) return;
-                                if (u[0] === 253) { hostCtl(c, readCtl(u)); return; }
+                                if (!c._ver) {
+                                    var first = u[0] === 253 ? readCtl(u) : null;
+                                    if (first && first.json && first.json.t === 'ver' && first.json.v === MCRE_BUILD) { c._ver = true; return; }
+                                    console.warn('[net] a different build tried to join; closed');
+                                    try { c.close(); } catch (e) { }
+                                    gone();
+                                    return;
+                                }
+                                if (u[0] === 253) { hostCtl(c, readCtl(u), id); return; }
                                 ev({ t: 'data', p: id, b: u });
                             });
                         });
@@ -1057,6 +1086,13 @@
                             if (net.state === 'joining' && b.length >= 5 && b[0] === 255) {
                                 if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
                                 myId = (b[1] | (b[2] << 8) | (b[3] << 16) | (b[4] << 24)) >>> 0;
+                                var theirs = b.length > 6 ? dec.decode(b.subarray(6)).replace(/[^ -~]/g, '').slice(0, 40) : '';
+                                if (theirs !== MCRE_BUILD) {
+                                    fail('msg:That game is on version ' + (theirs || 'an older one') + ' and you are on ' + MCRE_BUILD +
+                                         '. Both of you need the same version - reload the page to update.');
+                                    return;
+                                }
+                                sendCtl(c, { t: 'ver', v: MCRE_BUILD });
                                 if (b.length >= 6 && b[5] === 1 && Module.mcMods && Module.mcMods.askJoin) {
                                     net.state = 'mods';
                                     joinTimer = setTimeout(function () { fail('mods'); }, 30000);
@@ -1099,6 +1135,11 @@
                                 }
                                 return;
                             }
+                            if (net.state === 'in' && b[0] === 253) {
+                                var hm = readCtl(b);
+                                if (hm && hm.json && Module.mcScripts) Module.mcScripts.fromHost(hm.json);
+                                return;
+                            }
                             if (net.state === 'in') ev({ t: 'data', p: 1, b: b });
                         }
                         function finish() {
@@ -1117,6 +1158,9 @@
                 }).catch(function () { fail('lib'); });
             };
 
+            net.sendCtlTo = function (id, obj) { var c = conns.get(id); if (c && c.open) sendCtl(c, obj); };
+            net.eachConn = function (fn) { conns.forEach(function (c, id) { if (c.open) fn(id); }); };
+            net.sendCtlHost = function (obj) { if (server && server.open && net.state === 'in') sendCtl(server, obj); };
             net.send = function (id, b) {
                 var c = (id === 1 && server) ? server : conns.get(id);
                 if (c && c.open) queueSend(c, b);
@@ -1270,7 +1314,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/)/i.test(k);
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|scripts\/.+\.js$)/i.test(k);
                 });
             }
             function manifestOf(files, fallbackName) {
@@ -1284,7 +1328,7 @@
                 }
                 if (m.format !== undefined && m.format !== 1) throw new Error('needs a newer version of the game');
                 if (m.type !== undefined && ['resource', 'content', 'mod'].indexOf(m.type) < 0) throw new Error('is a "' + String(m.type).slice(0, 24) + '" mod - this version runs resource packs and content mods');
-                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items or recipes)');
+                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items, recipes or scripts)');
                 var str = function (v, max) { return typeof v === 'string' ? v.trim().slice(0, max) : ''; };
                 var id = typeof m.id === 'string' && /^[a-z0-9_.-]{1,48}$/.test(m.id) ? m.id : '';
                 if (!id) {
@@ -1377,6 +1421,7 @@
                 var lang = [];
                 var unknown = 0;
                 var content = [];
+                var scripts = [];
                 var newTex = { blocks: {}, items: {} };
                 var on = mods.filter(function (x) { return x.enabled && !x.err; }).reverse();
                 if (session) on = session.slice().reverse().concat(on);
@@ -1384,6 +1429,7 @@
                     return pr.then(function () { return readZip(x.bytes || FS.readFile(x.file)); }).then(function (files) {
                         files = normalise(files);
                         var jobs = Promise.resolve();
+                        var own = mods.indexOf(x) >= 0;
                         Object.keys(files).sort().forEach(function (path) {
                             var data = files[path], m;
                             if (/^images\/.+\.(png|json|txt)$/i.test(path) && path.indexOf('..') < 0) {
@@ -1430,11 +1476,14 @@
                                 lang.push(new TextDecoder().decode(data));
                             } else if ((m = /^(blocks|items|recipes)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: x.id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data });
+                            } else if (/^scripts\/.+\.js$/i.test(path)) {
+                                scripts.push({ mod: x.id, file: path, code: new TextDecoder().decode(data), session: !own });
                             }
                         });
                         return jobs;
                     }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); });
                 }, Promise.resolve()).then(function () {
+                    scriptList = scripts;
                     return buildContent(content, newTex, sheets, lang);
                 }).then(function (warn) {
                     unknown += warn || 0;
@@ -1460,6 +1509,24 @@
 
             var VANILLA = {};
             'stone:1,grass:2,dirt:3,cobblestone:4,planks:5,sapling:6,bedrock:7,sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,log:17,leaves:18,sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,noteblock:25,golden_rail:27,detector_rail:28,sticky_piston:29,web:30,tallgrass:31,deadbush:32,piston:33,wool:35,yellow_flower:37,red_flower:38,brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,brick_block:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,torch:50,mob_spawner:52,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,farmland:60,furnace:61,ladder:65,rail:66,stone_stairs:67,lever:69,stone_pressure_plate:70,wooden_pressure_plate:72,redstone_ore:73,redstone_torch:76,stone_button:77,snow_layer:78,ice:79,snow:80,cactus:81,clay:82,fence:85,pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,lit_pumpkin:91,trapdoor:96,stonebrick:98,iron_bars:101,glass_pane:102,melon_block:103,vine:106,fence_gate:107,brick_stairs:108,stone_brick_stairs:109,mycelium:110,waterlily:111,nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,enchanting_table:116,end_stone:121,redstone_lamp:123,wooden_slab:126,sandstone_stairs:128,emerald_ore:129,ender_chest:130,emerald_block:133,spruce_stairs:134,birch_stairs:135,jungle_stairs:136,cobblestone_wall:139,wooden_button:143,anvil:145,trapped_chest:146,redstone_block:152,quartz_ore:153,hopper:154,quartz_block:155,quartz_stairs:156,activator_rail:157,dropper:158,hay_block:170,carpet:171,hardened_clay:172,coal_block:173,iron_shovel:256,iron_pickaxe:257,iron_axe:258,flint_and_steel:259,apple:260,bow:261,arrow:262,coal:263,diamond:264,iron_ingot:265,gold_ingot:266,iron_sword:267,wooden_sword:268,wooden_shovel:269,wooden_pickaxe:270,wooden_axe:271,stone_sword:272,stone_shovel:273,stone_pickaxe:274,stone_axe:275,diamond_sword:276,diamond_shovel:277,diamond_pickaxe:278,diamond_axe:279,stick:280,bowl:281,mushroom_stew:282,golden_sword:283,golden_shovel:284,golden_pickaxe:285,golden_axe:286,string:287,feather:288,gunpowder:289,wooden_hoe:290,stone_hoe:291,iron_hoe:292,diamond_hoe:293,golden_hoe:294,wheat_seeds:295,wheat:296,bread:297,leather_helmet:298,leather_chestplate:299,leather_leggings:300,leather_boots:301,chainmail_helmet:302,chainmail_chestplate:303,chainmail_leggings:304,chainmail_boots:305,iron_helmet:306,iron_chestplate:307,iron_leggings:308,iron_boots:309,diamond_helmet:310,diamond_chestplate:311,diamond_leggings:312,diamond_boots:313,golden_helmet:314,golden_chestplate:315,golden_leggings:316,golden_boots:317,flint:318,porkchop:319,cooked_porkchop:320,painting:321,golden_apple:322,sign:323,wooden_door:324,bucket:325,water_bucket:326,lava_bucket:327,minecart:328,saddle:329,iron_door:330,redstone:331,snowball:332,boat:333,leather:334,milk_bucket:335,brick:336,clay_ball:337,reeds:338,paper:339,book:340,slime_ball:341,egg:344,compass:345,fishing_rod:346,clock:347,glowstone_dust:348,fish:349,cooked_fished:350,dye:351,bone:352,sugar:353,cake:354,bed:355,repeater:356,cookie:357,filled_map:358,shears:359,melon:360,pumpkin_seeds:361,melon_seeds:362,beef:363,cooked_beef:364,chicken:365,cooked_chicken:366,rotten_flesh:367,ender_pearl:368,blaze_rod:369,ghast_tear:370,gold_nugget:371,nether_wart:372,potion:373,glass_bottle:374,spider_eye:375,fermented_spider_eye:376,blaze_powder:377,magma_cream:378,brewing_stand:379,cauldron:380,ender_eye:381,speckled_melon:382,experience_bottle:384,fire_charge:385,emerald:388,item_frame:389,flower_pot:390,carrot:391,potato:392,baked_potato:393,poisonous_potato:394,map:395,golden_carrot:396,skull:397,carrot_on_a_stick:398,nether_star:399,pumpkin_pie:400,comparator:404,netherbrick:405,quartz:406'.split(',').forEach(function (kv) { var p = kv.split(':'); VANILLA[p[0]] = parseInt(p[1], 10); });
+            var SHAPES = {
+                cube: 'cube', full: 'cube', cross: 'cross', plant: 'cross',
+                slab: '0,0,0,16,8,16', bottom_slab: '0,0,0,16,8,16', top_slab: '0,8,0,16,16,16',
+                carpet: '0,0,0,16,1,16', layer: '0,0,0,16,2,16', plate: '1,0,1,15,1,15',
+                path: '0,0,0,16,15,16', cactus: '1,0,1,15,16,15', post: '6,0,6,10,16,10',
+                pillar: '4,0,4,12,16,12', table: '0,12,0,16,16,16', button: '5,0,6,11,2,10'
+            };
+            function shapeOf(s) {
+                if (Array.isArray(s) && s.length === 6 && s.every(function (v) { return typeof v === 'number'; })) {
+                    var b = s.map(function (v) { return Math.max(0, Math.min(16, v)); });
+                    for (var i = 0; i < 3; i++) if (b[i + 3] < b[i]) { var t = b[i]; b[i] = b[i + 3]; b[i + 3] = t; }
+                    return b.join(',');
+                }
+                if (s && typeof s === 'object' && Array.isArray(s.box)) return shapeOf(s.box);
+                return SHAPES[String(s || 'cube').toLowerCase()] || 'cube';
+            }
+            var contentKeys = {};
+            var scriptList = [];
             var maxSheet = 0;
             function maxTextureSize() {
                 if (maxSheet) return maxSheet;
@@ -1481,6 +1548,9 @@
                     else if (c.kind === 'items') items[key] = { mod: c.mod, name: c.name, j: j };
                     else recipes.push({ mod: c.mod, j: j });
                 });
+                contentKeys = {};
+                Object.keys(blocks).forEach(function (k) { contentKeys[k] = 'block'; });
+                Object.keys(items).forEach(function (k) { contentKeys[k] = 'item'; });
                 function ref(r, mod) {
                     if (typeof r === 'object' && r) r = r.item || r.id || '';
                     r = String(r || '').trim().toLowerCase();
@@ -1534,8 +1604,13 @@
                     var count = Math.max(0, Math.min(64, parseInt(j.drop_count, 10) || 1));
                     var desc = 'tile.mod.' + key;
                     lang.push(desc + '.name=' + clean(j.name || pretty(b.name)));
-                    lines.push(['block', key, desc, tex.join(','), hard, tool, sound, (j.light > 0 || j.light === true) ? 1 : 0,
-                                (j.transparent || j.see_through) ? 1 : 0, drop, count].join('\t'));
+                    var light = j.light === true ? 15 : Math.max(0, Math.min(15, Math.round(+j.light || 0)));
+                    var shape = shapeOf(j.shape);
+                    var collide = j.collision === undefined && j.collide === undefined ? shape !== 'cross' : !!(j.collision === undefined ? j.collide : j.collision);
+                    var friction = typeof j.friction === 'number' ? Math.max(0.1, Math.min(1.2, j.friction)) : (j.slippery ? 0.98 : 0.6);
+                    lines.push(['block', key, desc, tex.join(','), hard, tool, sound, light,
+                                (j.transparent || j.see_through) ? 1 : 0, drop, count,
+                                shape, collide ? 1 : 0, j.gravity ? 1 : 0, friction.toFixed(2), j.flammable ? 1 : 0, j.scripted ? 1 : 0].join('\t'));
                 });
                 Object.keys(items).forEach(function (key) {
                     var it = items[key], j = it.j;
@@ -1545,7 +1620,7 @@
                     var desc = 'item.mod.' + key;
                     lang.push(desc + '.name=' + clean(j.name || pretty(it.name)));
                     lines.push(['item', key, desc, cellOf('items', it.mod, j.texture || it.name),
-                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat].join('\t'));
+                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0].join('\t'));
                 });
                 recipes.forEach(function (r) {
                     var j = r.j, type = String(j.type || '').toLowerCase().replace('minecraft:', '').replace('crafting_', '');
@@ -1709,6 +1784,35 @@
                 if (x.hash) return Promise.resolve(x.hash);
                 return sha(FS.readFile(x.file)).then(function (h) { x.hash = h; return h; });
             }
+            api.scripts = function (joined) { return scriptList.filter(function (s) { return !!s.session === !!joined; }); };
+            api.refOf = function (name, mod) {
+                if (typeof name === 'number') return 'id:' + (name | 0);
+                var p = String(name || '').trim().toLowerCase().split(':');
+                if (!p[0]) return '';
+                if (p[0] === 'air' || p[0] === 'minecraft' && p[1] === 'air') return 'id:0';
+                var data = function (s) { return s !== undefined && s !== '' ? ':' + (parseInt(s, 10) || 0) : ''; };
+                if (p[0] === 'minecraft' || p[0] === 'id') {
+                    var id = /^\d+$/.test(p[1] || '') ? parseInt(p[1], 10) : VANILLA[p[1]];
+                    return id ? 'id:' + id + data(p[2]) : '';
+                }
+                if (/^\d+$/.test(p[0])) return 'id:' + p[0] + data(p[1]);
+                if (p[0] === 'mod') p = p.slice(1);
+                if (p.length === 1) {
+                    if (contentKeys[mod + ':' + p[0]]) return 'mod:' + mod + ':' + p[0];
+                    return VANILLA[p[0]] ? 'id:' + VANILLA[p[0]] : '';
+                }
+                return 'mod:' + p[0] + ':' + p[1];
+            };
+            var byId = null;
+            api.nameOfRef = function (r) {
+                r = String(r || '');
+                if (r.indexOf('mod:') === 0) return r.slice(4);
+                var m = /^id:(\d+)(?::(\d+))?$/.exec(r);
+                if (!m) return r;
+                if (m[1] === '0') return 'air';
+                if (!byId) { byId = {}; Object.keys(VANILLA).forEach(function (k) { if (byId[VANILLA[k]] === undefined) byId[VANILLA[k]] = k; }); }
+                return 'minecraft:' + (byId[m[1]] || m[1]) + (m[2] && m[2] !== '0' ? ':' + m[2] : '');
+            };
             api.hasEnabled = function () { return mods.some(function (x) { return x.enabled && !x.err; }); };
             api.offer = function () {
                 var on = mods.filter(function (x) { return x.enabled && !x.err; });
@@ -1854,6 +1958,466 @@
                 overlay.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
             };
             api.closePick = closeBox;
+        })();
+
+        (function () {
+            var worker = null, side = '', folder = '', actions = [], me = null;
+            var known = {};
+            var wants = {};
+            var remoteReq = {}, nextRemoteReq = 1000000;
+            var api = Module.mcScripts = {};
+            function W() { return Module.mcMods; }
+            function net() { return Module.mcNet || {}; }
+            function joined() { return net().state === 'in'; }
+
+            function workerMain() {
+                var post = self.postMessage.bind(self);
+                ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts', 'indexedDB', 'caches',
+                 'Worker', 'SharedWorker', 'BroadcastChannel', 'WebTransport', 'Request', 'Response'].forEach(function (n) {
+                    var o = self;
+                    while (o) {
+                        try { if (Object.prototype.hasOwnProperty.call(o, n)) delete o[n]; } catch (e) { }
+                        o = Object.getPrototypeOf(o);
+                    }
+                    try { Object.defineProperty(self, n, { value: undefined, writable: false, configurable: false }); } catch (e) { }
+                });
+                var server = {}, client = {}, commands = {}, pending = {}, req = 0, store = {}, saveTimer = {};
+                var isHost = false, warned = {};
+                function pid(p) { return (p && typeof p === 'object') ? p.id : p; }
+                function act(mod, a) { post({ t: 'act', mod: mod, a: a }); }
+                function ask(mod, a) {
+                    return new Promise(function (res) { var id = ++req; pending[id] = res; act(mod, [a[0], id].concat(a.slice(1))); });
+                }
+                function report(mod, e) { post({ t: 'error', mod: mod, text: String((e && e.message) || e) }); }
+                function save(mod) {
+                    if (saveTimer[mod]) return;
+                    saveTimer[mod] = setTimeout(function () { saveTimer[mod] = 0; post({ t: 'save', mod: mod, data: store[mod] || {} }); }, 400);
+                }
+                function plain(v) { try { return v === undefined ? null : JSON.parse(JSON.stringify(v)); } catch (e) { return null; } }
+                function hostOnly(mod, what) {
+                    if (isHost) return true;
+                    if (!warned[mod + what]) { warned[mod + what] = 1; post({ t: 'log', mod: mod, text: what + ' is kept by the host: use client.send to ask it' }); }
+                    return false;
+                }
+                function apiFor(mod) {
+                    function on(list) {
+                        return function (type, fn) {
+                            if (typeof fn !== 'function') return;
+                            (list[type] = list[type] || []).push({ mod: mod, fn: fn });
+                            if (list === server && type === 'gametick') act(mod, ['subscribe', 'gametick']);
+                            if (list === client && (type === 'tick' || type === 'key')) post({ t: 'want', what: type });
+                        };
+                    }
+                    var sound = function (name, x, y, z, v, p) { act(mod, ['sound', String(name), +x, +y, +z, v == null ? 1 : +v, p == null ? 1 : +p]); };
+                    return {
+                        mod: {
+                            id: mod, on: on(server),
+                            command: function (name, fn) { if (typeof fn === 'function') commands[String(name).toLowerCase().replace(/^[/]/, '')] = { mod: mod, fn: fn }; },
+                            send: function (p, data) { post({ t: 'send', mod: mod, player: p === 'all' ? 'all' : pid(p), data: plain(data) }); }
+                        },
+                        world: {
+                            setBlock: function (x, y, z, block, data) { act(mod, ['setblock', x | 0, y | 0, z | 0, block, data == null ? '' : data | 0]); },
+                            setData: function (x, y, z, data) { act(mod, ['setdata', x | 0, y | 0, z | 0, data | 0]); },
+                            getBlock: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return { block: r.block, data: r.data }; }); },
+                            scheduleTick: function (x, y, z, ticks) { act(mod, ['tickat', x | 0, y | 0, z | 0, Math.max(1, ticks | 0)]); },
+                            spawnItem: function (x, y, z, item, n) { act(mod, ['spawnitem', +x, +y, +z, item, Math.max(1, n | 0 || 1)]); },
+                            explode: function (x, y, z, power, fire) { act(mod, ['explode', +x, +y, +z, +power || 2, fire ? 1 : 0]); },
+                            time: function () { return ask(mod, ['time']).then(function (r) { return r.time; }); },
+                            setTime: function (t) { act(mod, ['settime', t | 0]); },
+                            sound: sound
+                        },
+                        players: {
+                            all: function () { return ask(mod, ['players']).then(function (r) { return r.players || []; }); },
+                            message: function (p, text) { act(mod, ['message', p === 'all' ? 'all' : pid(p), String(text)]); },
+                            give: function (p, item, n) { act(mod, ['give', pid(p), item, Math.max(1, n | 0 || 1)]); },
+                            teleport: function (p, x, y, z) { act(mod, ['teleport', pid(p), +x, +y, +z]); },
+                            heal: function (p, n) { act(mod, ['heal', pid(p), n | 0]); }
+                        },
+                        gui: {
+                            open: function (p, spec) { post({ t: 'gui', mod: mod, player: pid(p), spec: plain(spec) || {} }); },
+                            close: function (p) { post({ t: 'guiClose', mod: mod, player: pid(p) }); }
+                        },
+                        storage: {
+                            get: function (k) { if (!hostOnly(mod, 'storage')) return undefined; return plain((store[mod] || {})[k]); },
+                            set: function (k, v) { if (!hostOnly(mod, 'storage')) return; (store[mod] = store[mod] || {})[k] = plain(v); save(mod); },
+                            all: function () { return plain(store[mod] || {}); }
+                        },
+                        client: {
+                            on: on(client),
+                            get isHost() { return isHost; },
+                            player: function () { return new Promise(function (res) { var id = ++req; pending[id] = res; post({ t: 'me', req: id }); }).then(function (r) { return r.player; }); },
+                            send: function (data) { post({ t: 'csend', mod: mod, data: plain(data) }); },
+                            gui: {
+                                open: function (spec) { post({ t: 'cgui', mod: mod, spec: plain(spec) || {} }); },
+                                close: function () { post({ t: 'cguiClose', mod: mod }); }
+                            },
+                            sound: function (name, v, p) { post({ t: 'csound', name: String(name), v: v == null ? 1 : +v, p: p == null ? 1 : +p }); },
+                            message: function (text) { post({ t: 'cmsg', text: String(text) }); },
+                            hud: function (id, text) { post({ t: 'hud', mod: mod, id: String(id), text: text == null ? null : String(text) }); }
+                        },
+                        log: function () { post({ t: 'log', mod: mod, text: Array.prototype.map.call(arguments, function (a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); }).join(' ') }); }
+                    };
+                }
+                function fire(list, type, e) {
+                    (list[type] || []).forEach(function (h) {
+                        if (e.mod && (type === 'gui' || type === 'message') && e.mod !== h.mod) return;
+                        try { var r = h.fn(e); if (r && r.catch) r.catch(function (x) { report(h.mod, x); }); } catch (x) { report(h.mod, x); }
+                    });
+                }
+                self.onmessage = function (m) {
+                    var d = m.data;
+                    if (d.t === 'load') {
+                        store = d.store || {};
+                        isHost = !!d.host;
+                        d.scripts.forEach(function (s) {
+                            var a = apiFor(s.mod);
+                            try { new Function('mod', 'world', 'players', 'gui', 'storage', 'client', 'log', s.code)(a.mod, a.world, a.players, a.gui, a.storage, a.client, a.log); }
+                            catch (e) { report(s.mod, e); }
+                        });
+                        return;
+                    }
+                    if (d.t !== 'event') return;
+                    var e = d.e;
+                    if (e.t === 'reply') { var r = pending[e.req]; delete pending[e.req]; if (r) r(e); return; }
+                    if (e.client) { delete e.client; fire(client, e.t, e); return; }
+                    if (e.t === 'command') {
+                        var parts = String(e.text || '').replace(/^[/]/, '').split(' ');
+                        var c = commands[parts[0].toLowerCase()];
+                        if (!c) { post({ t: 'unknown', player: e.player, text: e.text }); return; }
+                        try { var cr = c.fn({ player: e.player, args: parts.slice(1), text: e.text }); if (cr && cr.catch) cr.catch(function (x) { report(c.mod, x); }); } catch (x) { report(c.mod, x); }
+                        return;
+                    }
+                    if (e.t === 'stop') {
+                        Object.keys(saveTimer).forEach(function (k) { if (saveTimer[k]) { clearTimeout(saveTimer[k]); saveTimer[k] = 0; post({ t: 'save', mod: k, data: store[k] || {} }); } });
+                    }
+                    fire(server, e.t, e);
+                };
+            }
+
+            function ref(name, mod) { return W() && W().refOf ? W().refOf(name, mod) : ''; }
+            function nameOf(r) { return W() && W().nameOfRef ? W().nameOfRef(r) : r; }
+            function chat(text) { if (Module._mcScriptLocalMessage) Module._mcScriptLocalMessage(String(text).slice(0, 300)); }
+            function remote(p) {
+                return side === 'host' && p && p.guid && me && p.guid !== me.guid && net().isOpen && net().isOpen(p.guid) ? p.guid : 0;
+            }
+            function eachJoiner(fn) { if (side === 'host' && net().eachConn) net().eachConn(fn); }
+
+            function runAct(mod, a, fromGuid) {
+                if (!Array.isArray(a) || typeof a[0] !== 'string') return;
+                var k = a[0];
+                if (side === 'client') { if (net().sendCtlHost) net().sendCtlHost({ t: 'sact', mod: mod, a: a }); return; }
+                if ((k === 'getblock' || k === 'players' || k === 'time') && fromGuid) {
+                    var id = nextRemoteReq++;
+                    remoteReq[id] = { guid: fromGuid, req: a[1] };
+                    a = a.slice(); a[1] = id;
+                }
+                if (k === 'setblock' || k === 'spawnitem') a[4] = ref(a[4], mod) || 'none';
+                if (k === 'give' || k === 'teleport' || k === 'heal') {
+                    var g = remote(known[a[1]]);
+                    if (k === 'give') a[2] = ref(a[2], mod) || 'none';
+                    if (g) {
+                        if (k === 'give') net().sendCtlTo(g, { t: 'give', ref: a[2], n: +a[3] || 1 });
+                        else if (k === 'teleport') net().sendCtlTo(g, { t: 'tp', x: +a[2], y: +a[3], z: +a[4] });
+                        else net().sendCtlTo(g, { t: 'heal', n: a[2] | 0 });
+                        return;
+                    }
+                }
+                if (k === 'sound') eachJoiner(function (c) { net().sendCtlTo(c, { t: 'sound', name: a[1], x: +a[2], y: +a[3], z: +a[4], v: +a[5], p: +a[6] }); });
+                if (k === 'subscribe' && fromGuid) return;
+                actions.push(a.map(function (v) { return String(v).replace(/[\t\n\r]/g, ' '); }).join('\t'));
+            }
+            function sendToPlayer(mod, who, data) {
+                if (who === 'all') {
+                    toWorker({ t: 'message', client: true, mod: mod, data: data });
+                    eachJoiner(function (c) { net().sendCtlTo(c, { t: 'cmsg', mod: mod, data: data }); });
+                    return;
+                }
+                var p = known[who], g = remote(p);
+                if (g) net().sendCtlTo(g, { t: 'cmsg', mod: mod, data: data });
+                else if (p && me && p.id === me.id) toWorker({ t: 'message', client: true, mod: mod, data: data });
+            }
+
+            function onWorker(m) {
+                var d = m.data;
+                switch (d.t) {
+                case 'act': runAct(d.mod, d.a, 0); break;
+                case 'gui': case 'guiClose':
+                    if (side !== 'host') { if (net().sendCtlHost) net().sendCtlHost({ t: 'sgui', mod: d.mod, open: d.t === 'gui', player: d.player, spec: d.spec }); break; }
+                    serverGui(d.mod, d.t === 'gui', known[d.player] || (me && d.player === me.id ? me : null), d.spec);
+                    break;
+                case 'send':
+                    if (side !== 'host') { if (net().sendCtlHost) net().sendCtlHost({ t: 'ssend', mod: d.mod, player: d.player, data: d.data }); break; }
+                    sendToPlayer(d.mod, d.player, d.data);
+                    break;
+                case 'csend':
+                    if (side === 'host') toWorker({ t: 'message', mod: d.mod, data: d.data, player: me });
+                    else if (net().sendCtlHost) net().sendCtlHost({ t: 'csend', mod: d.mod, data: d.data });
+                    break;
+                case 'cgui': showGui(Object.assign({}, d.spec, { _mod: d.mod }), function (ev) { toWorker(Object.assign(ev, { t: 'gui', client: true })); }); break;
+                case 'cguiClose': closeGui(); break;
+                case 'csound':
+                    if (Module._mcScriptSound && me) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [d.name, NaN, 0, 0, d.v, d.p]);
+                    break;
+                case 'cmsg': chat(d.text); break;
+                case 'hud': hud(d.mod + ':' + d.id, d.text); break;
+                case 'want': wants[d.what] = true; break;
+                case 'me':
+                    var p = null;
+                    try { p = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (x) { }
+                    toWorker({ t: 'reply', req: d.req, player: p });
+                    break;
+                case 'save': saveStore(d.mod, d.data); break;
+                case 'error':
+                    console.warn('[mod ' + d.mod + ']', d.text);
+                    chat('[' + d.mod + '] error: ' + String(d.text).slice(0, 120));
+                    break;
+                case 'log': console.log('[mod ' + d.mod + ']', d.text); break;
+                case 'unknown':
+                    var who = d.player && d.player.id != null ? d.player.id : (me && me.id);
+                    if (who != null) runAct('', ['message', who, 'Unknown command: ' + String(d.text || '').split(' ')[0]], 0);
+                    break;
+                }
+            }
+            function serverGui(mod, open, p, spec) {
+                var g = remote(p);
+                if (g) { net().sendCtlTo(g, open ? { t: 'gui', spec: Object.assign({}, spec, { _mod: mod }) } : { t: 'guiClose' }); return; }
+                if (p && me && p.id !== me.id) return;
+                if (!open) { closeGui(); return; }
+                showGui(Object.assign({}, spec, { _mod: mod }), function (ev) { toWorker(Object.assign(ev, { t: 'gui', player: me })); });
+            }
+            function toWorker(e) {
+                if (!worker) return;
+                if (e.player && e.player.id != null) known[e.player.id] = e.player;
+                if (Array.isArray(e.players)) e.players.forEach(function (p) { if (p) known[p.id] = p; });
+                if (typeof e.block === 'string') e.block = nameOf(e.t === 'reply' ? e.block : 'mod:' + e.block);
+                if (typeof e.item === 'string') e.item = nameOf('mod:' + e.item);
+                worker.postMessage({ t: 'event', e: e });
+            }
+
+            var store = {};
+            function loadStore() {
+                store = {};
+                if (!folder) return store;
+                try { store = JSON.parse(new TextDecoder().decode(FS.readFile(folder + '/mod_data.json'))) || {}; } catch (e) { store = {}; }
+                return store;
+            }
+            function saveStore(mod, data) {
+                if (!folder || side !== 'host') return;
+                store[mod] = data;
+                try { FS.writeFile(folder + '/mod_data.json', JSON.stringify(store)); } catch (e) { }
+                if (Module._syncSaves) Module._syncSaves();
+            }
+
+            api.running = function () { return !!worker; };
+            api.wantsTick = function () { return worker && wants.tick ? 1 : 0; };
+            api.peekLen = function () { return actions.length ? lengthBytesUTF8(actions[0]) + 1 : 0; };
+            api.next = function () { return actions.shift() || ''; };
+            var stopTimer = 0;
+            api.event = function (json) {
+                var e;
+                try { e = JSON.parse(json); } catch (x) { return; }
+                if (e.t === 'start') {
+                    var newSide = e.client ? 'client' : 'host';
+                    me = e.player || null;
+                    if (me) known[me.id] = me;
+                    if (stopTimer) { clearTimeout(stopTimer); stopTimer = 0; }
+                    if (worker && side === newSide && folder === (e.folder || '')) {
+                        if (side === 'host') toWorker({ t: 'dimension', dimension: e.dimension, player: me });
+                        toWorker({ t: 'dimension', client: true, dimension: e.dimension, player: me });
+                        return;
+                    }
+                    stop();
+                    var scripts = W() && W().scripts ? W().scripts(newSide === 'client') : [];
+                    if (!scripts.length) return;
+                    side = newSide; folder = e.folder || '';
+                    try {
+                        var url = URL.createObjectURL(new Blob(['(' + workerMain.toString() + ')()'], { type: 'text/javascript' }));
+                        worker = new Worker(url);
+                        URL.revokeObjectURL(url);
+                    } catch (x) { console.warn('[mods] scripts could not start', x); worker = null; return; }
+                    worker.onmessage = onWorker;
+                    worker.onerror = function (x) { console.warn('[mods] script error', x.message); chat('[mods] script error: ' + x.message); };
+                    worker.postMessage({ t: 'load', scripts: scripts, store: side === 'host' ? loadStore() : {}, host: side === 'host' });
+                    if (side === 'host') toWorker({ t: 'start', folder: folder, dimension: e.dimension, player: me });
+                    toWorker({ t: 'start', client: true, dimension: e.dimension, player: me });
+                    return;
+                }
+                if (e.t === 'stop') {
+                    toWorker({ t: 'stop', client: true });
+                    if (side === 'host') toWorker(e);
+                    if (stopTimer) clearTimeout(stopTimer);
+                    stopTimer = setTimeout(function () { stopTimer = 0; stop(); }, 300);
+                    return;
+                }
+                if (e.t === 'ctick') { e.t = 'tick'; e.client = true; if (e.player) me = e.player; }
+                else if (e.t === 'reply' && remoteReq[e.req]) {
+                    var rr = remoteReq[e.req]; delete remoteReq[e.req];
+                    if (typeof e.block === 'string') e.block = nameOf(e.block);
+                    e.req = rr.req;
+                    if (net().sendCtlTo) net().sendCtlTo(rr.guid, { t: 'reply', e: e });
+                    return;
+                }
+                toWorker(e);
+            };
+            function stop() {
+                if (worker) { try { worker.terminate(); } catch (x) { } }
+                worker = null; side = ''; actions = []; known = {}; wants = {}; remoteReq = {};
+                closeGui();
+                hud(null);
+            }
+            api.command = function (text, playerJson) {
+                if (joined()) {
+                    if (!worker || !net().sendCtlHost) return false;
+                    net().sendCtlHost({ t: 'cmd', text: String(text).slice(0, 500) });
+                    return true;
+                }
+                if (!worker || side !== 'host') return false;
+                var p = null;
+                try { p = JSON.parse(playerJson); } catch (x) { }
+                toWorker({ t: 'command', text: String(text), player: p });
+                return true;
+            };
+            api.fromJoiner = function (guid, msg) {
+                if (!worker || side !== 'host' || !msg) return;
+                var p = null;
+                try { p = JSON.parse(UTF8ToString(Module._mcPlayerByGuid(guid))); } catch (x) { }
+                if (!p) return;
+                known[p.id] = p;
+                var ownMod = function (id) { return W() && W().scripts(false).some(function (s) { return s.mod === id; }); };
+                switch (msg.t) {
+                case 'cmd': toWorker({ t: 'command', text: String(msg.text || ''), player: p }); break;
+                case 'guiev': toWorker({ t: 'gui', mod: msg.mod, gui: msg.gui, action: msg.action, id: msg.id, values: msg.values || {}, player: p }); break;
+                case 'csend': if (ownMod(msg.mod)) toWorker({ t: 'message', mod: msg.mod, data: msg.data, player: p }); break;
+                case 'sact': if (ownMod(msg.mod)) runAct(msg.mod, msg.a, guid); break;
+                case 'sgui': if (ownMod(msg.mod)) serverGui(msg.mod, !!msg.open, known[msg.player], msg.spec || {}); break;
+                case 'ssend': if (ownMod(msg.mod)) sendToPlayer(msg.mod, msg.player, msg.data); break;
+                }
+            };
+            api.fromHost = function (msg) {
+                if (!msg) return;
+                switch (msg.t) {
+                case 'gui': showGui(msg.spec || {}, function (ev) { if (net().sendCtlHost) net().sendCtlHost(Object.assign(ev, { t: 'guiev' })); }); break;
+                case 'guiClose': closeGui(); break;
+                case 'tp': if (Module._mcScriptTeleport) Module._mcScriptTeleport(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
+                case 'give': if (Module._mcScriptGive) Module.ccall('mcScriptGive', null, ['string', 'number'], [String(msg.ref || ''), msg.n | 0]); break;
+                case 'heal': if (Module._mcScriptHeal) Module._mcScriptHeal(msg.n | 0); break;
+                case 'sound': if (Module._mcScriptSound) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [String(msg.name || ''), +msg.x, +msg.y, +msg.z, +msg.v || 1, +msg.p || 1]); break;
+                case 'cmsg': toWorker({ t: 'message', client: true, mod: msg.mod, data: msg.data }); break;
+                case 'reply': if (msg.e) toWorker(msg.e); break;
+                }
+            };
+
+            function onKey(e) {
+                if (!worker || !wants.key || e.repeat || gui) return;
+                var t = e.target;
+                if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+                toWorker({ t: 'key', client: true, key: e.key, code: e.code, down: e.type === 'keydown' });
+            }
+            window.addEventListener('keydown', onKey);
+            window.addEventListener('keyup', onKey);
+
+            var hudBox = null, hudLines = {};
+            function hud(key, text) {
+                if (key === null) { hudLines = {}; if (hudBox) hudBox.innerHTML = ''; return; }
+                if (text === null || text === '') delete hudLines[key];
+                else hudLines[key] = String(text).slice(0, 200);
+                if (!hudBox) {
+                    hudBox = document.createElement('div');
+                    hudBox.style.cssText = 'position:fixed;right:8px;top:8px;z-index:6;pointer-events:none;font:13px monospace;' +
+                        'color:#fff;text-shadow:1px 1px 0 #000;text-align:right;max-width:45vw';
+                    document.body.appendChild(hudBox);
+                }
+                hudBox.innerHTML = '';
+                Object.keys(hudLines).forEach(function (k) {
+                    var l = document.createElement('div');
+                    l.textContent = hudLines[k];
+                    l.style.cssText = 'margin-bottom:2px;white-space:pre-wrap';
+                    hudBox.appendChild(l);
+                });
+            }
+
+            var gui = null;
+            function closeGui() {
+                if (gui && gui.el && gui.el.parentNode) gui.el.parentNode.removeChild(gui.el);
+                gui = null;
+            }
+            function showGui(spec, send) {
+                closeGui();
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                var color = function (c, dflt) { return /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : dflt; };
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;' +
+                    'justify-content:center;z-index:9998;font-family:monospace;padding:16px;box-sizing:border-box';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:18px;width:100%;max-width:' +
+                    Math.max(200, Math.min(640, (spec.width | 0) || 380)) + 'px;box-sizing:border-box;color:#eee;' +
+                    'max-height:90vh;overflow:auto';
+                ov.appendChild(box);
+                ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend', 'touchmove'].forEach(function (t) {
+                    ov.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                var inputs = {};
+                var values = function () { var v = {}; Object.keys(inputs).forEach(function (k) { v[k] = inputs[k].value; }); return v; };
+                var emit = function (action, id) { send({ mod: spec._mod, gui: String(spec.id || ''), action: action, id: id || '', values: values() }); };
+                if (spec.title) {
+                    var h = document.createElement('h2');
+                    h.style.cssText = 'margin:0 0 12px;color:#fff;font-size:18px;text-align:center';
+                    h.textContent = String(spec.title).slice(0, 80);
+                    box.appendChild(h);
+                }
+                function add(parent, el, inRow) {
+                    if (!el || typeof el !== 'object') return;
+                    var t = el.type, node;
+                    if (t === 'text') {
+                        node = document.createElement('div');
+                        node.textContent = String(el.text == null ? '' : el.text).slice(0, 2000);
+                        node.style.cssText = 'margin:4px 0;font-size:14px;line-height:1.4;white-space:pre-wrap;color:' + color(el.color, '#ddd');
+                    } else if (t === 'button') {
+                        node = document.createElement('button');
+                        node.textContent = String(el.text == null ? '' : el.text).slice(0, 60);
+                        node.style.cssText = 'padding:9px 14px;margin:4px;background:' + color(el.color, '#5a5a5a') +
+                            ';color:#fff;border:2px solid #222;cursor:pointer;font-size:14px;font-family:monospace;' + (inRow ? 'flex:1' : 'width:calc(100% - 8px)');
+                        node.onclick = function () { emit('click', String(el.id || '')); };
+                    } else if (t === 'input') {
+                        node = document.createElement('input');
+                        node.type = 'text';
+                        node.value = String(el.value == null ? '' : el.value).slice(0, 500);
+                        node.placeholder = String(el.placeholder || '').slice(0, 100);
+                        node.style.cssText = 'padding:8px;margin:4px;background:#222;color:#fff;border:1px solid #666;font-size:14px;font-family:monospace;box-sizing:border-box;' + (inRow ? 'flex:1;min-width:0' : 'width:calc(100% - 8px)');
+                        inputs[String(el.id || ('input' + Object.keys(inputs).length))] = node;
+                        node.addEventListener('keydown', function (e) { if (e.key === 'Enter') emit('submit', String(el.id || '')); });
+                    } else if (t === 'row') {
+                        node = document.createElement('div');
+                        node.style.cssText = 'display:flex;gap:4px;align-items:center';
+                        (el.elements || []).slice(0, 12).forEach(function (c) { add(node, c, true); });
+                    } else if (t === 'divider') {
+                        node = document.createElement('hr');
+                        node.style.cssText = 'border:0;border-top:1px solid #666;margin:10px 0';
+                    } else return;
+                    parent.appendChild(node);
+                }
+                (spec.elements || []).slice(0, 64).forEach(function (el) { add(box, el, false); });
+                var close = function () { emit('close'); closeGui(); };
+                if (spec.closeButton !== false) {
+                    var c = document.createElement('button');
+                    c.textContent = 'Close';
+                    c.style.cssText = 'display:block;margin:12px auto 0;padding:8px 22px;background:#555;color:#fff;border:none;cursor:pointer;font-family:monospace';
+                    c.onclick = close;
+                    box.appendChild(c);
+                }
+                ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+                ov.tabIndex = -1;
+                document.body.appendChild(ov);
+                var refocus = gui === null && lastGui && lastGui.id === spec.id ? lastGui.focus : null;
+                setTimeout(function () {
+                    var target = (refocus && inputs[refocus]) || box.querySelector('input');
+                    (target || ov).focus();
+                }, 30);
+                gui = { id: spec.id, el: ov };
+                lastGui = { id: spec.id, focus: null };
+                Object.keys(inputs).forEach(function (k) { inputs[k].addEventListener('focus', function () { if (lastGui) lastGui.focus = k; }); });
+            }
+            var lastGui = null;
         })();
     </script>
     <script type='text/javascript'>
