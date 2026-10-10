@@ -1045,6 +1045,7 @@
                 return null;
             }
             function hostCtl(c, msg, id) {
+                if (msg && msg.json && msg.json.t === 'presence') { presenceReport(id, msg.json); return; }
                 if (msg && msg.json && { cmd: 1, guiev: 1, sact: 1, sgui: 1, ssend: 1, csend: 1, sev: 1 }[msg.json.t]) {
                     if (Module.mcScripts) Module.mcScripts.fromJoiner(id, msg.json);
                     return;
@@ -1062,7 +1063,75 @@
                 try { if (peer) peer.destroy(); } catch (e) { }
                 peer = null; server = null; conns = new Map(); nextId = 2;
                 net.state = 'idle'; net.code = ''; net.error = '';
+                pres.peers = {}; pres.sentAfk = null;
+                try { if (Module._mcPresenceClear && Module.mcInWorld === 1) Module._mcPresenceClear(); } catch (e) { }
             }
+
+            var AFK_IDLE_MS = 60000, AFK_KICK_MS = 120000, QUIET_MS = 15000, BEAT_MS = 5000;
+            var pres = { lastInput: Date.now(), sentAfk: null, sentAt: 0, peers: {}, device: 0 };
+            ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart', 'pointerdown'].forEach(function (t) {
+                window.addEventListener(t, function () { pres.lastInput = Date.now(); }, true);
+            });
+            function myDevice() {
+                if (!pres.device && Module.mcInWorld === 1 && Module._mcIsPhoneDevice) {
+                    try { pres.device = Module._mcIsPhoneDevice() ? 2 : 1; } catch (e) { }
+                }
+                return pres.device || 1;
+            }
+            function myAfk() {
+                if (document.hidden || Module.mcPaused === 1) return true;
+                if (myDevice() === 1 && (!document.hasFocus() || Date.now() - pres.lastInput > AFK_IDLE_MS)) return true;
+                return false;
+            }
+            function presenceReport(id, j) {
+                var now = Date.now(), p = pres.peers[id] || (pres.peers[id] = { device: 0, afkSince: 0, heard: now });
+                p.heard = now;
+                p.reported = true;
+                p.device = j.device === 2 ? 2 : 1;
+                if (j.afk) { if (!p.afkSince) p.afkSince = now; }
+                else p.afkSince = 0;
+            }
+            function applyPresence(list) {
+                if (!Module._mcPresenceSet || Module.mcInWorld !== 1 || !Array.isArray(list)) return;
+                list.slice(0, 64).forEach(function (p) {
+                    var ms = +p.afk;
+                    try { Module._mcPresenceSet(p.id | 0, p.device | 0, !(ms >= 0) ? -1 : Math.min(ms, 2e9) | 0); } catch (e) { }
+                });
+            }
+            function presenceTick(force) {
+                var now = Date.now();
+                if (net.state === 'in') {
+                    var afk = myAfk();
+                    if (force || afk !== pres.sentAfk || now - pres.sentAt >= BEAT_MS) {
+                        pres.sentAfk = afk; pres.sentAt = now;
+                        net.sendCtlHost({ t: 'presence', device: myDevice(), afk: afk });
+                    }
+                    return;
+                }
+                if (net.state !== 'open' || !conns.size) return;
+                var mine = pres.peers[1] || (pres.peers[1] = { device: 0, afkSince: 0, heard: now });
+                mine.device = myDevice();
+                if (myAfk()) { if (!mine.afkSince) mine.afkSince = now; } else mine.afkSince = 0;
+                var list = [{ id: 1, device: mine.device, afk: mine.afkSince ? now - mine.afkSince : -1 }];
+                Object.keys(pres.peers).forEach(function (k) { if (k !== '1' && !conns.has(+k)) delete pres.peers[k]; });
+                conns.forEach(function (c, id) {
+                    var p = pres.peers[id] || (pres.peers[id] = { device: 0, afkSince: 0, heard: now });
+                    if (!p.afkSince && p.reported && now - p.heard > QUIET_MS) p.afkSince = p.heard;
+                    var ms = p.afkSince ? now - p.afkSince : -1;
+                    if (ms >= AFK_KICK_MS && !p.kicked && c.open) {
+                        p.kicked = true;
+                        sendCtl(c, { t: 'kick', why: 'You were disconnected for being AFK' });
+                        setTimeout(function () { try { c.close(); } catch (e) { } }, 1000);
+                    }
+                    list.push({ id: id, device: p.device, afk: ms });
+                });
+                conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list }); });
+                applyPresence(list);
+            }
+            setInterval(presenceTick, 1000);
+            document.addEventListener('visibilitychange', function () { presenceTick(true); });
+            window.addEventListener('blur', function () { presenceTick(true); });
+            window.addEventListener('focus', function () { pres.lastInput = Date.now(); presenceTick(true); });
 
             net.host = function () {
                 if (net.state === 'opening' || net.state === 'open') return;
@@ -1208,6 +1277,8 @@
                             }
                             if (net.state === 'in' && b[0] === 253) {
                                 var hm = readCtl(b);
+                                if (hm && hm.json && hm.json.t === 'presence') { applyPresence(hm.json.list); return; }
+                                if (hm && hm.json && hm.json.t === 'kick') { net.kickReason = String(hm.json.why || 'Disconnected').slice(0, 150); return; }
                                 if (hm && hm.json && Module.mcScripts) Module.mcScripts.fromHost(hm.json);
                                 return;
                             }
