@@ -941,6 +941,40 @@
                 });
                 return libPromise;
             }
+            Module.mcGameRules = Module.mcGameRules || (function () {
+                var defs = {}, values = {};
+                function fit(d, v) {
+                    if (typeof d.value === 'boolean') return v === true || v === 'true' || v === 1 || v === '1';
+                    if (typeof d.value === 'number') {
+                        var n = Number(v);
+                        if (!isFinite(n)) return d.value;
+                        if (d.min != null) n = Math.max(d.min, n);
+                        if (d.max != null) n = Math.min(d.max, n);
+                        return n;
+                    }
+                    return String(v).slice(0, 200);
+                }
+                var R = {
+                    define: function (name, value, description, range) {
+                        defs[name] = { value: value, description: String(description || ''), min: range ? range[0] : null, max: range ? range[1] : null };
+                    },
+                    get: function (name) { var d = defs[name]; return !d ? undefined : (name in values ? values[name] : d.value); },
+                    set: function (name, v) {
+                        var d = defs[String(name)];
+                        if (!d) return false;
+                        if (v === null || v === undefined) delete values[name];
+                        else values[name] = fit(d, v);
+                        return true;
+                    },
+                    list: function () {
+                        var o = {};
+                        Object.keys(defs).forEach(function (k) { o[k] = { value: R.get(k), default: defs[k].value, description: defs[k].description }; });
+                        return o;
+                    },
+                    reset: function () { values = {}; }
+                };
+                return R;
+            })();
             var net = Module.mcNet = { state: 'idle', code: '', error: '', events: [], cur: null };
             var peer = null, conns = new Map(), nextId = 2, server = null, joinTimer = 0;
             function ev(e) { net.events.push(e); }
@@ -1063,14 +1097,24 @@
                 try { if (peer) peer.destroy(); } catch (e) { }
                 peer = null; server = null; conns = new Map(); nextId = 2;
                 net.state = 'idle'; net.code = ''; net.error = '';
-                pres.peers = {}; pres.sentAfk = null;
+                pres.peers = {}; pres.sentAfk = null; pres.forceAfk = false;
                 try { if (Module._mcPresenceClear && Module.mcInWorld === 1) Module._mcPresenceClear(); } catch (e) { }
             }
 
-            var AFK_IDLE_MS = 60000, AFK_KICK_MS = 120000, QUIET_MS = 15000, BEAT_MS = 5000;
-            var pres = { lastInput: Date.now(), sentAfk: null, sentAt: 0, peers: {}, device: 0 };
+            var QUIET_MS = 15000, BEAT_MS = 5000;
+            Module.mcGameRules.define('afkIdleSeconds', 60, 'A computer player with no key, mouse or touch input for this long is AFK (0: idling never counts)', [0, 86400]);
+            Module.mcGameRules.define('afkKickSeconds', 120, 'A joined player AFK this long is disconnected (0: never); they fade out over this time', [0, 86400]);
+            Module.mcGameRules.define('afkFade', true, 'AFK players fade out');
+            Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
+            function rule(n) { return Module.mcGameRules.get(n); }
+            function afkRules() {
+                if (net.state === 'in') return pres.rules;
+                return { idle: rule('afkIdleSeconds') * 1000, kick: rule('afkKickSeconds') * 1000, fade: !!rule('afkFade'), mobs: !!rule('afkMobsIgnore') };
+            }
+            var pres = { lastInput: Date.now(), sentAfk: null, sentAt: 0, peers: {}, device: 0, forceAfk: false,
+                         rules: { idle: 60000, kick: 120000, fade: true, mobs: true } };
             ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart', 'pointerdown'].forEach(function (t) {
-                window.addEventListener(t, function () { pres.lastInput = Date.now(); }, true);
+                window.addEventListener(t, function () { pres.lastInput = Date.now(); pres.forceAfk = false; }, true);
             });
             function myDevice() {
                 if (!pres.device && Module.mcInWorld === 1 && Module._mcIsPhoneDevice) {
@@ -1079,10 +1123,32 @@
                 return pres.device || 1;
             }
             function myAfk() {
-                if (document.hidden || Module.mcPaused === 1) return true;
-                if (myDevice() === 1 && (!document.hasFocus() || Date.now() - pres.lastInput > AFK_IDLE_MS)) return true;
+                if (pres.forceAfk || document.hidden || Module.mcPaused === 1) return true;
+                var idle = afkRules().idle;
+                if (myDevice() === 1 && (!document.hasFocus() || (idle > 0 && Date.now() - pres.lastInput > idle))) return true;
                 return false;
             }
+            function setMyAfk(on) {
+                pres.forceAfk = !!on;
+                if (!on) pres.lastInput = Date.now();
+                presenceTick(true);
+            }
+            function afkChanged(id, p, afk) {
+                if (!!p.wasAfk === afk) return;
+                p.wasAfk = afk;
+                if (net.onAfk) try { net.onAfk(id, afk, p.device); } catch (e) { }
+            }
+            net.presenceOf = function (id) {
+                var p = pres.peers[id], now = Date.now();
+                if (id === 1 && !p) return { device: myDevice(), afk: myAfk(), afkMs: 0 };
+                if (!p) return null;
+                return { device: p.device, afk: !!p.afkSince, afkMs: p.afkSince ? now - p.afkSince : 0 };
+            };
+            net.setAfk = function (id, on) {
+                if (id === 1 || net.state !== 'open') { setMyAfk(on); return; }
+                var c = conns.get(id);
+                if (c && c.open) sendCtl(c, { t: 'setafk', on: !!on });
+            };
             function presenceReport(id, j) {
                 var now = Date.now(), p = pres.peers[id] || (pres.peers[id] = { device: 0, afkSince: 0, heard: now });
                 p.heard = now;
@@ -1091,8 +1157,11 @@
                 if (j.afk) { if (!p.afkSince) p.afkSince = now; }
                 else p.afkSince = 0;
             }
-            function applyPresence(list) {
+            function applyPresence(list, rules) {
                 if (!Module._mcPresenceSet || Module.mcInWorld !== 1 || !Array.isArray(list)) return;
+                if (rules && Module._mcPresenceRules) {
+                    try { Module._mcPresenceRules(rules.kick > 0 ? Math.min(rules.kick, 2e9) | 0 : 120000, rules.fade ? 1 : 0, rules.mobs ? 1 : 0); } catch (e) { }
+                }
                 list.slice(0, 64).forEach(function (p) {
                     var ms = +p.afk;
                     try { Module._mcPresenceSet(p.id | 0, p.device | 0, !(ms >= 0) ? -1 : Math.min(ms, 2e9) | 0); } catch (e) { }
@@ -1108,25 +1177,30 @@
                     }
                     return;
                 }
-                if (net.state !== 'open' || !conns.size) return;
+                if (Module.mcInWorld !== 1 || (net.state !== 'open' && net.state !== 'idle')) return;
                 var mine = pres.peers[1] || (pres.peers[1] = { device: 0, afkSince: 0, heard: now });
                 mine.device = myDevice();
                 if (myAfk()) { if (!mine.afkSince) mine.afkSince = now; } else mine.afkSince = 0;
+                afkChanged(1, mine, !!mine.afkSince);
+                if (net.state !== 'open' || !conns.size) return;
+                var R = afkRules();
                 var list = [{ id: 1, device: mine.device, afk: mine.afkSince ? now - mine.afkSince : -1 }];
                 Object.keys(pres.peers).forEach(function (k) { if (k !== '1' && !conns.has(+k)) delete pres.peers[k]; });
                 conns.forEach(function (c, id) {
                     var p = pres.peers[id] || (pres.peers[id] = { device: 0, afkSince: 0, heard: now });
                     if (!p.afkSince && p.reported && now - p.heard > QUIET_MS) p.afkSince = p.heard;
                     var ms = p.afkSince ? now - p.afkSince : -1;
-                    if (ms >= AFK_KICK_MS && !p.kicked && c.open) {
+                    if (p.reported) afkChanged(id, p, ms >= 0);
+                    if (R.kick > 0 && ms >= R.kick && !p.kicked && c.open) {
                         p.kicked = true;
                         sendCtl(c, { t: 'kick', why: 'You were disconnected for being AFK' });
                         setTimeout(function () { try { c.close(); } catch (e) { } }, 1000);
                     }
                     list.push({ id: id, device: p.device, afk: ms });
                 });
-                conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list }); });
-                applyPresence(list);
+                var rules = { idle: R.idle, kick: R.kick, fade: R.fade, mobs: R.mobs };
+                conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list, rules: rules }); });
+                applyPresence(list, rules);
             }
             setInterval(presenceTick, 1000);
             document.addEventListener('visibilitychange', function () { presenceTick(true); });
@@ -1277,7 +1351,13 @@
                             }
                             if (net.state === 'in' && b[0] === 253) {
                                 var hm = readCtl(b);
-                                if (hm && hm.json && hm.json.t === 'presence') { applyPresence(hm.json.list); return; }
+                                if (hm && hm.json && hm.json.t === 'presence') {
+                                    var hr = hm.json.rules;
+                                    if (hr) pres.rules = { idle: +hr.idle || 0, kick: +hr.kick || 0, fade: hr.fade !== false, mobs: hr.mobs !== false };
+                                    applyPresence(hm.json.list, hr ? pres.rules : null);
+                                    return;
+                                }
+                                if (hm && hm.json && hm.json.t === 'setafk') { setMyAfk(!!hm.json.on); return; }
                                 if (hm && hm.json && hm.json.t === 'kick') { net.kickReason = String(hm.json.why || 'Disconnected').slice(0, 150); return; }
                                 if (hm && hm.json && Module.mcScripts) Module.mcScripts.fromHost(hm.json);
                                 return;
@@ -4073,6 +4153,9 @@
                             },
                             weather: function () { return ask(mod, ['weather']).then(function (r) { return { raining: !!r.raining, thundering: !!r.thundering }; }); },
                             difficulty: function () { return ask(mod, ['difficulty']).then(function (r) { return r.difficulty | 0; }); },
+                            gameRule: function (name) { return ask(mod, ['gamerule', String(name)]).then(function (r) { return r.value; }); },
+                            gameRules: function () { return ask(mod, ['gamerules']).then(function (r) { return r.rules || {}; }); },
+                            setGameRule: function (name, value) { act(mod, ['setgamerule', String(name), value === undefined ? null : value]); },
                             setDifficulty: function (d) {
                                 var n = typeof d === 'string' ? ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()) : d | 0;
                                 if (n >= 0 && n <= 3) act(mod, ['setdifficulty', n]);
@@ -4187,6 +4270,8 @@
                                 if (n === 0 || n === 1) act(mod, ['setgamemode', pid(p), n]);
                             },
                             isOp: function (p) { return ask(mod, ['isop', pid(p)]).then(function (r) { return !!r.op; }); },
+                            presence: function (p) { return ask(mod, ['presence', pid(p)]).then(function (r) { return r.presence || null; }); },
+                            setAfk: function (p, on) { act(mod, ['setafk', pid(p), on ? 1 : 0]); },
                             setOp: function (p, on) { act(mod, ['setop', pid(p), on ? 1 : 0]); }
                         },
                         gui: {
@@ -4409,6 +4494,24 @@
                 };
                 if (INV_OPS[k]) { invOp(mod, a, fromGuid); return; }
                 if (k === 'isop') { var op = known[a[2]]; deliver(fromGuid, a[1], { op: !!op && isOp(op) }); return; }
+                if (k === 'gamerule') { deliver(fromGuid, a[1], { value: Module.mcGameRules.get(String(a[2])) }); return; }
+                if (k === 'gamerules') { deliver(fromGuid, a[1], { rules: Module.mcGameRules.list() }); return; }
+                if (k === 'setgamerule') {
+                    if (fromGuid && !isOp(byGuid(fromGuid))) return;
+                    if (!Module.mcGameRules.set(String(a[1]), a[2]) && W() && W().problem) W().problem(mod, 'scripts', 'world.setGameRule: no game rule "' + a[1] + '"', 'script');
+                    return;
+                }
+                if (k === 'presence') {
+                    var pp = known[a[2]], pr = pp && pp.guid && net().presenceOf ? net().presenceOf(pp.guid) : null;
+                    deliver(fromGuid, a[1], { presence: pr ? { device: DEVICES[pr.device] || 'unknown', afk: !!pr.afk, afkMs: pr.afkMs | 0 } : null });
+                    return;
+                }
+                if (k === 'setafk') {
+                    if (fromGuid && !isOp(byGuid(fromGuid))) return;
+                    var ap = known[a[1]];
+                    if (ap && ap.guid && net().setAfk) net().setAfk(ap.guid, !!(a[2] | 0));
+                    return;
+                }
                 if (k === 'setop') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) return;
                     var tp = known[a[1]];
@@ -4596,6 +4699,12 @@
                 }
             }
             function byGuid(guid) { try { return JSON.parse(UTF8ToString(Module._mcPlayerByGuid(guid))); } catch (x) { return null; } }
+            var DEVICES = { 0: 'unknown', 1: 'computer', 2: 'phone' };
+            if (net().presenceOf) net().onAfk = function (guid, afk, device) {
+                if (!worker || side !== 'host') return;
+                var p = byGuid(guid);
+                if (p) toWorker({ t: 'afk', player: p, afk: !!afk, device: DEVICES[device] || 'unknown' });
+            };
             function opCommand(text, host, tellFn) {
                 var m = /^[/](op|deop|ops)(?:\s+(\S+))?\s*$/i.exec(String(text));
                 if (!m) return false;
@@ -4725,6 +4834,7 @@
             function stop() {
                 if (worker) { try { worker.terminate(); } catch (x) { } }
                 worker = null; side = ''; actions = []; known = {}; wants = {}; swants = {}; remoteReq = {}; ops = null;
+                if (Module.mcGameRules) Module.mcGameRules.reset();
                 closeGui(true);
                 closePanels();
                 hud(null);
