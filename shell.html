@@ -1562,6 +1562,36 @@
                 return out;
             }
 
+            function thisPlatform() {
+                try { if (Module._mcIsPhoneDevice) return Module._mcIsPhoneDevice() ? 'mobile' : 'computer'; } catch (e) { }
+                return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') ? 'mobile' : 'computer';
+            }
+            function forPlatform(files) {
+                if (!files['manifest.json']) return files;
+                var m;
+                try { m = JSON.parse(new TextDecoder().decode(files['manifest.json'])); } catch (e) { return files; }
+                var P = m && typeof m.platforms === 'object' && !Array.isArray(m.platforms) ? m.platforms : null;
+                if (!P) return files;
+                var mine = thisPlatform();
+                var list = function (k) {
+                    var v = P[k];
+                    return (Array.isArray(v) ? v : typeof v === 'string' ? [v] : []).map(function (s) { return String(s).replace(/^[./]+/, '').toLowerCase(); }).filter(Boolean);
+                };
+                var keep = list(mine), drop = [];
+                Object.keys(P).forEach(function (k) { if (k !== mine) drop = drop.concat(list(k)); });
+                if (!drop.length) return files;
+                var under = function (path, prefixes) {
+                    var p = path.toLowerCase();
+                    return prefixes.some(function (s) { return p === s || p.indexOf(s.charAt(s.length - 1) === '/' ? s : s + '/') === 0; });
+                };
+                var out = {};
+                Object.keys(files).forEach(function (path) {
+                    if (under(path, drop) && !under(path, keep)) return;
+                    out[path] = files[path];
+                });
+                return out;
+            }
+
             function slug(s) {
                 return String(s || '').toLowerCase().replace(/\.zip$/, '').replace(/[^a-z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 48);
             }
@@ -1799,6 +1829,7 @@
             }
 
             function contentsOf(files) {
+                files = forPlatform(files);
                 var n = {}, keys = Object.keys(files);
                 var count = function (re) { return keys.filter(function (k) { return re.test(k) && !/[/]$/.test(k); }).length; };
                 var parts = [];
@@ -1945,7 +1976,7 @@
                 return on.reduce(function (pr, x) {
                     var id = cid(x);
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
-                        files = normalise(files);
+                        files = forPlatform(normalise(files));
                         var jobs = Promise.resolve();
                         var own = mods.indexOf(x) >= 0;
                         if (!settingDecls[id] && files['manifest.json']) {

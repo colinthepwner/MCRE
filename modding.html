@@ -64,6 +64,11 @@ mark { background: #6b5a1d; color: #fff; }
                       Shown in the Mods tab: &quot;name&quot;, &quot;version&quot;, &quot;author&quot;, &quot;description&quot;.
                       A mod isn&#x27;t made for one version of the game: it keeps working as the
                       game updates. (&quot;format&quot; and &quot;type&quot; are fine to leave in; they&#x27;re ignored.)
+                      &quot;platforms&quot;: {&quot;computer&quot;: [&quot;scripts/&quot;, &quot;gui/&quot;], &quot;mobile&quot;: [&quot;modpe/&quot;]}
+                        parts for one kind of device only: folders (or files) listed under
+                        &quot;computer&quot; aren&#x27;t loaded on phones and tablets, &quot;mobile&quot; ones not on
+                        computers - one mod with a version for each (everything else loads
+                        everywhere). Use &quot;devices&quot;: &quot;any&quot; for such a mod.
                       &quot;dependencies&quot;: [&quot;other_mod&quot;, {&quot;id&quot;: &quot;nice_to_have&quot;, &quot;optional&quot;: true}]
                         other mods this one needs: they&#x27;re turned on with it and loaded first.
                         One that&#x27;s missing shows in the Mods tab.
