@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Making mods - Minecraft RE</title>
+<style>
+:root { --bg: #1d1b19; --panel: #2a2724; --text: #e8e2d8; --dim: #a59d90; --accent: #8fd16a; --code: #f1d38a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+header { padding: 18px 24px; background: #12110f; border-bottom: 2px solid #3a362f; }
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 4px 0 0; color: var(--dim); }
+.wrap { display: flex; align-items: flex-start; }
+nav { position: sticky; top: 0; flex: none; width: 220px; max-height: 100vh; overflow: auto; padding: 16px; }
+nav a { display: block; color: var(--dim); text-decoration: none; padding: 3px 0; }
+nav a:hover { color: var(--accent); }
+main { flex: 1; min-width: 0; padding: 8px 24px 60px; }
+section { background: var(--panel); border: 1px solid #3a362f; border-radius: 6px; padding: 4px 18px 14px; margin: 16px 0; }
+h2 { color: var(--accent); font-size: 18px; }
+pre { margin: 0; white-space: pre-wrap; font: 13px/1.45 ui-monospace, Consolas, monospace; color: var(--text); overflow-x: auto; }
+code { color: var(--code); }
+a { color: var(--accent); }
+#search { width: 100%; padding: 6px 8px; margin-bottom: 10px; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px; }
+mark { background: #6b5a1d; color: #fff; }
+@media (max-width: 760px) { .wrap { display: block; } nav { position: static; width: auto; max-height: none; } main { padding: 8px 12px 40px; } }
+</style></head><body>
+<header><h1>Example Pack - how a Minecraft RE mod is made</h1><p>Everything a mod can contain and every function its scripts can call. In a world, <code>/console</code> shows your scripts' log and errors and lets you try the API.</p></header>
+<div class="wrap"><nav><input id="search" placeholder="Search the guide"><div id="toc"><a href="#introduction">Introduction</a>
+<a href="#what-s-inside">What&#x27;s inside</a>
+<a href="#new-blocks-items-and-recipes">New blocks, items and recipes</a>
+<a href="#block-models">Block models</a>
+<a href="#scripts">Scripts</a>
+<a href="#structures">Structures</a>
+<a href="#creatures">Creatures</a>
+<a href="#rules">Rules</a>
+<a href="#loot-tables">Loot tables</a>
+<a href="#order">Order</a>
+<a href="#making-a-mod">Making a mod</a>
+<a href="#sharing-a-mod">Sharing a mod</a>
+<a href="#old-pocket-edition-mods-modpe">Old Pocket Edition mods (ModPE)</a>
+<a href="#java-resource-packs">Java resource packs</a>
+<a href="#types-mcre-d-ts">Types (mcre.d.ts)</a></div></nav><main><section id="introduction"><h2>Introduction</h2><pre>A mod is a .zip file. Turn this one on in the Mods tab to see what a mod can do:
+  - it changes how the game looks, sounds and reads: dirt turns purple, the apple turns gold,
+    menu buttons pop instead of click, and both get new names;
+  - it adds blocks, items and recipes: Example Ore underground (and in the Nether), which
+    drops Example Gems (2 dirt make 2 as well), the glowing Example
+    Block, the Example Counter (gem + planks), the slippery, falling Example Slide (gem +
+    sand) and the Example Wand (gem + stick);
+  - and scripts/main.js makes them do things: the Counter opens a menu, the Wand tells you
+    what a block is, /example is a command, and K shows your coordinates.</pre></section>
+<section id="what-s-inside"><h2>What&#x27;s inside</h2><pre>manifest.json         Who the mod is. Required:
+                        &quot;id&quot;: &quot;example&quot;        (lower-case letters, digits, . _ - ; must be unique)
+                        &quot;devices&quot;: &quot;any&quot;       what it&#x27;s made for: &quot;any&quot;, &quot;computer&quot; or &quot;mobile&quot;.
+                                               A label, not a lock - players see it in the Mods
+                                               tab (and get a heads-up if they&#x27;re on the other
+                                               kind), and mod lists can show it too (&quot;devices&quot;)
+                      Shown in the Mods tab: &quot;name&quot;, &quot;version&quot;, &quot;author&quot;, &quot;description&quot;.
+                      A mod isn&#x27;t made for one version of the game: it keeps working as the
+                      game updates. (&quot;format&quot; and &quot;type&quot; are fine to leave in; they&#x27;re ignored.)
+                      &quot;dependencies&quot;: [&quot;other_mod&quot;, {&quot;id&quot;: &quot;nice_to_have&quot;, &quot;optional&quot;: true}]
+                        other mods this one needs: they&#x27;re turned on with it and loaded first.
+                        One that&#x27;s missing shows in the Mods tab.
+                      &quot;settings&quot;: what players can change in the Mods tab (Settings) or with
+                        /modsettings &lt;id&gt; in a world - each player&#x27;s own:
+                        {&quot;id&quot;: &quot;sparkle&quot;, &quot;name&quot;: &quot;Sparkles&quot;, &quot;type&quot;: &quot;toggle&quot;, &quot;default&quot;: true}
+                        {&quot;id&quot;: &quot;count&quot;, &quot;type&quot;: &quot;slider&quot;, &quot;min&quot;: 0, &quot;max&quot;: 20, &quot;step&quot;: 1, &quot;default&quot;: 6}
+                        {&quot;id&quot;: &quot;count&quot;, &quot;type&quot;: &quot;number&quot;, &quot;min&quot;: 0, &quot;max&quot;: 1000, &quot;default&quot;: 6}
+                        {&quot;id&quot;: &quot;mode&quot;, &quot;type&quot;: &quot;choice&quot;, &quot;options&quot;: [&quot;easy&quot;, &quot;hard&quot;], &quot;default&quot;: &quot;easy&quot;}
+                        {&quot;id&quot;: &quot;motd&quot;, &quot;type&quot;: &quot;text&quot;, &quot;default&quot;: &quot;Hello&quot;}
+                        {&quot;id&quot;: &quot;menu_key&quot;, &quot;name&quot;: &quot;Open the menu&quot;, &quot;type&quot;: &quot;key&quot;, &quot;default&quot;: &quot;O&quot;}
+                          - a key the player picks. It&#x27;s listed in Options &gt; Controls &gt; Key
+                          Bindings under your mod&#x27;s name, with the game&#x27;s own keys (as in
+                          Java), and in your Settings; it&#x27;s a key code - &quot;KeyO&quot;, &quot;Digit1&quot;, &quot;F8&quot;,
+                          &quot;Space&quot;. Scripts hear it: client.on(&quot;keybind&quot;, e =&gt; e.id === &quot;menu_key&quot;
+                          &amp;&amp; e.down ...) - whatever the player bound it to
+                        (&quot;description&quot; on any: a line under it). Scripts read them with
+                        mod.settings.get(&quot;sparkle&quot;) and hear changes: mod.on(&quot;settings&quot;).
+pack.png              The icon in the Mods tab (64x64 looks good).
+
+textures/blocks/&lt;name&gt;.png    Replaces one block texture.
+textures/items/&lt;name&gt;.png     Replaces one item texture.
+                      The names are in texture_names.txt (they&#x27;re Minecraft Java Edition&#x27;s
+                      names, so textures from Java packs drop straight in). Any texture can also
+                      be named by its number: textures/blocks/cell_&lt;number&gt;.png.
+                      16x16 pixels; bigger pictures are shrunk to fit. For animated strips
+                      only the first frame is used.
+
+images/&lt;path&gt;.png     Replaces one of the game&#x27;s picture files whole, same path as the game&#x27;s
+                      (e.g. images/mob/zombie.png, images/gui/gui.png, images/terrain.png).
+
+sounds/&lt;group&gt;/&lt;name&gt;&lt;number&gt;.ogg
+                      Replaces the sound &quot;&lt;group&gt;.&lt;name&gt;&quot; - every variant of it. This pack&#x27;s
+                      sounds/random/click.ogg replaces &quot;random.click&quot; (menu buttons).
+                      Several files (click1.ogg, click2.ogg...) play at random.
+
+lang/en_US.lang       Lines of key=value that replace the game&#x27;s text, e.g.
+                      tile.dirt.name=Example Dirt</pre></section>
+<section id="new-blocks-items-and-recipes"><h2>New blocks, items and recipes</h2><pre>blocks/&lt;name&gt;.json    A new block, called &quot;&lt;mod id&gt;:&lt;name&gt;&quot; (this one: example:example_block).
+                      Everything is optional; these are shortcuts, and scripts do the rest.
+                        &quot;name&quot;        what it&#x27;s called in the game
+                        &quot;texture&quot;     a texture name: one of this mod&#x27;s textures/blocks/&lt;n&gt;.png,
+                                      or any of the game&#x27;s (texture_names.txt). Different faces:
+                                      {&quot;top&quot;: &quot;a&quot;, &quot;bottom&quot;: &quot;b&quot;, &quot;side&quot;: &quot;c&quot;} (also &quot;all&quot;,
+                                      &quot;up&quot;, &quot;down&quot;, &quot;north&quot;, &quot;south&quot;, &quot;east&quot;, &quot;west&quot;)
+                        &quot;hardness&quot;    how long it takes to break (stone is 1.5, dirt 0.5;
+                                      -1 can&#x27;t be broken)
+                        &quot;tool&quot;        &quot;pickaxe&quot;, &quot;axe&quot;, &quot;shovel&quot; or &quot;none&quot;
+                        &quot;sound&quot;       stone, wood, gravel, grass, metal, glass, cloth or sand
+                        &quot;light&quot;       how much light it gives, 0-15 (a torch is 14)
+                        &quot;transparent&quot; true for blocks you can see through (glass-like)
+                        &quot;drops&quot;       &quot;self&quot; (default), &quot;none&quot;, or an item; &quot;drop_count&quot;
+                        &quot;shape&quot;       &quot;cube&quot; (default), &quot;slab&quot;, &quot;top_slab&quot;, &quot;carpet&quot;, &quot;layer&quot;,
+                                      &quot;plate&quot;, &quot;path&quot;, &quot;cactus&quot;, &quot;post&quot;, &quot;pillar&quot;, &quot;table&quot;,
+                                      &quot;button&quot;, &quot;cross&quot; (drawn like a flower), or your own box in
+                                      pixels: [x1, y1, z1, x2, y2, z2], each 0-16
+                                      (a slab is [0, 0, 0, 16, 8, 16])
+                        &quot;collision&quot;   false: players and mobs walk through it
+                        &quot;gravity&quot;     true: falls like sand
+                        &quot;friction&quot;    0.6 normal, 0.98 like ice (&quot;slippery&quot;: true is ice)
+                        &quot;flammable&quot;   true: catches fire and burns like wood
+                        &quot;scripted&quot;    true: using it does nothing else - your script&#x27;s &quot;use&quot;
+                                      event decides (and it never places a block against it);
+                                      its world.scheduleTick ticks reach the script too
+items/&lt;name&gt;.json     A new item, &quot;&lt;mod id&gt;:&lt;name&gt;&quot;.
+                        &quot;name&quot;, &quot;texture&quot; (textures/items/&lt;n&gt;.png or the game&#x27;s),
+                        &quot;stack&quot; (1-64), &quot;food&quot; (hunger points it fills, or
+                        {&quot;hunger&quot;: 4, &quot;saturation&quot;: 0.6}), &quot;scripted&quot; (using it on a block does
+                        nothing else - your script&#x27;s &quot;useItemOn&quot; decides)
+                        &quot;tool&quot;        &quot;pickaxe&quot;, &quot;axe&quot;, &quot;shovel&quot;, &quot;hoe&quot;, &quot;sword&quot; or &quot;shears&quot;,
+                                      or {&quot;type&quot;: &quot;pickaxe&quot;, &quot;tier&quot;: &quot;iron&quot;, &quot;speed&quot;: 6,
+                                      &quot;durability&quot;: 250, &quot;damage&quot;: 4} - the tier (wood, stone,
+                                      iron, diamond, gold) sets what it can mine and the rest&#x27;s
+                                      defaults
+                        &quot;armor&quot;       {&quot;slot&quot;: &quot;head&quot; | &quot;chest&quot; | &quot;legs&quot; | &quot;feet&quot;,
+                                       &quot;protection&quot;: 3, &quot;durability&quot;: 250, &quot;model&quot;: &quot;iron&quot;
+                                       (leather, chain, iron, gold, diamond: its worn look), or
+                                       &quot;texture&quot;: a Java armour layer picture in the mod
+                                       (&quot;texture_legs&quot; for the leggings&#x27; layer)}
+                        &quot;effects&quot;     [{&quot;effect&quot;: &quot;speed&quot;, &quot;seconds&quot;: 30, &quot;level&quot;: 1,
+                                       &quot;chance&quot;: 1}] - when eaten (food), or on what it hits
+                                      (throwable). Effects: speed, slowness, haste,
+                                      mining_fatigue, strength, instant_health, instant_damage,
+                                      jump_boost, nausea, regeneration, resistance,
+                                      fire_resistance, water_breathing, invisibility,
+                                      blindness, night_vision, hunger, weakness, poison, wither
+                        &quot;always_edible&quot; true: eaten even when not hungry
+                        &quot;throwable&quot;   true or {&quot;damage&quot;: 2, &quot;speed&quot;: 1.5, &quot;gravity&quot;: 0.03} -
+                                      thrown like a snowball; scripts hear where it landed:
+                                      mod.on(&quot;hit&quot;, {item, x, y, z, entity, player})
+                        &quot;ranged&quot;      {&quot;ammo&quot;: &quot;minecraft:arrow&quot;, &quot;power&quot;: 1, &quot;durability&quot;:
+                                      384} - drawn and shot like a bow; the ammo can be an
+                                      arrow or one of your throwable items
+                        &quot;damage&quot;      what a hit with it does (a club...)
+                        &quot;ore&quot;         makes it generate in new chunks, like the game&#x27;s ores:
+                                      {&quot;vein_size&quot;: 8, &quot;veins_per_chunk&quot;: 8, &quot;min_y&quot;: 1,
+                                       &quot;max_y&quot;: 64, &quot;dimension&quot;: &quot;overworld&quot;, &quot;replace&quot;:
+                                       [&quot;minecraft:stone&quot;]} - everything optional (&quot;ore&quot;: {} is
+                                      iron-like); veins_per_chunk below 1 is a chance (0.25:
+                                      one vein in every fourth chunk); dimension &quot;overworld&quot;,
+                                      &quot;nether&quot; (replaces netherrack), &quot;end&quot; (end stone) or
+                                      &quot;any&quot;; a list of these for several kinds of veins
+worldgen/&lt;name&gt;.json  The same, for any block - this mod&#x27;s, another mod&#x27;s or the game&#x27;s own:
+                        {&quot;type&quot;: &quot;ore&quot;, &quot;block&quot;: &quot;minecraft:diamond_ore&quot;, &quot;veins_per_chunk&quot;: 2,
+                         &quot;max_y&quot;: 16}
+                      Only chunks generated from now on get them: explore somewhere new.
+recipes/&lt;name&gt;.json   {&quot;type&quot;: &quot;shaped&quot;, &quot;pattern&quot;: [&quot;##&quot;, &quot;##&quot;], &quot;key&quot;: {&quot;#&quot;: item},
+                       &quot;result&quot;: item, &quot;count&quot;: 1}
+                      {&quot;type&quot;: &quot;shapeless&quot;, &quot;ingredients&quot;: [item, item], &quot;result&quot;: item}
+                      {&quot;type&quot;: &quot;smelting&quot;, &quot;input&quot;: item, &quot;result&quot;: item}
+                      An item is &quot;&lt;name&gt;&quot; (this mod&#x27;s), &quot;&lt;mod id&gt;:&lt;name&gt;&quot; (another mod&#x27;s) or
+                      &quot;minecraft:&lt;name&gt;&quot; (the game&#x27;s, Java names like minecraft:iron_ingot;
+                      add &quot;:&lt;number&gt;&quot; for a variant, e.g. minecraft:wool:14).
+Textures for new things are 16x16; the game makes room for as many as your device can hold.</pre></section>
+<section id="block-models"><h2>Block models</h2><pre>models/block/&lt;name&gt;.json  A Java block model - exactly what Blockbench exports (&quot;Java Block/Item&quot;):
+                       {&quot;textures&quot;: {&quot;side&quot;: &quot;block/stone&quot;, &quot;gem&quot;: &quot;example:block/example_block&quot;},
+                        &quot;elements&quot;: [{&quot;from&quot;: [0, 0, 0], &quot;to&quot;: [16, 8, 16],
+                          &quot;rotation&quot;: {&quot;origin&quot;: [8, 8, 8], &quot;axis&quot;: &quot;y&quot;, &quot;angle&quot;: 22.5},
+                          &quot;faces&quot;: {&quot;north&quot;: {&quot;uv&quot;: [0, 8, 16, 16], &quot;texture&quot;: &quot;#side&quot;,
+                                              &quot;cullface&quot;: &quot;north&quot;, &quot;rotation&quot;: 90}, ...}}]}
+                       Any number of boxes, turned -45 to 45 degrees, each face its own texture,
+                       uv and rotation; &quot;parent&quot; works with your own models or the usual ones
+                       (block/cube_all, cube_column, cube_bottom_top, orientable, cross, slab...).
+                       Textures: &quot;&lt;mod id&gt;:block/&lt;name&gt;&quot; is your textures/blocks/&lt;name&gt;.png;
+                       &quot;block/&lt;name&gt;&quot; or &quot;minecraft:block/&lt;name&gt;&quot; the game&#x27;s (newer names like
+                       oak_planks work too).
+                       Use it from a block: &quot;model&quot;: &quot;block/&lt;name&gt;&quot; - or name the model like the
+                       block and leave it out. &quot;rotate&quot;: &quot;horizontal&quot; turns the block to face
+                       whoever places it (a Java blockstates/&lt;name&gt;.json with facing=... variants
+                       does the same). Light passes through a block with a model; it can be
+                       walked on where the model is (or give &quot;shape&quot; a box for its collision).
+                       See example_pedestal and example_chair. A Java mod&#x27;s assets/&lt;id&gt;/models,
+                       textures and blockstates folders work as they are.
+models/item/&lt;name&gt;.json   An item model with &quot;parent&quot;: &quot;item/generated&quot; gives an item its
+                       &quot;layer0&quot; texture.
+Every world remembers its mod blocks: open it without the mod and they stay as purple-and-black
+placeholders until you turn the mod back on.</pre></section>
+<section id="scripts"><h2>Scripts</h2><pre>scripts/&lt;anything&gt;.js  JavaScript that makes your mod do things. scripts/main.js in this mod is
+                       a full example; read it alongside this.
+
+Write your script once. It runs on every device in the game - yours, and everyone who joins you -
+and the game sorts out where each thing happens:
+  - World events (mod.on) fire once, where the world is, never once per player.
+  - world.* and players.* work from anywhere; the game sends them where they need to go.
+  - Anything aimed at a player (a menu, items, teleporting, healing, a message) reaches that
+    player, whichever device they&#x27;re on.
+  - client.* is &quot;this device&quot;: its screen, its keys, its sounds, its own player.
+In single player it&#x27;s all one device, and the same script just works.
+
+Names: a block or item is &quot;&lt;mod id&gt;:&lt;name&gt;&quot;, &quot;minecraft:&lt;java name&gt;&quot; (e.g. minecraft:stone),
+&quot;air&quot;, or just &quot;&lt;name&gt;&quot; for your own mod&#x27;s. A player is {id, name, x, y, z, health}; pass it
+(or its id) wherever a player goes.
+
+mod.on(event, function (e) { ... })          where the world is
+Every event has the same shape: a block is e.block, e.data, e.x, e.y, e.z; an item is e.item,
+e.data, e.count; a creature is e.entity {id, type (&quot;minecraft:zombie&quot;), x, y, z, health}; and
+whoever did it is e.player.
+  &quot;start&quot; / &quot;stop&quot;     the world opened / closed
+  &quot;join&quot; / &quot;leave&quot;     a player joined / left your game
+  &quot;respawn&quot;            a player came back after dying
+  &quot;use&quot;                any block was used (right-clicked)  block, player
+  &quot;place&quot; / &quot;break&quot;    any block was placed / broken       block, player
+  &quot;step&quot;               a player walked onto a block        block, player
+  &quot;tick&quot;               a scripted block&#x27;s world.scheduleTick came (block)
+  &quot;useItem&quot;            any item was used in the air        item, player
+  &quot;useItemOn&quot;          ... used on a block                 item, x, y, z, face, player
+  &quot;eat&quot; / &quot;craft&quot;      a player ate / crafted something    item, player
+  &quot;smelt&quot;              a furnace finished something        item, x, y, z
+  &quot;attack&quot;/&quot;interact&quot;  a player hit / right-clicked a creature   entity, player
+  &quot;hurt&quot;               a creature (or player) was hurt     entity, damage, source
+  &quot;death&quot;              ... died                            entity, source, player (the killer, or
+                                                           the player who died)
+  &quot;spawn&quot;              a creature appeared                 entity
+  &quot;chat&quot;               a player said something             text, player
+  &quot;explode&quot;            an explosion                        x, y, z, power
+  &quot;weather&quot;            rain / thunder started or stopped   raining, thundering
+  &quot;structure&quot;          a scripted structure generated      name, x, y, z, rotation, size
+  &quot;gametick&quot;           every game tick (20 a second)
+  &quot;gui&quot;                a button in a menu you opened:       e.gui, e.id, e.action (&quot;click&quot;,
+                       &quot;submit&quot; - Enter in a text box - or &quot;close&quot;), e.values (text boxes), e.player
+  &quot;message&quot;            client.send from a device:           e.data, e.player
+mod.command(name, function (c) { ... }, options)
+                                             /name typed in chat: c.player, c.args, c.text,
+                                             c.isHost, c.isOp. options (all optional):
+                                             {permission: &quot;host&quot; (only the world&#x27;s owner),
+                                             &quot;op&quot; (operators - see players.isOp) or
+                                             &quot;everyone&quot;, description, usage} - /help lists them
+mod.send(player or &quot;all&quot;, data)              to client.on(&quot;message&quot;) on that player&#x27;s device
+mod.settings.get(id)  mod.settings.all()     this mod&#x27;s settings (see manifest.json &quot;settings&quot;);
+mod.settings.set(id, value)                  where the world is: the host&#x27;s; client code: that
+                                             player&#x27;s. mod.on(&quot;settings&quot;) / client.on(&quot;settings&quot;):
+                                             changed, e.values
+
+world.setBlock(x, y, z, block, data)         world.setData(x, y, z, data)
+world.getBlock(x, y, z)                      -&gt; a Promise of {block, data}
+world.scheduleTick(x, y, z, ticks)           a &quot;tick&quot; event for a scripted block later
+world.spawnItem(x, y, z, item, count)        world.explode(x, y, z, power, fire)
+world.time()  -&gt; a Promise of the time       world.setTime(t)      (a day is world.DAY: 19200
+                                             ticks, from sunrise; Java&#x27;s is 24000)
+world.timeOfDay()                            -&gt; a Promise of {day, ticks, hour (Java&#x27;s: 0 is
+                                             sunrise, 6 noon), clock &quot;12:00&quot;, night}
+world.setTimeOfDay(when, next)               &quot;sunrise&quot;, &quot;day&quot;, &quot;noon&quot;, &quot;sunset&quot;, &quot;night&quot;,
+                                             &quot;midnight&quot; or a Java time (0-23999): that time
+                                             today - next: true, the next one
+world.weather() -&gt; {raining, thundering}     world.setWeather(&quot;clear&quot; | &quot;rain&quot; | &quot;thunder&quot;,
+                                             seconds) - without seconds, as long as the game&#x27;s
+                                             own weather would last
+world.difficulty() -&gt; 0-3                    world.setDifficulty(0-3 or &quot;peaceful&quot;, &quot;easy&quot;,
+                                             &quot;normal&quot;, &quot;hard&quot;) - the host&#x27;s own setting
+world.sound(name, x, y, z, volume, pitch)    heard by everyone nearby (e.g. &quot;random.pop&quot;)
+world.container(x, y, z)                     -&gt; a Promise of a chest&#x27;s (furnace&#x27;s, hopper&#x27;s...)
+                                             slots: [{item, count, data} or null], or null
+world.setSlot(x, y, z, slot, item, count)    put items in a container&#x27;s slot (item null: empty)
+world.fillLoot(x, y, z, table)               fill a container from a loot table
+world.dropLoot(x, y, z, table)               drop a loot table&#x27;s items there
+world.rollLoot(table)                        -&gt; a Promise of what the table gives
+world.placeStructure(name, x, y, z, turn)    build one of your worldgen structures here
+world.setRules(id, rules)                    rules the game enforces from now on (see Rules);
+                                             the same id replaces them, null removes them
+world.spawnEntity(type, x, y, z)             -&gt; a Promise of the new creature&#x27;s id: one of
+                                             yours (&quot;example_critter&quot;) or the game&#x27;s
+                                             (&quot;pig&quot;, &quot;minecraft:pig&quot;)
+
+Creatures (players are creatures too - a player or their id works in all of these):
+world.entities(filter)                       -&gt; a Promise of [{id, type, x, y, z, health}]:
+                                             all of them, entities(&quot;zombie&quot;), or
+                                             {type, x, y, z, radius, limit} (radius 16 by
+                                             default when x, y, z are given)
+world.entity(id)                             -&gt; a Promise of one, with yaw, pitch, motion,
+                                             onGround, fire, maxHealth, target and effects
+                                             [{effect, seconds, level}] (null: gone)
+world.moveEntity(id, x, y, z, yaw, pitch)    put it there (yaw / pitch optional)
+world.pushEntity(id, dx, dy, dz)             add to its motion (0.4 up is a jump)
+world.damageEntity(id, amount, source)       world.healEntity(id, amount)
+world.addEffect(id, effect, seconds, level)  world.removeEffect(id, effect) (none: all)
+world.setOnFire(id, seconds)                 0 puts it out
+world.setTarget(id, target)                  who a creature goes for (null: nobody)
+world.walkTo(id, x, y, z)                    walk there (up to 32 blocks, if there&#x27;s a way)
+world.removeEntity(id)                       gone, no drops (not players)
+
+world.particle(name, x, y, z, options)       flame, smoke, large_smoke, heart, crit,
+                                             enchanted_hit, portal, explosion,
+                                             large_explosion, huge_explosion, lava, splash,
+                                             bubble, dust, effect, entity_effect, enchant,
+                                             angry_villager, happy_villager, snowball, slime,
+                                             item, block. options: {count, spread (blocks, or
+                                             [x, y, z]), speed, color (&quot;#ff8800&quot; for dust /
+                                             effect / entity_effect), item / block (for &quot;item&quot;
+                                             and &quot;block&quot;)}. Everyone nearby sees them.
+world.signText(x, y, z)                      -&gt; a Promise of a sign&#x27;s 4 lines (null: no sign)
+world.setSignText(x, y, z, lines)            [&quot;line 1&quot;, &quot;line 2&quot;...], 15 letters each
+world.getBlockData(x, y, z)                  -&gt; a Promise of what you kept on that block
+world.setBlockData(x, y, z, value)           keep any value (JSON) on the block there - a
+                                             machine&#x27;s fuel, a lock&#x27;s owner... Saved with the
+                                             world, and gone when the block is broken or
+                                             replaced. null removes it.
+
+players.all()  -&gt; a Promise of every player  players.message(player or &quot;all&quot;, text)
+players.give(player, item, count)            players.heal(player, amount) (negative hurts)
+players.teleport(player, x, y, z)            y null: onto the ground there. Never into blocks
+                                             or off the edge of the world.
+players.inventory(player)                    -&gt; a Promise of {slots: [36 stacks or null; 0-8
+                                             the hotbar], armor: [head, chest, legs, feet],
+                                             selected: the held hotbar slot}
+players.setSlot(player, slot, item, count)   slot 0-35, or &quot;head&quot;, &quot;chest&quot;, &quot;legs&quot;, &quot;feet&quot;
+players.take(player, item, count)            -&gt; a Promise of how many were taken
+players.clear(player)                        empty the inventory
+players.gameMode(player)                     -&gt; a Promise of &quot;survival&quot;, &quot;creative&quot; or
+                                             &quot;challenge&quot; (a 404 Challenge world: it stays)
+players.setGameMode(player, mode)            &quot;survival&quot; | &quot;creative&quot; - their items come along
+players.isOp(player)                         -&gt; a Promise: an operator? The host always is; the
+                                             host makes others ones with /op &lt;name&gt; (/deop,
+                                             /ops), kept with the world. Use it for anything
+                                             only trusted players should do.
+players.setOp(player, on)                    the same from a script (the host&#x27;s own scripts)
+
+Items as stacks: {item, count, data} - and, all optional, what makes a stack special:
+  name: &quot;Excalibur&quot;, lore: [&quot;a line&quot;, &quot;another&quot;], enchantments: [{id: &quot;sharpness&quot;, level: 5}]
+  (Java&#x27;s names: protection, fire_protection, feather_falling, blast_protection,
+  projectile_protection, respiration, aqua_affinity, thorns, sharpness, smite,
+  bane_of_arthropods, knockback, fire_aspect, looting, efficiency, silk_touch, unbreaking,
+  fortune, power, punch, flame, infinity - or their numbers), unbreakable: true (it never
+  wears), tag: anything of your own (kept on the stack; stacks only merge when it matches).
+  Give one anywhere an item goes - players.give(player, {item: &quot;minecraft:diamond_sword&quot;,
+  name: &quot;Excalibur&quot;, enchantments: [{id: &quot;sharpness&quot;, level: 5}]}), players.setSlot,
+  world.setSlot, world.spawnItem, client.setHeld... - and stacks you read (players.inventory,
+  world.container, events) carry them too. Saved with the world as Java saves them.
+
+gui.open(player, menu)  gui.close(player)    a menu on that player&#x27;s screen:
+  {id: &quot;my_menu&quot;, title: &quot;Title&quot;, width: 380, elements: [
+    {type: &quot;text&quot;, text: &quot;Hello&quot;, color: &quot;#ffcc00&quot;},
+    {type: &quot;button&quot;, id: &quot;ok&quot;, text: &quot;OK&quot;, color: &quot;#3a7a3a&quot;},
+    {type: &quot;input&quot;, id: &quot;name&quot;, placeholder: &quot;Your name&quot;, value: &quot;&quot;},
+    {type: &quot;row&quot;, elements: [ ...side by side... ]},
+    {type: &quot;divider&quot;},
+    {type: &quot;slots&quot;, id: &quot;in&quot;, count: 9, columns: 9, items: [{item: &quot;minecraft:coal&quot;, count: 4}],
+     put: true, take: true, accept: [&quot;minecraft:coal&quot;], keep: false},
+    {type: &quot;inventory&quot;}
+  ]}
+  Open it again with the same id to update it.
+  Item slots work like a chest: click to pick up, click to put down, right-click for half / one,
+  shift-click to move across. Every change is a &quot;gui&quot; event with action &quot;slot&quot; (e.id: which
+  slots, e.index: which one), and every gui event has e.slots: {in: [stacks or null]}. &quot;put&quot;:
+  false makes an output slot; &quot;accept&quot; lists the only items that fit. Leave &quot;items&quot; out when you
+  update an open menu to keep what&#x27;s in the slots. When the menu closes, what&#x27;s left in slots the
+  player can put into goes back to them - unless &quot;keep&quot;: true (then e.slots in the &quot;close&quot; event
+  is yours to keep, e.g. in storage: see the Gem Bag in scripts/main.js).
+  Phones and computers: nothing to do - the same menu is drawn for the device it&#x27;s on (bigger
+  slots and buttons on a touch screen; tap = click, a long press = shift-click, or &quot;put one&quot;
+  while holding a stack).
+  Designing it yourself, still drawn by the game:
+    &quot;style&quot;: {&quot;background&quot;: &quot;#203040&quot; or &quot;textures/gui/bg.png&quot;, &quot;border&quot;: &quot;#8af&quot;, &quot;color&quot;: text,
+              &quot;title&quot;: title colour, &quot;accent&quot;: buttons, &quot;radius&quot;: 6, &quot;font&quot;: &quot;pixel&quot; | &quot;sans&quot;}
+    {type: &quot;image&quot;, src: &quot;textures/gui/logo.png&quot; (or item: &quot;minecraft:diamond&quot;), width: 64}
+    {type: &quot;grid&quot;, columns: 3, elements: [...]}   as many columns as fit, up to 3
+    buttons: &quot;icon&quot; (an item or a picture), &quot;textColor&quot;; text: &quot;size&quot;, &quot;align&quot;, &quot;bold&quot;
+  More elements:
+    {type: &quot;items&quot;, id: &quot;pick&quot;, items: [...stacks or names...], columns: 9, rows: 5}
+       an item picker: pages of item pictures with their names as tooltips; a click is a &quot;gui&quot;
+       event, action &quot;click&quot;, with e.index, e.item and e.button (&quot;left&quot; / &quot;right&quot;), e.shift.
+       counts: true shows stack sizes, frame: false drops the slot frames.
+    {type: &quot;input&quot;, ..., live: true}   a &quot;gui&quot; event, action &quot;input&quot;, for every change
+  Panels - beside the game, not over it: add modal: false (and position: {left | right, top |
+  bottom}, width, height in pixels). No dimmed screen, the game keeps the mouse and keys
+  everywhere else, several can be open at once, Esc doesn&#x27;t close them, and hidden: true keeps
+  one without showing it. client.on(&quot;screen&quot;) tells you where the game&#x27;s inventory window is,
+  to put one beside it. client.gui.close(id) closes one.
+  All the way - your own page: gui.open(player, {id: &quot;shop&quot;, html: &quot;gui/shop.html&quot;,
+  data: {...}}). gui/shop.html (with its .css, .js, pictures and fonts next to it in gui/) is
+  shown in a frame of its own: it can&#x27;t reach the internet or the rest of the game, only your
+  script, through window.mcre - mcre.data (what gui.open sent), mcre.send(x) (-&gt; mod.on(&quot;gui&quot;,
+  {action: &quot;message&quot;, data: x})), mcre.on(function (data) {...}) (gui.open again with the same
+  id: new data, the page stays), mcre.close(), and mcre.touch (true on a touch screen: lay it
+  out as you like). It can show the game&#x27;s items and pictures too: mcre.icons(items) -&gt; a
+  Promise of [{item, data, name, max, rarity, category, icon (a picture URL)...}], and
+  mcre.asset(&quot;font/default8.png&quot;) -&gt; one of the game&#x27;s own pictures. As a panel (modal: false)
+  covering the screen, mcre.area([{x, y, width, height}...]) says which parts of the page are
+  yours - the game gets the mouse everywhere else.
+
+storage.get(key)  storage.set(key, value)  storage.all()
+                       kept with the world (where the world is: a joined device asks the host
+                       with client.send)
+
+client.on(event, function (e) { ... })       on every device, for its own player
+  &quot;start&quot; / &quot;stop&quot;     joined / left a world               &quot;tick&quot;   every game tick: e.player
+  &quot;key&quot;                a key went down / up: e.key, e.code (&quot;KeyK&quot;), e.down
+  &quot;message&quot;            mod.send arrived: e.data
+  &quot;gui&quot;                a button in a client.gui menu
+  &quot;screen&quot;             the game&#x27;s screen changed: e.screen (&quot;none&quot; while playing, &quot;inventory&quot;,
+                       &quot;crafting&quot;, &quot;chest&quot;, &quot;furnace&quot;, &quot;container&quot;, &quot;creative&quot;, &quot;station&quot;,
+                       &quot;trading&quot;, &quot;pause&quot;, &quot;chat&quot;, &quot;death&quot;, &quot;sign&quot;, &quot;bed&quot;, &quot;menu&quot;, &quot;other&quot;),
+                       e.rect (where an inventory window is, in pixels), e.held (the stack on
+                       the cursor), e.container {x, y, z, size} (the open chest / furnace...),
+                       e.width, e.height, e.scale (pixels per GUI pixel)
+  &quot;keybind&quot;            one of your mod&#x27;s &quot;key&quot; settings went down / up: e.id, e.down, e.code
+  &quot;slotClick&quot;          a click on a slot of the game&#x27;s inventory screens: e.area (&quot;inventory&quot;
+                       0-35, &quot;armor&quot; 0-3, &quot;container&quot;, &quot;craft&quot;, &quot;result&quot;, &quot;catalog&quot; - the
+                       creative list), e.index, e.item / e.count / e.data, e.button, e.shift
+client.player()  -&gt; a Promise of this device&#x27;s player
+client.send(data)                            to mod.on(&quot;message&quot;) where the world is
+client.gui.open(menu)  client.gui.close()    a menu on this screen only
+client.hud(id, text)                         a line of text at the top right (null removes it)
+client.sound(name, volume, pitch)            a sound only this device hears
+client.message(text)                         a line in this device&#x27;s chat
+client.isHost                                true where the world is
+client.screen()                              -&gt; a Promise of the same as the &quot;screen&quot; event
+client.held() / client.setHeld(stack)        the stack on the cursor of an open inventory screen
+client.screenSlots()                         -&gt; a Promise of {inventory, armor, container,
+                                             craft}: what&#x27;s in the open screen&#x27;s slots
+client.setScreenSlot(area, index, stack)     change one (null empties it)
+client.openControls()                        the game&#x27;s Controls screen, on your mod&#x27;s keys (a
+                                             &quot;Controls...&quot; button in your menu)
+client.captureSlots(true)                    clicks on the game&#x27;s slots are yours: the game
+                                             leaves them alone, &quot;slotClick&quot; decides (false:
+                                             hand them back)
+client.items()                               -&gt; a Promise of every block and item the game has
+                                             (mods&#x27; too), in creative order, each a full stack
+client.itemInfo(item)                        -&gt; a Promise of {name, max, block, category,
+                                             rarity, durability, food, armor, id}
+client.storage.get / set / all               kept on this device for your mod, in every world
+
+log(...)                                     to the mod console (/console) and the browser&#x27;s
+
+/console in a world opens the mod console: every mod&#x27;s log() lines and script errors, a line of
+JavaScript to try things out (await world.time(), players.all(), client.items() - your mod&#x27;s API
+is there as a mod called &quot;console&quot;), and Names: every block and item with its picture, its name
+for scripts and its number. &quot;API docs&quot; opens this guide as a page.
+
+Scripts run in a sandbox: no web pages, no network, no files - only what&#x27;s above. Errors show
+in chat as &quot;[mod id] error (scripts/main.js:12): ...&quot;, and in the mod&#x27;s panel in the Mods tab.</pre></section>
+<section id="structures"><h2>Structures</h2><pre>worldgen/&lt;name&gt;.json  {&quot;type&quot;: &quot;structure&quot;, ...} - something built into new chunks:
+                        &quot;layers&quot;      the blocks, bottom layer first; each layer is rows from
+                                      north to south, each row a character per block west to
+                                      east: &quot; &quot; keeps what&#x27;s there, &quot;.&quot; is air, anything else is
+                                      looked up in &quot;key&quot; ({&quot;#&quot;: &quot;minecraft:cobblestone&quot;, ...})
+                        &quot;file&quot;        instead of layers: a schematic in the mod - MCEdit / WorldEdit
+                                      .schematic, Sponge .schem or a structure block&#x27;s .nbt
+                        &quot;placement&quot;   &quot;surface&quot; (default: on the ground), &quot;underground&quot; or
+                                      &quot;anywhere&quot; (between &quot;min_y&quot; and &quot;max_y&quot;)
+                        &quot;y_offset&quot;    up or down from the ground (-1 sinks the bottom layer in)
+                        &quot;on&quot;          what the ground must be, e.g. [&quot;minecraft:sand&quot;]
+                        &quot;chance&quot;      per chunk (0.02: one chunk in fifty)
+                        &quot;rotate&quot;      turn it randomly (default: yes for layers, no for files -
+                                      stairs, doors and torches don&#x27;t turn with it)
+                        &quot;dimension&quot;   &quot;overworld&quot; (default), &quot;nether&quot;, &quot;end&quot; or &quot;any&quot;
+                        &quot;scripted&quot;    true: mod.on(&quot;structure&quot;) tells your script where it went
+                        &quot;loot&quot;        fill every chest (and other container) in it from a loot
+                                      table; or one at a time in &quot;key&quot;:
+                                      {&quot;C&quot;: {&quot;block&quot;: &quot;minecraft:chest&quot;, &quot;loot&quot;: &quot;chests/hut&quot;}}
+                                      or {&quot;block&quot;: &quot;minecraft:chest&quot;, &quot;items&quot;: [{&quot;slot&quot;: 13,
+                                      &quot;item&quot;: &quot;minecraft:diamond&quot;, &quot;count&quot;: 2}]}
+                        &quot;loot_tables&quot; for files: {&quot;minecraft:chests/x&quot;: &quot;my_table&quot;} swaps a table a
+                                      schematic&#x27;s chest names for one of yours
+                        &quot;biomes&quot;      only in these biomes, e.g. [&quot;desert&quot;, &quot;plains&quot;] (ores
+                                      take &quot;biomes&quot; too)
+worldgen/&lt;name&gt;.json  {&quot;type&quot;: &quot;tree&quot;, ...} - trees in new chunks:
+                        &quot;log&quot;, &quot;leaves&quot; any blocks (default the game&#x27;s oak; &quot;leaves&quot;: false
+                                      for none)
+                        &quot;shape&quot;       &quot;oak&quot; (default), &quot;spruce&quot;, &quot;round&quot;, &quot;bush&quot; or &quot;column&quot;
+                        &quot;height&quot;      [min, max] trunk height
+                        &quot;per_chunk&quot;   how many (0.1: one chunk in ten)
+                        &quot;on&quot;          what it grows on (default grass and dirt)
+                        &quot;biomes&quot;, &quot;dimension&quot;
+worldgen/&lt;name&gt;.json  {&quot;type&quot;: &quot;plant&quot;, &quot;block&quot;: &quot;example_flower&quot;, ...} - flowers, grass,
+                      mushrooms... scattered in patches on the ground: &quot;patches&quot; per chunk,
+                      &quot;tries&quot; per patch, &quot;on&quot;, &quot;biomes&quot;, &quot;dimension&quot;, &quot;height&quot;: [min y, max y]
+Biomes: rainforest, swampland, seasonal_forest, forest, savanna, shrubland, taiga, desert,
+plains, ice_desert, tundra (Java names like &quot;jungle&quot;, &quot;swamp&quot; or &quot;snowy_tundra&quot; work too).
+worldgen/&lt;name&gt;.schematic (or .schem / .nbt) on its own works too, with the defaults. Chests in
+schematics keep their items, and their loot tables (the game has stand-ins for Java&#x27;s chest
+tables: minecraft:chests/simple_dungeon, village_blacksmith, abandoned_mineshaft, desert_pyramid,
+jungle_temple, stronghold_corridor, spawn_bonus_chest, nether_bridge).
+Up to 64 x 128 x 64 blocks. Newer files&#x27; blocks are matched to the nearest this game has.</pre></section>
+<section id="creatures"><h2>Creatures</h2><pre>mobs/&lt;name&gt;.json      A new creature, &quot;&lt;mod id&gt;:&lt;name&gt;&quot;:
+                        &quot;name&quot;        what it&#x27;s called
+                        &quot;model&quot;       its model: a Bedrock geometry file (.geo.json - Blockbench&#x27;s
+                                      &quot;Bedrock Entity&quot; / File &gt; Export &gt; Bedrock Geometry) or an
+                                      OptiFine CEM model (.jem) anywhere in the mod
+                        &quot;texture&quot;     its picture (any size; box UVs as Blockbench lays them out)
+                        &quot;behaviour&quot;   &quot;passive&quot; (wanders, runs when hit, breeds), &quot;hostile&quot; (hunts
+                                      the nearest player), &quot;neutral&quot; (fights back only),
+                                      &quot;flying&quot; (drifts around in the air) or &quot;swimming&quot; (in water)
+                        &quot;health&quot;, &quot;damage&quot; (hostile / neutral), &quot;speed&quot; (a pig&#x27;s is 0.25),
+                        &quot;size&quot;: [width, height] in blocks, &quot;scale&quot; (draws it bigger or smaller)
+                        &quot;drops&quot;       [{&quot;item&quot;: &quot;...&quot;, &quot;count&quot;: [min, max], &quot;chance&quot;: 0.5}], or
+                        &quot;loot&quot;        a loot table
+                        &quot;xp&quot;          experience when killed
+                        &quot;breed&quot;       an item that makes two of them breed (passive)
+                        &quot;burns_in_daylight&quot;, &quot;fire_immune&quot;
+                        &quot;sounds&quot;      {&quot;ambient&quot;: &quot;mob.pig&quot;, &quot;hurt&quot;: ..., &quot;death&quot;: ...}
+                        &quot;spawn&quot;       where they appear by themselves - a list of
+                                      {&quot;dimension&quot;: &quot;overworld&quot;, &quot;light&quot;: [min, max] (0-15),
+                                       &quot;height&quot;: [min, max], &quot;on&quot;: [&quot;minecraft:grass&quot;],
+                                       &quot;biomes&quot;: [&quot;plains&quot;, &quot;forest&quot;], &quot;weight&quot;: 10,
+                                       &quot;group&quot;: [min, max]}
+                        &quot;egg&quot;         [colour, colour]: its spawn egg&#x27;s colours (an egg is made for
+                                      every creature; false for none)
+                        &quot;animations&quot;  {&quot;&lt;part&gt;&quot;: &quot;head&quot; | &quot;leg&quot; | &quot;arm&quot; | &quot;wing&quot; | &quot;tail&quot; | &quot;none&quot;}
+                                      - parts move by their names otherwise: &quot;head&quot; looks around,
+                                      &quot;leg...&quot; / &quot;arm...&quot; swing as it walks, &quot;wing...&quot; flap,
+                                      &quot;tail...&quot; sways
+                      Scripts see it in every creature event (spawn, hurt, death, attack,
+                      interact) as e.entity.type &quot;example:example_critter&quot;, and
+                      world.spawnEntity(&quot;example_critter&quot;, x, y, z) makes one.
+                      See example_critter: it breeds with Example Gems.</pre></section>
+<section id="rules"><h2>Rules</h2><pre>Scripts hear about things after they happen, so they can&#x27;t stop them. Rules can: the game checks
+them at the moment something happens.
+rules/&lt;name&gt;.json     {&quot;no_break&quot;: [blocks], &quot;no_place&quot;: [blocks], &quot;no_use&quot;: [blocks],
+                       &quot;no_damage&quot;: [{&quot;entity&quot;: &quot;minecraft:player&quot;, &quot;cause&quot;: &quot;fall&quot;}],
+                       &quot;pvp&quot;: false, &quot;explosions_break_blocks&quot;: false,
+                       &quot;explosion_proof&quot;: [blocks], &quot;fire_spreads&quot;: false,
+                       &quot;no_spawn&quot;: [&quot;minecraft:creeper&quot;]}
+                      Blocks can be &quot;*&quot; (any). Creatures: &quot;minecraft:player&quot;, &quot;minecraft:pig&quot;,
+                      &quot;&lt;mod id&gt;:&lt;name&gt;&quot;, or &quot;*&quot;. Causes: any, fall, fire, lava, drown, explosion,
+                      attack, projectile, magic, void, suffocation, other. &quot;no_damage&quot;: [&quot;fall&quot;]
+                      (just causes) means players.
+                      Add &quot;area&quot;: [x1, y1, z1, x2, y2, z2] (a box of blocks) and / or
+                      &quot;dimension&quot; to limit them; {&quot;rules&quot;: [{...}, {...}]} for several areas.
+                      Block rules leave players in creative mode alone - &quot;creative&quot;: true
+                      includes them.
+In a block: &quot;explosion_proof&quot;: true. In a creature: &quot;immune&quot;: [&quot;fall&quot;, &quot;fire&quot;].
+From a script: world.setRules(id, {...}) turns a set of rules on (the same form; the same id
+replaces it, null turns it off) - e.g. protect an arena while a game runs. See /example protect.</pre></section>
+<section id="loot-tables"><h2>Loot tables</h2><pre>loot_tables/&lt;path&gt;.json  A loot table called &quot;&lt;mod id&gt;:&lt;path&gt;&quot; (this mod&#x27;s chests/shrine.json is
+                       example:chests/shrine). Java&#x27;s format works as it is:
+                         {&quot;pools&quot;: [{&quot;rolls&quot;: {&quot;min&quot;: 2, &quot;max&quot;: 4}, &quot;entries&quot;: [
+                           {&quot;type&quot;: &quot;minecraft:item&quot;, &quot;name&quot;: &quot;minecraft:diamond&quot;, &quot;weight&quot;: 2,
+                            &quot;functions&quot;: [{&quot;function&quot;: &quot;minecraft:set_count&quot;,
+                                           &quot;count&quot;: {&quot;min&quot;: 1, &quot;max&quot;: 3}}]},
+                           {&quot;type&quot;: &quot;minecraft:empty&quot;, &quot;weight&quot;: 5},
+                           {&quot;type&quot;: &quot;minecraft:loot_table&quot;, &quot;name&quot;: &quot;another_table&quot;}]}]}
+                       (set_count and set_data are used; other functions are ignored.) Or short:
+                         {&quot;rolls&quot;: [1, 3], &quot;items&quot;: [{&quot;item&quot;: &quot;minecraft:apple&quot;,
+                          &quot;count&quot;: [1, 4], &quot;weight&quot;: 3}], &quot;empty&quot;: 2}
+                       A Java data pack&#x27;s data/&lt;namespace&gt;/loot_tables/... files work too.
+Use them in blocks (&quot;loot&quot;: &quot;my_table&quot; drops from the table instead of &quot;drops&quot;), in structures
+(above) and from scripts (world.fillLoot, dropLoot, rollLoot).</pre></section>
+<section id="order"><h2>Order</h2><pre>Mods higher in the list win when two change the same thing. A mod you add goes on top.</pre></section>
+<section id="making-a-mod"><h2>Making a mod</h2><pre>Start from this one: Download it from the Mods tab, unzip it, change it.
+  - Open the folder, not a .zip, while you work: Add mod -&gt; Open a folder (Chrome and Edge).
+    The game reads it straight from your disk. Change a file, then press Reload in the Mods
+    tab - or type /reload in a world to reload without leaving it (new blocks, textures,
+    recipes and scripts all come in; scripts start again; players who joined you keep the
+    old version until they join again). Download on a folder&#x27;s row makes the .zip to share. (Other browsers: Add mod the .zip again - the same id, name and author
+    replace the old copy.)
+  - Problems: anything in a mod the game can&#x27;t use - a recipe with an unknown item, a texture
+    that isn&#x27;t there, broken JSON, a script error with its file and line - is listed in the
+    mod&#x27;s panel in the Mods tab, and counted on its row.
+  - Autocomplete: types/mcre.d.ts describes the scripting API and jsconfig.json points your
+    editor at it. Open the mod&#x27;s folder in VS Code (or any editor that reads TypeScript
+    types) and mod., world., players. ... complete as you type, with their notes.</pre></section>
+<section id="sharing-a-mod"><h2>Sharing a mod</h2><pre>Add mod -&gt; Browse mods lists mods from mod lists and installs them (with what they need).
+A mod list is one JSON file anyone can put online (GitHub Pages works):
+  {&quot;name&quot;: &quot;My mods&quot;, &quot;mods&quot;: [{&quot;id&quot;: &quot;example&quot;, &quot;name&quot;: &quot;Example Pack&quot;, &quot;author&quot;: &quot;you&quot;,
+    &quot;version&quot;: &quot;1.0&quot;, &quot;devices&quot;: &quot;any&quot;, &quot;description&quot;: &quot;...&quot;, &quot;url&quot;: &quot;example.zip&quot;, &quot;icon&quot;: &quot;example.png&quot;,
+    &quot;tags&quot;: [&quot;blocks&quot;], &quot;dependencies&quot;: [], &quot;sha256&quot;: &quot;(optional: the .zip&#x27;s SHA-256)&quot;}]}
+&quot;url&quot; and &quot;icon&quot; can be relative to the list. Players add a list under Sources by its
+address - or paste the address of a .zip there to install just that mod. A newer &quot;version&quot;
+in a list shows an Update button.</pre></section>
+<section id="old-pocket-edition-mods-modpe"><h2>Old Pocket Edition mods (ModPE)</h2><pre>BlockLauncher&#x27;s ModPE scripts work: Add mod -&gt; choose the .js (or a .modpkg). Their blocks, items,
+food, armour, recipes and hooks (useItem, destroyBlock, modTick, procCmd, attackHook, deathHook,
+chatHook...) run as they did on a phone, with Pocket Edition&#x27;s ids and texture names. Their
+menus (Android buttons, panels, text boxes, checkboxes, sliders, dialogs, toasts) are drawn
+by the game, for touch and mouse alike - with a mouse, M frees the cursor for a mod&#x27;s buttons
+while playing. ModPE scripts run where the world is (single player, or the host).</pre></section>
+<section id="java-resource-packs"><h2>Java resource packs</h2><pre>A Java Edition resource pack .zip (with pack.mcmeta) can be added as it is: its block and item
+textures, sounds and en_us.lang lines are used.</pre></section>
+<section id="types-mcre-d-ts"><h2>Types (mcre.d.ts)</h2><p>Every script's API, for editors that read TypeScript types (VS Code...): put it next to your scripts with a jsconfig.json and <code>mod.</code>, <code>world.</code>... complete as you type. <a id="dl" href="#">Download mcre.d.ts</a></p><pre>// Minecraft RE - mod scripting API, for editors (VS Code and others read this file and complete
+// the API as you type). Keep it next to your scripts: this mod&#x27;s jsconfig.json points the editor
+// at types/*.d.ts and scripts/*.js. Nothing here runs - it only describes what the game gives
+// every script: mod, world, players, gui, storage, client and log.
+
+/** A block or item: &quot;&lt;mod id&gt;:&lt;name&gt;&quot;, &quot;minecraft:&lt;java name&gt;&quot; (e.g. &quot;minecraft:stone&quot;),
+ *  &quot;air&quot;, or just &quot;&lt;name&gt;&quot; for your own mod&#x27;s. Add &quot;:&lt;data&gt;&quot; for a variant (&quot;minecraft:wool:14&quot;). */
+type Name = string;
+
+/** A player. Pass it (or its id) wherever a player goes. */
+interface Player {
+  id: number;
+  name: string;
+  /** Feet position. */
+  x: number; y: number; z: number;
+  health: number;
+}
+
+/** A creature (or other entity) in an event. */
+interface Creature {
+  id: number;
+  /** &quot;minecraft:zombie&quot;, &quot;&lt;mod id&gt;:&lt;name&gt;&quot; for a mod&#x27;s own creature, ... */
+  type: string;
+  x: number; y: number; z: number;
+  health?: number;
+  /** Set when the creature is a player. */
+  name?: string;
+}
+
+/** world.entity(): a creature in detail. */
+interface CreatureDetail extends Creature {
+  yaw: number; pitch: number;
+  motion: [number, number, number];
+  onGround: boolean;
+  /** Ticks of fire left. */
+  fire: number;
+  maxHealth?: number;
+  /** The creature it&#x27;s going for (0: none). */
+  target?: number;
+  effects?: { effect: string; seconds: number; level: number }[];
+}
+
+/** Everything an event can carry. Which fields are set depends on the event (see mod.on). */
+interface GameEvent {
+  /** The event&#x27;s name. */
+  t: string;
+  /** A block: its name, data value and position. */
+  block?: Name; data?: number; x?: number; y?: number; z?: number;
+  /** An item: its name and how many. */
+  item?: Name; count?: number;
+  /** The face of a block an item was used on (0 down, 1 up, 2 north, 3 south, 4 west, 5 east). */
+  face?: number;
+  /** Whoever did it. */
+  player?: Player;
+  /** The creature it happened to, and (hurt / death) what did it. */
+  entity?: Creature; source?: Creature | null;
+  damage?: number;
+  /** &quot;chat&quot; */
+  text?: string;
+  /** &quot;explode&quot; */
+  power?: number;
+  /** &quot;weather&quot; */
+  raining?: number; thundering?: number;
+  /** &quot;dimension&quot;: 0 overworld, -1 Nether, 1 End. */
+  dimension?: number;
+  /** &quot;gametick&quot;: the world&#x27;s time. */
+  time?: number;
+  /** &quot;structure&quot;: which one, how it was turned (0-3, a quarter each) and its size [x, y, z]. */
+  name?: string; rotation?: number; size?: [number, number, number];
+  /** &quot;gui&quot;: the menu&#x27;s id, the button&#x27;s id, what happened, the text boxes&#x27; values. */
+  gui?: string; id?: string; action?: &#x27;click&#x27; | &#x27;submit&#x27; | &#x27;input&#x27; | &#x27;close&#x27; | &#x27;slot&#x27; | &#x27;message&#x27;;
+  values?: { [inputId: string]: string };
+  /** &quot;gui&quot;, action &quot;message&quot;: what an html menu sent (mcre.send). */
+  data?: any;
+  /** &quot;gui&quot;: what&#x27;s in the menu&#x27;s item slots now (see SlotsElement); action &quot;slot&quot;: which slot changed. */
+  slots?: { [slotsId: string]: (ItemStack | null)[] }; index?: number;
+  /** &quot;gui&quot; / &quot;message&quot;: the mod it&#x27;s for. (&quot;message&quot; carries what was sent as e.data.) */
+  mod?: string;
+}
+
+/** A stack of items. */
+interface ItemStack { item: Name; count: number; data?: number; }
+
+/** A world event&#x27;s handler. Return a Promise if you like; errors are listed with the mod. */
+type Handler = (e: GameEvent &amp; { [k: string]: any }) =&gt; void | Promise&lt;void&gt;;
+
+type WorldEventName =
+  | &#x27;start&#x27; | &#x27;stop&#x27; | &#x27;dimension&#x27; | &#x27;join&#x27; | &#x27;leave&#x27; | &#x27;respawn&#x27;
+  | &#x27;use&#x27; | &#x27;place&#x27; | &#x27;break&#x27; | &#x27;step&#x27; | &#x27;tick&#x27; | &#x27;useItem&#x27; | &#x27;useItemOn&#x27;
+  | &#x27;eat&#x27; | &#x27;craft&#x27; | &#x27;smelt&#x27; | &#x27;attack&#x27; | &#x27;interact&#x27; | &#x27;hurt&#x27; | &#x27;death&#x27; | &#x27;spawn&#x27;
+  | &#x27;chat&#x27; | &#x27;explode&#x27; | &#x27;weather&#x27; | &#x27;gametick&#x27; | &#x27;gui&#x27; | &#x27;message&#x27; | &#x27;structure&#x27;
+  /** a &quot;throwable&quot; mod item landed: e.item, e.x/y/z, e.entity (what it hit, if anything), e.player */
+  | &#x27;hit&#x27;
+  /** this mod&#x27;s settings changed (e.values: all of them) */
+  | &#x27;settings&#x27;;
+
+interface CommandContext {
+  player: Player;
+  /** The words after the command&#x27;s name. */
+  args: string[];
+  /** Everything typed, &quot;/name ...&quot; */
+  text: string;
+  /** Typed by the player whose world it is (single player: always). */
+  isHost: boolean;
+}
+
+interface CommandOptions {
+  /** &quot;host&quot;: only the player whose world it is may use it. Default &quot;everyone&quot;. */
+  permission?: &#x27;everyone&#x27; | &#x27;host&#x27;;
+  /** Shown by /help. */
+  description?: string;
+  /** What follows the name, for /help: &quot;&lt;player&gt; &lt;amount&gt;&quot;. */
+  usage?: string;
+}
+
+interface ModApi {
+  /** This mod&#x27;s id (manifest.json). */
+  readonly id: string;
+  /** A world event - fires once, where the world is (single player or the host). */
+  on(event: WorldEventName, fn: Handler): void;
+  /** &quot;/name ...&quot; typed in chat. */
+  command(name: string, fn: (c: CommandContext) =&gt; void | Promise&lt;void&gt;, options?: CommandOptions): void;
+  /** Data to client.on(&quot;message&quot;) on that player&#x27;s device (&quot;all&quot;: everyone&#x27;s). */
+  send(player: Player | number | &#x27;all&#x27;, data: any): void;
+  /** This device&#x27;s values of the settings in manifest.json (&quot;settings&quot;). Where the world is,
+   *  they&#x27;re the host&#x27;s; in client code, that player&#x27;s own. Changes: on(&quot;settings&quot;), e.values. */
+  readonly settings: {
+    get(id: string): any;
+    all(): { [id: string]: any };
+    /** Change one (kept, like a change in the Settings dialog; the value is fitted to the setting). */
+    set(id: string, value: any): void;
+  };
+}
+
+interface WorldApi {
+  setBlock(x: number, y: number, z: number, block: Name, data?: number): void;
+  setData(x: number, y: number, z: number, data: number): void;
+  getBlock(x: number, y: number, z: number): Promise&lt;{ block: Name; data: number }&gt;;
+  /** A &quot;tick&quot; event for a scripted block, this many game ticks (20 a second) from now. */
+  scheduleTick(x: number, y: number, z: number, ticks: number): void;
+  spawnItem(x: number, y: number, z: number, item: Name, count?: number): void;
+  explode(x: number, y: number, z: number, power?: number, fire?: boolean): void;
+  /** The world&#x27;s time in ticks (a day is 19200; 0 is sunrise). */
+  time(): Promise&lt;number&gt;;
+  setTime(t: number): void;
+  /** Is it raining / thundering? */
+  weather(): Promise&lt;{ raining: boolean; thundering: boolean }&gt;;
+  /** Clear skies, rain (snow where it&#x27;s cold) or a thunderstorm - for this many seconds, or (none
+   *  given) as long as the game&#x27;s own weather would last. */
+  setWeather(kind: &#x27;clear&#x27; | &#x27;rain&#x27; | &#x27;thunder&#x27;, seconds?: number): void;
+  /** A sound everyone nearby hears, e.g. &quot;random.pop&quot;. */
+  sound(name: string, x: number, y: number, z: number, volume?: number, pitch?: number): void;
+  /** What&#x27;s in a container (chest, furnace, dispenser, hopper...), slot by slot; null if there&#x27;s none. */
+  container(x: number, y: number, z: number): Promise&lt;(ItemStack | null)[] | null&gt;;
+  /** Put items in one slot of a container (item null: empty it). */
+  setSlot(x: number, y: number, z: number, slot: number, item: Name | ItemStack | null, count?: number, data?: number): void;
+  /** Fill a container from a loot table (&quot;chests/hut&quot; for your own loot_tables/chests/hut.json,
+   *  &quot;&lt;mod&gt;:&lt;path&gt;&quot;, or the game&#x27;s: &quot;minecraft:chests/simple_dungeon&quot;...). */
+  fillLoot(x: number, y: number, z: number, table: string): void;
+  /** Drop a loot table&#x27;s items there. */
+  dropLoot(x: number, y: number, z: number, table: string): void;
+  /** Roll a loot table without placing anything. */
+  rollLoot(table: string): Promise&lt;ItemStack[]&gt;;
+  /** Build one of the mods&#x27; worldgen structures with its lowest north-west corner here
+   *  (&quot;&lt;name&gt;&quot; for your own worldgen/&lt;name&gt;.json); rotation 0-3 quarters (default: random if it turns). */
+  placeStructure(name: string, x: number, y: number, z: number, rotation?: number): void;
+  /** A creature: &quot;&lt;name&gt;&quot; (your mod&#x27;s mobs/&lt;name&gt;.json, or the game&#x27;s: &quot;pig&quot;), &quot;&lt;mod&gt;:&lt;name&gt;&quot;
+   *  or &quot;minecraft:pig&quot;. A Promise of its entity id (0 if it couldn&#x27;t be made). */
+  spawnEntity(type: string, x: number, y: number, z: number): Promise&lt;number&gt;;
+
+  // --- creatures (a player, or any creature&#x27;s id, works in all of these) ---
+  /** Every creature, those of one type (&quot;zombie&quot;, &quot;minecraft:zombie&quot;, &quot;&lt;mod&gt;:&lt;name&gt;&quot;), or
+   *  those near a point (radius 16 unless given). */
+  entities(filter?: string | { type?: string; x?: number; y?: number; z?: number; radius?: number; limit?: number }): Promise&lt;Creature[]&gt;;
+  /** One creature in detail; null if it&#x27;s gone. */
+  entity(id: number | Player | Creature): Promise&lt;CreatureDetail | null&gt;;
+  /** Put it there (yaw / pitch in degrees, optional). */
+  moveEntity(id: number | Player | Creature, x: number, y: number, z: number, yaw?: number, pitch?: number): void;
+  /** Add to its motion (blocks per tick; 0.4 up is about a jump). */
+  pushEntity(id: number | Player | Creature, dx: number, dy: number, dz: number): void;
+  damageEntity(id: number | Player | Creature, amount: number, source?: number | Player | Creature): void;
+  healEntity(id: number | Player | Creature, amount: number): void;
+  /** Effects: speed, slowness, haste, mining_fatigue, strength, instant_health, instant_damage,
+   *  jump_boost, nausea, regeneration, resistance, fire_resistance, water_breathing,
+   *  invisibility, blindness, night_vision, hunger, weakness, poison, wither. */
+  addEffect(id: number | Player | Creature, effect: string, seconds?: number, level?: number): void;
+  /** One effect, or (none given) all of them. */
+  removeEffect(id: number | Player | Creature, effect?: string): void;
+  /** Seconds (default 8); 0 puts it out. */
+  setOnFire(id: number | Player | Creature, seconds?: number): void;
+  /** Who a creature goes for (null: nobody). */
+  setTarget(id: number | Creature, target: number | Player | Creature | null): void;
+  /** Walk there, if it can find a way (up to 32 blocks). */
+  walkTo(id: number | Creature, x: number, y: number, z: number): void;
+  /** Gone, without drops (never a player). */
+  removeEntity(id: number | Creature): void;
+
+  /** Particles everyone nearby sees: flame, smoke, large_smoke, heart, crit, enchanted_hit,
+   *  portal, explosion, large_explosion, huge_explosion, lava, splash, bubble, dust, effect,
+   *  entity_effect, enchant, angry_villager, happy_villager, snowball, slime, item, block. */
+  particle(name: string, x: number, y: number, z: number, options?: {
+    count?: number; spread?: number | [number, number, number]; speed?: number;
+    /** dust / effect / entity_effect: &quot;#ff8800&quot;, 0xff8800 or [r, g, b] */
+    color?: string | number | [number, number, number];
+    /** &quot;item&quot; / &quot;block&quot; particles: which */
+    item?: Name; block?: Name;
+  }): void;
+
+  // --- signs, and data kept on a block ---
+  /** A sign&#x27;s 4 lines; null if there&#x27;s no sign there. */
+  signText(x: number, y: number, z: number): Promise&lt;string[] | null&gt;;
+  /** Up to 4 lines of up to 15 letters (an array, or one string with \n). */
+  setSignText(x: number, y: number, z: number, lines: string[] | string): void;
+  /** What your mod kept on the block there (undefined: nothing, or the block changed). */
+  getBlockData(x: number, y: number, z: number): Promise&lt;any&gt;;
+  /** Keep a value (anything JSON) on the block there, saved with the world and dropped when
+   *  the block is broken or replaced; null removes it. A Promise of whether it was kept
+   *  (false: there&#x27;s no block there). Where the world is only. */
+  setBlockData(x: number, y: number, z: number, value: any): Promise&lt;boolean&gt;;
+  /** Rules the game itself enforces from now on (scripts can&#x27;t stop things in time; rules can).
+   *  The same id replaces a set; null removes it. Gone when the scripts stop. */
+  setRules(id: string, rules: Rules | null): void;
+}
+
+/** What the game refuses (a mod&#x27;s rules/&lt;name&gt;.json has the same form). */
+interface Rules {
+  no_break?: Name | Name[]; no_place?: Name | Name[]; no_use?: Name | Name[];
+  /** Creatures (&quot;minecraft:player&quot;, &quot;&lt;mod&gt;:&lt;name&gt;&quot;, &quot;*&quot;) a kind of damage doesn&#x27;t hurt. A plain
+   *  string: that cause, for players. */
+  no_damage?: string | Array&lt;string | { entity?: string | string[]; cause?: DamageCause }&gt;;
+  /** false: players can&#x27;t hurt players; explosions break nothing; fire doesn&#x27;t spread. */
+  pvp?: boolean; explosions_break_blocks?: boolean; fire_spreads?: boolean;
+  explosion_proof?: Name | Name[];
+  no_spawn?: string | string[];
+  /** Only inside this box of blocks [x1, y1, z1, x2, y2, z2], and / or this dimension. */
+  area?: [number, number, number, number, number, number];
+  dimension?: &#x27;overworld&#x27; | &#x27;nether&#x27; | &#x27;end&#x27; | &#x27;any&#x27;;
+  /** Block rules apply to creative players too. */
+  creative?: boolean;
+  rules?: Rules[];
+}
+type DamageCause = &#x27;any&#x27; | &#x27;fall&#x27; | &#x27;fire&#x27; | &#x27;lava&#x27; | &#x27;drown&#x27; | &#x27;explosion&#x27; | &#x27;attack&#x27; | &#x27;projectile&#x27; | &#x27;magic&#x27; | &#x27;void&#x27; | &#x27;suffocation&#x27; | &#x27;other&#x27;;
+
+interface PlayersApi {
+  all(): Promise&lt;Player[]&gt;;
+  message(player: Player | number | &#x27;all&#x27;, text: string): void;
+  /** item: a name (&quot;minecraft:wool:14&quot; for a variant) or a stack ({item, data}, e.g. from client.items()). */
+  give(player: Player | number, item: Name | ItemStack, count?: number): void;
+  /** Negative amounts hurt. */
+  heal(player: Player | number, amount: number): void;
+  /** y null: onto the ground there. Never into blocks or off the world. */
+  teleport(player: Player | number, x: number, y: number | null, z: number): void;
+  /** Everything a player carries: slots 0-8 the hotbar, 9-35 the rest; armour head, chest, legs, feet. */
+  inventory(player: Player | number): Promise&lt;{ slots: (ItemStack | null)[]; armor: (ItemStack | null)[]; selected: number } | null&gt;;
+  /** Put items in one of a player&#x27;s slots (0-35, or &quot;head&quot; / &quot;chest&quot; / &quot;legs&quot; / &quot;feet&quot;); item null empties it. */
+  setSlot(player: Player | number, slot: number | &#x27;head&#x27; | &#x27;chest&#x27; | &#x27;legs&#x27; | &#x27;feet&#x27;, item: Name | ItemStack | null, count?: number, data?: number): void;
+  /** Take up to count of an item from a player (data: only that variant); how many were taken. */
+  take(player: Player | number, item: Name, count?: number, data?: number): Promise&lt;number&gt;;
+  /** Empty a player&#x27;s inventory (armorToo: the armour as well). */
+  clear(player: Player | number, armorToo?: boolean): void;
+}
+
+interface TextElement { type: &#x27;text&#x27;; text: string; color?: string; size?: number; align?: &#x27;left&#x27; | &#x27;center&#x27; | &#x27;right&#x27;; bold?: boolean; }
+interface ButtonElement {
+  type: &#x27;button&#x27;; id: string; text: string; color?: string; textColor?: string;
+  /** An item (&quot;minecraft:diamond&quot;) or a picture in the mod (&quot;textures/gui/coin.png&quot;). */
+  icon?: string;
+}
+/** A picture in the mod, or an item&#x27;s icon. */
+interface ImageElement { type: &#x27;image&#x27;; src?: string; item?: Name; width?: number; height?: number; align?: &#x27;left&#x27; | &#x27;center&#x27; | &#x27;right&#x27;; }
+/** Elements in columns: up to &quot;columns&quot;, fewer when the screen is narrow. */
+interface GridElement { type: &#x27;grid&#x27;; columns?: number; elements: Element[]; }
+/** live: true - a &quot;gui&quot; event with action &quot;input&quot; for every change (a search as you type). */
+interface InputElement { type: &#x27;input&#x27;; id: string; placeholder?: string; value?: string; live?: boolean; }
+interface RowElement { type: &#x27;row&#x27;; elements: Element[]; }
+interface DividerElement { type: &#x27;divider&#x27;; }
+/** Item slots the player can move items in and out of. Every change is a &quot;gui&quot; event with
+ *  action &quot;slot&quot;; every gui event carries e.slots (what&#x27;s in each slots element). */
+interface SlotsElement {
+  type: &#x27;slots&#x27;; id: string;
+  /** How many slots (default: as many as items), and per row (up to 9). */
+  count?: number; columns?: number;
+  /** What&#x27;s in them. Leave it out when updating an open menu to keep what&#x27;s there. */
+  items?: (ItemStack | Name | null)[];
+  /** May the player put items in / take them out (default true). put: false = an output slot. */
+  put?: boolean; take?: boolean;
+  /** Only these items may go in. */
+  accept?: Name[];
+  /** true: the script looks after what&#x27;s left when the menu closes. Otherwise it goes back to
+   *  the player (from slots they can put into). */
+  keep?: boolean;
+}
+/** The player&#x27;s own inventory, to move items to and from. */
+interface InventoryElement { type: &#x27;inventory&#x27;; title?: string; }
+type Element = TextElement | ButtonElement | InputElement | RowElement | DividerElement | SlotsElement | InventoryElement | ImageElement | GridElement;
+
+/** How a drawn menu looks (all optional; it still adapts to phones and computers). */
+interface MenuStyle {
+  /** &quot;#203040&quot;, or a picture in the mod (&quot;textures/gui/bg.png&quot;). */
+  background?: string;
+  backgroundSize?: &#x27;cover&#x27; | &#x27;tile&#x27;;
+  border?: string; color?: string; title?: string; accent?: string;
+  /** Rounded corners, 0-24. */
+  radius?: number;
+  font?: &#x27;pixel&#x27; | &#x27;sans&#x27; | &#x27;serif&#x27;;
+}
+
+interface Menu {
+  /** Open a menu again with the same id to update it. */
+  id: string;
+  /** false: a panel - beside the game instead of over it. No dimmed backdrop, the game keeps the
+   *  mouse and keys everywhere else, several can be open at once (one per id). Place it with
+   *  position and width / height in CSS pixels - client.on(&quot;screen&quot;) says where the game&#x27;s
+   *  inventory window is, to dock one beside it. No Close button unless closeButton: true. */
+  modal?: boolean;
+  /** A panel&#x27;s place: {left | right, top | bottom} in CSS pixels. */
+  position?: { left?: number; right?: number; top?: number; bottom?: number };
+  /** A panel kept but out of sight (an html one keeps running); open it again without to show it. */
+  hidden?: boolean;
+  title?: string;
+  /** In pixels, 200-720 (default 380). For an html menu: pixels or &quot;80%&quot;. */
+  width?: number | string;
+  height?: number | string;
+  elements?: Element[];
+  style?: MenuStyle;
+  /** Your own page instead of elements: &quot;gui/shop.html&quot; in the mod. It gets window.mcre and nothing
+   *  else - no internet, no game page: data, send(x), on(fn), close(), touch, and
+   *    icons(items) -&gt; Promise [{item, data, id, name, max, icon}] (icon: a 32 x 32 picture URL),
+   *    asset(path) -&gt; Promise URL of one of the game&#x27;s pictures (&quot;font/default8.png&quot;),
+   *    panel (true for a panel), area(rects | null): only these parts [{x, y, width, height}] of a
+   *    panel show and take the mouse - the game gets the rest. A panel hands the game the keys it
+   *    doesn&#x27;t type with (or preventDefault) and the mouse&#x27;s movement. */
+  html?: string;
+  /** For an html menu: mcre.data; opening it again with the same id passes new data to mcre.on. */
+  data?: any;
+  /** false: no Close button (Esc still closes it). */
+  closeButton?: boolean;
+}
+
+interface GuiApi {
+  open(player: Player | number, menu: Menu): void;
+  close(player: Player | number): void;
+}
+
+interface StorageApi {
+  /** Kept with the world, where the world is (a joined device&#x27;s storage is empty). */
+  get(key: string): any;
+  set(key: string, value: any): void;
+  all(): { [key: string]: any };
+}
+
+type ClientEventName = &#x27;start&#x27; | &#x27;stop&#x27; | &#x27;tick&#x27; | &#x27;key&#x27; | &#x27;message&#x27; | &#x27;gui&#x27; | &#x27;dimension&#x27; | &#x27;settings&#x27;
+  /** the game&#x27;s open screen changed (see ScreenInfo) - also when it moves, or the held stack changes */
+  | &#x27;screen&#x27;
+  /** one of this mod&#x27;s &quot;key&quot; settings went down / up: e.id, e.down, e.code (Options &gt; Controls lists them) */
+  | &#x27;keybind&#x27;
+  /** a click on a slot of the game&#x27;s inventory screens: e.area, e.index, e.item, e.button, e.shift */
+  | &#x27;slotClick&#x27;;
+
+/** The game&#x27;s own screen on this device (client.screen(), client.on(&quot;screen&quot;)). */
+interface ScreenInfo {
+  /** &quot;none&quot; (playing), &quot;inventory&quot;, &quot;crafting&quot;, &quot;chest&quot;, &quot;furnace&quot;, &quot;container&quot; (dispenser, dropper,
+   *  hopper), &quot;creative&quot;, &quot;station&quot; (enchanting / anvil / brewing), &quot;trading&quot;, &quot;pause&quot;, &quot;chat&quot;,
+   *  &quot;death&quot;, &quot;sign&quot;, &quot;bed&quot;, &quot;menu&quot; (no world), &quot;other&quot;. */
+  screen: string;
+  /** Where an inventory screen draws its window, in CSS pixels; null for other screens. */
+  rect: { x: number; y: number; width: number; height: number } | null;
+  /** The stack on the cursor of an inventory screen. */
+  held: ItemStack | null;
+  /** The window&#x27;s size in CSS pixels, and CSS pixels per GUI pixel (a slot is 18 GUI pixels). */
+  width: number; height: number; scale: number;
+}
+
+interface KeyEvent extends GameEvent { key: string; code: string; down: boolean; }
+
+interface ClientApi {
+  /** This device&#x27;s own events: &quot;key&quot; {key, code, down}, &quot;tick&quot; {player}, &quot;message&quot; {data}... */
+  on(event: ClientEventName, fn: Handler): void;
+  /** True where the world is (single player or the host). */
+  readonly isHost: boolean;
+  /** This device&#x27;s player. */
+  player(): Promise&lt;Player&gt;;
+  /** To mod.on(&quot;message&quot;) where the world is. */
+  send(data: any): void;
+  /** close(id): that menu or panel; close(): the menu and this mod&#x27;s panels. */
+  gui: { open(menu: Menu): void; close(id?: string): void; };
+  /** A sound only this device hears. */
+  sound(name: string, volume?: number, pitch?: number): void;
+  /** A line in this device&#x27;s chat. */
+  message(text: string): void;
+  /** A line of text at the top right; null removes it. */
+  hud(id: string, text: string | null): void;
+  /** What&#x27;s open in the game on this device, and where. */
+  screen(): Promise&lt;ScreenInfo&gt;;
+  /** The game&#x27;s Controls screen (Options &gt; Controls &gt; Key Bindings), on this mod&#x27;s keys. */
+  openControls(): void;
+  /** The open inventory screen&#x27;s slots by area, and changing one. */
+  screenSlots(): Promise&lt;{ [area: string]: (ItemStack | null)[] } | null&gt;;
+  setScreenSlot(area: string, index: number, item: Name | ItemStack | null, count?: number, data?: number): Promise&lt;boolean&gt;;
+  /** true: clicks on the game&#x27;s inventory slots are this mod&#x27;s (&quot;slotClick&quot; decides). */
+  captureSlots(on: boolean): void;
+  /** What the game knows about an item. */
+  itemInfo(item: Name | ItemStack): Promise&lt;{ name: string; max: number; block: boolean; category: string; rarity: string; durability?: number; food?: number; armor?: string; id: number | null } | null&gt;;
+  /** The stack on the cursor of an open inventory screen (null: nothing). */
+  held(): Promise&lt;ItemStack | null&gt;;
+  /** Put a stack on that cursor (null: take it away). False when no inventory screen is open. */
+  setHeld(item: Name | ItemStack | null, count?: number, data?: number): Promise&lt;boolean&gt;;
+  /** Every block and item the game has - variants and mods&#x27; included - in the creative
+   *  inventory&#x27;s order, each a full stack. */
+  items(): Promise&lt;ItemStack[]&gt;;
+  /** Kept on this device for this mod, in every world (settings a player chose, their favourites...). */
+  storage: { get(key: string): any; set(key: string, value: any): void; all(): { [key: string]: any } };
+}
+
+declare const mod: ModApi;
+declare const world: WorldApi;
+declare const players: PlayersApi;
+declare const gui: GuiApi;
+declare const storage: StorageApi;
+declare const client: ClientApi;
+/** To the browser console (F12). */
+declare function log(...args: any[]): void;</pre></section></main></div>
+<script>
+var DTS = "// Minecraft RE - mod scripting API, for editors (VS Code and others read this file and complete\n// the API as you type). Keep it next to your scripts: this mod's jsconfig.json points the editor\n// at types/*.d.ts and scripts/*.js. Nothing here runs - it only describes what the game gives\n// every script: mod, world, players, gui, storage, client and log.\n\n/** A block or item: \"<mod id>:<name>\", \"minecraft:<java name>\" (e.g. \"minecraft:stone\"),\n *  \"air\", or just \"<name>\" for your own mod's. Add \":<data>\" for a variant (\"minecraft:wool:14\"). */\ntype Name = string;\n\n/** A player. Pass it (or its id) wherever a player goes. */\ninterface Player {\n  id: number;\n  name: string;\n  /** Feet position. */\n  x: number; y: number; z: number;\n  health: number;\n}\n\n/** A creature (or other entity) in an event. */\ninterface Creature {\n  id: number;\n  /** \"minecraft:zombie\", \"<mod id>:<name>\" for a mod's own creature, ... */\n  type: string;\n  x: number; y: number; z: number;\n  health?: number;\n  /** Set when the creature is a player. */\n  name?: string;\n}\n\n/** world.entity(): a creature in detail. */\ninterface CreatureDetail extends Creature {\n  yaw: number; pitch: number;\n  motion: [number, number, number];\n  onGround: boolean;\n  /** Ticks of fire left. */\n  fire: number;\n  maxHealth?: number;\n  /** The creature it's going for (0: none). */\n  target?: number;\n  effects?: { effect: string; seconds: number; level: number }[];\n}\n\n/** Everything an event can carry. Which fields are set depends on the event (see mod.on). */\ninterface GameEvent {\n  /** The event's name. */\n  t: string;\n  /** A block: its name, data value and position. */\n  block?: Name; data?: number; x?: number; y?: number; z?: number;\n  /** An item: its name and how many. */\n  item?: Name; count?: number;\n  /** The face of a block an item was used on (0 down, 1 up, 2 north, 3 south, 4 west, 5 east). */\n  face?: number;\n  /** Whoever did it. */\n  player?: Player;\n  /** The creature it happened to, and (hurt / death) what did it. */\n  entity?: Creature; source?: Creature | null;\n  damage?: number;\n  /** \"chat\" */\n  text?: string;\n  /** \"explode\" */\n  power?: number;\n  /** \"weather\" */\n  raining?: number; thundering?: number;\n  /** \"dimension\": 0 overworld, -1 Nether, 1 End. */\n  dimension?: number;\n  /** \"gametick\": the world's time. */\n  time?: number;\n  /** \"structure\": which one, how it was turned (0-3, a quarter each) and its size [x, y, z]. */\n  name?: string; rotation?: number; size?: [number, number, number];\n  /** \"gui\": the menu's id, the button's id, what happened, the text boxes' values. */\n  gui?: string; id?: string; action?: 'click' | 'submit' | 'input' | 'close' | 'slot' | 'message';\n  values?: { [inputId: string]: string };\n  /** \"gui\", action \"message\": what an html menu sent (mcre.send). */\n  data?: any;\n  /** \"gui\": what's in the menu's item slots now (see SlotsElement); action \"slot\": which slot changed. */\n  slots?: { [slotsId: string]: (ItemStack | null)[] }; index?: number;\n  /** \"gui\" / \"message\": the mod it's for. (\"message\" carries what was sent as e.data.) */\n  mod?: string;\n}\n\n/** A stack of items. */\ninterface ItemStack { item: Name; count: number; data?: number; }\n\n/** A world event's handler. Return a Promise if you like; errors are listed with the mod. */\ntype Handler = (e: GameEvent & { [k: string]: any }) => void | Promise<void>;\n\ntype WorldEventName =\n  | 'start' | 'stop' | 'dimension' | 'join' | 'leave' | 'respawn'\n  | 'use' | 'place' | 'break' | 'step' | 'tick' | 'useItem' | 'useItemOn'\n  | 'eat' | 'craft' | 'smelt' | 'attack' | 'interact' | 'hurt' | 'death' | 'spawn'\n  | 'chat' | 'explode' | 'weather' | 'gametick' | 'gui' | 'message' | 'structure'\n  /** a \"throwable\" mod item landed: e.item, e.x/y/z, e.entity (what it hit, if anything), e.player */\n  | 'hit'\n  /** this mod's settings changed (e.values: all of them) */\n  | 'settings';\n\ninterface CommandContext {\n  player: Player;\n  /** The words after the command's name. */\n  args: string[];\n  /** Everything typed, \"/name ...\" */\n  text: string;\n  /** Typed by the player whose world it is (single player: always). */\n  isHost: boolean;\n}\n\ninterface CommandOptions {\n  /** \"host\": only the player whose world it is may use it. Default \"everyone\". */\n  permission?: 'everyone' | 'host';\n  /** Shown by /help. */\n  description?: string;\n  /** What follows the name, for /help: \"<player> <amount>\". */\n  usage?: string;\n}\n\ninterface ModApi {\n  /** This mod's id (manifest.json). */\n  readonly id: string;\n  /** A world event - fires once, where the world is (single player or the host). */\n  on(event: WorldEventName, fn: Handler): void;\n  /** \"/name ...\" typed in chat. */\n  command(name: string, fn: (c: CommandContext) => void | Promise<void>, options?: CommandOptions): void;\n  /** Data to client.on(\"message\") on that player's device (\"all\": everyone's). */\n  send(player: Player | number | 'all', data: any): void;\n  /** This device's values of the settings in manifest.json (\"settings\"). Where the world is,\n   *  they're the host's; in client code, that player's own. Changes: on(\"settings\"), e.values. */\n  readonly settings: {\n    get(id: string): any;\n    all(): { [id: string]: any };\n    /** Change one (kept, like a change in the Settings dialog; the value is fitted to the setting). */\n    set(id: string, value: any): void;\n  };\n}\n\ninterface WorldApi {\n  setBlock(x: number, y: number, z: number, block: Name, data?: number): void;\n  setData(x: number, y: number, z: number, data: number): void;\n  getBlock(x: number, y: number, z: number): Promise<{ block: Name; data: number }>;\n  /** A \"tick\" event for a scripted block, this many game ticks (20 a second) from now. */\n  scheduleTick(x: number, y: number, z: number, ticks: number): void;\n  spawnItem(x: number, y: number, z: number, item: Name, count?: number): void;\n  explode(x: number, y: number, z: number, power?: number, fire?: boolean): void;\n  /** The world's time in ticks (a day is 19200; 0 is sunrise). */\n  time(): Promise<number>;\n  setTime(t: number): void;\n  /** Is it raining / thundering? */\n  weather(): Promise<{ raining: boolean; thundering: boolean }>;\n  /** Clear skies, rain (snow where it's cold) or a thunderstorm - for this many seconds, or (none\n   *  given) as long as the game's own weather would last. */\n  setWeather(kind: 'clear' | 'rain' | 'thunder', seconds?: number): void;\n  /** A sound everyone nearby hears, e.g. \"random.pop\". */\n  sound(name: string, x: number, y: number, z: number, volume?: number, pitch?: number): void;\n  /** What's in a container (chest, furnace, dispenser, hopper...), slot by slot; null if there's none. */\n  container(x: number, y: number, z: number): Promise<(ItemStack | null)[] | null>;\n  /** Put items in one slot of a container (item null: empty it). */\n  setSlot(x: number, y: number, z: number, slot: number, item: Name | ItemStack | null, count?: number, data?: number): void;\n  /** Fill a container from a loot table (\"chests/hut\" for your own loot_tables/chests/hut.json,\n   *  \"<mod>:<path>\", or the game's: \"minecraft:chests/simple_dungeon\"...). */\n  fillLoot(x: number, y: number, z: number, table: string): void;\n  /** Drop a loot table's items there. */\n  dropLoot(x: number, y: number, z: number, table: string): void;\n  /** Roll a loot table without placing anything. */\n  rollLoot(table: string): Promise<ItemStack[]>;\n  /** Build one of the mods' worldgen structures with its lowest north-west corner here\n   *  (\"<name>\" for your own worldgen/<name>.json); rotation 0-3 quarters (default: random if it turns). */\n  placeStructure(name: string, x: number, y: number, z: number, rotation?: number): void;\n  /** A creature: \"<name>\" (your mod's mobs/<name>.json, or the game's: \"pig\"), \"<mod>:<name>\"\n   *  or \"minecraft:pig\". A Promise of its entity id (0 if it couldn't be made). */\n  spawnEntity(type: string, x: number, y: number, z: number): Promise<number>;\n\n  // --- creatures (a player, or any creature's id, works in all of these) ---\n  /** Every creature, those of one type (\"zombie\", \"minecraft:zombie\", \"<mod>:<name>\"), or\n   *  those near a point (radius 16 unless given). */\n  entities(filter?: string | { type?: string; x?: number; y?: number; z?: number; radius?: number; limit?: number }): Promise<Creature[]>;\n  /** One creature in detail; null if it's gone. */\n  entity(id: number | Player | Creature): Promise<CreatureDetail | null>;\n  /** Put it there (yaw / pitch in degrees, optional). */\n  moveEntity(id: number | Player | Creature, x: number, y: number, z: number, yaw?: number, pitch?: number): void;\n  /** Add to its motion (blocks per tick; 0.4 up is about a jump). */\n  pushEntity(id: number | Player | Creature, dx: number, dy: number, dz: number): void;\n  damageEntity(id: number | Player | Creature, amount: number, source?: number | Player | Creature): void;\n  healEntity(id: number | Player | Creature, amount: number): void;\n  /** Effects: speed, slowness, haste, mining_fatigue, strength, instant_health, instant_damage,\n   *  jump_boost, nausea, regeneration, resistance, fire_resistance, water_breathing,\n   *  invisibility, blindness, night_vision, hunger, weakness, poison, wither. */\n  addEffect(id: number | Player | Creature, effect: string, seconds?: number, level?: number): void;\n  /** One effect, or (none given) all of them. */\n  removeEffect(id: number | Player | Creature, effect?: string): void;\n  /** Seconds (default 8); 0 puts it out. */\n  setOnFire(id: number | Player | Creature, seconds?: number): void;\n  /** Who a creature goes for (null: nobody). */\n  setTarget(id: number | Creature, target: number | Player | Creature | null): void;\n  /** Walk there, if it can find a way (up to 32 blocks). */\n  walkTo(id: number | Creature, x: number, y: number, z: number): void;\n  /** Gone, without drops (never a player). */\n  removeEntity(id: number | Creature): void;\n\n  /** Particles everyone nearby sees: flame, smoke, large_smoke, heart, crit, enchanted_hit,\n   *  portal, explosion, large_explosion, huge_explosion, lava, splash, bubble, dust, effect,\n   *  entity_effect, enchant, angry_villager, happy_villager, snowball, slime, item, block. */\n  particle(name: string, x: number, y: number, z: number, options?: {\n    count?: number; spread?: number | [number, number, number]; speed?: number;\n    /** dust / effect / entity_effect: \"#ff8800\", 0xff8800 or [r, g, b] */\n    color?: string | number | [number, number, number];\n    /** \"item\" / \"block\" particles: which */\n    item?: Name; block?: Name;\n  }): void;\n\n  // --- signs, and data kept on a block ---\n  /** A sign's 4 lines; null if there's no sign there. */\n  signText(x: number, y: number, z: number): Promise<string[] | null>;\n  /** Up to 4 lines of up to 15 letters (an array, or one string with \\n). */\n  setSignText(x: number, y: number, z: number, lines: string[] | string): void;\n  /** What your mod kept on the block there (undefined: nothing, or the block changed). */\n  getBlockData(x: number, y: number, z: number): Promise<any>;\n  /** Keep a value (anything JSON) on the block there, saved with the world and dropped when\n   *  the block is broken or replaced; null removes it. A Promise of whether it was kept\n   *  (false: there's no block there). Where the world is only. */\n  setBlockData(x: number, y: number, z: number, value: any): Promise<boolean>;\n  /** Rules the game itself enforces from now on (scripts can't stop things in time; rules can).\n   *  The same id replaces a set; null removes it. Gone when the scripts stop. */\n  setRules(id: string, rules: Rules | null): void;\n}\n\n/** What the game refuses (a mod's rules/<name>.json has the same form). */\ninterface Rules {\n  no_break?: Name | Name[]; no_place?: Name | Name[]; no_use?: Name | Name[];\n  /** Creatures (\"minecraft:player\", \"<mod>:<name>\", \"*\") a kind of damage doesn't hurt. A plain\n   *  string: that cause, for players. */\n  no_damage?: string | Array<string | { entity?: string | string[]; cause?: DamageCause }>;\n  /** false: players can't hurt players; explosions break nothing; fire doesn't spread. */\n  pvp?: boolean; explosions_break_blocks?: boolean; fire_spreads?: boolean;\n  explosion_proof?: Name | Name[];\n  no_spawn?: string | string[];\n  /** Only inside this box of blocks [x1, y1, z1, x2, y2, z2], and / or this dimension. */\n  area?: [number, number, number, number, number, number];\n  dimension?: 'overworld' | 'nether' | 'end' | 'any';\n  /** Block rules apply to creative players too. */\n  creative?: boolean;\n  rules?: Rules[];\n}\ntype DamageCause = 'any' | 'fall' | 'fire' | 'lava' | 'drown' | 'explosion' | 'attack' | 'projectile' | 'magic' | 'void' | 'suffocation' | 'other';\n\ninterface PlayersApi {\n  all(): Promise<Player[]>;\n  message(player: Player | number | 'all', text: string): void;\n  /** item: a name (\"minecraft:wool:14\" for a variant) or a stack ({item, data}, e.g. from client.items()). */\n  give(player: Player | number, item: Name | ItemStack, count?: number): void;\n  /** Negative amounts hurt. */\n  heal(player: Player | number, amount: number): void;\n  /** y null: onto the ground there. Never into blocks or off the world. */\n  teleport(player: Player | number, x: number, y: number | null, z: number): void;\n  /** Everything a player carries: slots 0-8 the hotbar, 9-35 the rest; armour head, chest, legs, feet. */\n  inventory(player: Player | number): Promise<{ slots: (ItemStack | null)[]; armor: (ItemStack | null)[]; selected: number } | null>;\n  /** Put items in one of a player's slots (0-35, or \"head\" / \"chest\" / \"legs\" / \"feet\"); item null empties it. */\n  setSlot(player: Player | number, slot: number | 'head' | 'chest' | 'legs' | 'feet', item: Name | ItemStack | null, count?: number, data?: number): void;\n  /** Take up to count of an item from a player (data: only that variant); how many were taken. */\n  take(player: Player | number, item: Name, count?: number, data?: number): Promise<number>;\n  /** Empty a player's inventory (armorToo: the armour as well). */\n  clear(player: Player | number, armorToo?: boolean): void;\n}\n\ninterface TextElement { type: 'text'; text: string; color?: string; size?: number; align?: 'left' | 'center' | 'right'; bold?: boolean; }\ninterface ButtonElement {\n  type: 'button'; id: string; text: string; color?: string; textColor?: string;\n  /** An item (\"minecraft:diamond\") or a picture in the mod (\"textures/gui/coin.png\"). */\n  icon?: string;\n}\n/** A picture in the mod, or an item's icon. */\ninterface ImageElement { type: 'image'; src?: string; item?: Name; width?: number; height?: number; align?: 'left' | 'center' | 'right'; }\n/** Elements in columns: up to \"columns\", fewer when the screen is narrow. */\ninterface GridElement { type: 'grid'; columns?: number; elements: Element[]; }\n/** live: true - a \"gui\" event with action \"input\" for every change (a search as you type). */\ninterface InputElement { type: 'input'; id: string; placeholder?: string; value?: string; live?: boolean; }\ninterface RowElement { type: 'row'; elements: Element[]; }\ninterface DividerElement { type: 'divider'; }\n/** Item slots the player can move items in and out of. Every change is a \"gui\" event with\n *  action \"slot\"; every gui event carries e.slots (what's in each slots element). */\ninterface SlotsElement {\n  type: 'slots'; id: string;\n  /** How many slots (default: as many as items), and per row (up to 9). */\n  count?: number; columns?: number;\n  /** What's in them. Leave it out when updating an open menu to keep what's there. */\n  items?: (ItemStack | Name | null)[];\n  /** May the player put items in / take them out (default true). put: false = an output slot. */\n  put?: boolean; take?: boolean;\n  /** Only these items may go in. */\n  accept?: Name[];\n  /** true: the script looks after what's left when the menu closes. Otherwise it goes back to\n   *  the player (from slots they can put into). */\n  keep?: boolean;\n}\n/** The player's own inventory, to move items to and from. */\ninterface InventoryElement { type: 'inventory'; title?: string; }\ntype Element = TextElement | ButtonElement | InputElement | RowElement | DividerElement | SlotsElement | InventoryElement | ImageElement | GridElement;\n\n/** How a drawn menu looks (all optional; it still adapts to phones and computers). */\ninterface MenuStyle {\n  /** \"#203040\", or a picture in the mod (\"textures/gui/bg.png\"). */\n  background?: string;\n  backgroundSize?: 'cover' | 'tile';\n  border?: string; color?: string; title?: string; accent?: string;\n  /** Rounded corners, 0-24. */\n  radius?: number;\n  font?: 'pixel' | 'sans' | 'serif';\n}\n\ninterface Menu {\n  /** Open a menu again with the same id to update it. */\n  id: string;\n  /** false: a panel - beside the game instead of over it. No dimmed backdrop, the game keeps the\n   *  mouse and keys everywhere else, several can be open at once (one per id). Place it with\n   *  position and width / height in CSS pixels - client.on(\"screen\") says where the game's\n   *  inventory window is, to dock one beside it. No Close button unless closeButton: true. */\n  modal?: boolean;\n  /** A panel's place: {left | right, top | bottom} in CSS pixels. */\n  position?: { left?: number; right?: number; top?: number; bottom?: number };\n  /** A panel kept but out of sight (an html one keeps running); open it again without to show it. */\n  hidden?: boolean;\n  title?: string;\n  /** In pixels, 200-720 (default 380). For an html menu: pixels or \"80%\". */\n  width?: number | string;\n  height?: number | string;\n  elements?: Element[];\n  style?: MenuStyle;\n  /** Your own page instead of elements: \"gui/shop.html\" in the mod. It gets window.mcre and nothing\n   *  else - no internet, no game page: data, send(x), on(fn), close(), touch, and\n   *    icons(items) -> Promise [{item, data, id, name, max, icon}] (icon: a 32 x 32 picture URL),\n   *    asset(path) -> Promise URL of one of the game's pictures (\"font/default8.png\"),\n   *    panel (true for a panel), area(rects | null): only these parts [{x, y, width, height}] of a\n   *    panel show and take the mouse - the game gets the rest. A panel hands the game the keys it\n   *    doesn't type with (or preventDefault) and the mouse's movement. */\n  html?: string;\n  /** For an html menu: mcre.data; opening it again with the same id passes new data to mcre.on. */\n  data?: any;\n  /** false: no Close button (Esc still closes it). */\n  closeButton?: boolean;\n}\n\ninterface GuiApi {\n  open(player: Player | number, menu: Menu): void;\n  close(player: Player | number): void;\n}\n\ninterface StorageApi {\n  /** Kept with the world, where the world is (a joined device's storage is empty). */\n  get(key: string): any;\n  set(key: string, value: any): void;\n  all(): { [key: string]: any };\n}\n\ntype ClientEventName = 'start' | 'stop' | 'tick' | 'key' | 'message' | 'gui' | 'dimension' | 'settings'\n  /** the game's open screen changed (see ScreenInfo) - also when it moves, or the held stack changes */\n  | 'screen'\n  /** one of this mod's \"key\" settings went down / up: e.id, e.down, e.code (Options > Controls lists them) */\n  | 'keybind'\n  /** a click on a slot of the game's inventory screens: e.area, e.index, e.item, e.button, e.shift */\n  | 'slotClick';\n\n/** The game's own screen on this device (client.screen(), client.on(\"screen\")). */\ninterface ScreenInfo {\n  /** \"none\" (playing), \"inventory\", \"crafting\", \"chest\", \"furnace\", \"container\" (dispenser, dropper,\n   *  hopper), \"creative\", \"station\" (enchanting / anvil / brewing), \"trading\", \"pause\", \"chat\",\n   *  \"death\", \"sign\", \"bed\", \"menu\" (no world), \"other\". */\n  screen: string;\n  /** Where an inventory screen draws its window, in CSS pixels; null for other screens. */\n  rect: { x: number; y: number; width: number; height: number } | null;\n  /** The stack on the cursor of an inventory screen. */\n  held: ItemStack | null;\n  /** The window's size in CSS pixels, and CSS pixels per GUI pixel (a slot is 18 GUI pixels). */\n  width: number; height: number; scale: number;\n}\n\ninterface KeyEvent extends GameEvent { key: string; code: string; down: boolean; }\n\ninterface ClientApi {\n  /** This device's own events: \"key\" {key, code, down}, \"tick\" {player}, \"message\" {data}... */\n  on(event: ClientEventName, fn: Handler): void;\n  /** True where the world is (single player or the host). */\n  readonly isHost: boolean;\n  /** This device's player. */\n  player(): Promise<Player>;\n  /** To mod.on(\"message\") where the world is. */\n  send(data: any): void;\n  /** close(id): that menu or panel; close(): the menu and this mod's panels. */\n  gui: { open(menu: Menu): void; close(id?: string): void; };\n  /** A sound only this device hears. */\n  sound(name: string, volume?: number, pitch?: number): void;\n  /** A line in this device's chat. */\n  message(text: string): void;\n  /** A line of text at the top right; null removes it. */\n  hud(id: string, text: string | null): void;\n  /** What's open in the game on this device, and where. */\n  screen(): Promise<ScreenInfo>;\n  /** The game's Controls screen (Options > Controls > Key Bindings), on this mod's keys. */\n  openControls(): void;\n  /** The open inventory screen's slots by area, and changing one. */\n  screenSlots(): Promise<{ [area: string]: (ItemStack | null)[] } | null>;\n  setScreenSlot(area: string, index: number, item: Name | ItemStack | null, count?: number, data?: number): Promise<boolean>;\n  /** true: clicks on the game's inventory slots are this mod's (\"slotClick\" decides). */\n  captureSlots(on: boolean): void;\n  /** What the game knows about an item. */\n  itemInfo(item: Name | ItemStack): Promise<{ name: string; max: number; block: boolean; category: string; rarity: string; durability?: number; food?: number; armor?: string; id: number | null } | null>;\n  /** The stack on the cursor of an open inventory screen (null: nothing). */\n  held(): Promise<ItemStack | null>;\n  /** Put a stack on that cursor (null: take it away). False when no inventory screen is open. */\n  setHeld(item: Name | ItemStack | null, count?: number, data?: number): Promise<boolean>;\n  /** Every block and item the game has - variants and mods' included - in the creative\n   *  inventory's order, each a full stack. */\n  items(): Promise<ItemStack[]>;\n  /** Kept on this device for this mod, in every world (settings a player chose, their favourites...). */\n  storage: { get(key: string): any; set(key: string, value: any): void; all(): { [key: string]: any } };\n}\n\ndeclare const mod: ModApi;\ndeclare const world: WorldApi;\ndeclare const players: PlayersApi;\ndeclare const gui: GuiApi;\ndeclare const storage: StorageApi;\ndeclare const client: ClientApi;\n/** To the browser console (F12). */\ndeclare function log(...args: any[]): void;\n";
+document.getElementById('dl').onclick = function (e) {
+  e.preventDefault();
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([DTS], { type: 'text/plain' }));
+  a.download = 'mcre.d.ts'; a.click();
+};
+// (search: show the sections that mention it, marked)
+var pres = Array.prototype.slice.call(document.querySelectorAll('section pre')), originals = pres.map(function (p) { return p.textContent; });
+document.getElementById('search').addEventListener('input', function () {
+  var q = this.value.trim().toLowerCase();
+  pres.forEach(function (p, i) {
+    var t = originals[i], sec = p.parentNode;
+    if (!q) { p.textContent = t; sec.style.display = ''; return; }
+    var hit = t.toLowerCase().indexOf(q) >= 0 || sec.querySelector('h2').textContent.toLowerCase().indexOf(q) >= 0;
+    sec.style.display = hit ? '' : 'none';
+    if (!hit) return;
+    var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }, out = '', at = 0, lower = t.toLowerCase(), k;
+    while ((k = lower.indexOf(q, at)) >= 0) { out += esc(t.slice(at, k)) + '<mark>' + esc(t.slice(k, k + q.length)) + '</mark>'; at = k + q.length; }
+    p.innerHTML = out + esc(t.slice(at));
+  });
+});
+</script></body></html>

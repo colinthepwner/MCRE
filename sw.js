@@ -2,8 +2,6 @@ const CACHE_NAME = 'minecraft-web-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
-    './index.js',
-    './index.wasm',
     './mc_platform.js',
     './saves.js',
     './manifest.json'
@@ -79,7 +77,7 @@ self.addEventListener('install', event => {
         caches.open(CACHE_NAME)
             .then(cache => {
                 console.log('Opened cache');
-                return cache.addAll(ASSETS_TO_CACHE);
+                return cache.addAll(ASSETS_TO_CACHE.map(u => new Request(u, { cache: 'reload' })));
             })
             .then(() => self.skipWaiting())
     );
@@ -100,6 +98,22 @@ self.addEventListener('activate', event => {
     );
 });
 
+function revalidating(request, url) {
+    if (url.origin !== self.location.origin || url.searchParams.has('v')) return request;
+    try {
+        if (request.mode === 'navigate') return new Request(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' });
+        return new Request(request, { cache: 'no-cache' });
+    } catch (e) {
+        return request;
+    }
+}
+function dropOtherVersions(cache, url) {
+    cache.keys().then(keys => keys.forEach(k => {
+        const u = new URL(k.url);
+        if (u.origin === url.origin && u.pathname === url.pathname && u.search !== url.search) cache.delete(k);
+    })).catch(() => {});
+}
+
 // Fetch event: Network falling back to cache
 self.addEventListener('fetch', event => {
     // Only intercept GET requests, and skip extensions like browser-sync if running locally
@@ -110,9 +124,12 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    const url = new URL(event.request.url);
+    if (url.searchParams.has('mcre-check')) return;
+
     const isolate = needsIsolation(event.request);
     event.respondWith(
-        fetch(event.request)
+        fetch(revalidating(event.request, url))
             .then(response => {
                 // Check if we received a valid response
                 if (!response || response.status !== 200 || response.type !== 'basic') {
@@ -128,6 +145,7 @@ self.addEventListener('fetch', event => {
                 caches.open(CACHE_NAME)
                     .then(cache => {
                         cache.put(event.request, responseToCache);
+                        if (url.searchParams.has('v')) dropOtherVersions(cache, url);
                     });
 
                 return isolate ? withIsolation(response) : response;
