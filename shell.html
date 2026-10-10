@@ -1372,7 +1372,7 @@
                     id = slug(m.name) || slug(base) || 'mod';
                 }
                 return { id: id, name: str(m.name, 48) || base.slice(0, 48) || id, version: str(m.version, 16), author: str(m.author, 48),
-                         description: str(m.description, 200), notes: notes };
+                         description: str(m.description, 4000), notes: notes };
             }
 
             function iconOf(id, files) {
