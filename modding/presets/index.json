@@ -1,0 +1,136 @@
+{
+  "name": "Minecraft RE mod presets",
+  "mods": [
+    {
+      "id": "my_mod",
+      "name": "My Mod",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "An empty mod to start from: a manifest, a script that says hello, and the folders a mod can have.",
+      "url": "my_mod.zip",
+      "tags": [
+        "template"
+      ]
+    },
+    {
+      "id": "ores_example",
+      "name": "Example Ores",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "An ore that generates underground, the gem it drops, a block of it, tools, armour and recipes - using the game's own textures.",
+      "url": "ores_example.zip",
+      "tags": [
+        "ores",
+        "items",
+        "worldgen"
+      ]
+    },
+    {
+      "id": "biome_example",
+      "name": "Example Biome Features",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Trees, flowers, a structure and ore deposits that only appear in certain biomes.",
+      "url": "biome_example.zip",
+      "tags": [
+        "worldgen",
+        "biomes"
+      ]
+    },
+    {
+      "id": "blocks_example",
+      "name": "Example Blocks",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Decorative blocks: shapes (slab, pillar, carpet, a pixel box), a light, an icy tile, a falling block and a block model that turns to face you.",
+      "url": "blocks_example.zip",
+      "tags": [
+        "blocks"
+      ]
+    },
+    {
+      "id": "items_example",
+      "name": "Example Items",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Food with effects, a throwable pebble, a slingshot that fires it, and a wand whose script tells you what a block is.",
+      "url": "items_example.zip",
+      "tags": [
+        "items",
+        "food",
+        "scripts"
+      ]
+    },
+    {
+      "id": "creature_example",
+      "name": "Example Creature",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "A creature: a Bedrock model (as Blockbench exports it), how it behaves, where it spawns, what it drops, a spawn egg - and a script that hears it.",
+      "url": "creature_example.zip",
+      "tags": [
+        "creatures",
+        "scripts"
+      ]
+    },
+    {
+      "id": "structures_example",
+      "name": "Example Structures",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "A ruin built into new land, its chest filled from a loot table, and a command that builds it where you stand.",
+      "url": "structures_example.zip",
+      "tags": [
+        "structures",
+        "loot",
+        "scripts"
+      ]
+    },
+    {
+      "id": "scripting_example",
+      "name": "Example Scripting",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Commands, a menu with buttons and an item picker, a key players can rebind (Options > Controls), a HUD line and data saved with the world.",
+      "url": "scripting_example.zip",
+      "tags": [
+        "scripts",
+        "gui",
+        "commands"
+      ]
+    },
+    {
+      "id": "textures_example",
+      "name": "Example Texture Pack",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Changes how things look, sound and read: textures, a sound and names - here swapping some of the game's own pictures around.",
+      "url": "textures_example.zip",
+      "tags": [
+        "resource pack"
+      ]
+    },
+    {
+      "id": "rules_example",
+      "name": "Example Rules",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Rules the game enforces at once: creepers don't break blocks, no fall damage - and a command that protects the area around you.",
+      "url": "rules_example.zip",
+      "tags": [
+        "rules",
+        "scripts"
+      ]
+    }
+  ]
+}

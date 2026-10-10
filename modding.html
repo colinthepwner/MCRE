@@ -20,10 +20,18 @@ code { color: var(--code); }
 a { color: var(--accent); }
 #search { width: 100%; padding: 6px 8px; margin-bottom: 10px; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px; }
 mark { background: #6b5a1d; color: #fff; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin: 12px 0; }
+.card { background: #1f1d1a; border: 1px solid #3a362f; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; }
+.card h3 { margin: 2px 0 6px; font-size: 16px; }
+.card p { margin: 0 0 8px; }
+.card .files { color: var(--dim); font: 12px ui-monospace, Consolas, monospace; flex: 1; }
+.dl { align-self: flex-start; background: #3d6b2a; color: #fff; text-decoration: none; padding: 5px 10px; border-radius: 4px; }
+.dl:hover { background: #4d8536; }
 @media (max-width: 760px) { .wrap { display: block; } nav { position: static; width: auto; max-height: none; } main { padding: 8px 12px 40px; } }
 </style></head><body>
 <header><h1>Example Pack - how a Minecraft RE mod is made</h1><p>Everything a mod can contain and every function its scripts can call. In a world, <code>/console</code> shows your scripts' log and errors and lets you try the API.</p></header>
 <div class="wrap"><nav><input id="search" placeholder="Search the guide"><div id="toc"><a href="#introduction">Introduction</a>
+<a href="#presets">Presets</a>
 <a href="#what-s-inside">What&#x27;s inside</a>
 <a href="#new-blocks-items-and-recipes">New blocks, items and recipes</a>
 <a href="#block-models">Block models</a>
@@ -46,6 +54,7 @@ mark { background: #6b5a1d; color: #fff; }
     sand) and the Example Wand (gem + stick);
   - and scripts/main.js makes them do things: the Counter opens a menu, the Wand tells you
     what a block is, /example is a command, and K shows your coordinates.</pre></section>
+<section id="presets"><h2>Presets</h2><p>Small mods to start from, one thing each - using the game's own textures, so they're all JSON and script. Download one, unzip it, change the <code>"id"</code> in manifest.json, then open the folder in the Mods tab (Add mod &gt; Open a folder) and press Reload as you change it. They're kept up to date with the game.</p><p>In the game: Add mod &gt; Browse mods &gt; Sources, add <code>https://colinthepwner.github.io/MCRE/modding/presets/index.json</code> to install them from there.</p><div class="cards"><div class="card"><h3>My Mod</h3><p>An empty mod to start from: a manifest, a script that says hello, and the folders a mod can have.</p><p class="files">README.txt, blocks/, items/, manifest.json, recipes/, scripts/main.js, textures/blocks/, textures/items/</p><a class="dl" href="modding/presets/my_mod.zip" download>Download my_mod.zip</a></div><div class="card"><h3>Example Ores</h3><p>An ore that generates underground, the gem it drops, a block of it, tools, armour and recipes - using the game&#x27;s own textures.</p><p class="files">README.txt, blocks/ruby_block.json, blocks/ruby_ore.json, items/ruby.json, items/ruby_chestplate.json, items/ruby_helmet.json, items/ruby_pickaxe.json, items/ruby_sword.json, manifest.json, recipes/ruby_block.json, recipes/ruby_chestplate.json, recipes/ruby_from_block.json, recipes/ruby_helmet.json, recipes/ruby_pickaxe.json, recipes/ruby_smelting.json, recipes/ruby_sword.json, worldgen/ruby_ore_nether.json</p><a class="dl" href="modding/presets/ores_example.zip" download>Download ores_example.zip</a></div><div class="card"><h3>Example Biome Features</h3><p>Trees, flowers, a structure and ore deposits that only appear in certain biomes.</p><p class="files">README.txt, blocks/bluebell.json, blocks/frost_leaves.json, manifest.json, worldgen/bluebells.json, worldgen/desert_well.json, worldgen/frost_spruce.json, worldgen/swamp_clay.json</p><a class="dl" href="modding/presets/biome_example.zip" download>Download biome_example.zip</a></div><div class="card"><h3>Example Blocks</h3><p>Decorative blocks: shapes (slab, pillar, carpet, a pixel box), a light, an icy tile, a falling block and a block model that turns to face you.</p><p class="files">README.txt, blocks/ice_tile.json, blocks/lamp.json, blocks/loose_rock.json, blocks/marble_pillar.json, blocks/polished_slab.json, blocks/polished_stone.json, blocks/rug.json, blocks/step.json, blocks/table.json, manifest.json, models/block/table.json, recipes/lamp.json, recipes/polished_slab.json, recipes/polished_stone.json, recipes/table.json</p><a class="dl" href="modding/presets/blocks_example.zip" download>Download blocks_example.zip</a></div><div class="card"><h3>Example Items</h3><p>Food with effects, a throwable pebble, a slingshot that fires it, and a wand whose script tells you what a block is.</p><p class="files">README.txt, items/cheese.json, items/energy_bar.json, items/pebble.json, items/slingshot.json, items/wand.json, manifest.json, recipes/cheese.json, recipes/pebble.json, recipes/slingshot.json, recipes/wand.json, scripts/main.js</p><a class="dl" href="modding/presets/items_example.zip" download>Download items_example.zip</a></div><div class="card"><h3>Example Creature</h3><p>A creature: a Bedrock model (as Blockbench exports it), how it behaves, where it spawns, what it drops, a spawn egg - and a script that hears it.</p><p class="files">README.txt, manifest.json, mobs/waddler.json, models/entity/waddler.geo.json, scripts/main.js</p><a class="dl" href="modding/presets/creature_example.zip" download>Download creature_example.zip</a></div><div class="card"><h3>Example Structures</h3><p>A ruin built into new land, its chest filled from a loot table, and a command that builds it where you stand.</p><p class="files">README.txt, loot_tables/chests/ruin.json, manifest.json, scripts/main.js, worldgen/ruin.json</p><a class="dl" href="modding/presets/structures_example.zip" download>Download structures_example.zip</a></div><div class="card"><h3>Example Scripting</h3><p>Commands, a menu with buttons and an item picker, a key players can rebind (Options &gt; Controls), a HUD line and data saved with the world.</p><p class="files">README.txt, manifest.json, scripts/main.js</p><a class="dl" href="modding/presets/scripting_example.zip" download>Download scripting_example.zip</a></div><div class="card"><h3>Example Texture Pack</h3><p>Changes how things look, sound and read: textures, a sound and names - here swapping some of the game&#x27;s own pictures around.</p><p class="files">README.txt, lang/en_US.lang, manifest.json</p><a class="dl" href="modding/presets/textures_example.zip" download>Download textures_example.zip</a></div><div class="card"><h3>Example Rules</h3><p>Rules the game enforces at once: creepers don&#x27;t break blocks, no fall damage - and a command that protects the area around you.</p><p class="files">README.txt, manifest.json, rules/gentle.json, scripts/main.js</p><a class="dl" href="modding/presets/rules_example.zip" download>Download rules_example.zip</a></div></div></section>
 <section id="what-s-inside"><h2>What&#x27;s inside</h2><pre>manifest.json         Who the mod is. Required:
                         &quot;id&quot;: &quot;example&quot;        (lower-case letters, digits, . _ - ; must be unique)
                         &quot;devices&quot;: &quot;any&quot;       what it&#x27;s made for: &quot;any&quot;, &quot;computer&quot; or &quot;mobile&quot;.
@@ -493,7 +502,8 @@ Up to 64 x 128 x 64 blocks. Newer files&#x27; blocks are matched to the nearest 
                         &quot;model&quot;       its model: a Bedrock geometry file (.geo.json - Blockbench&#x27;s
                                       &quot;Bedrock Entity&quot; / File &gt; Export &gt; Bedrock Geometry) or an
                                       OptiFine CEM model (.jem) anywhere in the mod
-                        &quot;texture&quot;     its picture (any size; box UVs as Blockbench lays them out)
+                        &quot;texture&quot;     its picture (any size; box UVs as Blockbench lays them out),
+                                      or one of the game&#x27;s: &quot;minecraft:mob/pig.png&quot;
                         &quot;behaviour&quot;   &quot;passive&quot; (wanders, runs when hit, breeds), &quot;hostile&quot; (hunts
                                       the nearest player), &quot;neutral&quot; (fights back only),
                                       &quot;flying&quot; (drifts around in the air) or &quot;swimming&quot; (in water)
@@ -1014,8 +1024,10 @@ document.getElementById('dl').onclick = function (e) {
 };
 // (search: show the sections that mention it, marked)
 var pres = Array.prototype.slice.call(document.querySelectorAll('section pre')), originals = pres.map(function (p) { return p.textContent; });
+var cardEls = Array.prototype.slice.call(document.querySelectorAll('.card'));
 document.getElementById('search').addEventListener('input', function () {
   var q = this.value.trim().toLowerCase();
+  cardEls.forEach(function (c) { c.style.display = !q || c.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none'; });
   pres.forEach(function (p, i) {
     var t = originals[i], sec = p.parentNode;
     if (!q) { p.textContent = t; sec.style.display = ''; return; }

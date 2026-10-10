@@ -2977,7 +2977,11 @@
                         if (k.split('/').pop().replace(/[.]png$/i, '') === String(j.texture || mb.name).toLowerCase().split('/').pop().replace(/[.]png$/i, '')) { tf = texFiles[k]; return true; }
                         return false;
                     });
-                    if (!tf) { bad(mb.mod, file, 'no texture "' + (j.texture || mb.name + '.png') + '" in the mod'); return; }
+                    var gameTex = /^minecraft:(.+[.]png)$/i.exec(String(j.texture || ''));
+                    if (!tf && gameTex && gameTex[1].indexOf('..') < 0) {
+                        try { tf = { data: FS.readFile('/data/images/' + gameTex[1].replace(/^[/]+/, '')) }; } catch (e) { tf = null; }
+                    }
+                    if (!tf) { bad(mb.mod, file, 'no texture "' + (j.texture || mb.name + '.png') + '" in the mod' + (gameTex ? ' or the game' : '')); return; }
                     var texPath = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '.png';
                     try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + texPath, tf.data); } catch (e) { }
                     var beh = BEHAVIOURS[String(j.behaviour || j.behavior || 'passive').toLowerCase()];
