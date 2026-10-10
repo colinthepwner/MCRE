@@ -1350,7 +1350,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|scripts\/.+\.js$)/i.test(k);
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|scripts\/.+\.js$)/i.test(k);
                 });
             }
             function manifestOf(files, fallbackName) {
@@ -1364,7 +1364,7 @@
                 }
                 if (m.format !== undefined && m.format !== 1) throw new Error('needs a newer version of the game');
                 if (m.type !== undefined && ['resource', 'content', 'mod'].indexOf(m.type) < 0) throw new Error('is a "' + String(m.type).slice(0, 24) + '" mod - this version runs resource packs and content mods');
-                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items, recipes or scripts)');
+                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items, recipes, worldgen or scripts)');
                 var str = function (v, max) { return typeof v === 'string' ? v.trim().slice(0, max) : ''; };
                 var id = typeof m.id === 'string' && /^[a-z0-9_.-]{1,48}$/.test(m.id) ? m.id : '';
                 if (!id) {
@@ -1510,7 +1510,7 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
-                            } else if ((m = /^(blocks|items|recipes)\/([^\/]+)\.json$/i.exec(path))) {
+                            } else if ((m = /^(blocks|items|recipes|worldgen)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: x.id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data });
                             } else if (/^scripts\/.+\.js$/i.test(path)) {
                                 scripts.push({ mod: x.id, file: path, code: new TextDecoder().decode(data), session: !own });
@@ -1575,13 +1575,14 @@
             function buildContent(content, newTex, sheets, lang) {
                 var dec = new TextDecoder(), warn = 0;
                 var parse = function (c) { try { var j = JSON.parse(dec.decode(c.data)); return j && typeof j === 'object' ? j : null; } catch (e) { warn++; return null; } };
-                var lines = [], blocks = {}, items = {}, recipes = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [];
                 content.forEach(function (c) {
                     var j = parse(c);
                     if (!j) return;
                     var key = c.mod + ':' + c.name;
                     if (c.kind === 'blocks') blocks[key] = { mod: c.mod, name: c.name, j: j };
                     else if (c.kind === 'items') items[key] = { mod: c.mod, name: c.name, j: j };
+                    else if (c.kind === 'worldgen') worldgen.push({ mod: c.mod, name: c.name, j: j });
                     else recipes.push({ mod: c.mod, j: j });
                 });
                 contentKeys = {};
@@ -1657,6 +1658,32 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(it.name)));
                     lines.push(['item', key, desc, cellOf('items', it.mod, j.texture || it.name),
                                 Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0].join('\t'));
+                });
+                var DIMS = { overworld: 0, nether: -1, end: 1, any: 99 };
+                var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
+                function ore(o, blockRef, mod) {
+                    if (o === true) o = {};
+                    if (!o || typeof o !== 'object' || !blockRef) { warn++; return; }
+                    var num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
+                    var dim = DIMS[String(o.dimension || 'overworld').toLowerCase()];
+                    if (dim === undefined) { warn++; return; }
+                    var rep = o.replace === undefined ? REPLACES[dim] : (Array.isArray(o.replace) ? o.replace : [o.replace]).map(function (r) { return ref(r, mod); });
+                    if (!rep.length || rep.some(function (r) { return !r; })) { warn++; return; }
+                    var size = Math.round(num(o.vein_size !== undefined ? o.vein_size : o.size, 8));
+                    var veins = num(o.veins_per_chunk !== undefined ? o.veins_per_chunk : (o.veins !== undefined ? o.veins : o.count), 8);
+                    var minY = Math.round(num(o.min_y, 1)), maxY = Math.round(num(o.max_y, 64));
+                    lines.push(['ore', blockRef, Math.max(1, Math.min(64, size)), Math.max(0, Math.min(64, veins)),
+                                Math.max(1, Math.min(126, minY)), Math.max(1, Math.min(126, maxY)), rep.join(';'), dim].join('\t'));
+                }
+                Object.keys(blocks).forEach(function (key) {
+                    var o = blocks[key].j.ore;
+                    if (o === undefined || o === false) return;
+                    (Array.isArray(o) ? o : [o]).forEach(function (x) { ore(x, 'mod:' + key, blocks[key].mod); });
+                });
+                worldgen.forEach(function (w) {
+                    var type = String(w.j.type || 'ore').toLowerCase();
+                    if (type !== 'ore') { warn++; return; }
+                    ore(w.j, ref(w.j.block, w.mod), w.mod);
                 });
                 recipes.forEach(function (r) {
                     var j = r.j, type = String(j.type || '').toLowerCase().replace('minecraft:', '').replace('crafting_', '');
