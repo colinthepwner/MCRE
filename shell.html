@@ -1010,7 +1010,7 @@
                 return null;
             }
             function hostCtl(c, msg, id) {
-                if (msg && msg.json && (msg.json.t === 'cmd' || msg.json.t === 'guiev')) {
+                if (msg && msg.json && { cmd: 1, guiev: 1, sact: 1, sgui: 1, ssend: 1, csend: 1, sev: 1 }[msg.json.t]) {
                     if (Module.mcScripts) Module.mcScripts.fromJoiner(id, msg.json);
                     return;
                 }
@@ -1381,6 +1381,22 @@
                 try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, files['pack.png']); return p; } catch (e) { return ''; }
             }
 
+            function contentsOf(files) {
+                var n = {}, keys = Object.keys(files);
+                var count = function (re) { return keys.filter(function (k) { return re.test(k) && !/[/]$/.test(k); }).length; };
+                var parts = [];
+                var say = function (num, one, many) { if (num) parts.push(num + ' ' + (num === 1 ? one : many)); };
+                say(count(/^blocks[/].+[.]json$/i), 'block', 'blocks');
+                say(count(/^items[/].+[.]json$/i), 'item', 'items');
+                say(count(/^recipes[/].+[.]json$/i), 'recipe', 'recipes');
+                say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
+                var scripts = count(/^scripts[/].+[.]js$/i);
+                if (scripts) parts.push(scripts === 1 ? 'a script' : scripts + ' scripts');
+                say(count(/^(textures[/]|images[/]).+[.]png$/i), 'picture', 'pictures');
+                say(count(/^sounds[/].+[.](ogg|mp3|wav)$/i), 'sound', 'sounds');
+                if (count(/^lang[/]/i)) parts.push('text');
+                return parts.join(', ');
+            }
             function load() {
                 var st = readState(), found = {};
                 var add = function (dir, bundled) {
@@ -1408,6 +1424,7 @@
                             x.m = manifestOf(files, x.id + '.zip');
                             x.m.id = x.id;
                             x.icon = iconOf(x.id, files);
+                            x.contents = contentsOf(files);
                             x.err = '';
                         }).catch(function (e) { x.err = 'This mod ' + e.message; x.enabled = false; });
                     });
@@ -1458,6 +1475,7 @@
                 var unknown = 0;
                 var content = [];
                 var scripts = [];
+                var schems = [];
                 var newTex = { blocks: {}, items: {} };
                 var on = mods.filter(function (x) { return x.enabled && !x.err; }).reverse();
                 if (session) on = session.slice().reverse().concat(on);
@@ -1514,13 +1532,15 @@
                                 content.push({ mod: x.id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data });
                             } else if (/^scripts\/.+\.js$/i.test(path)) {
                                 scripts.push({ mod: x.id, file: path, code: new TextDecoder().decode(data), session: !own });
+                            } else if (/[.](schematic|schem|nbt)$/i.test(path)) {
+                                schems.push({ mod: x.id, path: path, data: data });
                             }
                         });
                         return jobs;
                     }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); });
                 }, Promise.resolve()).then(function () {
                     scriptList = scripts;
-                    return buildContent(content, newTex, sheets, lang);
+                    return decodeSchematics(schems).then(function (sch) { return buildContent(content, newTex, sheets, lang, sch, schems); });
                 }).then(function (warn) {
                     unknown += warn || 0;
                     return Object.keys(sheets).reduce(function (pr, fp) {
@@ -1563,6 +1583,156 @@
             }
             var contentKeys = {};
             var scriptList = [];
+            function gunzipMaybe(bytes) {
+                if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return Promise.resolve(bytes);
+                return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')))
+                    .arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+            }
+            function readNbt(b) {
+                var dv = new DataView(b.buffer, b.byteOffset, b.byteLength), o = 0, dec = new TextDecoder();
+                function str() { var n = dv.getUint16(o); o += 2; var s = dec.decode(b.subarray(o, o + n)); o += n; return s; }
+                function val(t) {
+                    var n, i, a;
+                    switch (t) {
+                    case 1: return dv.getInt8(o++);
+                    case 2: n = dv.getInt16(o); o += 2; return n;
+                    case 3: n = dv.getInt32(o); o += 4; return n;
+                    case 4: n = dv.getInt32(o) * 4294967296 + dv.getUint32(o + 4); o += 8; return n;
+                    case 5: n = dv.getFloat32(o); o += 4; return n;
+                    case 6: n = dv.getFloat64(o); o += 8; return n;
+                    case 7: n = dv.getInt32(o); o += 4; a = b.slice(o, o + n); o += n; return a;
+                    case 8: return str();
+                    case 9: { var et = dv.getUint8(o++); n = dv.getInt32(o); o += 4; a = []; for (i = 0; i < n; i++) a.push(val(et)); return a; }
+                    case 10: { var c = {}; for (;;) { var tt = dv.getUint8(o++); if (tt === 0) return c; var k = str(); c[k] = val(tt); } }
+                    case 11: n = dv.getInt32(o); o += 4; a = new Int32Array(n); for (i = 0; i < n; i++, o += 4) a[i] = dv.getInt32(o); return a;
+                    case 12: n = dv.getInt32(o); o += 4; a = []; for (i = 0; i < n; i++, o += 8) a.push(dv.getInt32(o) * 4294967296 + dv.getUint32(o + 4)); return a;
+                    }
+                    throw new Error('bad NBT tag ' + t);
+                }
+                var t = dv.getUint8(o++);
+                if (t !== 10) throw new Error('not NBT');
+                str();
+                return val(10);
+            }
+            var COLORS = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+            var WOODS = ['oak', 'spruce', 'birch', 'jungle'];
+            var MODERN = {};
+            ('air:0,cave_air:0,void_air:0,stone:1,granite:1,polished_granite:1,diorite:1,polished_diorite:1,andesite:1,polished_andesite:1,' +
+             'grass_block:2,dirt:3,coarse_dirt:3,podzol:3,rooted_dirt:3,dirt_path:3,grass_path:3,cobblestone:4,bedrock:7,water:9,lava:11,' +
+             'sand:12,red_sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,deepslate_gold_ore:14,deepslate_iron_ore:15,deepslate_coal_ore:16,' +
+             'sponge:19,wet_sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,chiseled_sandstone:24:1,cut_sandstone:24:2,' +
+             'smooth_sandstone:24:2,note_block:25,powered_rail:27,detector_rail:28,sticky_piston:29,cobweb:30,short_grass:31:1,grass:31:1,fern:31:2,' +
+             'tall_grass:31:1,large_fern:31:2,dead_bush:32,piston:33,dandelion:37,poppy:38,blue_orchid:38:1,brown_mushroom:39,red_mushroom:40,' +
+             'torch:50,wall_torch:50,redstone_wall_torch:76,gold_block:41,iron_block:42,smooth_stone:43:8,bricks:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,fire:51,spawner:52,' +
+             'chest:54,redstone_wire:55,diamond_ore:56,deepslate_diamond_ore:56,diamond_block:57,crafting_table:58,wheat:59,farmland:60,furnace:61,' +
+             'ladder:65,rail:66,lever:69,stone_pressure_plate:70,oak_pressure_plate:72,redstone_ore:73,deepslate_redstone_ore:73,redstone_torch:76,' +
+             'stone_button:77,snow:78,ice:79,packed_ice:79,blue_ice:79,snow_block:80,cactus:81,clay:82,sugar_cane:83,jukebox:84,pumpkin:86,' +
+             'carved_pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,jack_o_lantern:91,cake:92,stone_bricks:98,mossy_stone_bricks:98:1,' +
+             'cracked_stone_bricks:98:2,chiseled_stone_bricks:98:3,brown_mushroom_block:99,red_mushroom_block:100,iron_bars:101,glass_pane:102,' +
+             'melon:103,pumpkin_stem:104,melon_stem:105,vine:106,mycelium:110,lily_pad:111,nether_bricks:112,nether_brick_fence:113,' +
+             'nether_wart:115,enchanting_table:116,brewing_stand:117,cauldron:118,end_portal_frame:120,end_stone:121,end_stone_bricks:121,' +
+             'dragon_egg:122,redstone_lamp:123,emerald_ore:129,deepslate_emerald_ore:129,ender_chest:130,tripwire_hook:131,tripwire:132,' +
+             'emerald_block:133,cobblestone_wall:139,mossy_cobblestone_wall:139:1,flower_pot:140,carrots:141,potatoes:142,anvil:145,' +
+             'trapped_chest:146,redstone_block:152,nether_quartz_ore:153,hopper:154,quartz_block:155,chiseled_quartz_block:155:1,' +
+             'quartz_pillar:155:2,smooth_quartz:155,dropper:158,hay_block:170,terracotta:172,coal_block:173,iron_door:71,' +
+             'oak_fence:85,oak_fence_gate:107,oak_trapdoor:96,oak_door:64,oak_sign:63,oak_wall_sign:68,oak_button:143,' +
+             'stone_slab:44,smooth_stone_slab:44,sandstone_slab:44:1,cobblestone_slab:44:3,brick_slab:44:4,stone_brick_slab:44:5,' +
+             'nether_brick_slab:44:6,quartz_slab:44:7,oak_slab:126,spruce_slab:126:1,birch_slab:126:2,jungle_slab:126:3,' +
+             'oak_stairs:53,cobblestone_stairs:67,brick_stairs:108,stone_brick_stairs:109,nether_brick_stairs:114,sandstone_stairs:128,' +
+             'spruce_stairs:134,birch_stairs:135,jungle_stairs:136,quartz_stairs:156').split(',').forEach(function (kv) {
+                var p = kv.split(':'); MODERN[p[0]] = [parseInt(p[1], 10), parseInt(p[2] || '0', 10)];
+            });
+            COLORS.forEach(function (c, i) { MODERN[c + '_wool'] = [35, i]; MODERN[c + '_carpet'] = [171, i]; MODERN[c + '_terracotta'] = [172, 0]; MODERN[c + '_bed'] = [26, 0]; MODERN[c + '_stained_glass'] = [20, 0]; MODERN[c + '_stained_glass_pane'] = [102, 0]; });
+            WOODS.forEach(function (w, i) {
+                MODERN[w + '_planks'] = [5, i]; MODERN[w + '_log'] = [17, i]; MODERN[w + '_wood'] = [17, i]; MODERN['stripped_' + w + '_log'] = [17, i];
+                MODERN[w + '_leaves'] = [18, i]; MODERN[w + '_sapling'] = [6, i];
+            });
+            ['acacia', 'dark_oak', 'mangrove', 'cherry', 'bamboo', 'crimson', 'warped'].forEach(function (w) {
+                var n = w === 'dark_oak' ? 1 : w === 'cherry' ? 2 : 0;
+                MODERN[w + '_planks'] = [5, n]; MODERN[w + '_log'] = [17, n]; MODERN[w + '_leaves'] = [18, n];
+                MODERN[w + '_stairs'] = [53, 0]; MODERN[w + '_slab'] = [126, n]; MODERN[w + '_fence'] = [85, 0]; MODERN[w + '_door'] = [64, 0];
+            });
+            ['oak', 'spruce', 'birch', 'jungle'].forEach(function (w) { MODERN[w + '_fence'] = [85, 0]; MODERN[w + '_door'] = [64, 0]; MODERN[w + '_trapdoor'] = [96, 0]; MODERN[w + '_fence_gate'] = [107, 0]; });
+            ['poppy', 'blue_orchid', 'allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'oxeye_daisy', 'cornflower', 'lily_of_the_valley', 'rose_bush', 'peony', 'lilac'].forEach(function (f) {
+                if (!MODERN[f]) MODERN[f] = [38, 0];
+            });
+            function modernRef(state) {
+                var m = /^(?:minecraft:)?([a-z0-9_]+)(?:\[(.*)\])?$/.exec(String(state || '').trim());
+                if (!m) return '';
+                var name = m[1], props = {};
+                (m[2] || '').split(',').forEach(function (kv) { var p = kv.split('='); if (p.length === 2) props[p[0]] = p[1]; });
+                if (name === 'structure_void') return ' ';
+                var e = MODERN[name];
+                if (!e) {
+                    if (VANILLA[name] && VANILLA[name] < 256) e = [VANILLA[name], 0];
+                    else if (/_stairs$/.test(name)) e = [67, 0];
+                    else if (/_slab$/.test(name)) e = [44, 0];
+                    else if (/_wall$/.test(name)) e = [139, 0];
+                    else if (/(^|_)(bricks|tiles)$/.test(name)) e = [98, 0];
+                    else if (/_glass_pane$/.test(name)) e = [102, 0];
+                    else if (/_glass$/.test(name)) e = [20, 0];
+                    else return '';
+                }
+                var id = e[0], data = e[1];
+                if (id === 0) return '.';
+                var F4 = { east: 0, west: 1, south: 2, north: 3 };
+                if (/_stairs$/.test(name)) { data = (F4[props.facing] || 0) + (props.half === 'top' ? 4 : 0); }
+                else if (/_slab$/.test(name)) {
+                    if (props.type === 'double') id = id === 126 ? 125 : 43;
+                    else if (props.type === 'top') data += 8;
+                } else if (id === 17 && props.axis) data += props.axis === 'x' ? 4 : props.axis === 'z' ? 8 : 0;
+                else if (name === 'wall_torch' || name === 'redstone_wall_torch') { id = name === 'wall_torch' ? 50 : 76; data = { east: 1, west: 2, south: 3, north: 4 }[props.facing] || 5; }
+                else if (name === 'torch') { id = 50; data = 5; }
+                else if (name === 'ladder' || name === 'furnace' || name === 'chest' || name === 'dispenser' || name === 'ender_chest' || name === 'trapped_chest')
+                    data = { north: 2, south: 3, west: 4, east: 5 }[props.facing] || 2;
+                else if (name === 'water' || name === 'lava') { if (props.level && props.level !== '0') return '.'; }
+                return 'id:' + id + (data ? ':' + data : '');
+            }
+            function readSchematic(nbt) {
+                var root = nbt.Schematic && typeof nbt.Schematic === 'object' && !Array.isArray(nbt.Schematic) ? nbt.Schematic : nbt;
+                if (root.Blocks instanceof Uint8Array && root.Width !== undefined && !root.Palette) {
+                    var W = root.Width, H = root.Height, L = root.Length, B = root.Blocks, D = root.Data || new Uint8Array(B.length);
+                    var add = root.AddBlocks;
+                    return { sx: W, sy: H, sz: L, at: function (x, y, z) {
+                        var i = (y * L + z) * W + x, id = B[i] & 255;
+                        if (add) id |= ((i & 1 ? add[i >> 1] & 15 : add[i >> 1] >> 4) & 15) << 8;
+                        if (id === 0) return '.';
+                        if (id >= 256) return ' ';
+                        var d = D[i] & 15;
+                        return 'id:' + id + (d ? ':' + d : '');
+                    } };
+                }
+                if (root.Width !== undefined && (root.Palette || (root.Blocks && root.Blocks.Palette))) {
+                    var pal = root.Palette || root.Blocks.Palette, data = root.BlockData || (root.Blocks && root.Blocks.Data);
+                    var w = root.Width, h = root.Height, l = root.Length, refs = [];
+                    Object.keys(pal).forEach(function (k) { refs[pal[k]] = modernRef(k); });
+                    var ids = new Int32Array(w * h * l), o = 0, n = 0;
+                    while (o < data.length && n < ids.length) {
+                        var v = 0, s = 0, byte;
+                        do { byte = data[o++] & 255; v |= (byte & 127) << s; s += 7; } while (byte & 128);
+                        ids[n++] = v;
+                    }
+                    return { sx: w, sy: h, sz: l, at: function (x, y, z) { var r = refs[ids[x + z * w + y * w * l]]; return r === undefined || r === '' ? ' ' : r; } };
+                }
+                if (Array.isArray(root.size) && root.size.length === 3 && (root.palette || root.palettes) && root.blocks) {
+                    var p2 = (root.palette || root.palettes[0]).map(function (st) {
+                        var props = st.Properties ? Object.keys(st.Properties).map(function (k) { return k + '=' + st.Properties[k]; }).join(',') : '';
+                        return modernRef(st.Name + (props ? '[' + props + ']' : ''));
+                    });
+                    var sx = root.size[0], sy = root.size[1], sz = root.size[2], cells = {};
+                    root.blocks.forEach(function (bl) { if (bl.pos && bl.pos.length === 3) cells[bl.pos[0] + ',' + bl.pos[1] + ',' + bl.pos[2]] = p2[bl.state]; });
+                    return { sx: sx, sy: sy, sz: sz, at: function (x, y, z) { var r = cells[x + ',' + y + ',' + z]; return r === undefined || r === '' ? ' ' : r; } };
+                }
+                throw new Error('not a schematic this game knows (.schematic, .schem or structure .nbt)');
+            }
+            function decodeSchematics(list) {
+                var out = {};
+                return list.reduce(function (pr, s) {
+                    return pr.then(function () { return gunzipMaybe(s.data); }).then(function (raw) {
+                        out[s.mod + ':' + s.path] = readSchematic(readNbt(raw));
+                    }).catch(function (e) { console.warn('[mods] ' + s.mod + ': ' + s.path + ': ' + (e && e.message || e)); out[s.mod + ':' + s.path] = null; });
+                }, Promise.resolve()).then(function () { return out; });
+            }
             var maxSheet = 0;
             function maxTextureSize() {
                 if (maxSheet) return maxSheet;
@@ -1572,7 +1742,8 @@
                 } catch (e) { maxSheet = 4096; }
                 return maxSheet;
             }
-            function buildContent(content, newTex, sheets, lang) {
+            function buildContent(content, newTex, sheets, lang, schematics, schemFiles) {
+                schematics = schematics || {};
                 var dec = new TextDecoder(), warn = 0;
                 var parse = function (c) { try { var j = JSON.parse(dec.decode(c.data)); return j && typeof j === 'object' ? j : null; } catch (e) { warn++; return null; } };
                 var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [];
@@ -1680,8 +1851,77 @@
                     if (o === undefined || o === false) return;
                     (Array.isArray(o) ? o : [o]).forEach(function (x) { ore(x, 'mod:' + key, blocks[key].mod); });
                 });
+                var SMAX = [64, 128, 64];
+                var CODES = '';
+                for (var ci = 33; ci < 127; ci++) { var ch = String.fromCharCode(ci); if ('.;='.indexOf(ch) < 0) CODES += ch; }
+                function gridOfLayers(j, mod) {
+                    var layers = j.layers;
+                    if (!Array.isArray(layers) || !layers.length) return null;
+                    layers = layers.map(function (l) { return Array.isArray(l) ? l.map(String) : [String(l)]; });
+                    var sz = 0, sx = 0;
+                    layers.forEach(function (l) { sz = Math.max(sz, l.length); l.forEach(function (r) { sx = Math.max(sx, r.length); }); });
+                    var keyRefs = {}, ok = true;
+                    Object.keys(j.key || {}).forEach(function (c) {
+                        var k = ref(j.key[c], mod);
+                        if (c.length !== 1 || c === ' ' || c === '.' || !k) ok = false; else keyRefs[c] = k;
+                    });
+                    if (!ok) return null;
+                    return { sx: sx, sy: layers.length, sz: sz, at: function (x, y, z) {
+                        var c = (layers[y][z] || '').charAt(x) || ' ';
+                        return c === ' ' || c === '.' ? c : (keyRefs[c] || ' ');
+                    } };
+                }
+                function gridOfFile(file, mod) {
+                    var p = String(file || '').replace(/^[/]+/, '');
+                    var g = schematics[mod + ':' + p];
+                    if (g === undefined) g = schematics[mod + ':worldgen/' + p];
+                    if (g === undefined) g = schematics[mod + ':structures/' + p];
+                    return g || null;
+                }
+                function structure(w, grid) {
+                    var j = w.j;
+                    grid = grid || (j.file ? gridOfFile(j.file, w.mod) : gridOfLayers(j, w.mod));
+                    if (!grid || grid.sx < 1 || grid.sy < 1 || grid.sz < 1 || grid.sx > SMAX[0] || grid.sy > SMAX[1] || grid.sz > SMAX[2]) { warn++; return; }
+                    var sx = grid.sx, sz = grid.sz, codeOf = {}, keys = [], cells = [];
+                    for (var y = 0; y < grid.sy; y++)
+                        for (var z = 0; z < sz; z++)
+                            for (var x = 0; x < sx; x++) {
+                                var r = grid.at(x, y, z);
+                                if (r === ' ' || r === '.') { cells.push(r); continue; }
+                                if (codeOf[r] === undefined) {
+                                    if (keys.length >= CODES.length) { codeOf[r] = ' '; warn++; }
+                                    else { codeOf[r] = CODES.charAt(keys.length); keys.push(codeOf[r] + '=' + r); }
+                                }
+                                cells.push(codeOf[r]);
+                            }
+                    cells = cells.join('');
+                    var layersCount = grid.sy;
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()];
+                    var place = { surface: 0, underground: 1, anywhere: 1, sky: 1 }[String(j.placement || 'surface').toLowerCase()];
+                    if (dim === undefined || place === undefined) { warn++; return; }
+                    var num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
+                    var on = j.on === undefined ? [] : (Array.isArray(j.on) ? j.on : [j.on]).map(function (r) { return ref(r, w.mod); });
+                    if (on.some(function (r) { return !r; })) { warn++; return; }
+                    var underground = String(j.placement || '').toLowerCase() === 'underground';
+                    lines.push(['structure', w.mod + ':' + w.name, sx, layersCount, sz,
+                                Math.max(0, Math.min(1, num(j.chance, 0.02))), place,
+                                Math.max(1, Math.min(126, Math.round(num(j.min_y, underground ? 10 : 64)))),
+                                Math.max(1, Math.min(126, Math.round(num(j.max_y, underground ? 50 : 100)))),
+                                Math.max(-32, Math.min(32, Math.round(num(j.y_offset, 0)))),
+                                (j.rotate === undefined ? !j.file && !w.file : j.rotate) ? 1 : 0, dim, on.join(';'), j.scripted ? 1 : 0, keys.join(';'), cells].join('\t'));
+                }
+                (schemFiles || []).forEach(function (s) {
+                    var m = /^worldgen[/]([^/]+)[.](schematic|schem|nbt)$/i.exec(s.path);
+                    if (!m) return;
+                    var name = m[1].toLowerCase();
+                    if (worldgen.some(function (w) { return w.mod === s.mod && w.name === name; })) return;
+                    var g = schematics[s.mod + ':' + s.path];
+                    if (!g) { warn++; return; }
+                    structure({ mod: s.mod, name: name, j: {}, file: true }, g);
+                });
                 worldgen.forEach(function (w) {
                     var type = String(w.j.type || 'ore').toLowerCase();
+                    if (type === 'structure') { structure(w); return; }
                     if (type !== 'ore') { warn++; return; }
                     ore(w.j, ref(w.j.block, w.mod), w.mod);
                 });
@@ -1776,8 +2016,10 @@
             api.status = function () { return status; };
             api.list = function () {
                 var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
+                var desc = function (s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/\n/g, '\x1f').slice(0, 4000); };
                 return mods.map(function (x) {
-                    return [x.id, x.m.name, x.m.version, x.m.author, x.m.description, x.enabled ? 1 : 0, x.bundled ? 1 : 0, x.icon, x.err].map(clean).join('\t');
+                    return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
+                        .concat([x.enabled ? 1 : 0, x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean)).join('\t');
                 }).join('\n');
             };
             function find(id) { for (var i = 0; i < mods.length; i++) if (mods[i].id === id) return i; return -1; }
@@ -2027,6 +2269,8 @@
             var worker = null, side = '', folder = '', actions = [], me = null;
             var known = {};
             var wants = {};
+            var swants = {};
+            var FWD = { eat: 1, craft: 1, chat: 1, respawn: 1 };
             var remoteReq = {}, nextRemoteReq = 1000000;
             var api = Module.mcScripts = {};
             function W() { return Module.mcMods; }
@@ -2068,6 +2312,7 @@
                             if (typeof fn !== 'function') return;
                             (list[type] = list[type] || []).push({ mod: mod, fn: fn });
                             if (list === server && type === 'gametick') act(mod, ['subscribe', 'gametick']);
+                            if (list === server) post({ t: 'want', side: 'world', what: type });
                             if (list === client && (type === 'tick' || type === 'key')) post({ t: 'want', what: type });
                         };
                     }
@@ -2222,7 +2467,7 @@
                     break;
                 case 'cmsg': chat(d.text); break;
                 case 'hud': hud(d.mod + ':' + d.id, d.text); break;
-                case 'want': wants[d.what] = true; break;
+                case 'want': if (d.side === 'world') swants[d.what] = true; else wants[d.what] = true; break;
                 case 'me':
                     var p = null;
                     try { p = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (x) { }
@@ -2251,8 +2496,9 @@
                 if (!worker) return;
                 if (e.player && e.player.id != null) known[e.player.id] = e.player;
                 if (Array.isArray(e.players)) e.players.forEach(function (p) { if (p) known[p.id] = p; });
-                if (typeof e.block === 'string') e.block = nameOf(e.t === 'reply' ? e.block : 'mod:' + e.block);
-                if (typeof e.item === 'string') e.item = nameOf('mod:' + e.item);
+                if (typeof e.block === 'string') e.block = nameOf(e.block);
+                if (typeof e.item === 'string') e.item = nameOf(e.item);
+                ['entity', 'source'].forEach(function (k) { var x = e[k]; if (x && x.guid !== undefined && x.id != null) known[x.id] = x; });
                 worker.postMessage({ t: 'event', e: e });
             }
 
@@ -2272,6 +2518,7 @@
 
             api.running = function () { return !!worker; };
             api.wantsTick = function () { return worker && wants.tick ? 1 : 0; };
+            api.wants = function (type) { return !!(worker && swants[type]); };
             api.peekLen = function () { return actions.length ? lengthBytesUTF8(actions[0]) + 1 : 0; };
             api.next = function () { return actions.shift() || ''; };
             var stopTimer = 0;
@@ -2312,6 +2559,12 @@
                     return;
                 }
                 if (e.t === 'ctick') { e.t = 'tick'; e.client = true; if (e.player) me = e.player; }
+                else if (e.fwd) {
+                    delete e.fwd;
+                    if (side === 'client' && FWD[e.t] && net().sendCtlHost) net().sendCtlHost({ t: 'sev', e: e });
+                    else if (side === 'host') toWorker(e);
+                    return;
+                }
                 else if (e.t === 'reply' && remoteReq[e.req]) {
                     var rr = remoteReq[e.req]; delete remoteReq[e.req];
                     if (typeof e.block === 'string') e.block = nameOf(e.block);
@@ -2323,7 +2576,7 @@
             };
             function stop() {
                 if (worker) { try { worker.terminate(); } catch (x) { } }
-                worker = null; side = ''; actions = []; known = {}; wants = {}; remoteReq = {};
+                worker = null; side = ''; actions = []; known = {}; wants = {}; swants = {}; remoteReq = {};
                 closeGui();
                 hud(null);
             }
@@ -2356,6 +2609,9 @@
                 case 'sact': if (ownMod(msg.mod)) runAct(msg.mod, msg.a, guid); break;
                 case 'sgui': if (ownMod(msg.mod)) serverGui(msg.mod, !!msg.open, known[msg.player], msg.spec || {}); break;
                 case 'ssend': if (ownMod(msg.mod)) sendToPlayer(msg.mod, msg.player, msg.data); break;
+                case 'sev':
+                    if (msg.e && FWD[msg.e.t] && swants[msg.e.t]) { var se = msg.e; se.player = p; delete se.fwd; toWorker(se); }
+                    break;
                 }
             };
             api.fromHost = function (msg) {
