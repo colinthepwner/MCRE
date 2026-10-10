@@ -4790,6 +4790,10 @@
                     out.scale = (r.guiScale || 1) * sx;
                     if (r.rect) out.rect = { x: Math.round(b.left + r.rect[0] * sx), y: Math.round(b.top + r.rect[1] * sy), width: Math.round(r.rect[2] * sx), height: Math.round(r.rect[3] * sy) };
                 }
+                if (r.close && b && gw > 0 && gh > 0) {
+                    var csx = b.width / gw, csy = b.height / gh;
+                    out.close = { x: Math.round(b.left + r.close[0] * csx), y: Math.round(b.top + r.close[1] * csy), width: Math.round(r.close[2] * csx), height: Math.round(r.close[3] * csy) };
+                }
                 if (r.held) out.held = stackForScript(r.held);
                 if (r.container) out.container = r.container;
                 return out;
@@ -4800,10 +4804,10 @@
                     pollScreen.on = true;
                     requestAnimationFrame(function () { pollScreen.on = false; pollScreen(); });
                 }
-                var s = screenInfo(), key = JSON.stringify([s.screen, s.rect, s.width, s.height, s.scale, s.held]);
+                var s = screenInfo(), key = JSON.stringify([s.screen, s.rect, s.width, s.height, s.scale, s.held, s.close]);
                 if (key === lastScreen) return;
                 lastScreen = key;
-                toWorker({ t: 'screen', client: true, screen: s.screen, rect: s.rect, width: s.width, height: s.height, scale: s.scale, held: s.held });
+                toWorker({ t: 'screen', client: true, screen: s.screen, rect: s.rect, width: s.width, height: s.height, scale: s.scale, held: s.held, close: s.close || null });
             }
 
             function onKey(e) {
@@ -4822,6 +4826,7 @@
                 else hudLines[key] = String(text).slice(0, 200);
                 if (!hudBox) {
                     hudBox = document.createElement('div');
+                    hudBox.setAttribute('data-mc-keepoff', '');
                     hudBox.style.cssText = 'position:fixed;right:8px;top:8px;z-index:6;pointer-events:none;font:13px monospace;' +
                         'color:#fff;text-shadow:1px 1px 0 #000;text-align:right;max-width:45vw';
                     document.body.appendChild(hudBox);
@@ -4896,6 +4901,7 @@
                 if (spec.hidden) css += ';display:none';
                 css += ';pointer-events:none';
                 el.style.cssText = css;
+                el.setAttribute('data-mc-keepoff', '');
             }
             function dropG(g, giveBackItems) {
                 if (!g) return;
@@ -5476,6 +5482,31 @@
             }
         })();
         (function () {
+            Module.mcKeepOff = function (has, x, y, w, h, gw, gh) {
+                var els = document.querySelectorAll('[data-mc-keepoff]');
+                if (!els.length) return;
+                var hole = null, cv = Module.canvas;
+                if (has && cv && gw > 0 && gh > 0) {
+                    var b = cv.getBoundingClientRect(), sx = b.width / gw, sy = b.height / gh, m = 3;
+                    hole = [b.left + x * sx - m, b.top + y * sy - m, w * sx + 2 * m, h * sy + 2 * m];
+                }
+                for (var i = 0; i < els.length; i++) {
+                    var el = els[i], want = '';
+                    if (hole) {
+                        var e = el.getBoundingClientRect(), hx = hole[0] - e.left, hy = hole[1] - e.top;
+                        if (e.width > 0 && e.height > 0 && hx < e.width && hy < e.height && hx + hole[2] > 0 && hy + hole[3] > 0)
+                            want = 'path(evenodd, "M-20000 -20000H20000V20000H-20000Z M' + hx.toFixed(1) + ' ' + hy.toFixed(1) +
+                                'h' + hole[2].toFixed(1) + 'v' + hole[3].toFixed(1) + 'h' + (-hole[2]).toFixed(1) + 'Z")';
+                    }
+                    if (el._mcKeepWant !== want || el.style.clipPath !== el._mcKeepSet) {
+                        el.style.clipPath = want;
+                        el._mcKeepWant = want;
+                        el._mcKeepSet = el.style.clipPath;
+                    }
+                }
+            };
+        })();
+        (function () {
             var el = null, hist = [], at = 0;
             function close() {
                 if (!el) return;
@@ -5576,6 +5607,7 @@
                 if (el) { el.parentNode.removeChild(el); el = logBox = null; return; }
                 if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
                 el = document.createElement('div');
+                el.setAttribute('data-mc-keepoff', '');
                 el.style.cssText = 'position:fixed;left:8px;bottom:8px;width:min(680px,calc(100vw - 16px));height:min(56vh,520px);z-index:9500;' +
                     'background:rgba(10,10,14,.88);border:1px solid #555;color:#ddd;font:12px monospace;display:flex;flex-direction:column;box-sizing:border-box';
                 var head = document.createElement('div');
@@ -6548,6 +6580,7 @@
             function drawUi(list) {
                 if (!uiLayer) {
                     uiLayer = document.createElement('div');
+                    uiLayer.setAttribute('data-mc-keepoff', '');
                     uiLayer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9990;font-family:sans-serif';
                     ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend', 'touchmove', 'contextmenu'].forEach(function (t) {
                         uiLayer.addEventListener(t, function (e) { if (e.target !== uiLayer) e.stopPropagation(); });
