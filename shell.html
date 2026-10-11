@@ -509,20 +509,29 @@
             var buffers = {};
             var pendingPlay = {};
             var liveSources = 0;
+            var LOAD_TIMEOUT = 8000, RETRY_MS = 30000;
+            var loadStarted = {}, failedAt = {};
             function loadBuffer(u) {
+                if (buffers[u] === 'failed' && Date.now() - (failedAt[u] || 0) > RETRY_MS) delete buffers[u];
+                if (buffers[u] === 'loading' && Date.now() - (loadStarted[u] || 0) > LOAD_TIMEOUT) { buffers[u] = 'failed'; failedAt[u] = Date.now(); delete pendingPlay[u]; }
                 if (buffers[u]) return;
                 buffers[u] = 'loading';
+                var started = loadStarted[u] = Date.now();
+                setTimeout(function () {
+                    if (buffers[u] === 'loading' && loadStarted[u] === started) { buffers[u] = 'failed'; failedAt[u] = Date.now(); delete pendingPlay[u]; }
+                }, LOAD_TIMEOUT);
                 fetch(u).then(function (r) {
                     if (!r.ok) throw new Error(r.status);
                     return r.arrayBuffer();
                 }).then(function (data) {
                     return new Promise(function (res, rej) { actx.decodeAudioData(data, res, rej); });
                 }).then(function (buf) {
+                    if (loadStarted[u] !== started) return;
                     buffers[u] = buf;
                     var pend = pendingPlay[u];
                     delete pendingPlay[u];
                     if (pend && Date.now() - pend[2] < 600) playBuffer(buf, pend[0], pend[1]);
-                }).catch(function () { buffers[u] = 'failed'; delete pendingPlay[u]; });
+                }).catch(function () { if (loadStarted[u] === started) { buffers[u] = 'failed'; failedAt[u] = Date.now(); delete pendingPlay[u]; } });
             }
             function playBuffer(buf, volume, pitch) {
                 if (actx.state !== 'running') {
@@ -582,6 +591,7 @@
                 var u = list[(Math.random() * list.length) | 0];
                 if (actx) for (var w = 0; w < list.length; w++) loadBuffer(list[w]);
                 if (actx) {
+                    if (buffers[u] === 'loading' || buffers[u] === 'failed') loadBuffer(u);
                     var b = buffers[u];
                     if (b && b !== 'loading' && b !== 'failed') { playBuffer(b, volume, pitch); return true; }
                     if (b !== 'failed') {
