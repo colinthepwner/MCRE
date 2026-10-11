@@ -1339,6 +1339,10 @@
                                     return;
                                 }
                                 if (Module.mcMods && Module.mcMods.setJoinedMap) Module.mcMods.setJoinedMap('');
+                                if (Module.mcMods && Module.mcMods.startSession && Module.mcMods.hasEnabled && Module.mcMods.hasEnabled()) {
+                                    Module.mcMods.startSession([], {}, false).then(enter, enter);
+                                    return;
+                                }
                                 enter();
                                 return;
                             }
@@ -1997,7 +2001,7 @@
                     on.forEach(visit);
                     on = out;
                 })();
-                if (session) on = session.slice().reverse().concat(on);
+                if (session) on = session.slice().reverse();
                 settingDecls = {};
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
                 return on.reduce(function (pr, x) {
