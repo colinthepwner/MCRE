@@ -1955,6 +1955,7 @@
                 mobFiles = {}; texFiles = {};
                 Object.keys(picUrls).forEach(function (k) { URL.revokeObjectURL(picUrls[k]); });
                 guiFiles = {}; picUrls = {};
+                sdFiles = {};
                 var on = mods.filter(function (x) { return x.enabled && !x.err; }).reverse();
                 (function () {
                     var out = [], placed = {}, visiting = {};
@@ -2043,6 +2044,8 @@
                                 content.push({ mod: id, kind: 'loot', name: id + ':' + m[1].toLowerCase(), data: data, file: path });
                             } else if ((m = /^data[/]([a-z0-9_.-]+)[/]loot_tables?[/](.+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'loot', name: m[1].toLowerCase() + ':' + m[2].toLowerCase(), data: data, file: path });
+                            } else if (/^sdcard[/].+/i.test(path) && path.indexOf('..') < 0 && !/[/]$/.test(path)) {
+                                sdFiles[id + ':' + path.toLowerCase()] = { path: path, data: data };
                             } else if (/^modpe[/].+[.]js$/i.test(path)) {
                                 modpeFiles.push({ mod: id, file: path.slice(6), code: new TextDecoder().decode(data), session: !own });
                             } else if (/^scripts\/.+\.js$/i.test(path)) {
@@ -2125,9 +2128,10 @@
             var mobFiles = {}, texFiles = {};
             var scriptList = [];
             var guiFiles = {}, picUrls = {};
+            var sdFiles = {};
             api.modFile = function (mod, path) {
                 var k = mod + ':' + String(path || '').toLowerCase().replace(/^[./]+/, '');
-                return guiFiles[k] || texFiles[k] || null;
+                return guiFiles[k] || texFiles[k] || sdFiles[k] || null;
             };
             api.picture = function (mod, path) {
                 var k = mod + ':' + String(path || '').toLowerCase().replace(/^[./]+/, '');
@@ -6046,7 +6050,7 @@
                     getWorldName: function () { return (op('world') || {}).name || ''; },
                     getWorldDir: function () { return (op('world') || {}).dir || ''; },
                     getGameMode: function () { return (op('world') || {}).creative ? 1 : 0; },
-                    setGameMode: function () { problem("Level.setGameMode isn't supported"); },
+                    setGameMode: function (m) { op('gamemode', num(m) === 1 ? 1 : 0); },
                     playSound: function (x, y, z, name, vol, pitch) { op('sound', num(x), num(y), num(z), String(name), vol == null ? 1 : num(vol), pitch == null ? 1 : num(pitch)); },
                     playSoundEnt: function (ent, name, vol, pitch) { var e = E(ent); op('sound', e.x || 0, e.y || 0, e.z || 0, String(name), vol == null ? 1 : num(vol), pitch == null ? 1 : num(pitch)); },
                     addParticle: function (type, x, y, z, vx, vy, vz) {
@@ -6080,6 +6084,7 @@
                     getCarriedItemCount: function () { return stack(P().carried, 'count'); },
                     getCarriedItemData: function () { return stack(P().carried, 'data'); },
                     addItemInventory: A.addItemInventory,
+                    addItemCreativeInv: function () { },
                     clearInventorySlot: function (n) { op('setslot', num(n) | 0, '', 0, ''); },
                     getInventorySlot: function (n) { return stack(slot(n), 'id'); },
                     getInventorySlotCount: function (n) { return stack(slot(n), 'count'); },
@@ -6136,7 +6141,11 @@
                     getItemEntityCount: function (e) { return stack(E(e).item, 'count'); },
                     getItemEntityData: function (e) { return stack(E(e).item, 'data'); },
                     spawnMob: A.Level.spawnMob,
-                    setCarriedItem: noop, getRenderType: function () { return 0; }, setRenderType: noop, setMobSkin: noop, getMobSkin: function () { return ''; },
+                    setCarriedItem: function (ent, id, count, d) {
+                        if ((num(ent) | 0) !== (P().id | 0)) return;
+                        op('setslot', P().slot | 0, refOf(id, d), count == null ? 1 : Math.max(1, num(count) | 0), d == null ? '' : num(d) | 0);
+                    },
+                    getRenderType: function () { return 0; }, setRenderType: noop, setMobSkin: noop, getMobSkin: function () { return ''; },
                     setNameTag: noop, getNameTag: function () { return ''; }, setCollisionSize: noop, setImmobile: noop, setCape: noop,
                     getAnimalAge: function () { return 0; }, setAnimalAge: noop
                 };
@@ -6456,6 +6465,124 @@
                 Thread.currentThread = function () { return proxied({}); };
                 function Handler() { return proxied({ post: function (r) { setTimeout(function () { runR(r); }, 0); return true; }, postDelayed: function (r, ms) { setTimeout(function () { runR(r); }, Number(ms) || 0); return true; }, removeCallbacks: function () { } }); }
                 var self_ = function (o) { return o; };
+
+                function javaErr(cls, msg) {
+                    var s = 'JavaException: ' + cls + ': ' + msg;
+                    var e = new Error(s);
+                    e.toString = function () { return s; };
+                    e.javaException = { getMessage: function () { return msg; }, toString: function () { return cls + ': ' + msg; } };
+                    return e;
+                }
+                function fop(kind, path, data) { return op('file', kind, curMod, String(path), data == null ? '' : encodeURIComponent(String(data))); }
+                function pathOf(a) { return a && a.__path != null ? a.__path : String(a); }
+                function JFile(a, b) {
+                    var path = b == null ? pathOf(a) : pathOf(a).replace(/[/]+$/, '') + '/' + String(b);
+                    path = path.replace(/[/]{2,}/g, '/');
+                    var st = function () { return fop('stat', path) || {}; };
+                    var name = path.replace(/[/]+$/, '').split('/').pop();
+                    var parent = path.replace(/[/]+$/, '').replace(/[/][^/]*$/, '') || '/';
+                    var f = {
+                        __path: path,
+                        toString: function () { return path; }, getPath: function () { return path; },
+                        getAbsolutePath: function () { return path; }, getCanonicalPath: function () { return path; },
+                        getName: function () { return name; }, getParent: function () { return parent; },
+                        getParentFile: function () { return new JFile(parent); },
+                        exists: function () { return !!st().exists; }, isFile: function () { return !!st().file; },
+                        isDirectory: function () { return !!st().dir; }, length: function () { return st().size | 0; },
+                        canRead: function () { return !!st().exists; }, canWrite: function () { return true; },
+                        lastModified: function () { return st().time || 0; },
+                        mkdir: function () { return !!fop('mkdir', path); }, mkdirs: function () { return !!fop('mkdir', path); },
+                        createNewFile: function () { if (st().exists) return false; fop('write', path, ''); return true; },
+                        delete: function () { return !!fop('del', path); },
+                        list: function () { return fop('list', path) || []; },
+                        listFiles: function () { return (fop('list', path) || []).map(function (n) { return new JFile(path, n); }); },
+                        renameTo: function (to) { var t = fop('read', path); if (t == null) return false; fop('write', pathOf(to), t); fop('del', path); return true; }
+                    };
+                    return f;
+                }
+                function textOf(src) {
+                    if (src && src.__text != null) return src.__text;
+                    var p = pathOf(src), t = fop('read', p);
+                    if (t == null) throw javaErr('java.io.FileNotFoundException', p + ': open failed: ENOENT (No such file or directory)');
+                    return t;
+                }
+                function Reader(src) {
+                    var text = textOf(src), at = 0;
+                    return {
+                        __text: text,
+                        readLine: function () {
+                            if (at >= text.length) return null;
+                            var e = text.indexOf('\n', at), line = e < 0 ? text.slice(at) : text.slice(at, e);
+                            at = e < 0 ? text.length : e + 1;
+                            return line.replace(/\r$/, '');
+                        },
+                        read: function (buf) {
+                            if (buf && typeof buf === 'object') {
+                                if (at >= text.length) return -1;
+                                var n = Math.min(buf.length || 1024, text.length - at);
+                                for (var i = 0; i < n; i++) buf[i] = text.charCodeAt(at + i) & 0xff;
+                                at += n; return n;
+                            }
+                            return at < text.length ? text.charCodeAt(at++) : -1;
+                        },
+                        ready: function () { return at < text.length; }, available: function () { return text.length - at; },
+                        skip: function (n) { at = Math.min(text.length, at + (Number(n) || 0)); return n; },
+                        close: function () { }, mark: function () { }, reset: function () { at = 0; }
+                    };
+                }
+                function Writer(target, append) {
+                    if (target && target.__w) return target.__w;
+                    var path = pathOf(target), out = [], open = true;
+                    if (!append) fop('write', path, '');
+                    var flush = function () { if (out.length) { fop('append', path, out.join('')); out = []; } };
+                    var w = {
+                        write: function (s, off, len) {
+                            if (s && typeof s === 'object' && s.length != null && typeof s !== 'string') {
+                                var o = off | 0, n = len == null ? s.length - o : len | 0, str = '';
+                                for (var i = 0; i < n; i++) str += String.fromCharCode(s[o + i] & 0xff);
+                                out.push(str);
+                            } else if (typeof s === 'number') out.push(String.fromCharCode(s));
+                            else out.push(off == null ? String(s) : String(s).substr(off | 0, len == null ? undefined : len | 0));
+                        },
+                        append: function (s) { out.push(String(s)); return w; },
+                        print: function (s) { out.push(String(s)); }, println: function (s) { out.push((s == null ? '' : String(s)) + '\n'); },
+                        newLine: function () { out.push('\n'); },
+                        flush: flush, close: function () { if (open) { flush(); open = false; } }
+                    };
+                    w.__w = w;
+                    return w;
+                }
+                var javaIo = ns({
+                    File: JFile,
+                    FileReader: function (f) { return Reader(f); }, InputStreamReader: function (s) { return Reader(s); },
+                    BufferedReader: function (r) { return Reader(r); }, FileInputStream: function (f) { return Reader(f); },
+                    BufferedInputStream: function (s) { return Reader(s); },
+                    FileWriter: function (f, append) { return Writer(f, !!append); }, FileOutputStream: function (f, append) { return Writer(f, !!append); },
+                    PrintWriter: function (f) { return Writer(f, false); }, BufferedWriter: function (w) { return Writer(w, false); },
+                    OutputStreamWriter: function (s) { return Writer(s, false); }, BufferedOutputStream: function (s) { return Writer(s, false); },
+                    PrintStream: function (f) { return Writer(f, false); }
+                });
+                function noNet(u) {
+                    var host = (/^[a-z]+:[/][/]([^/:?#]+)/i.exec(String(u)) || [])[1] || String(u);
+                    throw javaErr('java.net.UnknownHostException', 'Unable to resolve host "' + host + '": No address associated with hostname');
+                }
+                function JURL(u) {
+                    var s = String(u);
+                    var conn = {
+                        setRequestMethod: function () { }, setDoOutput: function () { }, setDoInput: function () { }, setRequestProperty: function () { },
+                        setConnectTimeout: function () { }, setReadTimeout: function () { }, setUseCaches: function () { }, disconnect: function () { },
+                        connect: function () { noNet(s); }, getInputStream: function () { noNet(s); }, getOutputStream: function () { noNet(s); },
+                        getResponseCode: function () { noNet(s); }, getContentLength: function () { noNet(s); }, getHeaderField: function () { noNet(s); }
+                    };
+                    return { toString: function () { return s; }, openConnection: function () { return conn; }, openStream: function () { noNet(s); },
+                             getHost: function () { return (/^[a-z]+:[/][/]([^/:?#]+)/i.exec(s) || [])[1] || ''; } };
+                }
+                var javaNet = ns({ URL: JURL, HttpURLConnection: { HTTP_OK: 200 }, URLEncoder: { encode: function (s) { return encodeURIComponent(String(s)); } },
+                                   URLDecoder: { decode: function (s) { return decodeURIComponent(String(s)); } } });
+                var Environment = { getExternalStorageDirectory: function () { return new JFile('/sdcard'); }, getExternalStorageState: function () { return 'mounted'; },
+                                    MEDIA_MOUNTED: 'mounted', getDataDirectory: function () { return new JFile('/data'); },
+                                    getExternalStoragePublicDirectory: function (t) { return new JFile('/sdcard/' + String(t || '')); },
+                                    DIRECTORY_PICTURES: 'Pictures', DIRECTORY_DOWNLOADS: 'Download' };
                 var Toast = { LENGTH_SHORT: 0, LENGTH_LONG: 1, makeText: function (c, t) { var text = String(t); return proxied({ show: function () { op('tip', text); }, setGravity: function () { } }); } };
                 var View = { VISIBLE: 0, INVISIBLE: 4, GONE: 8, OnClickListener: self_, OnTouchListener: self_, OnLongClickListener: self_ };
                 var Gravity = { TOP: 48, BOTTOM: 80, LEFT: 3, RIGHT: 5, CENTER: 17, CENTER_HORIZONTAL: 1, CENTER_VERTICAL: 16, START: 8388611, END: 8388613, NO_GRAVITY: 0 };
@@ -6484,16 +6611,50 @@
                     content: ns({ DialogInterface: ns({ OnClickListener: self_, OnCancelListener: self_, OnDismissListener: self_ }), Context: ns({}) }),
                     graphics: ns({ Color: Color, Typeface: { DEFAULT: {}, DEFAULT_BOLD: { bold: true }, MONOSPACE: {}, SANS_SERIF: {}, SERIF: {}, BOLD: 1, NORMAL: 0, create: function (a, s) { return { bold: s === 1 || s === 3 }; } },
                                         drawable: ns({ ColorDrawable: ColorDrawable, GradientDrawable: GradientDrawable }) }),
-                    os: ns({ Handler: Handler, Looper: ns({ getMainLooper: function () { return ns({}); }, prepare: function () { }, myLooper: function () { return ns({}); } }) }),
+                    os: ns({ Environment: Environment, Handler: Handler, Looper: ns({ getMainLooper: function () { return ns({}); }, prepare: function () { }, myLooper: function () { return ns({}); } }) }),
                     util: ns({ TypedValue: { COMPLEX_UNIT_DIP: 1, COMPLEX_UNIT_PX: 0, COMPLEX_UNIT_SP: 2, applyDimension: function (u, v) { return Number(v) || 0; } },
                                     DisplayMetrics: function () { return ns({ density: 1, widthPixels: screenW, heightPixels: screenH }); } }),
                     text: ns({ TextWatcher: self_, InputType: { TYPE_CLASS_NUMBER: 2, TYPE_CLASS_TEXT: 1 } })
                 });
+                function JString(s, off, len) {
+                    if (s && typeof s === 'object' && s.length != null && !(s instanceof String)) {
+                        var o = off | 0, n = len == null ? s.length - o : len | 0, out = '';
+                        for (var i = 0; i < n; i++) out += String.fromCharCode(s[o + i] & 0xff);
+                        return Object(out);
+                    }
+                    return Object(s == null ? '' : String(s));
+                }
+                JString.valueOf = function (v) { return String(v); };
+                JString.format = function (fmt) {
+                    var args = Array.prototype.slice.call(arguments, 1), first = 0;
+                    if (args.length === 1 && Array.isArray(args[0])) args = args[0];
+                    if (fmt && typeof fmt === 'object' && typeof fmt.getLanguage === 'function') { fmt = args.shift(); }
+                    return String(fmt).replace(/%(?:(\d+)\$)?([-#+ 0,(]*)(\d+)?(?:\.(\d+))?([sSdfxXcbBn%])/g, function (all, pos, flags, width, prec, conv) {
+                        if (conv === '%') return '%';
+                        if (conv === 'n') return '\n';
+                        var v = pos ? args[(pos | 0) - 1] : args[first++];
+                        var s;
+                        if (conv === 'd') s = String(Math.trunc(Number(v) || 0));
+                        else if (conv === 'f') s = (Number(v) || 0).toFixed(prec == null ? 6 : prec | 0);
+                        else if (conv === 'x' || conv === 'X') { s = ((Number(v) || 0) >>> 0).toString(16); if (conv === 'X') s = s.toUpperCase(); }
+                        else if (conv === 'c') s = typeof v === 'number' ? String.fromCharCode(v) : String(v).charAt(0);
+                        else if (conv === 'b' || conv === 'B') s = String(!!v && v !== 'false');
+                        else { s = v == null ? 'null' : String(v); if (prec != null) s = s.slice(0, prec | 0); if (conv === 'S') s = s.toUpperCase(); }
+                        if (width && s.length < (width | 0)) s = flags.indexOf('-') >= 0 ? s + ' '.repeat(width - s.length) : (flags.indexOf('0') >= 0 && conv !== 's' ? '0' : ' ').repeat(width - s.length) + s;
+                        return s;
+                    });
+                };
+                function Locale(lang, country) { return { getLanguage: function () { return String(lang || ''); }, getCountry: function () { return String(country || ''); },
+                                                          toString: function () { return String(lang || '') + (country ? '_' + country : ''); } }; }
+                Locale.getDefault = function () { var l = String((typeof navigator !== 'undefined' && navigator.language) || 'en').split('-'); return Locale(l[0].toLowerCase(), (l[1] || '').toUpperCase()); };
+                Locale.ENGLISH = Locale('en'); Locale.US = Locale('en', 'US'); Locale.KOREAN = Locale('ko'); Locale.KOREA = Locale('ko', 'KR');
+                Locale.JAPANESE = Locale('ja'); Locale.CHINESE = Locale('zh'); Locale.GERMAN = Locale('de'); Locale.FRENCH = Locale('fr');
                 var javaNS = ns({
-                    lang: ns({ Runnable: self_, Thread: Thread, String: function (s) { return String(s); }, Integer: { parseInt: function (s) { return parseInt(s, 10) | 0; }, MAX_VALUE: 2147483647 },
+                    lang: ns({ Runnable: self_, Thread: Thread, String: JString, Integer: { parseInt: function (s) { return parseInt(s, 10) | 0; }, MAX_VALUE: 2147483647 },
                                     System: { currentTimeMillis: function () { return Date.now(); }, nanoTime: function () { return Math.round(performance.now() * 1e6); }, gc: function () { } },
                                     Math: Math }),
-                    util: ns({ Random: function () { return { nextInt: function (n) { return Math.floor(Math.random() * (n || 2147483647)); }, nextFloat: Math.random, nextDouble: Math.random, nextBoolean: function () { return Math.random() < 0.5; } }; } })
+                    util: ns({ Locale: Locale, Random: function () { return { nextInt: function (n) { return Math.floor(Math.random() * (n || 2147483647)); }, nextFloat: Math.random, nextDouble: Math.random, nextBoolean: function () { return Math.random() < 0.5; } }; } }),
+                    io: javaIo, net: javaNet
                 });
                 var mojang = ns({ minecraftpe: ns({ MainActivity: ns({ currentMainActivity: { get: function () { return ctx; } } }) }) });
                 var comNS = ns({ mojang: mojang });
@@ -6510,8 +6671,95 @@
                 var HOOKS = ['useItem', 'destroyBlock', 'startDestroyBlock', 'continueDestroyBlock', 'attackHook', 'modTick', 'procCmd', 'newLevel',
                     'leaveGame', 'deathHook', 'entityAddedHook', 'entityRemovedHook', 'explodeHook', 'eatHook', 'chatHook', 'selectLevelHook',
                     'levelEventHook', 'blockEventHook', 'redstoneUpdateHook', 'screenChangeHook', 'serverMessageReceiveHook', 'chatReceiveHook'];
+                function rhinoCompat(code) {
+                    if (!/\bfor\s+each\b|\bnew\s+[\w.$]+\s*\([^()]*\)\s*\{/.test(code)) return code;
+                    var toks = [], i = 0, n = code.length, prevSig = null;
+                    var regexOk = function () {
+                        if (!prevSig) return true;
+                        if (prevSig.t === 'id') return /^(return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else)$/.test(prevSig.v);
+                        if (prevSig.t === 'num' || prevSig.t === 'str' || prevSig.t === 're') return false;
+                        return !/^[)\]}]$/.test(prevSig.v);
+                    };
+                    while (i < n) {
+                        var c = code[i], st = i;
+                        if (/\s/.test(c)) { while (i < n && /\s/.test(code[i])) i++; toks.push({ t: 'ws', v: code.slice(st, i) }); continue; }
+                        if (c === '/' && code[i + 1] === '/') { while (i < n && code[i] !== '\n') i++; toks.push({ t: 'ws', v: code.slice(st, i) }); continue; }
+                        if (c === '/' && code[i + 1] === '*') { var e = code.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; toks.push({ t: 'ws', v: code.slice(st, i) }); continue; }
+                        var tk;
+                        if (c === '"' || c === "'" || c === '`') {
+                            i++;
+                            while (i < n && code[i] !== c) { if (code[i] === '\\') i++; i++; }
+                            i++; tk = { t: 'str', v: code.slice(st, i) };
+                        } else if (c === '/' && regexOk()) {
+                            i++; var cls = false;
+                            while (i < n && (cls || code[i] !== '/') && code[i] !== '\n') { if (code[i] === '\\') i++; else if (code[i] === '[') cls = true; else if (code[i] === ']') cls = false; i++; }
+                            i++; while (i < n && /[a-z]/i.test(code[i])) i++;
+                            tk = { t: 're', v: code.slice(st, i) };
+                        } else if (/[A-Za-z_$]/.test(c)) {
+                            while (i < n && /[\w$]/.test(code[i])) i++; tk = { t: 'id', v: code.slice(st, i) };
+                        } else if (/[0-9]/.test(c)) {
+                            while (i < n && /[\w.]/.test(code[i])) i++; tk = { t: 'num', v: code.slice(st, i) };
+                        } else { i++; tk = { t: 'p', v: c }; }
+                        toks.push(tk); prevSig = tk;
+                    }
+                    var next = function (k) { k++; while (k < toks.length && toks[k].t === 'ws') k++; return k; };
+                    var match = function (k, open, close) {
+                        var d = 0;
+                        for (; k < toks.length; k++) {
+                            if (toks[k].t !== 'p') continue;
+                            if (toks[k].v === open) d++;
+                            else if (toks[k].v === close && --d === 0) return k;
+                        }
+                        return -1;
+                    };
+                    for (var k = 0; k < toks.length; k++) {
+                        var t = toks[k];
+                        if (t.t !== 'id') continue;
+                        if (t.v === 'for') {
+                            var e1 = next(k);
+                            if (!toks[e1] || toks[e1].v !== 'each') continue;
+                            var o = next(e1);
+                            if (!toks[o] || toks[o].v !== '(') continue;
+                            var cl = match(o, '(', ')');
+                            if (cl < 0) continue;
+                            var d2 = 0, inAt = -1;
+                            for (var q = o + 1; q < cl; q++) {
+                                var tq = toks[q];
+                                if (tq.t === 'p' && /[([{]/.test(tq.v)) d2++;
+                                else if (tq.t === 'p' && /[)\]}]/.test(tq.v)) d2--;
+                                else if (d2 === 0 && tq.t === 'id' && tq.v === 'in') { inAt = q; break; }
+                            }
+                            if (inAt < 0) continue;
+                            toks[e1].v = ''; toks[inAt].v = 'of __rhinoValues(';
+                            toks[cl].v = '))';
+                        } else if (t.v === 'new') {
+                            var j = next(k);
+                            if (!toks[j] || toks[j].t !== 'id') continue;
+                            while (toks[next(j)] && toks[next(j)].v === '.' && toks[next(next(j))] && toks[next(next(j))].t === 'id') j = next(next(j));
+                            var po = next(j);
+                            if (!toks[po] || toks[po].v !== '(') continue;
+                            var pc = match(po, '(', ')');
+                            if (pc < 0) continue;
+                            var bo = next(pc);
+                            if (!toks[bo] || toks[bo].v !== '{') continue;
+                            var bc = match(bo, '{', '}');
+                            if (bc < 0) continue;
+                            var empty = next(po) === pc;
+                            toks[pc].v = empty ? '' : ', ';
+                            toks[bc].v = '})';
+                        }
+                    }
+                    return toks.map(function (x) { return x.v; }).join('');
+                }
+                A.__rhinoValues = function (o) {
+                    if (o == null) return [];
+                    if (Array.isArray(o)) return o;
+                    if (typeof o.toArray === 'function') return o.toArray();
+                    return Object.keys(o).map(function (k) { return o[k]; });
+                };
                 function load(s) {
                     curMod = s.mod; curFile = s.file;
+                    s = Object.assign({}, s, { code: rhinoCompat(String(s.code)) });
                     var names = Object.keys(A);
                     var src = s.code + '\n;return {' + HOOKS.map(function (h) { return h + ': typeof ' + h + ' === "function" ? ' + h + ' : undefined'; }).join(', ') +
                         '};\n//# sourceURL=modpe/' + s.mod + '/' + s.file;
@@ -6606,6 +6854,7 @@
             function cellOf(sheet, name, idx, mod, say) {
                 names();
                 name = String(name || '').toLowerCase();
+                if (/^[0-9]+$/.test(name) && +name < 256) return 'cell_' + (+name);
                 var pe = peNames[sheet][name], jv = javaNames[sheet][name];
                 var cells = pe || jv;
                 if (!cells || !cells.length) { say('texture "' + name + '" isn\'t one Pocket Edition had - shown as ' + (sheet === 'blocks' ? 'stone' : 'a stick')); return sheet === 'blocks' ? 'cell_1' : 'cell_53'; }
@@ -6683,11 +6932,58 @@
             var worker = null, sab = null, ctl = null, buf = null, hooks = {}, busy = false, slowCount = 0, folder = '', running = '';
             var HOOK_BITS = { useItem: 1, destroyBlock: 2, startDestroyBlock: 4, attackHook: 8, modTick: 16, chatHook: 32, deathHook: 64,
                 entityAddedHook: 128, entityRemovedHook: 256, explodeHook: 512, eatHook: 1024 };
+            var SDCARD = '/games/modpe_sdcard';
+            function sdRel(p) {
+                var m = /^(?:[/]storage[/]emulated[/]0|[/]storage[/]sdcard0|[/]mnt[/]sdcard|[/]sdcard)(?=[/]|$)(.*)$/.exec(String(p).replace(/[\\]/g, '/'));
+                if (!m) return null;
+                var r = m[1].replace(/^[/]+|[/]+$/g, '').replace(/[/]{2,}/g, '/');
+                return r.split('/').indexOf('..') >= 0 ? null : r;
+            }
+            function bundled(mod, rel) {
+                var M = Module.mcMods;
+                var f = M && M.modFile && mod ? M.modFile(mod, 'sdcard/' + rel) : null;
+                return f && f.data ? f.data : null;
+            }
+            var sdSyncT = 0;
+            function sdSync() { if (sdSyncT) return; sdSyncT = setTimeout(function () { sdSyncT = 0; try { FS.syncfs(false, function () { }); } catch (e) { } }, 1000); }
+            function fileOp(a) {
+                var kind = a[1], mod = a[2], rel = sdRel(a[3]), data = a[4] ? decodeURIComponent(a[4]) : '';
+                if (rel == null) return kind === 'stat' ? {} : (kind === 'list' ? [] : null);
+                var fp = SDCARD + (rel ? '/' + rel : ''), st = FS.analyzePath(fp);
+                if (kind === 'stat') {
+                    if (st.exists) { var s = FS.stat(fp); return { exists: true, dir: FS.isDir(s.mode), file: FS.isFile(s.mode), size: s.size, time: +s.mtime || 0 }; }
+                    var b = rel ? bundled(mod, rel) : null;
+                    if (b) return { exists: true, file: true, size: b.length };
+                    return rel ? { exists: false } : { exists: true, dir: true };
+                }
+                if (kind === 'read') {
+                    try { if (st.exists && !st.object.isFolder) return new TextDecoder().decode(FS.readFile(fp)); } catch (e) { }
+                    var b2 = bundled(mod, rel);
+                    return b2 ? new TextDecoder().decode(b2) : null;
+                }
+                if (kind === 'write' || kind === 'append') {
+                    if (!rel) return false;
+                    try {
+                        FS.mkdirTree(fp.slice(0, fp.lastIndexOf('/')));
+                        var old = '';
+                        if (kind === 'append') { try { old = new TextDecoder().decode(FS.readFile(fp)); } catch (e) { var b3 = bundled(mod, rel); old = b3 ? new TextDecoder().decode(b3) : ''; } }
+                        FS.writeFile(fp, old + data);
+                        sdSync();
+                        return true;
+                    } catch (e) { return false; }
+                }
+                if (kind === 'mkdir') { try { FS.mkdirTree(fp); sdSync(); return true; } catch (e) { return false; } }
+                if (kind === 'del') { try { if (st.exists) { if (st.object.isFolder) FS.rmdir(fp); else FS.unlink(fp); sdSync(); return true; } } catch (e) { } return false; }
+                if (kind === 'list') { try { return st.exists ? FS.readdir(fp).filter(function (n) { return n !== '.' && n !== '..'; }) : []; } catch (e) { return []; } }
+                return null;
+            }
             function service() {
                 if (!ctl || Atomics.load(ctl, 0) !== 1) return;
                 var line = new TextDecoder().decode(buf.slice(0, Atomics.load(ctl, 1)));
                 var res = 'null';
-                try { res = UTF8ToString(Module.ccall('mcModpeOp', 'number', ['string'], [line])); } catch (e) { }
+                if (line.indexOf('file\t') === 0) { try { res = JSON.stringify(fileOp(line.split('\t'))); } catch (e) { res = 'null'; } }
+                else if (line.indexOf('gamemode\t') === 0) { try { if (Module._mcScriptSetGameMode) Module._mcScriptSetGameMode(+line.split('\t')[1] === 1 ? 1 : 0); } catch (e) { } res = 'true'; }
+                else try { res = UTF8ToString(Module.ccall('mcModpeOp', 'number', ['string'], [line])); } catch (e) { }
                 var b = new TextEncoder().encode(res);
                 if (b.length > buf.length) b = new TextEncoder().encode('null');
                 buf.set(b);

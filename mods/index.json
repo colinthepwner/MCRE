@@ -1,0 +1,725 @@
+{
+  "name": "Minecraft RE mods",
+  "mods": [
+    {
+      "id": "toomanyitems-pe",
+      "name": "Too Many Items (PE)",
+      "author": "MrARM",
+      "version": "1.0",
+      "devices": "any",
+      "description": "An M button opens every block and item by category (starter kit, building, decoration, armour, tools, food, dyes, ores, spawn eggs): tap one, pick how many, Add. Also heal, survival / creative, day / night, kill, set spawn, ride any animal and an entity manager. (Original ModPE script, GPL-3.0.)",
+      "url": "toomanyitems-pe.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "cheats",
+        "inventory"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0",
+      "source": "https://github.com/MCMrARM/modpe-mods",
+      "sha256": "4c8c9d89eb1b1814fca73349c81db21676fd313891dbea87d4370291f0cf0a96"
+    },
+    {
+      "id": "redstone-mod-mrarm",
+      "name": "Redstone Mod",
+      "author": "MrARM",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Redstone from before Pocket Edition had it: buttons, levers, pressure plates (stone slabs), wire and repeaters power TNT, doors and pistons. Craft parts on a stone-brick pad: tap a crafting table holding redstone. (Original ModPE script, GPL-3.0.)",
+      "url": "redstone-mod-mrarm.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "redstone",
+        "blocks"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0",
+      "source": "https://github.com/MCMrARM/modpe-mods",
+      "sha256": "a890be2b352f7ede73673f61c8d9cc060da3aa3b2709fc601799d2fb7324cc45"
+    },
+    {
+      "id": "heal-button",
+      "name": "Heal Button",
+      "author": "MrARM",
+      "version": "1.0",
+      "devices": "any",
+      "description": "A red Heal! button in the top-left corner fills your health. (Original ModPE script, GPL-3.0.)",
+      "url": "heal-button.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "cheats",
+        "gui"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0",
+      "source": "https://github.com/MCMrARM/modpe-mods",
+      "sha256": "43a303492848626dbc86073235ee3a7b09913704b1fb1180bbeb751a393cea3f"
+    },
+    {
+      "id": "spcpe",
+      "name": "Single Player Commands PE",
+      "author": "Connor4898 (with CheesyFriedBacon, MrARM, Temena)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Single Player Commands for Pocket Edition: /give, /tp, /time, /gamemode, /heal, /jump, /ascend, /descend, /explode, /magiccarpet, /coords, /setblock, /bind (a command on a button) and more - /help lists them. (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "spcpe.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "commands",
+        "cheats"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "8a4e33c7f0bcccc09cba4be4de141a69ac9311cae2f329bc4447dbb58cf28228"
+    },
+    {
+      "id": "custom-creative-inventory",
+      "name": "Custom Creative Inventory",
+      "author": "Connor4898",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/setitem <id> [damage] puts any item in your hand. (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "custom-creative-inventory.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "commands",
+        "creative"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "6fd3a8d52269e5c8218a4e8e24347d74fa71d36fb28af9947d06aec3cf646d1b"
+    },
+    {
+      "id": "instapixelart",
+      "name": "InstaPixelArt",
+      "author": "Connor4898 (with Intyre)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap a block with an iron sword to build a 31 x 31 pixel-art picture above it. (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "instapixelart.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "bd4f2cdaa2aae639f9361d04dbd384469d0066e9741861d9913a6034fd7c03fb"
+    },
+    {
+      "id": "pacman",
+      "name": "Pac-Man Maze",
+      "author": "Connor4898",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/pmmaze builds a big Pac-Man maze around you - obsidian floor, lapis walls. It clears the land there. (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "pacman.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "minigame"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "4062fe59e84b5c2c0131176137e2e5bb57895708a45b3300a0aa4c264703e9e7"
+    },
+    {
+      "id": "stopwatch",
+      "name": "Stopwatch",
+      "author": "Connor4898",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap with an iron sword to build a block clock, tap with an iron hoe to start it counting (a beta: it counts fast). (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "stopwatch.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "blocks"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "e0f05d3cb76029cdd428b1fb00db77b7fa16acb869576356b0203493a3d1226a"
+    },
+    {
+      "id": "tnt-cannon",
+      "name": "TNT Cannon",
+      "author": "Connor4898",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/launch counts down 3-2-1 and fires lit TNT the way you look. (Original ModPE script, GPL-3.0-or-later.)",
+      "url": "tnt-cannon.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "weapons",
+        "tnt"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0-or-later",
+      "source": "https://github.com/Connor4898/ModPE-Scripts",
+      "sha256": "3eae2950e52db2362f5ff56042bfc26be01ff9a12f98d5e531ec80d39975c56a"
+    },
+    {
+      "id": "cuboid",
+      "name": "Cuboid",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Pocket Edition's first WorldEdit: tap two corners with an iron hoe, then tap holding a block - the box fills with it. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "cuboid.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "worldedit"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "c309ab7af41eb940bf606ac45691d84d62d4040ffea329f51c1abc5caec1dbdc"
+    },
+    {
+      "id": "cuboid-copy",
+      "name": "Cuboid Copy",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap two corners with an iron hoe to copy a box of blocks, tap with seeds to paste it (as often as you like). (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "cuboid-copy.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "worldedit"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "b7195d843565cddb1129bcc1e921693d78eaae948b6034f279830ec568c2af26"
+    },
+    {
+      "id": "cuboid-replace",
+      "name": "Cuboid Replace",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap two corners with an iron hoe, then the block to replace, then tap holding the new block. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "cuboid-replace.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "worldedit"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "6e40a777202908658a2f5ba05c22807caa9aceb06d4ad28d97402f0b3bb5e54b"
+    },
+    {
+      "id": "super-pickaxe",
+      "name": "Super Pickaxe",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap with a diamond pickaxe to dig out 11 x 11 x 11 blocks - everything but stone, grass and dirt goes to your inventory. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "super-pickaxe.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "tools",
+        "mining"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "25c34f003271e11eeaf253346e0765b0bf97264ab432e4f1db80fc8f04299b6b"
+    },
+    {
+      "id": "jetpack",
+      "name": "Jetpack",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Hold a stick to fly the way you look. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "jetpack.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "movement"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "8c592944f66cbd13c2f5b32713eebe335c2b29adbe262b70c70380c158f6f02d"
+    },
+    {
+      "id": "pig-flight",
+      "name": "Pig Flight",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Hit any mob to ride it; hold gold ore to fly it where you look. (While it is on, hitting never hurts.) (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "pig-flight.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "movement",
+        "mobs"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "0a21fb3039a472bf65011bd246cd6edaaff609082d6aee57029746cbc8f4a812"
+    },
+    {
+      "id": "sit",
+      "name": "Sit on Stairs",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap any stairs to sit on them. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "sit.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "furniture"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "584beaad8250b5f40271dd8ff6d3e8b66903e7f958d29cf5b70624f42f22b2ea"
+    },
+    {
+      "id": "paintbrush",
+      "name": "Paintbrush",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/paintbrush turns paint mode on: whatever block you look at (up to 64 away) becomes the block you hold. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "paintbrush.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "bd742c9c40e8925d0c721021e6f13104bcfe925f415afb6a73d2d98c160e0289"
+    },
+    {
+      "id": "evil-ore",
+      "name": "Ore of Evil",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "A glowing magenta ore (block 187) that drops purple dye - the custom blocks API's first colour demo. Get it with a give command. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "evil-ore.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "blocks"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "7157c5f3310e57bb58520b444838bef4edf3bca57baf27474e10d59775dbbc00"
+    },
+    {
+      "id": "give",
+      "name": "Give Command",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/give <item name> [count] [damage] adds it to your inventory, /hold puts it in your hand. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "give.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "commands",
+        "cheats"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "d741218e222670972faf7a111916c796a6122447b950c61e0940d3beaa3afc90"
+    },
+    {
+      "id": "clone-mob",
+      "name": "Clone Mob",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Hit a mob while holding an egg to clone it (babies stay babies). (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "clone-mob.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "mobs"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "547e7052de7c8c8d7b529803baad746e3c69f6ee16105b2071eb01c2959ea97e"
+    },
+    {
+      "id": "color-chat",
+      "name": "Colour Chat",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/demo shows every chat colour, /onecolor <colour> <text>, /rainbow <text>. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "color-chat.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "chat"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "209e647d4d278a1b9e44db9b868af009eb5ff284f89fe09712e4ad9c1c9e4bb0"
+    },
+    {
+      "id": "dyed-clay",
+      "name": "Dyed Clay",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap clay with dye to colour it (stained clay before Pocket Edition had it); breaking it gives the dye back. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "dyed-clay.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "blocks",
+        "decoration"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "f309ed1556406662f6498668e0fccc466079834dfb33a1977d1030ec0d122589"
+    },
+    {
+      "id": "enchanting-bench",
+      "name": "Enchanting Bench",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "An enchantment table block (240, crafted from a book, diamonds and obsidian, or /enchanttable) - tapping it opens crafting. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "enchanting-bench.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "blocks"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "d821bd2c3f504789ea2b3d9843670d90fe1973d7a6e43456c9bc062b3abaf2a3"
+    },
+    {
+      "id": "item-golems",
+      "name": "Item Golems",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap with an iron sword, build something, tap again - it turns into floating blocks that drift away. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "item-golems.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "mobs",
+        "building"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "d94497ce1d82b9bbf6dd6cca383d661e97a7d7e7a4b7540146b265823a8f75ad"
+    },
+    {
+      "id": "mirrored",
+      "name": "Mirrored Building",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap with melon seeds to set a centre: every block you place is copied four ways around it. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "mirrored.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "6aea672180328200f6b089dd2a867a124316d93e8029079b6c51ffad43fc2bc6"
+    },
+    {
+      "id": "move-between-floors",
+      "name": "Move Between Floors",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap with cake to go up a floor, with an egg to go down. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "move-between-floors.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "movement"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "0c8bebacc2cd61a4500698e7e25594265e0cb0e4455dde15f646e05240ca92b4"
+    },
+    {
+      "id": "recorder",
+      "name": "Recorder",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/record your movements, /stop, then /play them back on yourself, a stand-in (/playsp) or a mob (/playent); /save and /load them. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "recorder.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "tools"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "e2866ff2b14d925f6d64f8fecc716ffa4f86259954808c20d91e90eeb1e8be31"
+    },
+    {
+      "id": "vehicles",
+      "name": "Block Vehicles",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap a build with an iron hoe and it moves, carrying you; tap a face to steer, any other item to stop. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "vehicles.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "movement"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "87343dd9f00a1bddd62e3e04a0b85ed54eac565a9d6ee0413696faaa7845b15c"
+    },
+    {
+      "id": "world-spheres",
+      "name": "World Spheres",
+      "author": "zhuowei (500 Internal Server Error)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Carves part of a world (64-127 x, z) into 20 floating spheres when it loads - try it on a new world. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "world-spheres.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "worldgen"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "dd49926d2a8a3becbd296bd0a39d15c09a948a00c5cae6c31e420c3e3311fe98"
+    },
+    {
+      "id": "instant-tree",
+      "name": "Instant Tree",
+      "author": "chad",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap the ground with an oak sapling to grow a tree at once. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "instant-tree.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "nature"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "2b93299e443c111f9b3e019b3c16432f1d6b8355c2155e0e3447fbbf16fe174d"
+    },
+    {
+      "id": "remove-entities",
+      "name": "Remove Entities",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/removeall removes every mob and dropped item in the world. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "remove-entities.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "commands"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "fbfc96aba32f650a820e3a0dc6e3e9991bab84151b744e3ef4187edaa70d1adc"
+    },
+    {
+      "id": "creeper-stare",
+      "name": "Men Who Stare at Creepers",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Look at a creeper and it explodes. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "creeper-stare.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "mobs"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "dc8e984e928ed58919ae417b25735d8a5562b9c247774895bfac2c92337a9bdc"
+    },
+    {
+      "id": "grass-dye",
+      "name": "Grass Dye",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Tap grass with dye to recolour it. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "grass-dye.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "decoration"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "2bbf6a5a7dd93107a009e775f13fb163dce84e8b0ccdd2e2724de7061a7c826d"
+    },
+    {
+      "id": "lens",
+      "name": "Lens",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Hold a diamond to zoom in like a spyglass. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "lens.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "tools"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "8ac3adf3caffae945e355fb88ca82cd8831fad9b40241950d6ebaf93c3f36c1a"
+    },
+    {
+      "id": "effect-command",
+      "name": "Effect Command",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/effect <name> [seconds] [level] gives you a potion effect. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "effect-command.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "commands"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "cd084bce95908cdb94984ce256ca8f88d8f084597f2d6b3fc58ce43f4127844b"
+    },
+    {
+      "id": "pistons",
+      "name": "Pistons",
+      "author": "zhuowei",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Piston and sticky piston blocks (199, 200) that push up to 12 blocks when powered by redstone. (Original ModPE script, CC-BY-SA-3.0.)",
+      "url": "pistons.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "redstone",
+        "blocks"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-SA-3.0",
+      "source": "https://github.com/zhuowei/ModPEScripts",
+      "sha256": "6d37fd2c9bafa01e8a229ce54816eeb701e6bd9a1d8f245b7bea3c8c8a637fce"
+    },
+    {
+      "id": "mazegen",
+      "name": "MazeGen",
+      "author": "ChalkPE (if(Team))",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/maze <width> <height> [block data height] [turn rate] [reconnection rate] builds a random maze where you stand. (Original ModPE script, Apache-2.0.)",
+      "url": "mazegen.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "building",
+        "minigame"
+      ],
+      "dependencies": [],
+      "license": "Apache-2.0",
+      "source": "https://github.com/if-Team/ModPE-Scripts",
+      "sha256": "1dee6713c4a94402ce03fb7f905e53efac2f18b684a28c53ff59c7a35af30300"
+    },
+    {
+      "id": "unlimited-night",
+      "name": "Unlimited Night",
+      "author": "if(Team)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Keeps it night; /nm turns it off and on (Korean messages). (Original ModPE script, GPL-3.0.)",
+      "url": "unlimited-night.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "time"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0",
+      "source": "https://github.com/if-Team/ModPE-Scripts",
+      "sha256": "146c5b983c7626e191fb7607de793d6c603f5b658fc3344d838a486827e2b3d0"
+    },
+    {
+      "id": "remove-all-mobs",
+      "name": "Remove All Mobs",
+      "author": "if(Team)",
+      "version": "1.0",
+      "devices": "any",
+      "description": "/md clears every mob about once a second (on by itself in creative; Korean messages). (Original ModPE script, GPL-3.0.)",
+      "url": "remove-all-mobs.zip",
+      "tags": [
+        "modpe",
+        "classic",
+        "mobs"
+      ],
+      "dependencies": [],
+      "license": "GPL-3.0",
+      "source": "https://github.com/if-Team/ModPE-Scripts",
+      "sha256": "24ff895d93d57f944feeb72e5538cb5c617fcf86442cba1653089da4d20feb8a"
+    }
+  ]
+}

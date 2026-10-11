@@ -612,7 +612,11 @@ food, armour, recipes and hooks (useItem, destroyBlock, modTick, procCmd, attack
 chatHook...) run as they did on a phone, with Pocket Edition&#x27;s ids and texture names. Their
 menus (Android buttons, panels, text boxes, checkboxes, sliders, dialogs, toasts) are drawn
 by the game, for touch and mouse alike - with a mouse, M frees the cursor for a mod&#x27;s buttons
-while playing. ModPE scripts run where the world is (single player, or the host).</pre></section>
+while playing. ModPE scripts run where the world is (single player, or the host).
+Rhino&#x27;s own JavaScript works too (new X() { ... } listeners, for each (... in ...)). The phone&#x27;s
+storage is there as /sdcard: what a script writes stays on this device, and files a mod ships
+under sdcard/ in its zip are there to read (a config it expects). The network isn&#x27;t: a script
+sees what a phone with no connection saw (most just skip their update check).</pre></section>
 <section id="java-resource-packs"><h2>Java resource packs</h2><pre>A Java Edition resource pack .zip (with pack.mcmeta) can be added as it is: its block and item
 textures, sounds and en_us.lang lines are used.</pre></section>
 <section id="types-mcre-d-ts"><h2>Types (mcre.d.ts)</h2><p>Every script's API, for editors that read TypeScript types (VS Code...): put it next to your scripts with a jsconfig.json and <code>mod.</code>, <code>world.</code>... complete as you type. <a id="dl" href="#">Download mcre.d.ts</a></p><pre>// Minecraft RE - mod scripting API, for editors (VS Code and others read this file and complete
