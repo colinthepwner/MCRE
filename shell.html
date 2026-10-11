@@ -197,7 +197,23 @@
                 if (hint) hint.style.display = show ? 'block' : 'none';
             }
 
+            Module.mcEscToGame = function () {
+                ['keydown', 'keyup'].forEach(function (t) {
+                    var ke = new KeyboardEvent(t, { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true });
+                    try { Object.defineProperty(ke, 'keyCode', { get: function () { return 27; } }); Object.defineProperty(ke, 'which', { get: function () { return 27; } }); } catch (x) { }
+                    document.body.dispatchEvent(ke);
+                });
+            };
+            Module.mcReclaimFocus = function () {
+                var a = document.activeElement;
+                if (a && a !== document.body && a !== canvas && (a.tagName === 'IFRAME' || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable)) {
+                    if (a.closest && a.closest('[data-mc-own-ui]')) return;
+                    try { a.blur(); } catch (x) { }
+                    try { canvas.focus(); } catch (x) { }
+                }
+            };
             Module.mcPointerWanted = function (on) {
+                if (on) Module.mcReclaimFocus();
                 wanted = !!on;
                 if (wanted) tryLock();
                 else if (locked() && document.exitPointerLock) document.exitPointerLock();
@@ -5114,7 +5130,10 @@
                 var T = p.top == null ? null : n(p.top), B = p.bottom == null ? null : n(p.bottom);
                 css += R != null && L == null ? ';right:' + R + 'px' : ';left:' + (L || 0) + 'px';
                 css += B != null && T == null ? ';bottom:' + B + 'px' : ';top:' + (T || 0) + 'px';
-                if (spec.hidden) css += ';display:none';
+                if (spec.hidden) {
+                    css += ';display:none';
+                    if (el.contains(document.activeElement)) { try { document.activeElement.blur(); } catch (x) { } }
+                }
                 css += ';pointer-events:none';
                 el.style.cssText = css;
                 el.setAttribute('data-mc-keepoff', '');
@@ -5530,7 +5549,7 @@
                     box.appendChild(c);
                 }
                 if (panel) {
-                    ov.addEventListener('keydown', function (e) { if (e.key === 'Escape' && typing(e)) e.target.blur(); });
+                    ov.addEventListener('keydown', function (e) { if (e.key === 'Escape' && typing(e)) { e.target.blur(); if (Module.mcEscToGame) Module.mcEscToGame(); } });
                     document.body.appendChild(ov);
                     g.panel = true;
                     panels[pkey] = g;
@@ -5598,8 +5617,8 @@
                     'window.mcre.data=m.data;L.forEach(function(f){try{f(m.data)}catch(x){}})});' +
                     'var typing=function(e){var t=e.target;return t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable)};' +
                     'if(!P)addEventListener("keydown",function(e){if(e.key==="Escape")window.mcre.close()});' +
-                    'else{["keydown","keyup"].forEach(function(k){addEventListener(k,function(e){if(typing(e)){if(k==="keydown"&&e.key==="Escape")e.target.blur();return}' +
-                    'setTimeout(function(){if(e.defaultPrevented)return;' +
+                    'else{["keydown","keyup"].forEach(function(k){addEventListener(k,function(e){var esc=e.key==="Escape";if(typing(e)){if(!esc)return;if(k==="keydown")e.target.blur()}' +
+                    'setTimeout(function(){if(e.defaultPrevented&&!esc)return;' +
                     'parent.postMessage({__mcre:T,t:"key",type:k,key:e.key,code:e.code,keyCode:e.keyCode,shift:e.shiftKey,ctrl:e.ctrlKey,alt:e.altKey,meta:e.metaKey,repeat:e.repeat},"*")},0)})});' +
                     'addEventListener("mousemove",function(e){parent.postMessage({__mcre:T,t:"move",x:e.clientX,y:e.clientY},"*")})}' +
                     '})();<\/script>';
@@ -5664,7 +5683,7 @@
                         else wrap.style.clipPath = 'path("' + (rs.map(function (r) {
                             var x = +r.x || 0, y = +r.y || 0, w = Math.max(0, +r.width || 0), h = Math.max(0, +r.height || 0);
                             return 'M' + x + ' ' + y + 'h' + w + 'v' + h + 'h' + (-w) + 'Z';
-                        }).join('') || 'M0 0Z') + '")';
+                        }).join('') + 'M0 0h1v1h-1Z') + '")';
                     } else if (panel && m.t === 'key') {
                         var ke = new KeyboardEvent(m.type === 'keyup' ? 'keyup' : 'keydown', { key: String(m.key || ''), code: String(m.code || ''), shiftKey: !!m.shift,
                             ctrlKey: !!m.ctrl, altKey: !!m.alt, metaKey: !!m.meta, repeat: !!m.repeat, bubbles: true, cancelable: true });
@@ -5740,6 +5759,7 @@
                     el.autocomplete = 'off';
                     el.spellcheck = false;
                     el.value = prefix || '';
+                    el.setAttribute('data-mc-own-ui', '');
                     el.style.cssText = 'position:fixed;left:2px;right:2px;bottom:2px;height:24px;z-index:9400;box-sizing:border-box;padding:2px 6px;' +
                         'background:rgba(0,0,0,.5);color:#fff;border:0;outline:none;font:16px monospace;text-shadow:2px 2px 0 #3f3f3f';
                     ['keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel'].forEach(function (t) { el.addEventListener(t, function (e) { e.stopPropagation(); }); });
@@ -5824,6 +5844,7 @@
                 if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
                 el = document.createElement('div');
                 el.setAttribute('data-mc-keepoff', '');
+                el.setAttribute('data-mc-own-ui', '');
                 el.style.cssText = 'position:fixed;left:8px;bottom:8px;width:min(680px,calc(100vw - 16px));height:min(56vh,520px);z-index:9500;' +
                     'background:rgba(10,10,14,.88);border:1px solid #555;color:#ddd;font:12px monospace;display:flex;flex-direction:column;box-sizing:border-box';
                 var head = document.createElement('div');
@@ -7091,7 +7112,14 @@
                     uiLayer.setAttribute('data-mc-keepoff', '');
                     uiLayer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9990;font-family:sans-serif';
                     ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend', 'touchmove', 'contextmenu'].forEach(function (t) {
-                        uiLayer.addEventListener(t, function (e) { if (e.target !== uiLayer) e.stopPropagation(); });
+                        uiLayer.addEventListener(t, function (e) {
+                            if (e.target === uiLayer) return;
+                            e.stopPropagation();
+                            if (t === 'keydown' && e.key === 'Escape') {
+                                if (e.target.blur) e.target.blur();
+                                if (Module.mcEscToGame) Module.mcEscToGame();
+                            }
+                        });
                     });
                     document.body.appendChild(uiLayer);
                 }

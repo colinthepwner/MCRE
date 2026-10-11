@@ -414,6 +414,10 @@ gui.open(player, menu)  gui.close(player)    a menu on that player&#x27;s screen
   one without showing it. client.on(&quot;screen&quot;) tells you where the game&#x27;s inventory window is,
   to put one beside it. client.gui.close(id) closes one. The game&#x27;s close X always stays on
   top: a panel over it gets a hole there (client.screen().close says where it is).
+  Esc always belongs to the game: pressed in a panel (even in one of its text boxes) it goes on
+  to the game - closing its screen, or pausing - and a page can&#x27;t keep it; when the game takes
+  the mouse back, the keyboard comes back from any panel too. A full-screen menu (no modal:
+  false) is like a game screen: Esc closes it.
   All the way - your own page: gui.open(player, {id: &quot;shop&quot;, html: &quot;gui/shop.html&quot;,
   data: {...}}). gui/shop.html (with its .css, .js, pictures and fonts next to it in gui/) is
   shown in a frame of its own: it can&#x27;t reach the internet or the rest of the game, only your
