@@ -500,7 +500,10 @@
             var AC = window.AudioContext || window.webkitAudioContext;
             var actx = null;
             try { if (AC) actx = new AC(); } catch (e) { actx = null; }
-            try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { }
+            Module.mcApplyAudioSession = function () {
+                try { if (navigator.audioSession) navigator.audioSession.type = Module.mcKeepMyMusic ? 'ambient' : 'playback'; } catch (e) { }
+            };
+            Module.mcApplyAudioSession();
             if (actx) ['touchend', 'mousedown', 'keydown'].forEach(function (t) {
                 window.addEventListener(t, function () {
                     if (actx.state !== 'running' && actx.resume) actx.resume().catch(function () {});
@@ -643,7 +646,7 @@
             var music = null, nextAt = Date.now() + (30 + Math.random() * 60) * 1000;
             setInterval(function () {
                 var vol = typeof Module.mcMusicVolume === 'number' ? Module.mcMusicVolume : 1;
-                var want = Module.mcInWorld === 1 && vol > 0 && !document.hidden && tracks.length;
+                var want = Module.mcInWorld === 1 && vol > 0 && !document.hidden && tracks.length && !Module.mcKeepMyMusic;
                 if (music) {
                     if (!want) { music.pause(); }
                     else { music.volume = vol; if (music.paused && !music.ended) music.play().catch(function () {}); }
