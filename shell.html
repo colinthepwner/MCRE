@@ -1160,6 +1160,9 @@
             Module.mcGameRules.define('afkFade', true, 'AFK players fade out');
             Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
             Module.mcGameRules.define('keepJoinedPlayers', true, "The world keeps joined players' inventory, armour, food, experience and spot for when they come back");
+            Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
+            Module.mcGameRules.define('edgeAssistDrop', 3, 'How deep (blocks) a drop has to be for Edge Assist; smaller steps are just terrain', [1, 64]);
+            Module.mcGameRules.define('edgeAssistHoldSeconds', 1, 'How long a touch player backing or strafing off an edge is held before they go over (walking at it: a moment)', [0, 10]);
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
             function rule(n) { return Module.mcGameRules.get(n); }
             function afkRules() {
