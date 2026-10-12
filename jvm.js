@@ -364,6 +364,7 @@ VM.prototype.makeThrowable = function (cname, msg) {
 	o.$jsStack = this.currentTrace ? this.currentTrace() : null;
 	return o;
 };
+VM.prototype.throwObject = function (obj) { throw new JavaThrow(obj); };
 VM.prototype.throwNew = function (cname, msg) {
 	throw new JavaThrow(this.makeThrowable(cname, msg));
 };
@@ -3164,6 +3165,21 @@ function installUtil(vm) {
 			'orElseGet(Ljava/util/function/Supplier;)Ljava/lang/Object;': function (vm, self, a) { return self.$v !== null ? self.$v : vm.callVirtual(a[0], 'get', '()' + OBJ, []); },
 			'ifPresent(Ljava/util/function/Consumer;)V': function (vm, self, a) { if (self.$v !== null) vm.callVirtual(a[0], 'accept', '(' + OBJ + ')V', [self.$v]); },
 			'map(Ljava/util/function/Function;)Ljava/util/Optional;': function (vm, self, a) { return optional(vm, self.$v === null ? null : vm.callVirtual(a[0], 'apply', '(' + OBJ + ')' + OBJ, [self.$v])); },
+			'orElseThrow()Ljava/lang/Object;': function (vm, self) { if (self.$v === null) vm.throwNew('java/util/NoSuchElementException', 'No value present'); return self.$v; },
+			'orElseThrow(Ljava/util/function/Supplier;)Ljava/lang/Object;': function (vm, self, a) {
+				if (self.$v !== null) return self.$v;
+				var ex = vm.callVirtual(a[0], 'get', '()' + OBJ, []);
+				if (ex) vm.throwObject(ex);
+				vm.throwNew('java/lang/NullPointerException', null);
+			},
+			'filter(Ljava/util/function/Predicate;)Ljava/util/Optional;': function (vm, self, a) { return self.$v !== null && vm.callVirtual(a[0], 'test', '(' + OBJ + ')Z', [self.$v]) ? self : optional(vm, null); },
+			'flatMap(Ljava/util/function/Function;)Ljava/util/Optional;': function (vm, self, a) { return self.$v === null ? self : vm.callVirtual(a[0], 'apply', '(' + OBJ + ')' + OBJ, [self.$v]); },
+			'or(Ljava/util/function/Supplier;)Ljava/util/Optional;': function (vm, self, a) { return self.$v !== null ? self : vm.callVirtual(a[0], 'get', '()' + OBJ, []); },
+			'ifPresentOrElse(Ljava/util/function/Consumer;Ljava/lang/Runnable;)V': function (vm, self, a) { if (self.$v !== null) vm.callVirtual(a[0], 'accept', '(' + OBJ + ')V', [self.$v]); else vm.callVirtual(a[1], 'run', '()V', []); },
+			'stream()Ljava/util/stream/Stream;': function (vm, self) { return JVM.newStream(vm, self.$v === null ? [] : [self.$v]); },
+			'equals(Ljava/lang/Object;)Z': function (vm, self, a) { var o = a[0]; return o && o.cls === self.cls && (o.$v === self.$v || (o.$v !== null && self.$v !== null && JVM.equalsOf(vm, o.$v, self.$v))) ? 1 : 0; },
+			'hashCode()I': function (vm, self) { return self.$v === null ? 0 : vm.callVirtual(self.$v, 'hashCode', '()I', []); },
+			'toString()Ljava/lang/String;': function (vm, self) { return self.$v === null ? 'Optional.empty' : 'Optional[' + vm.callVirtual(self.$v, 'toString', '()Ljava/lang/String;', []) + ']'; },
 		},
 		staticMethods: {
 			'of(Ljava/lang/Object;)Ljava/util/Optional;': function (vm, n, a) { return optional(vm, a[0]); },
@@ -3615,6 +3631,75 @@ function installIo(vm) {
 		'openStream()Ljava/io/InputStream;': function (vm, self) { return self.$res ? JVM.resourceStream(vm, '/' + self.$res, null) : null; },
 		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$spec); },
 		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$spec === self.$spec ? 1 : 0; },
+	} });
+	var jarEntries = function (vm, mod) {
+		var out = [];
+		Object.keys(vm.sources).forEach(function (c) { if ((vm.sources[c].source || '') === mod) out.push(c + '.class'); });
+		var files = vm.$stFiles && vm.$stFiles[mod];
+		if (files) Object.keys(files).forEach(function (k) { if (!/[.]class$/.test(k)) out.push(k); });
+		return out;
+	};
+	var modsWith = function (vm, path) {
+		var p = String(path || '').replace(/^[/]+/, ''), mods = [];
+		if (p && p[p.length - 1] !== '/') p += '/';
+		Object.keys(vm.sources).forEach(function (c) { var m = vm.sources[c].source || ''; if ((c + '.class').indexOf(p) === 0 && mods.indexOf(m) < 0) mods.push(m); });
+		return mods;
+	};
+	var jarURL = function (vm, mod, path) {
+		var u = vm.newObject(vm.loadClass('java/net/URL'));
+		u.$spec = 'jar:file:/mods/' + encodeURIComponent(mod) + '.jar!/' + String(path).replace(/^[/]+/, '');
+		return u;
+	};
+	var CL = vm.natives['java/lang/ClassLoader'];
+	if (CL) CL.methods = Object.assign({}, CL.methods, {
+		'getResources(Ljava/lang/String;)Ljava/util/Enumeration;': function (vm, self, a) {
+			var urls = modsWith(vm, a[0]).map(function (m) { return jarURL(vm, m, a[0]); });
+			var it = vm.newObject(vm.loadClass('mcre/Iterator')); it.$items = urls; it.$i = 0;
+			return it;
+		},
+	});
+	var CO = vm.natives['java/util/Collections'];
+	if (CO) CO.staticMethods = Object.assign({}, CO.staticMethods, {
+		'list(Ljava/util/Enumeration;)Ljava/util/ArrayList;': function (vm, n, a) {
+			var out = [];
+			while (vm.callVirtual(a[0], 'hasMoreElements', '()Z', [])) out.push(vm.callVirtual(a[0], 'nextElement', '()Ljava/lang/Object;', []));
+			return JVM.newList(vm, out);
+		},
+		'enumeration(Ljava/util/Collection;)Ljava/util/Enumeration;': function (vm, n, a) { var it = vm.newObject(vm.loadClass('mcre/Iterator')); it.$items = JVM.iterate(vm, a[0]); it.$i = 0; return it; },
+	});
+	def('java/net/URLDecoder', { staticMethods: {
+		'decode(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;': function (vm, n, a) { try { return decodeURIComponent(String(a[0]).replace(/[+]/g, ' ')); } catch (e) { return a[0]; } },
+		'decode(Ljava/lang/String;Ljava/nio/charset/Charset;)Ljava/lang/String;': function (vm, n, a) { try { return decodeURIComponent(String(a[0]).replace(/[+]/g, ' ')); } catch (e) { return a[0]; } },
+		'decode(Ljava/lang/String;)Ljava/lang/String;': function (vm, n, a) { try { return decodeURIComponent(String(a[0]).replace(/[+]/g, ' ')); } catch (e) { return a[0]; } },
+	} });
+	def('java/util/zip/ZipEntry', { methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$name = String(a[0]); },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'isDirectory()Z': function (vm, self) { return /[/]$/.test(self.$name) ? 1 : 0; },
+		'getSize()J': function () { return -1n; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$name; },
+	} });
+	def('java/util/jar/JarEntry', { super: 'java/util/zip/ZipEntry' });
+	var entryList = function (vm, self) {
+		return jarEntries(vm, self.$mod).map(function (n) { var e = vm.newObject(vm.loadClass('java/util/jar/JarEntry')); e.$name = n; return e; });
+	};
+	var jarOpen = function (vm, self, path) {
+		var m = /mods[/]([^/]+)[.]jar$/.exec(String(path).replace(/!.*$/, ''));
+		self.$mod = m ? decodeURIComponent(m[1]) : (vm.currentMod || '');
+	};
+	def('java/util/zip/ZipFile', { interfaces: ['java/io/Closeable'], methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { jarOpen(vm, self, a[0]); },
+		'<init>(Ljava/io/File;)V': function (vm, self, a) { jarOpen(vm, self, a[0] ? a[0].$path : ''); },
+		'stream()Ljava/util/stream/Stream;': function (vm, self) { return JVM.newStream(vm, entryList(vm, self)); },
+		'entries()Ljava/util/Enumeration;': function (vm, self) { var it = vm.newObject(vm.loadClass('mcre/Iterator')); it.$items = entryList(vm, self); it.$i = 0; return it; },
+		'size()I': function (vm, self) { return jarEntries(vm, self.$mod).length; },
+		'getName()Ljava/lang/String;': function (vm, self) { return '/mods/' + self.$mod + '.jar'; },
+		'close()V': function () {},
+	} });
+	def('java/util/jar/JarFile', { super: 'java/util/zip/ZipFile', methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { jarOpen(vm, self, a[0]); },
+		'<init>(Ljava/io/File;)V': function (vm, self, a) { jarOpen(vm, self, a[0] ? a[0].$path : ''); },
+		'<init>(Ljava/lang/String;Z)V': function (vm, self, a) { jarOpen(vm, self, a[0]); },
 	} });
 	def('java/io/File', {
 		interfaces: ['java/lang/Comparable'],
@@ -4185,7 +4270,14 @@ function installStreams(vm) {
 	});
 	var C = vm.natives['java/util/Collection'];
 	var colStream = function (vm, self) { return stream(vm, JVM.iterate(vm, self), 'o'); };
-	if (C) C.methods = Object.assign({}, C.methods, { 'stream()Ljava/util/stream/Stream;': colStream, 'parallelStream()Ljava/util/stream/Stream;': colStream });
+	if (C) C.methods = Object.assign({}, C.methods, { 'stream()Ljava/util/stream/Stream;': colStream, 'parallelStream()Ljava/util/stream/Stream;': colStream,
+		'toArray(Ljava/util/function/IntFunction;)[Ljava/lang/Object;': function (vm, self, a) {
+			var items = JVM.iterate(vm, self), arr = call(vm, a[0], 'apply', '(I)' + OBJ, [items.length]);
+			if (!arr || !arr.a) return JVM.javaArray(vm, OBJ, items);
+			if (arr.a.length < items.length) arr = JVM.javaArray(vm, arr.cls.component, items);
+			else items.forEach(function (x, i) { arr.a[i] = x; });
+			return arr;
+		} });
 	def('java/util/stream/StreamSupport', { staticMethods: {
 		'stream(Ljava/util/Spliterator;Z)Ljava/util/stream/Stream;': function (vm, x, a) { return stream(vm, a[0] && a[0].$items ? a[0].$items : [], 'o'); },
 	} });
@@ -4282,6 +4374,7 @@ function installStreams(vm) {
 }
 
 JVM.installStreams = installStreams;
+JVM.newStream = function (vm, items) { return stream(vm, items, 'o'); };
 })();
 
 (function () {
@@ -5010,6 +5103,7 @@ function installMc152(vm) {
 	if (JVM.installLegacy) JVM.installLegacy(vm);
 	if (JVM.installGui) JVM.installGui(vm);
 	if (JVM.installPotions) JVM.installPotions(vm);
+	if (JVM.installAchievements) JVM.installAchievements(vm);
 	installSounds(vm);
 	if (JVM.installStation) JVM.installStation(vm);
 	if (JVM.installStates) JVM.installStates(vm);
@@ -6968,7 +7062,7 @@ function installForgeCommon(vm, def) {
 		'getName()Ljava/lang/String;': function (vm, self) { return self.$name; },
 		'getAchievements()Ljava/util/List;': function (vm, self) { return self[':achievements']; },
 	}, staticMethods: {
-		'registerAchievementPage(Lnet/minecraftforge/common/AchievementPage;)V': function (vm) { vm.warnOnce('forge:ach', 'achievements are not available here (left unplugged)'); },
+		'registerAchievementPage(Lnet/minecraftforge/common/AchievementPage;)V': function () {},
 		'getAchievementPage(I)Lnet/minecraftforge/common/AchievementPage;': function () { return null; },
 		'getAchievementPages()Ljava/util/Set;': function (vm) { return vm.callStatic('java/util/Collections', 'emptySet', '()Ljava/util/Set;', []); },
 		'isAchievementInPages(Lnet/minecraft/src/Achievement;)Z': function () { return 0; },
@@ -7154,6 +7248,128 @@ function installPotions(vm) {
 }
 
 JVM.installPotions = installPotions;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function achs(vm) { var r = reg(vm); return r.achievements || (r.achievements = { list: [], byId: {} }); }
+
+var VANILLA = [['openInventory', 'openInventory', 0, 0], ['mineWood', 'mineWood', 2, 1], ['buildWorkBench', 'buildWorkBench', 4, -1],
+	['buildPickaxe', 'buildPickaxe', 4, 2], ['buildFurnace', 'buildFurnace', 3, 4], ['acquireIron', 'acquireIron', 1, 4],
+	['buildHoe', 'buildHoe', 2, -3], ['makeBread', 'makeBread', -1, -3], ['bakeCake', 'bakeCake', 0, -5],
+	['buildBetterPickaxe', 'buildBetterPickaxe', 6, 2], ['cookFish', 'cookFish', 2, 6], ['onARail', 'onARail', 2, 3],
+	['buildSword', 'buildSword', 6, -1], ['killEnemy', 'killEnemy', 8, -1], ['killCow', 'killCow', 7, -3], ['flyPig', 'flyPig', 8, -4],
+	['snipeSkeleton', 'snipeSkeleton', 7, 0], ['diamonds', 'diamonds', -1, 5], ['portal', 'portal', -1, 7], ['ghast', 'ghast', -4, 8],
+	['blazeRod', 'blazeRod', 0, 9], ['potion', 'potion', 2, 8], ['theEnd', 'theEnd', 3, 10], ['theEnd2', 'theEnd2', 4, 13],
+	['enchantments', 'enchantments', -4, 4], ['overkill', 'overkill', -4, 1], ['bookcase', 'bookcase', -3, 6]];
+
+function install(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var A = SRC + 'Achievement;';
+
+	def('StatBase', { fields: { statId: 'I', statName: 'Ljava/lang/String;', isIndependent: 'Z', statGuid: 'Ljava/lang/String;' }, methods: {
+		'<init>(ILjava/lang/String;)V': function (vm, self, a) { self[':statId'] = a[0]; self[':statName'] = a[1]; },
+		'initIndependentStat()Lnet/minecraft/src/StatBase;': function (vm, self) { self[':isIndependent'] = 1; return self; },
+		'registerStat()Lnet/minecraft/src/StatBase;': function (vm, self) { return self; },
+		'isAchievement()Z': function () { return 0; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self[':statName']; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self[':statName']; },
+	} });
+	var init = function (vm, self, id, name, col, row, icon, parent) {
+		self[':statId'] = 5242880 + (id | 0);
+		self.$key = 'achievement.' + name;
+		self[':statName'] = vm.$tag === 'babric' ? (reg(vm).lang[self.$key] || self.$key) : self.$key;
+		self[':displayColumn'] = col; self[':displayRow'] = row; self[':parentAchievement'] = parent || null;
+		self[':achievementDescription'] = 'achievement.' + name + '.desc';
+		var st = icon;
+		if (icon && !vm.isInstance(icon, vm.loadClass(SRC + 'ItemStack'))) {
+			var isBlock = vm.isInstance(icon, vm.loadClass(SRC + 'Block'));
+			st = JVM.mc152.newStack(vm, isBlock ? icon[':blockID'] : icon[':itemID'], 1, 0);
+		}
+		self[':theItemStack'] = st || null;
+		self.$mod = vm.currentMod;
+	};
+	var ctor = function (iconDesc) {
+		return function (vm, self, a) { init(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); };
+	};
+	var reg1 = function (vm, self) {
+		var s = achs(vm);
+		if (s.list.indexOf(self) < 0) { s.list.push(self); s.byId[self[':statId']] = self; }
+		var l = vm.loadClass(SRC + 'AchievementList'); vm.initClass(l);
+		if (l.statics.achievementList) vm.callVirtual(l.statics.achievementList, 'add', '(Ljava/lang/Object;)Z', [self]);
+		return self;
+	};
+	var self_ = function (vm, self) { return self; };
+	def('Achievement', { super: SRC + 'StatBase', fields: { displayColumn: 'I', displayRow: 'I', parentAchievement: 'L' + A, theItemStack: 'Lnet/minecraft/src/ItemStack;', achievementDescription: 'Ljava/lang/String;', isSpecial: 'Z' }, methods: {
+		'<init>(ILjava/lang/String;IILnet/minecraft/src/Item;Lnet/minecraft/src/Achievement;)V': ctor(),
+		'<init>(ILjava/lang/String;IILnet/minecraft/src/Block;Lnet/minecraft/src/Achievement;)V': ctor(),
+		'<init>(ILjava/lang/String;IILnet/minecraft/src/ItemStack;Lnet/minecraft/src/Achievement;)V': ctor(),
+		'setIndependent()Lnet/minecraft/src/Achievement;': function (vm, self) { self[':isIndependent'] = 1; return self; },
+		'func_27089_a()Lnet/minecraft/src/Achievement;': function (vm, self) { self[':isIndependent'] = 1; return self; },
+		'setSpecial()Lnet/minecraft/src/Achievement;': function (vm, self) { self[':isSpecial'] = 1; return self; },
+		'registerAchievement()Lnet/minecraft/src/Achievement;': reg1,
+		'registerStat()Lnet/minecraft/src/StatBase;': reg1,
+		'isAchievement()Z': function () { return 1; },
+		'getSpecial()Z': function (vm, self) { return self[':isSpecial'] ? 1 : 0; },
+		'getDescription()Ljava/lang/String;': function (vm, self) { var k = self[':achievementDescription']; return reg(vm).lang[k] || k; },
+		'setStatStringFormatter(Lnet/minecraft/src/IStatStringFormat;)Lnet/minecraft/src/Achievement;': self_,
+		'func_27092_a(Lnet/minecraft/src/IStatStringFormat;)Lnet/minecraft/src/Achievement;': self_,
+	} });
+	def('AchievementList', { statics: (function () {
+		var s = { achievementList: null, minDisplayColumn: 0, minDisplayRow: 0, maxDisplayColumn: 0, maxDisplayRow: 0 };
+		VANILLA.forEach(function (v) { s[v[0]] = null; });
+		return s;
+	})(), clinit: function (vm, c) {
+		c.statics.achievementList = JVM.newList(vm, []);
+		var prev = null;
+		VANILLA.forEach(function (v, i) {
+			var o = vm.newObject(vm.loadClass(SRC + 'Achievement'));
+			init(vm, o, i, v[1], v[2], v[3], null, prev);
+			o.$vanilla = true; o.$mod = null;
+			c.statics[v[0]] = o;
+			vm.callVirtual(c.statics.achievementList, 'add', '(Ljava/lang/Object;)Z', [o]);
+			prev = o;
+		});
+		c.statics.minDisplayColumn = -4; c.statics.minDisplayRow = -5; c.statics.maxDisplayColumn = 8; c.statics.maxDisplayRow = 13;
+	}, staticMethods: { 'init()V': function () {}, 'func_27374_a()V': function () {} } });
+	def('StatBasic', { super: SRC + 'StatBase', methods: {
+		'<init>(ILjava/lang/String;)V': function (vm, self, a) { self[':statId'] = a[0]; self[':statName'] = a[1]; },
+		'<init>(ILjava/lang/String;Lnet/minecraft/src/IStatType;)V': function (vm, self, a) { self[':statId'] = a[0]; self[':statName'] = a[1]; },
+		'registerStat()Lnet/minecraft/src/StatBase;': function (vm, self) { return self; },
+	} });
+	def('IStatType', { access: JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT });
+	def('StatList', { statics: { allStats: null, generalStats: null }, clinit: function (vm, c) { c.statics.allStats = JVM.newList(vm, []); c.statics.generalStats = JVM.newList(vm, []); },
+		staticMethods: { 'getOneShotStat(I)Lnet/minecraft/src/StatBase;': function (vm, n, a) { return achs(vm).byId[a[0]] || null; } } });
+
+	var award = function (vm, self, a) {
+		var s = a[0];
+		if (!s || !s.$key || s.$vanilla || !vm.isInstance(s, vm.loadClass(SRC + 'Achievement'))) return;
+		var lang = reg(vm).lang, key = s.$key, dot = key.replace(':', '.');
+		var name = lang[key] || lang[dot] || key.replace(/^achievement[.]/, '').replace(/^[^:]*:/, '');
+		var desc = lang[s[':achievementDescription']] || lang[String(s[':achievementDescription']).replace(':', '.')] || '';
+		var it = s[':theItemStack'];
+		op(vm, 'achievement', { id: (s.$mod || 'java') + ':' + key.replace(/^achievement[.]/, ''), name: name,
+			description: desc, mod: s.$mod || '', item: it ? it[':itemID'] : 0, data: it ? it[':itemDamage'] : 0 });
+	};
+	var pspec = vm.natives[SRC + 'EntityPlayer'];
+	if (pspec) pspec.methods = Object.assign({}, pspec.methods, {
+		'addStat(Lnet/minecraft/src/StatBase;I)V': function (vm, self, a) { award(vm, self, a); },
+		'triggerAchievement(Lnet/minecraft/src/StatBase;)V': function (vm, self, a) { award(vm, self, a); },
+	});
+	var ml = vm.natives[SRC + 'ModLoader'];
+	if (ml) ml.staticMethods['addAchievementDesc(Lnet/minecraft/src/Achievement;Ljava/lang/String;Ljava/lang/String;)V'] = function (vm, n, a) {
+		if (!a[0]) return;
+		var l = reg(vm).lang;
+		l[a[0].$key || a[0][':statName']] = String(a[1]);
+		l[a[0][':achievementDescription']] = String(a[2]);
+	};
+}
+JVM.installAchievements = install;
+JVM.achievementsOf = function (vm, modId) { var r = reg(vm).achievements; return r ? r.list.filter(function (o) { return o.$mod === modId; }) : []; };
 })();
 
 (function () {
@@ -9851,7 +10067,7 @@ function installStation(vm) {
 		'ofRegistry(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/registry/RegistryKey;': function (vm, n, a) { var k = vm.newObject(vm.loadClass(ST + 'registry/RegistryKey')); k.$s = a[0].$s; return k; },
 		'of(Lnet/modificationstation/stationapi/api/registry/RegistryKey;Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/registry/RegistryKey;': function (vm, n, a) { var k = vm.newObject(vm.loadClass(ST + 'registry/RegistryKey')); k.$s = a[1].$s; k.$reg = a[0] && a[0].$s; return k; },
 	} });
-	[['BlockRegistry', 'block'], ['ItemRegistry', 'item'], ['BlockEntityRegistry', 'block_entity'], ['EntityRegistry', 'entity_type'], ['DimensionRegistry', 'dimension'], ['BiomeRegistry', 'biome']].forEach(function (p) { regClass(p[0], p[1]); });
+	[['BlockRegistry', 'block'], ['ItemRegistry', 'item'], ['BlockEntityRegistry', 'block_entity'], ['EntityRegistry', 'entity_type'], ['DimensionRegistry', 'dimension'], ['BiomeRegistry', 'biome'], ['StatRegistry', 'stat']].forEach(function (p) { regClass(p[0], p[1]); });
 	def('com/mojang/serialization/Lifecycle', { staticMethods: {
 		'stable()Lcom/mojang/serialization/Lifecycle;': function (vm) { return vm.newObject(vm.loadClass('com/mojang/serialization/Lifecycle')); },
 		'experimental()Lcom/mojang/serialization/Lifecycle;': function (vm) { return vm.newObject(vm.loadClass('com/mojang/serialization/Lifecycle')); },
@@ -10317,6 +10533,34 @@ function installStation(vm) {
 		'getNextId()I': function () { return -257; },
 		'onConstructor(Lnet/minecraft/src/Item;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, n, a) { register(vm, 'item', a[1], a[0]); setKey(vm, a[0], a[1][':namespace'].$s + '.' + a[1][':path']); },
 	} });
+	var nextStat = function (vm) { var s = st(vm); s.nextStat = (s.nextStat | 0) + 1; return 5000 + s.nextStat; };
+	def(ST + 'template/stat/StatTemplate', { access: I, staticMethods: {
+		'getNextId()I': function (vm) { return nextStat(vm); },
+		'onConstructor(Lnet/minecraft/src/StatBase;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, n, a) { if (a[0] && a[1]) a[0].$stId = a[1].$s; },
+	} });
+	def(ST + 'template/achievement/AchievementTemplate', { access: I, interfaces: [ST + 'template/stat/StatTemplate'], staticMethods: {
+		'getNextId()I': function (vm) { return nextStat(vm); },
+		'onConstructor(Lnet/minecraft/src/Achievement;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, n, a) { if (a[0] && a[1]) a[0].$stId = a[1].$s; },
+	} });
+	var AP = ST + 'client/gui/screen/achievement/AchievementPage';
+	var pages = function (vm) { var s = st(vm); return s.achPages || (s.achPages = []); };
+	var pageInit = function (vm, self, key) { self.$key = String(key); self.$list = []; pages(vm).push(self); };
+	def(AP, { methods: {
+		'<init>(Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, self, a) { pageInit(vm, self, a[0] ? a[0][':namespace'].$s + '.' + a[0][':path'] : 'mod'); },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { pageInit(vm, self, a[0]); },
+		'addAchievements([Lnet/minecraft/src/Achievement;)V': function (vm, self, a) { var l = self.$list || (self.$list = []); if (a[0]) Array.prototype.forEach.call(a[0].a, function (x) { if (x) l.push(x); }); },
+		'getAchievements()Ljava/util/List;': function (vm, self) { return JVM.newList(vm, (self.$list || []).slice()); },
+		'name()Ljava/lang/String;': function (vm, self) { return self.$key; },
+		'getBackgroundTexture(Ljava/util/Random;IIII)I': function (vm, self, a) { return a[4]; },
+	}, staticMethods: {
+		'addPage(Lnet/modificationstation/stationapi/api/client/gui/screen/achievement/AchievementPage;)V': function (vm, n, a) { if (a[0] && pages(vm).indexOf(a[0]) < 0) pages(vm).push(a[0]); },
+		'getPageCount()I': function (vm) { return pages(vm).length; },
+		'getCurrentPageIndex()I': function () { return 0; },
+		'getCurrentPage()Lnet/modificationstation/stationapi/api/client/gui/screen/achievement/AchievementPage;': function (vm) { return pages(vm)[0] || null; },
+		'nextPage()Lnet/modificationstation/stationapi/api/client/gui/screen/achievement/AchievementPage;': function (vm) { return pages(vm)[0] || null; },
+		'prevPage()Lnet/modificationstation/stationapi/api/client/gui/screen/achievement/AchievementPage;': function (vm) { return pages(vm)[0] || null; },
+		'getCurrentPageName()Ljava/lang/String;': function (vm) { var p = pages(vm)[0]; return p ? p.$key : ''; },
+	} });
 	void blockKey; void regOf;
 }
 
@@ -10648,6 +10892,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/registry/AfterBlockAndItemRegisterEvent'));
 	JVM.run(vm, function () { fire(vm, newEvent(vm, E('event/achievement/AchievementRegisterEvent'), { achievements: JVM.newList(vm, []) }), modId); });
+	fireNew(E('event/registry/StatRegistryEvent'), { registry: regObj('StatRegistry') });
 	var rv = vm.loadClass(ST + 'event/recipe/RecipeRegisterEvent$Vanilla'); vm.initClass(rv);
 	rv.$values.forEach(function (v) { fireNew(E('event/recipe/RecipeRegisterEvent'), { recipeId: v.$type }); });
 	fireNew(E('client/event/texture/TextureRegisterEvent'));
@@ -10664,7 +10909,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
+	var SENT = /(StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();

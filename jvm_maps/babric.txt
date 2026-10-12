@@ -684,6 +684,27 @@ F	net/minecraft/class_6	field_8	field_8	xSize
 F	net/minecraft/class_6	field_9	field_9	ySize
 F	net/minecraft/class_6	field_11	field_11	chunk
 F	net/minecraft/class_7	field_21	field_21	dimension
+F	net/minecraft/class_23	field_108	field_108	minDisplayColumn
+F	net/minecraft/class_23	field_109	field_109	minDisplayRow
+F	net/minecraft/class_23	field_110	field_110	maxDisplayColumn
+F	net/minecraft/class_23	field_111	field_111	maxDisplayRow
+F	net/minecraft/class_23	field_112	field_112	achievementList
+F	net/minecraft/class_23	field_113	field_113	openInventory
+F	net/minecraft/class_23	field_114	field_114	mineWood
+F	net/minecraft/class_23	field_115	field_115	buildWorkBench
+F	net/minecraft/class_23	field_116	field_116	buildPickaxe
+F	net/minecraft/class_23	field_117	field_117	buildFurnace
+F	net/minecraft/class_23	field_118	field_118	acquireIron
+F	net/minecraft/class_23	field_119	field_119	buildHoe
+F	net/minecraft/class_23	field_120	field_120	makeBread
+F	net/minecraft/class_23	field_121	field_121	bakeCake
+F	net/minecraft/class_23	field_122	field_122	buildBetterPickaxe
+F	net/minecraft/class_23	field_123	field_123	cookFish
+F	net/minecraft/class_23	field_124	field_124	onARail
+F	net/minecraft/class_23	field_125	field_125	buildSword
+F	net/minecraft/class_23	field_126	field_126	killEnemy
+F	net/minecraft/class_23	field_127	field_127	killCow
+F	net/minecraft/class_23	field_128	field_128	flyPig
 F	net/minecraft/class_25	field_129	field_129	minX
 F	net/minecraft/class_25	field_130	field_130	minY
 F	net/minecraft/class_25	field_131	field_131	minZ
@@ -1025,6 +1046,12 @@ F	net/minecraft/class_304	field_1188	field_1188	leg4
 F	net/minecraft/class_305	field_1189	field_1189	entityId
 F	net/minecraft/class_308	field_1193	field_1193	entityId
 F	net/minecraft/class_309$class_310	field_1197	field_1197	hash
+F	net/minecraft/class_24	field_1202	field_1202	displayColumn
+F	net/minecraft/class_24	field_1203	field_1203	displayRow
+F	net/minecraft/class_24	field_1204	field_1204	parentAchievement
+F	net/minecraft/class_24	field_1205	field_1205	theItemStack
+F	net/minecraft/class_24	field_1206	field_1206	achievementDescription
+F	net/minecraft/class_24	field_1207	field_1207	isSpecial
 F	net/minecraft/class_118	field_1210	field_1210	username
 F	net/minecraft/class_118	field_1212	field_1212	dimension
 F	net/minecraft/class_320	field_1215	field_1215	name
@@ -1312,6 +1339,9 @@ F	net/minecraft/class_491	field_2015	field_2015	leg4
 F	net/minecraft/class_493	field_2016	field_2016	slimeBodies
 F	net/minecraft/class_496	field_2020	field_2020	sideModels
 F	net/minecraft/class_497	field_2021	field_2021	thePlayer
+F	net/minecraft/class_139	field_2025	field_2025	statId
+F	net/minecraft/class_139	field_2026	field_2026	statName
+F	net/minecraft/class_139	field_2028	field_2028	statGuid
 F	net/minecraft/class_439	field_2032	field_2032	entityId
 F	net/minecraft/class_439	field_2033	field_2033	xPosition
 F	net/minecraft/class_439	field_2034	field_2034	yPosition
@@ -1459,6 +1489,7 @@ M	net/minecraft/class_7	method_18	()I	method_18	getSpawnZ
 M	net/minecraft/class_7	method_19	()J	method_19	getWorldTime
 M	net/minecraft/class_7	method_21	()I	method_21	getDimension
 M	net/minecraft/class_7	method_32	()Ljava/lang/String;	method_32	getWorldName
+M	net/minecraft/class_23	method_84	()V	method_84	func_27374_a
 M	net/minecraft/class_25	method_86	(DDD)Lnet/minecraft/class_25;	method_86	addCoord
 M	net/minecraft/class_25	method_87	(DDDDDD)Lnet/minecraft/class_25;	method_87	getBoundingBox
 M	net/minecraft/class_25	method_90	(Lnet/minecraft/class_25;)Z	method_90	intersectsWith
@@ -1553,9 +1584,11 @@ M	net/minecraft/class_133	method_478	()V	method_478	onSlotChanged
 M	net/minecraft/class_133	method_479	(Lnet/minecraft/class_31;)V	method_479	putStack
 M	net/minecraft/class_133	method_480	()I	method_480	getSlotStackLimit
 M	net/minecraft/class_54	method_486	(Lnet/minecraft/class_134;)V	method_486	displayGUIChest
+M	net/minecraft/class_54	method_488	(Lnet/minecraft/class_139;I)V	method_488	addStat
 M	net/minecraft/class_54	method_490	(Ljava/lang/String;)V	method_490	addChatMessage
 M	net/minecraft/class_54	method_493	()V	method_493	closeScreen
 M	net/minecraft/class_54	method_502	()Lnet/minecraft/class_31;	method_502	getCurrentEquippedItem
+M	net/minecraft/class_54	method_512	(Lnet/minecraft/class_139;)V	method_512	triggerAchievement
 M	net/minecraft/class_54	method_514	(Lnet/minecraft/class_17;)Z	method_514	canHarvestBlock
 M	net/minecraft/class_53	method_523	()V	method_523	saveAllData
 M	net/minecraft/class_53	method_526	(Ljava/lang/String;)I	method_526	getUniqueDataId
@@ -1666,7 +1699,12 @@ M	net/minecraft/class_8	method_1032	(Ljava/lang/String;)[B	method_1032	getByteAr
 M	net/minecraft/class_8	method_1033	(Ljava/lang/String;)Lnet/minecraft/class_8;	method_1033	getCompoundTag
 M	net/minecraft/class_8	method_1034	(Ljava/lang/String;)Lnet/minecraft/class_202;	method_1034	getTagList
 M	net/minecraft/class_8	method_1035	(Ljava/lang/String;)Z	method_1035	getBoolean
+M	net/minecraft/class_24	method_1039	()Lnet/minecraft/class_24;	method_1039	func_27089_a
+M	net/minecraft/class_24	method_1040	()Lnet/minecraft/class_24;	method_1040	setSpecial
+M	net/minecraft/class_24	method_1041	()Lnet/minecraft/class_24;	method_1041	registerAchievement
+M	net/minecraft/class_24	method_1042	(Lnet/minecraft/class_241;)Lnet/minecraft/class_24;	method_1042	setStatStringFormatter
 M	net/minecraft/class_24	method_1043	()Ljava/lang/String;	method_1043	getDescription
+M	net/minecraft/class_24	method_1044	()Z	method_1044	getSpecial
 M	net/minecraft/class_55	method_1067	(Ljava/lang/Class;Ljava/lang/String;)V	method_1067	addMapping
 M	net/minecraft/class_55	method_1068	(Lnet/minecraft/class_8;)Lnet/minecraft/class_55;	method_1068	createAndLoadEntity
 M	net/minecraft/class_55	method_1069	()I	method_1069	getBlockMetadata
@@ -1767,6 +1805,7 @@ M	net/minecraft/class_17	method_1626	(Lnet/minecraft/class_14;IIII)I	method_1626
 M	net/minecraft/class_17	method_1627	(II)I	method_1627	getBlockTextureFromSideAndMetadata
 M	net/minecraft/class_17	method_1628	(Lnet/minecraft/class_18;Lnet/minecraft/class_54;IIII)V	method_1628	harvestBlock
 M	net/minecraft/class_17	method_1629	(I)I	method_1629	damageDropped
+M	net/minecraft/class_139	method_1676	()Lnet/minecraft/class_139;	method_1676	registerStat
 M	net/minecraft/class_52	method_1734	(Lnet/minecraft/class_50;)Lnet/minecraft/class_243;	method_1734	getChunkLoader
 M	net/minecraft/class_14	method_1776	(III)I	method_1776	getBlockId
 M	net/minecraft/class_14	method_1777	(III)Lnet/minecraft/class_55;	method_1777	getBlockTileEntity
@@ -1801,6 +1840,7 @@ M	net/minecraft/class_584	method_1936	(IIIIII)V	method_1936	drawTexturedModalRec
 M	net/minecraft/class_584	method_1937	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1937	drawString
 M	net/minecraft/class_588	method_1949	(Ljava/lang/String;)V	method_1949	addChatMessage
 M	net/minecraft/class_591	method_1958	()Ljava/lang/String;	method_1958	getDisplayName
+M	net/minecraft/class_598	method_1975	()V	method_1975	init
 M	net/minecraft/class_475	method_1976	()F	method_1976	getVolume
 M	net/minecraft/class_475	method_1977	()F	method_1977	getPitch
 M	net/minecraft/class_68	method_2006	(DDD)V	method_2006	setPosition

@@ -2534,9 +2534,11 @@ M	ayf	a	(Ljava/lang/String;FFFIII)Layf;	func_78786_a	addBox
 M	ayf	b	(F)V	func_78791_b	renderWithRotation
 M	ayf	b	(II)Layf;	func_78787_b	setTextureSize
 M	ayf	c	(F)V	func_78794_c	postRender
+M	ays	a	(Ljl;I)V	func_71064_a	addStat
 M	ays	i	()V	func_71053_j	closeScreen
 M	ays	i	(I)V	func_70691_i	heal
 M	bag	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	bag	a	(Ljl;I)V	func_71064_a	addStat
 M	bag	a	(Lla;)V	func_71007_a	displayGUIChest
 M	bag	ah	()Z	func_70093_af	isSneaking
 M	bag	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
@@ -2688,6 +2690,7 @@ M	in	c	(Llq;)Z	func_72942_c	addWeatherEffect
 M	in	o	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	iq	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	iq	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	iq	a	(Ljl;I)V	func_71064_a	addStat
 M	iq	a	(Lla;)V	func_71007_a	displayGUIChest
 M	iq	a	(Lrq;II)V	func_71112_a	sendProgressBarUpdate
 M	iq	a	(Lrq;ILur;)V	func_71111_a	sendSlotContents
@@ -2862,6 +2865,8 @@ M	qw	k_	()I	func_70302_i_	getSizeInventory
 M	qw	l_	()V	func_70295_k_	openChest
 M	qw	n	()Lur;	func_70445_o	getItemStack
 M	qx	a	(IIIILur;)Z	func_82247_a	canPlayerEdit
+M	qx	a	(Ljl;)V	func_71029_a	triggerAchievement
+M	qx	a	(Ljl;I)V	func_71064_a	addStat
 M	qx	a	(Lla;)V	func_71007_a	displayGUIChest
 M	qx	aT	()I	func_70667_aM	getMaxHealth
 M	qx	aW	()I	func_70658_aO	getTotalArmorValue

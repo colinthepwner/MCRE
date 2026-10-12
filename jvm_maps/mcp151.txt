@@ -2781,9 +2781,11 @@ M	bdj	a	(Ljava/lang/String;FFFIII)Lbdj;	func_78786_a	addBox
 M	bdj	b	(F)V	func_78791_b	renderWithRotation
 M	bdj	b	(II)Lbdj;	func_78787_b	setTextureSize
 M	bdj	c	(F)V	func_78794_c	postRender
+M	bdw	a	(Lka;I)V	func_71064_a	addStat
 M	bdw	h	()V	func_71053_j	closeScreen
 M	bdw	j	(I)V	func_70691_i	heal
 M	bfk	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	bfk	a	(Lka;I)V	func_71064_a	addStat
 M	bfk	a	(Llt;)V	func_71007_a	displayGUIChest
 M	bfk	ag	()Z	func_70093_af	isSneaking
 M	bfk	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
@@ -2938,6 +2940,7 @@ M	iz	d	(IIIIII)V	func_72965_b	addBlockEvent
 M	iz	o	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	jc	a	(Lka;I)V	func_71064_a	addStat
 M	jc	a	(Llt;)V	func_71007_a	displayGUIChest
 M	jc	a	(Ltj;II)V	func_71112_a	sendProgressBarUpdate
 M	jc	a	(Ltj;ILwm;)V	func_71111_a	sendSlotContents
@@ -3133,6 +3136,8 @@ M	so	l	()I	func_70430_l	getTotalArmorValue
 M	so	o	()Lwm;	func_70445_o	getItemStack
 M	sq	a	(IIIILwm;)Z	func_82247_a	canPlayerEdit
 M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
+M	sq	a	(Lka;)V	func_71029_a	triggerAchievement
+M	sq	a	(Lka;I)V	func_71064_a	addStat
 M	sq	a	(Llt;)V	func_71007_a	displayGUIChest
 M	sq	aW	()I	func_70667_aM	getMaxHealth
 M	sq	aZ	()I	func_70658_aO	getTotalArmorValue

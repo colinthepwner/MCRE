@@ -2784,8 +2784,10 @@ M	bcu	a	(Ljava/lang/String;FFFIII)Lbcu;	func_78786_a	addBox
 M	bcu	b	(F)V	func_78791_b	renderWithRotation
 M	bcu	b	(II)Lbcu;	func_78787_b	setTextureSize
 M	bcu	c	(F)V	func_78794_c	postRender
+M	bdi	a	(Lku;I)V	func_71064_a	addStat
 M	bdi	i	()V	func_71053_j	closeScreen
 M	bex	a	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	bex	a	(Lku;I)V	func_71064_a	addStat
 M	bex	a	(Lmo;)V	func_71007_a	displayGUIChest
 M	bex	aZ	()Lye;	func_70694_bm	getHeldItem
 M	bex	ah	()Z	func_70093_af	isSneaking
@@ -2919,6 +2921,7 @@ M	js	d	(IIIIII)V	func_72965_b	addBlockEvent
 M	js	p	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	jv	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jv	a	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	jv	a	(Lku;I)V	func_71064_a	addStat
 M	jv	a	(Lmo;)V	func_71007_a	displayGUIChest
 M	jv	a	(Luy;II)V	func_71112_a	sendProgressBarUpdate
 M	jv	a	(Luy;ILye;)V	func_71111_a	sendSlotContents
@@ -3083,6 +3086,8 @@ M	ud	o	()Lye;	func_70445_o	getItemStack
 M	uf	a	(IIIILye;)Z	func_82247_a	canPlayerEdit
 M	uf	a	(Laqz;)Z	func_71062_b	canHarvestBlock
 M	uf	a	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	uf	a	(Lku;)V	func_71029_a	triggerAchievement
+M	uf	a	(Lku;I)V	func_71064_a	addStat
 M	uf	a	(Lmo;)V	func_71007_a	displayGUIChest
 M	uf	aQ	()I	func_70658_aO	getTotalArmorValue
 M	uf	aZ	()Lye;	func_70694_bm	getHeldItem

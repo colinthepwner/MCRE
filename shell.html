@@ -1161,6 +1161,7 @@
             Module.mcGameRules.define('afkIdleSeconds', 60, 'A computer player with no key, mouse or touch input for this long is AFK (0: idling never counts)', [0, 86400]);
             Module.mcGameRules.define('afkKickSeconds', 120, 'A joined player AFK this long is disconnected (0: never); they fade out over this time', [0, 86400]);
             Module.mcGameRules.define('afkFade', true, 'AFK players fade out');
+            Module.mcGameRules.define('announceAchievements', true, 'Chat tells everyone when a player earns an achievement (mods\' achievements)');
             Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
             Module.mcGameRules.define('keepJoinedPlayers', true, "The world keeps joined players' inventory, armour, food, experience and spot for when they come back");
             Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
@@ -1660,6 +1661,13 @@
                         var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
                         if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : ''), n: a[1] | 0 }); return 1; }
                         return mp(['give', gref, a[1] | 0, gd].join('\t'));
+                    case 'achievement': {
+                        var ai = a[0] || {}, ap = actor;
+                        if (!ap) { try { ap = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (x) { ap = null; } }
+                        if (!ap || !Module.mcAchievements) return 0;
+                        return Module.mcAchievements.award(ap, { id: ai.id, name: ai.name, description: ai.description, mod: ai.mod,
+                            icon: ai.item ? itemRef(ai.item, ai.data) : '' }) ? 1 : 0;
+                    }
                     case 'chest': {
                         var cs = mp(['chest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('	'));
                         if (!cs || !cs[0] || cs[0] === 'id:0' || !(cs[1] > 0)) return null;
@@ -1724,7 +1732,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1 };
             J.running = function () { return running; };
             J.dispense = function (json) {
                 if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
@@ -1913,6 +1921,14 @@
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
                         if (vm.mcTicks % 600 === 0 && JV.storageSave) JV.storageSave(vm);
                     }
+                    return;
+                }
+                if (e.t === 'craft') {
+                    if (!e.item) return;
+                    var cj = javaOf(e.item, e.data), cpl = M.playerObj(vm, null);
+                    var cst = M.newStack(vm, cj.id, e.count != null ? e.count | 0 : 1, cj.data);
+                    (r.forge && r.forge.crafting || []).forEach(function (h) { call(h, 'onCrafting(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IInventory;)V', [cpl, cst, null]); });
+                    r.mods.forEach(function (m) { call(m, 'takenFromCrafting(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IInventory;)V', [cpl, cst, null]); });
                     return;
                 }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
@@ -5416,6 +5432,8 @@
                             isOp: function (p) { return ask(mod, ['isop', pid(p)]).then(function (r) { return !!r.op; }); },
                             presence: function (p) { return ask(mod, ['presence', pid(p)]).then(function (r) { return r.presence || null; }); },
                             setAfk: function (p, on) { act(mod, ['setafk', pid(p), on ? 1 : 0]); },
+                            award: function (p, id, o) { o = o || {}; act(mod, ['award', pid(p), String(id), String(o.name || id), String(o.description || ''), o.icon ? itemArg(o.icon) : '']); },
+                            achievements: function (p) { return ask(mod, ['achievements', pid(p)]).then(function (r) { return r.earned || {}; }); },
                             setOp: function (p, on) { act(mod, ['setop', pid(p), on ? 1 : 0]); }
                         },
                         gui: {
@@ -5656,6 +5674,12 @@
                     if (ap && ap.guid && net().setAfk) net().setAfk(ap.guid, !!(a[2] | 0));
                     return;
                 }
+                if (k === 'award') {
+                    var ap2 = known[a[1]];
+                    if (ap2) achievements.award(ap2, { id: (mod ? mod + ':' : '') + String(a[2]).replace(/^[^:]*:/, ''), name: a[3] || a[2], description: a[4] || '', icon: a[5] ? named(a[5], 'players.award') : '', mod: mod });
+                    return;
+                }
+                if (k === 'achievements') { var ep = known[a[2]]; deliver(fromGuid, a[1], { earned: ep ? achievements.earned(ep.name) : {} }); return; }
                 if (k === 'setop') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) return;
                     var tp = known[a[1]];
@@ -6032,6 +6056,45 @@
                 return true;
             };
             api.settingsChanged = function (mod, values) { if (worker) worker.postMessage({ t: 'settings', mod: mod, values: values }); };
+            var achWorld = null, achData = null;
+            function achFile() {
+                var w = null;
+                try { w = JSON.parse(Module.ccall('mcModpeOp', 'string', ['string'], ['world'])); } catch (x) { }
+                return w && w.dir ? '/games/com.mojang/minecraftWorlds/' + w.dir + '/achievements.json' : null;
+            }
+            function achLoad() {
+                var f = achFile();
+                if (f !== achWorld) {
+                    achWorld = f; achData = {};
+                    if (f) { try { achData = JSON.parse(FS.readFile(f, { encoding: 'utf8' })) || {}; } catch (x) { achData = {}; } }
+                }
+                return achData;
+            }
+            function achToast(p, a) {
+                var me = null;
+                try { me = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (x) { }
+                if (!p || (me && p.id === me.id)) {
+                    if (Module._mcAchievementToast) Module.ccall('mcAchievementToast', null, ['string', 'string', 'string'], ['Achievement get!', String(a.name || a.id), String(a.icon || '')]);
+                } else if (p.guid && net().sendCtlTo) net().sendCtlTo(p.guid, { t: 'achievement', name: String(a.name || a.id), icon: String(a.icon || '') });
+            }
+            var achievements = {
+                award: function (p, a) {
+                    if (!p || !a || !a.id || side === 'client') return false;
+                    var d = achLoad(), who = String(p.name || 'player'), id = String(a.id);
+                    var mine = d[who] || (d[who] = {});
+                    if (mine[id]) return false;
+                    mine[id] = Date.now();
+                    if (achWorld) {
+                        try { FS.writeFile(achWorld, JSON.stringify(d)); if (Module._syncSaves) Module._syncSaves(); } catch (x) { console.warn('[achievements]', x); }
+                    }
+                    achToast(p, a);
+                    if (Module.mcGameRules.get('announceAchievements')) runAct('', ['message', 'all', who + ' has just earned the achievement [' + String(a.name || id) + ']'], 0);
+                    api.event(JSON.stringify({ t: 'achievement', player: p, id: id, name: String(a.name || id), description: String(a.description || ''), mod: a.mod || '' }));
+                    return true;
+                },
+                earned: function (name) { var d = achLoad(); return Object.assign({}, d[String(name)] || {}); },
+            };
+            Module.mcAchievements = achievements;
             api.toRemote = function (guid, json) {
                 if (side !== 'host' || !net().isOpen || !net().isOpen(guid)) return;
                 var m;
@@ -6078,6 +6141,7 @@
                 case 'tp': if (Module._mcScriptTeleport) Module._mcScriptTeleport(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
                 case 'give': if (Module._mcScriptGive) Module.ccall('mcScriptGive', null, ['string', 'number'], [String(msg.ref || ''), msg.n | 0]); break;
                 case 'heal': if (Module._mcScriptHeal) Module._mcScriptHeal(msg.n | 0); break;
+                case 'achievement': if (Module._mcAchievementToast) Module.ccall('mcAchievementToast', null, ['string', 'string', 'string'], ['Achievement get!', String(msg.name || ''), String(msg.icon || '')]); break;
                 case 'chat': chat(msg.text); break;
                 case 'sound': if (Module._mcScriptSound) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [String(msg.name || ''), +msg.x, +msg.y, +msg.z, +msg.v || 1, +msg.p || 1]); break;
                 case 'effect': if (Module._mcScriptEffect) Module._mcScriptEffect(msg.id | 0, msg.ticks | 0, msg.amp | 0); break;
