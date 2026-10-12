@@ -1727,6 +1727,8 @@
                         return { id: sj.id, count: sl[1], data: sj.data, ench: enchOf(sl[3]) };
                     }
                     case 'world': return mp('world');
+                    case 'playerdata': { var pd = mp('playerdata'); return typeof pd === 'string' ? pd : ''; }
+                    case 'setplayerdata': return mp(['setplayerdata', String(a[0] || '').replace(/[\t\r\n]/g, ' ')].join('\t'));
                     case 'ent': return mp(['ent', a[0] | 0].join('\t'));
                     case 'players': return mp('players');
                     case 'setvel': return mp(['setvel', a[0] | 0, String(a[1]).charAt(0), +a[2] || 0].join('\t'));
@@ -1737,6 +1739,19 @@
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
                     case 'remove': return mp(['remove', a[0] | 0].join('\t'));
+                    case 'accessories': {
+                        var al = mp('accessories');
+                        return Array.isArray(al) ? al.map(function (sl) {
+                            var st = sl.item, ok = st && st[0] && st[0] !== 'id:0' && st[1] > 0, jj = ok ? javaOf(st[0], st[2]) : null;
+                            return { type: sl.type, label: sl.label, item: ok ? { id: jj.id, count: st[1], data: jj.data, ench: enchOf(st[3]) } : null };
+                        }) : null;
+                    }
+                    case 'setaccessory': {
+                        if (!a[1] || !(a[2] > 0)) return mp(['setaccessory', a[0] | 0, 'id:0', 0, 0].join('\t'));
+                        var aref = itemRef(a[1], a[3] | 0);
+                        return mp(['setaccessory', a[0] | 0, aref, a[2] | 0, variantRef(aref) ? 0 : a[3] | 0].join('\t'));
+                    }
+                    case 'extrahp': return mp(a.length && a[0] != null ? ['extrahp', a[0] | 0].join('\t') : 'extrahp');
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
@@ -1758,7 +1773,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -1786,6 +1801,7 @@
                 Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
                 vm.game = bridge;
                 vm.mcPlayer = null; vm.mcWorld = null; vm.mcTicks = 0;
+                if (window.JVM.playerDataLoad) window.JVM.playerDataLoad(vm);
                 var gameLang = null;
                 vm.gameLang = function (k) {
                     if (!gameLang) {
@@ -1934,6 +1950,7 @@
             J.worldStop = function () {
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
+                if (running && vm && window.JVM.playerDataSave) { vm.steps = 0; window.JVM.playerDataSave(vm); }
                 if (running && vm && window.JVM.storageSave) { vm.steps = 0; window.JVM.storageSave(vm); }
                 worldDir = null;
                 if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
@@ -1982,10 +1999,12 @@
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
                     if (JV.shotTick) JV.shotTick(vm);
+                    if (JV.accessoryTick) JV.accessoryTick(vm);
                     if (JV.guiTick) JV.guiTick(vm);
                     if (JV.tileTick) {
                         JV.tileTick(vm);
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
+                        if (vm.mcTicks % 600 === 0 && JV.playerDataSave) JV.playerDataSave(vm);
                         if (vm.mcTicks % 600 === 0 && JV.storageSave) JV.storageSave(vm);
                     }
                     return;
@@ -2000,6 +2019,7 @@
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
+                if (e.t === 'accessory') { if (JV.accessoryChanged) JV.accessoryChanged(vm, e, javaOf); return; }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
@@ -2444,6 +2464,7 @@
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.worldtypes || {}).forEach(function (k) { put('worldtypes/' + k + '.json', c.worldtypes[k]); });
                     if (c.oredict && Object.keys(c.oredict).length) put('oredict.json', c.oredict);
+                    if (c.accessorySlots) put('accessories.json', c.accessorySlots);
                     Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
                     Object.keys(c.dimensions || {}).forEach(function (k) { put('dimensions/' + k + '.json', c.dimensions[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
@@ -2479,8 +2500,22 @@
                         var pm = /(?:^|[/])textures[/]particles?[/](.+)[.]png$/i.exec(f);
                         if (pm && !/[/]/.test(pm[1])) add['textures/items/fx_' + pm[1].toLowerCase().replace(/[^a-z0-9_]+/g, '_') + '.png'] = files[f];
                     });
+                    var cropPng = function (bytes, cr) {
+                        return createImageBitmap(new Blob([bytes], { type: 'image/png' })).then(function (img) {
+                            var k = img.width / (cr[4] || img.width), cv = document.createElement('canvas');
+                            cv.width = Math.max(1, Math.round(cr[2] * k)); cv.height = Math.max(1, Math.round(cr[3] * k));
+                            var x = cv.getContext('2d');
+                            x.imageSmoothingEnabled = false;
+                            x.drawImage(img, cr[0] * k, cr[1] * k, cv.width, cv.height, 0, 0, cv.width, cv.height);
+                            return new Promise(function (res) { cv.toBlob(function (b) { res(b ? b.arrayBuffer() : null); }, 'image/png'); });
+                        }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
+                    };
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
+                        if (t.data && t.crop) {
+                            cuts.push(cropPng(t.data, t.crop).then(function (png) { if (png) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png; }));
+                            return;
+                        }
                         if (t.sheet != null) {
                             var sb = fileOf(t.sheet);
                             if (sb) cuts.push(cutCell(sb, t.cell).then(function (png) { return png && t.tint != null ? tintPng(png, t.tint) : png; }).then(function (png) { if (png) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png; }));
@@ -3241,6 +3276,8 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
+                            } else if (/^accessories[.]json$/i.test(path)) {
+                                content.push({ mod: id, kind: 'accessories', name: 'accessories', data: data, file: path });
                             } else if (/^oredict[.]json$/i.test(path)) {
                                 content.push({ mod: id, kind: 'oredict', name: 'oredict', data: data, file: path });
                             } else if ((m = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
@@ -3787,7 +3824,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [], accIcons = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3801,6 +3838,19 @@
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'worldtypes') { typeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'oredict') { oreFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
+                    if (c.kind === 'accessories') {
+                        if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'accessories.json is { "ring": 2, "pendant": 1 }'); return; }
+                        Object.keys(j).forEach(function (t) {
+                            var n = +(j[t] && typeof j[t] === 'object' ? j[t].count : j[t]), lab = j[t] && typeof j[t] === 'object' && j[t].label ? String(j[t].label) : '';
+                            var icn = j[t] && typeof j[t] === 'object' && j[t].icon ? String(j[t].icon).toLowerCase().replace(/[.]png$/, '').replace(/^(?:[^:]+:)?(?:items?[/])?/, '') : '';
+                            var iconKey = icn ? c.mod + ':' + icn : '';
+                            if (icn) accIcons.push([c.mod, icn, c.file]);
+                            var tn = String(t).trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+                            if (!tn || !(n >= 1)) { bad(c.mod, c.file, '"' + t + '": a slot count (1 or more)'); return; }
+                            lines.push(['accslot', tn, Math.min(16, Math.round(n)), lab.replace(/[\t\n\r]/g, ' ').slice(0, 24), iconKey].join('\t'));
+                        });
+                        return;
+                    }
                     if (c.kind === 'enchantments') { enchFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'dimensions') { dimFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
@@ -3892,7 +3942,8 @@
                     [items, blocks].forEach(function (tbl) {
                         Object.keys(tbl).forEach(function (k) {
                             var e = tbl[k], j = e.j || {}, r = 'mod:' + k;
-                            (Array.isArray(j.ore) ? j.ore : j.ore ? [j.ore] : []).forEach(function (n) { addOre(n, r); });
+                            var od = [].concat(j.oredict || [], typeof j.ore === 'string' ? [j.ore] : Array.isArray(j.ore) ? j.ore : []);
+                            od.forEach(function (n) { if (typeof n === 'string') addOre(n, r); });
                             var nm = String(j.name || '').replace(/\u00a7./g, '').trim().toLowerCase();
                             if (nm && MATERIAL.test(nm)) (named[nm] = named[nm] || []).push({ mod: e.mod, r: r });
                         });
@@ -4041,6 +4092,11 @@
                                 Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
+                    if (j.accessory !== undefined) {
+                        var at = (Array.isArray(j.accessory) ? j.accessory : [j.accessory]).map(function (x) { return String(x).trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_'); }).filter(Boolean);
+                        if (at.length) lines.push(['accessory', 'mod:' + key, at.join(',')].join('\t'));
+                        else bad(it.mod, it.file, '"accessory" is a slot type ("ring") or a list of them');
+                    }
                 });
                 function fuelLine(r, v, mod, file) {
                     var t = v === true ? 300 : v === false ? 0 : Math.round(+v);
@@ -4753,6 +4809,7 @@
                     var p = k.indexOf(':');
                     if (/^fx_/.test(k.slice(p + 1))) cellOf('items', k.slice(0, p), k.slice(p + 1));
                 });
+                accIcons.forEach(function (ai) { cellOf('items', ai[0], ai[1], ai[2]); });
                 ['items', 'blocks'].forEach(function (kind) {
                     Object.keys(given[kind]).forEach(function (k) { lines.push(['texcell', kind === 'blocks' ? 'b' : 'i', k, given[kind][k]].join('\t')); });
                 });
@@ -4859,9 +4916,10 @@
                 setTimeout(go, 8000);
                 try { names = JSON.parse(new TextDecoder().decode(FS.readFile('/data/images/atlas_names.json'))); } catch (e) { names = null; }
                 if (typeof DecompressionStream === 'undefined' || typeof createImageBitmap === 'undefined') { bump('Mods need a newer browser'); go(); return; }
+                var after = function () { if (finished) { if (Module._mcModsApplied) Module._mcModsApplied(); } else go(); };
                 load().then(function () {
                     return mods.some(function (x) { return x.enabled && !x.err; }) ? reapply(false) : null;
-                }).then(go, go);
+                }).then(after, after);
             };
             api.version = function () { return version; };
             api.status = function () { return status; };
@@ -5027,6 +5085,8 @@
                     });
                 });
             }
+            api.autoLibsForTests = function () { return autoLibs(); };
+            api.libFetchForTests = function (k, v) { return libFetch(k, v); };
             function autoLibs() {
                 if (!Module.mcJava || session || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
                 var want = {};
@@ -5036,10 +5096,11 @@
                     if (rep && rep.status === 'cant') return;
                     var ver = rep && rep.version || '';
                     var add = function (k, guess) { if (k && LIB_KNOWN[k]) k = LIB_KNOWN[k].slug; if (!k || libTried[k] || LIB_BUILTIN.test(k) || byContentId(k)) return; if (!want[k]) want[k] = { by: x.m.name, ver: ver, guess: !!guess, mod: id }; };
-                    if (Module.mcJava.depsOf) Module.mcJava.depsOf(id).concat(x.id !== id ? Module.mcJava.depsOf(x.id) : []).forEach(add);
+                    if (Module.mcJava.depsOf) Module.mcJava.depsOf(id).concat(x.id !== id ? Module.mcJava.depsOf(x.id) : [], x.javaDeps || []).forEach(function (k) { add(k); });
                     (rep && rep.needs || []).forEach(function (k) { add(k, true); });
                 });
                 var keys = Object.keys(want);
+                console.log('[mods] libraries wanted: ' + (keys.length ? keys.join(', ') : 'none'));
                 if (!keys.length) return;
                 keys.reduce(function (pr, k) {
                     return pr.then(function () {

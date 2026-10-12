@@ -3716,6 +3716,7 @@ M	mp	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	mp	a_	(Lsq;)Z	func_70085_c	interact
 M	mp	ae	()Z	func_70027_ad	isBurning
 M	mp	ag	()Z	func_70093_af	isSneaking
+M	mp	ai	()Z	func_82150_aj	isInvisible
 M	mp	al	()V	func_70110_aj	setInWeb
 M	mp	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	mp	ap	()Z	func_70075_an	canAttackWithItem
@@ -3726,6 +3727,7 @@ M	mp	c	(F)F	func_70013_c	getBrightness
 M	mp	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
 M	mp	d	(I)V	func_70015_d	setFire
 M	mp	d	(Lmp;)F	func_70032_d	getDistanceToEntity
+M	mp	d	(Z)V	func_82142_c	setInvisible
 M	mp	e	()F	func_70047_e	getEyeHeight
 M	mp	e	(Lbs;)V	func_70109_d	writeToNBT
 M	mp	equals	(Ljava/lang/Object;)Z	equals	equals
@@ -4204,6 +4206,7 @@ R	field_72197_a	mushroomType
 R	field_73664_a	x
 R	field_73662_b	y
 R	field_73663_c	z
+R	everything	everything
 R	mobs	mobs
 R	players	players
 R	field_72218_a	blockType
@@ -4211,6 +4214,7 @@ R	field_70417_a	record
 R	field_72166_a	powered
 R	field_82539_a	types
 R	field_82136_e	levels
+R	field_82354_a	command
 R	field_70376_r	rand
 R	field_70416_a	note
 R	field_70344_d	extending
@@ -4524,6 +4528,7 @@ R	field_73412_e	itemStack
 R	field_73410_g	yOffset
 R	field_73697_c	username
 R	field_73693_g	reason
+R	field_73702_a	command
 R	field_74267_a	mcServer
 R	field_74274_a	mcServer
 R	field_74272_a	mcServer

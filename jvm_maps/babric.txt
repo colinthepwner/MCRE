@@ -1141,6 +1141,7 @@ F	net/minecraft/class_322	field_1478	field_1478	keyBindings
 F	net/minecraft/class_63	field_1482	field_1482	x
 F	net/minecraft/class_63	field_1483	field_1483	y
 F	net/minecraft/class_63	field_1484	field_1484	z
+F	net/minecraft/class_389	field_1505	field_1505	everything
 F	net/minecraft/class_389	field_1506	field_1506	mobs
 F	net/minecraft/class_389	field_1507	field_1507	players
 F	net/minecraft/class_390	field_1512	field_1512	chunkProvider

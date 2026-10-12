@@ -3943,6 +3943,7 @@ R	field_72197_a	mushroomType
 R	field_73664_a	x
 R	field_73662_b	y
 R	field_73663_c	z
+R	everything	everything
 R	mobs	mobs
 R	players	players
 R	field_72218_a	blockType
@@ -3952,6 +3953,7 @@ R	field_70417_a	record
 R	field_72166_a	powered
 R	field_82539_a	types
 R	field_82136_e	levels
+R	field_82354_a	command
 R	field_70376_r	rand
 R	field_70394_a	delay
 R	field_70392_b	yaw
@@ -4250,6 +4252,7 @@ R	field_73412_e	itemStack
 R	field_73410_g	yOffset
 R	field_73697_c	username
 R	field_73693_g	reason
+R	field_73702_a	command
 R	field_73700_a	logger
 R	field_74267_a	mcServer
 R	field_82494_b	mcServer

@@ -58,7 +58,7 @@
       "author": "Minecraft RE",
       "version": "1.0",
       "devices": "any",
-      "description": "Food with effects, a throwable pebble, a slingshot that fires it, and a wand whose script tells you what a block is.",
+      "description": "Food with effects, a throwable pebble, a slingshot that fires it, a ring worn in accessory slots, and a wand whose script tells you what a block is.",
       "url": "items_example.zip",
       "tags": [
         "items",
