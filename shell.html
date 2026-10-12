@@ -2343,6 +2343,7 @@
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
+                    Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
                     var cuts = [];
                     var fileOf = function (path) {
@@ -2550,7 +2551,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
                         || /\.class$/i.test(k);
                 });
             }
@@ -2811,6 +2812,7 @@
                 say(count(/^recipes[/].+[.]json$/i), 'recipe', 'recipes');
                 say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
                 say(count(/^biomes[/][^/]+[.]json$/i), 'biome', 'biomes');
+                say(count(/^enchantments[/][^/]+[.]json$/i), 'enchantment', 'enchantments');
                 say(count(/^(assets[/][^/]+[/])?models[/].+[.]json$/i), 'model', 'models');
                 say(count(/^mobs?[/][^/]+[.]json$/i), 'creature', 'creatures');
                 if (count(/^rules[/][^/]+[.]json$/i)) parts.push('rules');
@@ -3028,7 +3030,7 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
-                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes)\/([^\/]+)\.json$/i.exec(path))) {
+                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes|enchantments)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
@@ -3572,7 +3574,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3584,6 +3586,7 @@
                     if (c.kind === 'mobs') { mobs[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
+                    if (c.kind === 'enchantments') { enchFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     var key = c.mod + ':' + c.name;
                     if (c.kind === 'blocks') blocks[key] = { mod: c.mod, name: c.name, j: j, file: c.file };
@@ -3949,6 +3952,66 @@
                         return BIOME_ALIAS[n] || n;
                     }).join(';');
                 };
+                var ENCH_IDS = { protection: 0, fire_protection: 1, feather_falling: 2, blast_protection: 3, projectile_protection: 4,
+                    respiration: 5, aqua_affinity: 6, thorns: 7, sharpness: 16, smite: 17, bane_of_arthropods: 18, knockback: 19,
+                    fire_aspect: 20, looting: 21, efficiency: 32, silk_touch: 33, unbreaking: 34, fortune: 35, power: 48, punch: 49,
+                    flame: 50, infinity: 51 };
+                var ENCH_TYPES = { all: 0, any: 0, armor: 1, boots: 2, feet: 2, leggings: 3, legs: 3, chestplate: 4, chest: 4, torso: 4,
+                    helmet: 5, head: 5, weapon: 6, sword: 6, tool: 7, digger: 7, bow: 8 };
+                var EFFECT_IDS = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
+                    jump_boost: 8, nausea: 9, regeneration: 10, resistance: 11, fire_resistance: 12, water_breathing: 13, invisibility: 14,
+                    blindness: 15, night_vision: 16, hunger: 17, weakness: 18, poison: 19, wither: 20 };
+                var enchUsed = {}, enchIds = {};
+                Object.keys(ENCH_IDS).forEach(function (k) { enchUsed[ENCH_IDS[k]] = true; });
+                enchFiles.sort(function (a, b) { var ka = a.mod + ':' + a.name, kb = b.mod + ':' + b.name; return ka < kb ? -1 : ka > kb ? 1 : 0; });
+                enchFiles.forEach(function (e) {
+                    var id = Math.round(Number(e.j.id));
+                    if (e.j.id === undefined) return;
+                    if (!(id >= 1 && id <= 255) || enchUsed[id]) { bad(e.mod, e.file, '"id" ' + e.j.id + ' is one of the game\'s, taken or outside 1-255: one is picked instead'); return; }
+                    enchUsed[id] = true; enchIds[e.mod + ':' + e.name] = id;
+                });
+                enchFiles.forEach(function (e) {
+                    var key = e.mod + ':' + e.name;
+                    if (enchIds[key]) return;
+                    var h = 0;
+                    for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+                    var id = 64 + ((h >>> 0) % 192), n = 0;
+                    while (enchUsed[id] && n++ < 192) id = id >= 255 ? 64 : id + 1;
+                    enchUsed[id] = true; enchIds[key] = id;
+                });
+                var enchRef = function (v, mod) {
+                    var n = String(v).toLowerCase().replace(/^minecraft:/, '').replace(/[\s-]+/g, '_');
+                    if (/^\d+$/.test(n)) return +n;
+                    if (ENCH_IDS[n] !== undefined) return ENCH_IDS[n];
+                    if (enchIds[n] !== undefined) return enchIds[n];
+                    if (enchIds[mod + ':' + n] !== undefined) return enchIds[mod + ':' + n];
+                    return -1;
+                };
+                Module.mcModEnchantNames = {};
+                Object.keys(enchIds).forEach(function (k) { Module.mcModEnchantNames[enchIds[k]] = k; });
+                enchFiles.forEach(function (e) {
+                    var j = e.j, key = e.mod + ':' + e.name, n = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
+                    var type = String(j.type || 'weapon').toLowerCase();
+                    if (ENCH_TYPES[type] === undefined) { bad(e.mod, e.file, '"type" is one of ' + Object.keys(ENCH_TYPES).join(', ')); type = 'all'; }
+                    var inc = (Array.isArray(j.incompatible) ? j.incompatible : []).map(function (x) {
+                        var id = enchRef(x, e.mod);
+                        if (id < 0) bad(e.mod, e.file, '"incompatible": no enchantment "' + x + '"');
+                        return id;
+                    }).filter(function (id) { return id >= 0; });
+                    var eff = '-';
+                    if (j.effect) {
+                        var en = String(j.effect.effect || j.effect.id || '').toLowerCase().replace(/^minecraft:/, '');
+                        var eid = EFFECT_IDS[en] || (+en > 0 ? +en : 0);
+                        if (!eid) bad(e.mod, e.file, '"effect": unknown effect "' + en + '"');
+                        else eff = [eid, Math.round(n(j.effect.seconds, 5, 1, 600)), Math.round(n(j.effect.level, 1, 1, 10)) - 1].join(',');
+                    }
+                    var desc = 'enchantment.mod.' + key;
+                    lang.push(desc + '=' + clean(j.name || pretty(e.name)));
+                    lines.push(['enchant', key, enchIds[key], desc, Math.round(n(j.max_level, 1, 1, 10)), Math.round(n(j.rarity !== undefined ? j.rarity : j.weight, 2, 1, 10)),
+                                ENCH_TYPES[type], Math.round(n(j.min_cost, 11, 1, 100)), Math.round(n(j.cost_per_level, 10, 0, 50)), Math.round(n(j.cost_range, 5, 1, 100)),
+                                inc.join(';') || '-', n(j.damage, 0, 0, 100), Math.round(n(j.protection, 0, 0, 25)), Math.round(n(j.knockback, 0, 0, 10)),
+                                Math.round(n(j.fire, 0, 0, 60)), eff, j.treasure ? 1 : 0].join('\t'));
+                });
                 var LEGACY_TO_MODERN = { rainforest: 'jungle', seasonal_forest: 'forest', savanna: 'plains', shrubland: 'extreme_hills',
                     ice_desert: 'ice_plains', tundra: 'ice_plains' };
                 var hexColor = function (v, mod, file, what) {
@@ -5306,7 +5369,9 @@
                     if (Array.isArray(s.lore) && s.lore.length) f.push('l' + s.lore.slice(0, 16).map(function (l) { return clean(l).slice(0, 200); }).join('\x1e'));
                     if (Array.isArray(s.enchantments) && s.enchantments.length) {
                         f.push('e' + s.enchantments.map(function (e) {
-                            var id = e && (typeof e.id === 'number' ? e.id : ENCH[String(e.id || e.name || '').toLowerCase().replace(/^minecraft:/, '')]);
+                            var nm = e ? String(e.id != null ? e.id : e.name || '').toLowerCase().replace(/^minecraft:/, '') : '';
+                            var id = e && (typeof e.id === 'number' ? e.id : ENCH[nm]);
+                            if (id == null && nm && /^[a-z0-9_.:-]+$/.test(nm)) return nm + ':' + Math.max(1, e.level | 0 || 1);
                             return id == null ? '' : (id | 0) + ':' + Math.max(1, e.level | 0 || 1);
                         }).filter(Boolean).join(','));
                     }
@@ -5657,7 +5722,7 @@
             function stackForScript(s) {
                 if (!s || typeof s !== 'object') return s;
                 if (typeof s.item === 'string') s.item = nameOf(s.item);
-                if (Array.isArray(s.enchantments)) s.enchantments = s.enchantments.map(function (e) { return { id: ENCH_NAMES[e.id] || e.id, level: e.level }; });
+                if (Array.isArray(s.enchantments)) s.enchantments = s.enchantments.map(function (e) { return { id: ENCH_NAMES[e.id] || (Module.mcModEnchantNames && Module.mcModEnchantNames[e.id]) || e.id, level: e.level }; });
                 if (typeof s.tag === 'string' && /^[\[{]/.test(s.tag)) { try { s.tag = JSON.parse(s.tag); } catch (x) { } }
                 return s;
             }

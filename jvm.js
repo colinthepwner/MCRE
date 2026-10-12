@@ -5109,6 +5109,7 @@ function installMc152(vm) {
 	if (JVM.installStates) JVM.installStates(vm);
 	if (JVM.installDispense) JVM.installDispense(vm);
 	if (JVM.installModBiomes) JVM.installModBiomes(vm);
+	if (JVM.installEnchantments) JVM.installEnchantments(vm);
 }
 
 var SIN_TABLE = null;
@@ -5605,6 +5606,7 @@ JVM.collectContent = function (vm, modId) {
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
 	if (JVM.collectBiomes) out.biomes = JVM.collectBiomes(vm, modId, ref, safe);
+	if (JVM.collectEnchantments) out.enchantments = JVM.collectEnchantments(vm, modId, safe);
 	return out;
 };
 
@@ -11690,6 +11692,111 @@ JVM.collectBiomes = function (vm, modId, ref, safe) {
 		}
 		if (p.hosts.length === 1 && p.hosts[0] === 'hell') { j.trees = 'none'; j.dimension = 'nether'; }
 		out[b.$biomeKey.split(':').slice(1).join(':')] = j;
+	});
+	return out;
+};
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+var VANILLA = [['protection', 0, 4], ['fireProtection', 1, 4], ['featherFalling', 2, 4], ['blastProtection', 3, 4], ['projectileProtection', 4, 4],
+	['respiration', 5, 3], ['aquaAffinity', 6, 1], ['thorns', 7, 3], ['sharpness', 16, 5], ['smite', 17, 5], ['baneOfArthropods', 18, 5],
+	['knockback', 19, 2], ['fireAspect', 20, 2], ['looting', 21, 3], ['efficiency', 32, 5], ['silkTouch', 33, 1], ['unbreaking', 34, 3],
+	['fortune', 35, 3], ['power', 48, 5], ['punch', 49, 2], ['flame', 50, 1], ['infinity', 51, 1]];
+var TYPES = ['all', 'armor', 'armor_feet', 'armor_legs', 'armor_torso', 'armor_head', 'weapon', 'digger', 'bow'];
+var TYPE_JSON = { all: 'all', armor: 'armor', armor_feet: 'boots', armor_legs: 'leggings', armor_torso: 'chestplate', armor_head: 'helmet', weapon: 'weapon', digger: 'tool', bow: 'bow' };
+
+function install(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var ET = SRC + 'EnumEnchantmentType';
+	def('EnumEnchantmentType', { super: 'java/lang/Enum', statics: { all: null, armor: null, armor_feet: null, armor_legs: null, armor_torso: null, armor_head: null, weapon: null, digger: null, bow: null }, clinit: function (vm, c) {
+		c.$values = TYPES.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+	}, methods: {
+		'canEnchantItem(Lnet/minecraft/src/Item;)Z': function () { return 1; },
+	}, staticMethods: {
+		'values()[Lnet/minecraft/src/EnumEnchantmentType;': function (vm) { var c = vm.loadClass(ET); vm.initClass(c); return JVM.javaArray(vm, 'L' + ET + ';', c.$values.slice()); },
+	} });
+	var list = function (vm) { var c = vm.loadClass(SRC + 'Enchantment'); vm.initClass(c); return c.statics.enchantmentsList; };
+	var init = function (vm, self, id, weight, type) {
+		self[':effectId'] = id | 0; self.$weight = weight | 0; self[':type'] = type || null; self[':name'] = 'enchantment.' + (id | 0);
+		self.$mod = vm.currentMod;
+		var l = list(vm);
+		if (id >= 0 && id < l.a.length) l.a[id] = self;
+		if (self.$mod) (reg(vm).enchants || (reg(vm).enchants = [])).push(self);
+	};
+	var statics = { enchantmentsList: null, field_92090_c: null };
+	VANILLA.forEach(function (v) { statics[v[0]] = null; });
+	def('Enchantment', { fields: { effectId: 'I', type: 'L' + ET + ';', name: 'Ljava/lang/String;' }, statics: statics, clinit: function (vm, c) {
+		c.statics.enchantmentsList = vm.newArray('L' + SRC + 'Enchantment;', 256);
+		var et = vm.loadClass(ET); vm.initClass(et);
+		VANILLA.forEach(function (v) {
+			var o = vm.newObject(c);
+			o[':effectId'] = v[1]; o.$weight = 2; o.$max = v[2]; o[':name'] = 'enchantment.' + v[0]; o.$vanilla = true;
+			c.statics[v[0]] = o; c.statics.enchantmentsList.a[v[1]] = o;
+		});
+	}, methods: {
+		'<init>(IILnet/minecraft/src/EnumEnchantmentType;)V': function (vm, self, a) { init(vm, self, a[0], a[1], a[2]); },
+		'getWeight()I': function (vm, self) { return self.$weight | 0; },
+		'getMinLevel()I': function () { return 1; },
+		'getMaxLevel()I': function (vm, self) { return self.$max || 1; },
+		'getMinEnchantability(I)I': function (vm, self, a) { return 1 + a[0] * 10; },
+		'getMaxEnchantability(I)I': function (vm, self, a) { return vm.callVirtual(self, 'getMinEnchantability', '(I)I', [a[0]]) + 5; },
+		'calcModifierDamage(ILnet/minecraft/src/DamageSource;)I': function () { return 0; },
+		'calcModifierLiving(ILnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'canApplyTogether(Lnet/minecraft/src/Enchantment;)Z': function (vm, self, a) { return a[0] !== self ? 1 : 0; },
+		'setName(Ljava/lang/String;)Lnet/minecraft/src/Enchantment;': function (vm, self, a) { self[':name'] = 'enchantment.' + a[0]; return self; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self[':name']; },
+		'getTranslatedName(I)Ljava/lang/String;': function (vm, self, a) { var l = reg(vm).lang; return (l[self[':name']] || self[':name']) + ' ' + (a[0] | 0); },
+		'canApply(Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'canApplyAtEnchantingTable(Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'func_92089_a(Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'isAllowedOnBooks()Z': function () { return 1; },
+	} });
+	def('EnchantmentHelper', { staticMethods: {
+		'getEnchantmentLevel(ILnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return a[1] && a[1].$ench ? (a[1].$ench[a[0]] | 0) : 0; },
+		'getEnchantments(Lnet/minecraft/src/ItemStack;)Ljava/util/Map;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(m, '<init>', '()V', []); return m; },
+		'getEfficiencyModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getKnockbackModifier(Lnet/minecraft/src/EntityLiving;Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getFireAspectModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getLootingModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getSilkTouchModifier(Lnet/minecraft/src/EntityLiving;)Z': function () { return 0; },
+		'getFortuneModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getRespiration(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
+		'getAquaAffinityModifier(Lnet/minecraft/src/EntityLiving;)Z': function () { return 0; },
+		'getMaxEnchantmentLevel(I[Lnet/minecraft/src/ItemStack;)I': function () { return 0; },
+	} });
+	var IS = vm.natives[SRC + 'ItemStack'];
+	if (IS) IS.methods = Object.assign({}, IS.methods, {
+		'addEnchantment(Lnet/minecraft/src/Enchantment;I)V': function (vm, self, a) { if (a[0]) (self.$ench = self.$ench || {})[a[0][':effectId']] = a[1] | 0; },
+		'isItemEnchanted()Z': function (vm, self) { return self.$ench && Object.keys(self.$ench).length ? 1 : 0; },
+		'isItemEnchantable()Z': function () { return 1; },
+	});
+}
+JVM.installEnchantments = install;
+
+JVM.collectEnchantments = function (vm, modId, safe) {
+	var out = {}, all = reg(vm).enchants || [];
+	var c = vm.loadClass(SRC + 'Enchantment'); vm.initClass(c);
+	var others = Array.prototype.filter.call(c.statics.enchantmentsList.a, Boolean);
+	all.forEach(function (e) {
+		if (e.$mod !== modId) return;
+		var num = function (name, desc, args, d) { var v = safe(function () { return vm.callVirtual(e, name, desc, args); }, d); return typeof v === 'number' && isFinite(v) ? v : d; };
+		var max = Math.max(1, Math.min(10, num('getMaxLevel', '()I', [], 1)));
+		var min1 = num('getMinEnchantability', '(I)I', [1], 11), min2 = max > 1 ? num('getMinEnchantability', '(I)I', [2], min1 + 10) : min1 + 10;
+		var max1 = num('getMaxEnchantability', '(I)I', [1], min1 + 5);
+		var lang = reg(vm).lang, key = e[':name'];
+		var label = lang[key] || String(key).replace(/^enchantment[.]/, '');
+		var j = { id: e[':effectId'], name: label, max_level: max, rarity: e.$weight || 2, type: TYPE_JSON[e[':type'] && e[':type'].$name] || 'all',
+			min_cost: Math.max(1, min1), cost_per_level: Math.max(0, min2 - min1), cost_range: Math.max(1, max1 - min1) };
+		var dmg = num('calcModifierLiving', '(ILnet/minecraft/src/EntityLiving;)I', [1, null], 0);
+		if (dmg > 0) j.damage = dmg;
+		var inc = others.filter(function (o) { return o !== e && !safe(function () { return vm.callVirtual(e, 'canApplyTogether', '(Lnet/minecraft/src/Enchantment;)Z', [o]); }, 1); })
+			.map(function (o) { return String(o[':effectId']); });
+		if (inc.length) j.incompatible = inc;
+		out[String(key).replace(/^enchantment[.]/, '').toLowerCase().replace(/[^a-z0-9_]+/g, '_') || 'e' + e[':effectId']] = j;
 	});
 	return out;
 };

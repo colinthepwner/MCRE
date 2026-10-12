@@ -2237,6 +2237,42 @@ F	ur	e	field_77991_e	itemDamage
 F	ur	f	field_82843_f	itemFrame
 F	vq	a	field_77885_a	blockID
 F	vu	b	field_77826_b	toolMaterial
+F	xc	A	field_77351_y	type
+F	xc	B	field_77350_z	name
+F	xc	a	field_77333_a	weight
+F	xc	b	field_77331_b	enchantmentsList
+F	xc	c	field_92090_c	field_92090_c
+F	xc	d	field_77332_c	protection
+F	xc	e	field_77329_d	fireProtection
+F	xc	f	field_77330_e	featherFalling
+F	xc	g	field_77327_f	blastProtection
+F	xc	h	field_77328_g	projectileProtection
+F	xc	i	field_77340_h	respiration
+F	xc	j	field_77341_i	aquaAffinity
+F	xc	l	field_77338_j	sharpness
+F	xc	m	field_77339_k	smite
+F	xc	n	field_77336_l	baneOfArthropods
+F	xc	o	field_77337_m	knockback
+F	xc	p	field_77334_n	fireAspect
+F	xc	q	field_77335_o	looting
+F	xc	r	field_77349_p	efficiency
+F	xc	s	field_77348_q	silkTouch
+F	xc	t	field_77347_r	unbreaking
+F	xc	u	field_77346_s	fortune
+F	xc	v	field_77345_t	power
+F	xc	w	field_77344_u	punch
+F	xc	x	field_77343_v	flame
+F	xc	y	field_77342_w	infinity
+F	xc	z	field_77352_x	effectId
+F	xd	a	all	all
+F	xd	b	armor	armor
+F	xd	c	armor_feet	armor_feet
+F	xd	d	armor_legs	armor_legs
+F	xd	e	armor_torso	armor_torso
+F	xd	f	armor_head	armor_head
+F	xd	g	weapon	weapon
+F	xd	h	digger	digger
+F	xd	i	bow	bow
 F	yc	A	field_72988_C	mapStorage
 F	yc	I	field_72995_K	isRemote
 F	yc	e	field_72996_f	loadedEntityList
@@ -3140,6 +3176,7 @@ M	ur	a	(ILmd;)V	func_77972_a	damageItem
 M	ur	a	(Lbq;)Lur;	func_77949_a	loadItemStackFromNBT
 M	ur	a	(Llq;)I	func_77971_a	getDamageVsEntity
 M	ur	a	(Lur;)Z	func_77969_a	isItemEqual
+M	ur	a	(Lxc;I)V	func_77966_a	addEnchantment
 M	ur	b	()Lup;	func_77973_b	getItem
 M	ur	b	(I)V	func_77964_b	setItemDamage
 M	ur	b	(Lamq;)Z	func_77987_b	canHarvestBlock
@@ -3159,6 +3196,7 @@ M	ur	q	()Lby;	func_77986_q	getEnchantmentTagList
 M	ur	r	()Ljava/lang/String;	func_82833_r	getDisplayName
 M	ur	s	()Z	func_82837_s	hasDisplayName
 M	ur	toString	()Ljava/lang/String;	toString	toString
+M	ur	v	()Z	func_77956_u	isItemEnchantable
 M	ur	w	()Z	func_77948_v	isItemEnchanted
 M	uy	a	(Lamq;)Z	func_77641_a	canHarvestBlock
 M	uy	a	(Lur;Lamq;)F	func_77638_a	getStrVsBlock
@@ -3177,6 +3215,31 @@ M	vu	a	(Lur;Lyc;Lqx;)Lur;	func_77659_a	onItemRightClick
 M	vu	c	()I	func_77619_b	getItemEnchantability
 M	vu	c_	(Lur;)I	func_77626_a	getMaxItemUseDuration
 M	vu	n_	()Z	func_77662_d	isFull3D
+M	xc	a	()Ljava/lang/String;	func_77320_a	getName
+M	xc	a	(I)I	func_77321_a	getMinEnchantability
+M	xc	a	(ILlh;)I	func_77318_a	calcModifierDamage
+M	xc	a	(ILmd;)I	func_77323_a	calcModifierLiving
+M	xc	a	(Lur;)Z	func_92089_a	func_92089_a
+M	xc	a	(Lxc;)Z	func_77326_a	canApplyTogether
+M	xc	b	()I	func_77325_b	getMaxLevel
+M	xc	b	(I)I	func_77317_b	getMaxEnchantability
+M	xc	b	(Ljava/lang/String;)Lxc;	func_77322_b	setName
+M	xc	c	()I	func_77324_c	getWeight
+M	xc	c	(I)Ljava/lang/String;	func_77316_c	getTranslatedName
+M	xc	d	()I	func_77319_d	getMinLevel
+M	xd	a	(Lup;)Z	func_77557_a	canEnchantItem
+M	xd	values	()[Lxd;	values	values
+M	xe	a	(ILur;)I	func_77506_a	getEnchantmentLevel
+M	xe	a	(I[Lur;)I	func_77511_a	getMaxEnchantmentLevel
+M	xe	a	(Lmd;)I	func_90036_a	getFireAspectModifier
+M	xe	a	(Lur;)Ljava/util/Map;	func_82781_a	getEnchantments
+M	xe	b	(Lmd;)I	func_77501_a	getRespiration
+M	xe	b	(Lmd;Lmd;)I	func_77507_b	getKnockbackModifier
+M	xe	c	(Lmd;)I	func_77509_b	getEfficiencyModifier
+M	xe	e	(Lmd;)Z	func_77502_d	getSilkTouchModifier
+M	xe	f	(Lmd;)I	func_77517_e	getFortuneModifier
+M	xe	g	(Lmd;)I	func_77519_f	getLootingModifier
+M	xe	h	(Lmd;)Z	func_77510_g	getAquaAffinityModifier
 M	yc	B	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
 M	yc	D	()V	func_72906_B	checkSessionLock
 M	yc	D	(III)Z	func_72951_B	canLightningStrikeAt

@@ -1557,6 +1557,42 @@ C	zw	net/minecraft/src/RecipesArmorDyes
 C	zx	net/minecraft/src/RecipesArmor
 C	zy	net/minecraft/src/RecipesDyes
 C	zz	net/minecraft/src/RecipeFireworks
+F	aau	A	field_77351_y	type
+F	aau	B	field_77350_z	name
+F	aau	a	field_77333_a	weight
+F	aau	b	field_77331_b	enchantmentsList
+F	aau	d	field_77332_c	protection
+F	aau	e	field_77329_d	fireProtection
+F	aau	f	field_77330_e	featherFalling
+F	aau	g	field_77327_f	blastProtection
+F	aau	h	field_77328_g	projectileProtection
+F	aau	i	field_77340_h	respiration
+F	aau	j	field_77341_i	aquaAffinity
+F	aau	k	field_92091_k	thorns
+F	aau	l	field_77338_j	sharpness
+F	aau	m	field_77339_k	smite
+F	aau	n	field_77336_l	baneOfArthropods
+F	aau	o	field_77337_m	knockback
+F	aau	p	field_77334_n	fireAspect
+F	aau	q	field_77335_o	looting
+F	aau	r	field_77349_p	efficiency
+F	aau	s	field_77348_q	silkTouch
+F	aau	t	field_77347_r	unbreaking
+F	aau	u	field_77346_s	fortune
+F	aau	v	field_77345_t	power
+F	aau	w	field_77344_u	punch
+F	aau	x	field_77343_v	flame
+F	aau	y	field_77342_w	infinity
+F	aau	z	field_77352_x	effectId
+F	aav	a	all	all
+F	aav	b	armor	armor
+F	aav	c	armor_feet	armor_feet
+F	aav	d	armor_legs	armor_legs
+F	aav	e	armor_torso	armor_torso
+F	aav	f	armor_head	armor_head
+F	aav	g	weapon	weapon
+F	aav	h	digger	digger
+F	aav	i	bow	bow
 F	abw	I	field_72995_K	isRemote
 F	abw	e	field_72996_f	loadedEntityList
 F	abw	h	field_73010_i	playerEntities
@@ -2467,6 +2503,22 @@ F	ye	f	field_77991_e	itemDamage
 F	ye	g	field_82843_f	itemFrame
 F	zh	a	field_77885_a	blockID
 F	zl	b	field_77826_b	toolMaterial
+M	aau	a	()Ljava/lang/String;	func_77320_a	getName
+M	aau	a	(I)I	func_77321_a	getMinEnchantability
+M	aau	a	(ILnb;)I	func_77318_a	calcModifierDamage
+M	aau	a	(Laau;)Z	func_77326_a	canApplyTogether
+M	aau	a	(Lye;)Z	func_92089_a	canApply
+M	aau	b	()I	func_77325_b	getMaxLevel
+M	aau	b	(I)I	func_77317_b	getMaxEnchantability
+M	aau	b	(Ljava/lang/String;)Laau;	func_77322_b	setName
+M	aau	c	()I	func_77324_c	getWeight
+M	aau	c	(I)Ljava/lang/String;	func_77316_c	getTranslatedName
+M	aau	d	()I	func_77319_d	getMinLevel
+M	aav	a	(Lyc;)Z	func_77557_a	canEnchantItem
+M	aav	values	()[Laav;	values	values
+M	aaw	a	(ILye;)I	func_77506_a	getEnchantmentLevel
+M	aaw	a	(I[Lye;)I	func_77511_a	getMaxEnchantmentLevel
+M	aaw	a	(Lye;)Ljava/util/Map;	func_82781_a	getEnchantments
 M	abw	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
 M	abw	F	(III)Z	func_72951_B	canLightningStrikeAt
 M	abw	G	()V	func_72906_B	checkSessionLock
@@ -3357,6 +3409,7 @@ M	yd	f	()I	func_82844_f	getToolCraftingMaterial
 M	yd	values	()[Lyd;	values	values
 M	ye	a	()Ljava/lang/String;	func_77977_a	getUnlocalizedName
 M	ye	a	(I)Lye;	func_77979_a	splitStack
+M	ye	a	(Laau;I)V	func_77966_a	addEnchantment
 M	ye	a	(Lby;)Lye;	func_77949_a	loadItemStackFromNBT
 M	ye	a	(Lye;)Z	func_77969_a	isItemEqual
 M	ye	b	()Lyc;	func_77973_b	getItem
@@ -3378,6 +3431,7 @@ M	ye	r	()Lcg;	func_77986_q	getEnchantmentTagList
 M	ye	s	()Ljava/lang/String;	func_82833_r	getDisplayName
 M	ye	toString	()Ljava/lang/String;	toString	toString
 M	ye	u	()Z	func_82837_s	hasDisplayName
+M	ye	x	()Z	func_77956_u	isItemEnchantable
 M	ye	y	()Z	func_77948_v	isItemEnchanted
 M	yn	a	(Laqz;)Z	func_77641_a	canHarvestBlock
 M	yn	a	(Lye;Laqz;)F	func_77638_a	getStrVsBlock
