@@ -538,7 +538,22 @@ worldgen/&lt;name&gt;.json  {&quot;type&quot;: &quot;plant&quot;, &quot;block&qu
                       mushrooms... scattered in patches on the ground: &quot;patches&quot; per chunk,
                       &quot;tries&quot; per patch, &quot;on&quot;, &quot;biomes&quot;, &quot;dimension&quot;, &quot;height&quot;: [min y, max y]
 Biomes: rainforest, swampland, seasonal_forest, forest, savanna, shrubland, taiga, desert,
-plains, ice_desert, tundra (Java names like &quot;jungle&quot;, &quot;swamp&quot; or &quot;snowy_tundra&quot; work too).
+plains, ice_desert, tundra (Java names like &quot;jungle&quot;, &quot;swamp&quot; or &quot;snowy_tundra&quot; work too), and
+mods&#x27; own: &quot;&lt;name&gt;&quot; for this mod&#x27;s, &quot;&lt;mod id&gt;:&lt;name&gt;&quot; for another&#x27;s.
+biomes/&lt;name&gt;.json    A new biome, &quot;&lt;mod id&gt;:&lt;name&gt;&quot;. It takes over parts of the game&#x27;s biomes
+                      in new chunks (the land keeps its shape - its surface, colours and trees
+                      change):
+                        &quot;name&quot;        what it&#x27;s called
+                        &quot;hosts&quot;       the game&#x27;s biomes it replaces parts of (default: the one
+                                      its temperature and rainfall would be)
+                        &quot;weight&quot;      how much of them: each host keeps 100 (default 10)
+                        &quot;temperature&quot;, &quot;rainfall&quot;   0-1 (grass / leaf colours, snow)
+                        &quot;top&quot;, &quot;filler&quot;             surface blocks (default grass, dirt)
+                        &quot;grass_color&quot;, &quot;foliage_color&quot;   &quot;#rrggbb&quot; (default: by climate)
+                        &quot;trees&quot;       &quot;oak&quot;, &quot;forest&quot;, &quot;birch&quot;, &quot;spruce&quot;, &quot;swamp&quot;, &quot;jungle&quot;
+                                      or &quot;none&quot;; &quot;trees_per_chunk&quot;
+                        &quot;flowers_per_chunk&quot;, &quot;grass_per_chunk&quot;, &quot;snow&quot;, &quot;rain&quot; (false: never
+                                      rains, like a desert)
 worldgen/&lt;name&gt;.schematic (or .schem / .nbt) on its own works too, with the defaults. Chests in
 schematics keep their items, and their loot tables (the game has stand-ins for Java&#x27;s chest
 tables: minecraft:chests/simple_dungeon, village_blacksmith, abandoned_mineshaft, desert_pyramid,

@@ -1749,7 +1749,8 @@
                 running = false;
                 var r = reg();
                 var hasMod = function (o) { return Object.keys(o || {}).some(function (k) { return o[k] && o[k].$mod; }); };
-                var stMods = window.JVM.station && vm && window.JVM.station.st(vm).listeners.length;
+                if (!vm || !r || !window.JVM) return null;
+                var stMods = window.JVM.station && window.JVM.station.st(vm).listeners.length;
                 if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length) || hasMod(r.blocks) || hasMod(r.items) || stMods)) return null;
                 var wi = mp('world');
                 worldDir = wi && wi.dir ? '/games/com.mojang/minecraftWorlds/' + wi.dir : null;
@@ -2548,7 +2549,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
                         || /\.class$/i.test(k);
                 });
             }
@@ -2579,7 +2580,7 @@
                 } else if (files['pack.mcmeta']) {
                     try { var mc = JSON.parse(dec.decode(files['pack.mcmeta'])); m = { description: mc.pack && mc.pack.description }; } catch (e) { }
                 }
-                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items, recipes, worldgen, loot tables or scripts)');
+                if (!usable(files)) throw new Error('has nothing this game can use (textures, images, sounds, lang, blocks, items, recipes, worldgen, biomes, loot tables or scripts)');
                 var str = function (v, max) { return typeof v === 'string' ? v.trim().slice(0, max) : ''; };
                 var id = typeof m.id === 'string' && /^[a-z0-9_.-]{1,48}$/.test(m.id) ? m.id : '';
                 if (!id) {
@@ -2808,6 +2809,7 @@
                 say(count(/^items[/].+[.]json$/i), 'item', 'items');
                 say(count(/^recipes[/].+[.]json$/i), 'recipe', 'recipes');
                 say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
+                say(count(/^biomes[/][^/]+[.]json$/i), 'biome', 'biomes');
                 say(count(/^(assets[/][^/]+[/])?models[/].+[.]json$/i), 'model', 'models');
                 say(count(/^mobs?[/][^/]+[.]json$/i), 'creature', 'creatures');
                 if (count(/^rules[/][^/]+[.]json$/i)) parts.push('rules');
@@ -3025,7 +3027,7 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
-                            } else if ((m = /^(blocks|items|recipes|worldgen)\/([^\/]+)\.json$/i.exec(path))) {
+                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
@@ -3569,7 +3571,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3580,6 +3582,7 @@
                     if (c.kind === 'model') { models[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'mobs') { mobs[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
+                    if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     var key = c.mod + ':' + c.name;
                     if (c.kind === 'blocks') blocks[key] = { mod: c.mod, name: c.name, j: j, file: c.file };
@@ -3935,13 +3938,44 @@
                     sunflower_plains: 'plains', meadow: 'plains', snowy_taiga: 'taiga', cold_taiga: 'taiga', snowy_tundra: 'tundra',
                     snowy_plains: 'tundra', ice_plains: 'tundra', ice_spikes: 'ice_desert', badlands: 'desert', mesa: 'desert',
                     extreme_hills: 'shrubland', windswept_hills: 'shrubland', mountains: 'shrubland' };
-                var biomeList = function (b) {
+                var modBiomeNames = {};
+                biomeFiles.forEach(function (b) { modBiomeNames[b.mod + ':' + b.name] = true; });
+                var biomeList = function (b, mod) {
                     if (b === undefined) return '';
                     return (Array.isArray(b) ? b : [b]).map(function (n) {
                         n = String(n).toLowerCase().replace(/^minecraft:/, '').replace(/[\s-]+/g, '_');
+                        if (mod && n.indexOf(':') < 0 && modBiomeNames[mod + ':' + n]) return mod + ':' + n;
                         return BIOME_ALIAS[n] || n;
                     }).join(';');
                 };
+                var LEGACY_TO_MODERN = { rainforest: 'jungle', seasonal_forest: 'forest', savanna: 'plains', shrubland: 'extreme_hills',
+                    ice_desert: 'ice_plains', tundra: 'ice_plains' };
+                var hexColor = function (v, mod, file, what) {
+                    if (v === undefined || v === null) return -1;
+                    var m = /^#?([0-9a-f]{6})$/i.exec(String(v));
+                    if (typeof v === 'number') return (v & 0xffffff).toString(16);
+                    if (!m) { bad(mod, file, '"' + what + '" is a colour like "#7fb238"'); return -1; }
+                    return m[1];
+                };
+                biomeFiles.forEach(function (b) {
+                    var j = b.j, num = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
+                    var hosts = [];
+                    (j.hosts === undefined ? [] : Array.isArray(j.hosts) ? j.hosts : [j.hosts]).forEach(function (h) {
+                        var n = String(h).toLowerCase().replace(/^minecraft:/, '').replace(/[\s-]+/g, '_');
+                        [n, BIOME_ALIAS[n], LEGACY_TO_MODERN[n], LEGACY_TO_MODERN[BIOME_ALIAS[n]]].forEach(function (x) { if (x && hosts.indexOf(x) < 0) hosts.push(x); });
+                    });
+                    var top = j.top === undefined ? '' : ref(j.top, b.mod, b.file), filler = j.filler === undefined ? '' : ref(j.filler, b.mod, b.file);
+                    if ((j.top !== undefined && !top) || (j.filler !== undefined && !filler)) return;
+                    var TREES = ['oak', 'forest', 'birch', 'spruce', 'taiga', 'swamp', 'jungle', 'none'];
+                    var trees = j.trees === undefined ? 'oak' : String(j.trees).toLowerCase();
+                    if (TREES.indexOf(trees) < 0) { bad(b.mod, b.file, '"trees" is one of ' + TREES.join(', ')); trees = 'oak'; }
+                    var key = b.mod + ':' + b.name;
+                    lines.push(['biome', key, clean(j.name || pretty(b.name)), hosts.join(';') || '-', Math.round(num(j.weight, 10, 0, 1000)),
+                                num(j.temperature, 0.7, -1, 2), num(j.rainfall, 0.5, 0, 1), top || '-', filler || '-',
+                                hexColor(j.grass_color, b.mod, b.file, 'grass_color'), hexColor(j.foliage_color, b.mod, b.file, 'foliage_color'),
+                                trees, num(j.trees_per_chunk, trees === 'none' ? 0 : 3, 0, 64), Math.round(num(j.flowers_per_chunk, 2, 0, 64)),
+                                Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1].join('\t'));
+                });
                 var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
                 function ore(o, blockRef, mod, file) {
                     if (o === true) o = {};
@@ -3956,7 +3990,7 @@
                     var veins = num(o.veins_per_chunk !== undefined ? o.veins_per_chunk : (o.veins !== undefined ? o.veins : o.count), 8);
                     var minY = Math.round(num(o.min_y, 1)), maxY = Math.round(num(o.max_y, 64));
                     lines.push(['ore', blockRef, Math.max(1, Math.min(64, size)), Math.max(0, Math.min(64, veins)),
-                                Math.max(1, Math.min(126, minY)), Math.max(1, Math.min(126, maxY)), rep.join(';'), dim, biomeList(o.biomes)].join('\t'));
+                                Math.max(1, Math.min(126, minY)), Math.max(1, Math.min(126, maxY)), rep.join(';'), dim, biomeList(o.biomes, mod)].join('\t'));
                 }
                 Object.keys(blocks).forEach(function (key) {
                     var o = blocks[key].j.ore;
@@ -4054,7 +4088,7 @@
                                 Math.max(1, Math.min(126, Math.round(num(j.max_y, underground ? 50 : 100)))),
                                 Math.max(-32, Math.min(32, Math.round(num(j.y_offset, 0)))),
                                 (j.rotate === undefined ? !j.file && !/[.](schematic|schem|nbt)$/i.test(w.file || '') : j.rotate) ? 1 : 0, dim, on.join(';'), j.scripted ? 1 : 0, keys.join(';'), cells,
-                                fills.concat(j.loot ? ['*>L:' + lootRef(j.loot, w.mod, w.file)] : []).join('|'), biomeList(j.biomes)].join('\t'));
+                                fills.concat(j.loot ? ['*>L:' + lootRef(j.loot, w.mod, w.file)] : []).join('|'), biomeList(j.biomes, w.mod)].join('\t'));
                 }
                 (schemFiles || []).forEach(function (s) {
                     var m = /^worldgen[/]([^/]+)[.](schematic|schem|nbt)$/i.exec(s.path);
@@ -4079,7 +4113,7 @@
                     var on = j.on === undefined ? [] : (Array.isArray(j.on) ? j.on : [j.on]).map(function (r) { return ref(r, w.mod, w.file); });
                     if (on.some(function (r) { return !r; })) return;
                     lines.push(['tree', w.mod + ':' + w.name, log, leaves || 'id:0', Math.max(1, h[0]), Math.max(1, h[1]), shape,
-                                Math.max(0, Math.min(16, num(j.per_chunk !== undefined ? j.per_chunk : j.chance, 0.5))), on.join(';'), biomeList(j.biomes), dim].join('\t'));
+                                Math.max(0, Math.min(16, num(j.per_chunk !== undefined ? j.per_chunk : j.chance, 0.5))), on.join(';'), biomeList(j.biomes, w.mod), dim].join('\t'));
                 }
                 function plant(w) {
                     var j = w.j, num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
@@ -4092,7 +4126,7 @@
                     if (on.some(function (r) { return !r; })) return;
                     var h = range(j.height, [1, 126]);
                     lines.push(['plant', w.mod + ':' + w.name, b, Math.max(0, Math.min(16, num(j.patches !== undefined ? j.patches : j.per_chunk, 1))),
-                                Math.max(1, Math.min(128, num(j.tries, 24) | 0)), on.join(';'), biomeList(j.biomes), dim, h[0], h[1]].join('\t'));
+                                Math.max(1, Math.min(128, num(j.tries, 24) | 0)), on.join(';'), biomeList(j.biomes, w.mod), dim, h[0], h[1]].join('\t'));
                 }
                 worldgen.forEach(function (w) {
                     var type = String(w.j.type || 'ore').toLowerCase();
@@ -5927,6 +5961,9 @@
             api.next = function () { return actions.shift() || ''; };
             var stopTimer = 0;
             api.event = function (json) {
+                try { eventNow(json); } catch (x) { console.warn('[scripts] event', x); }
+            };
+            function eventNow(json) {
                 var e;
                 try { e = JSON.parse(json); } catch (x) { return; }
                 if ((e.t === 'start' || e.t === 'stop') && Module.mcModpe) Module.mcModpe.worldEvent(e);
