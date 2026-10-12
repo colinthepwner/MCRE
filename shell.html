@@ -1689,7 +1689,7 @@
                         var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
                         return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref, a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
                     }
-                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : a[5] | 0].join('\t')); }
+                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : a[5] | 0, a[6] == null ? '' : a[6] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
                         return mp('msg\t' + clean(a[0]));
@@ -1739,6 +1739,19 @@
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
                     case 'remove': return mp(['remove', a[0] | 0].join('\t'));
+                    case 'entsin': {
+                        var es = mp(['entsin', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] | 0].join('\t'));
+                        if (Array.isArray(es)) es.forEach(function (en) {
+                            var st = en.item;
+                            if (Array.isArray(st)) { var ok = st[0] && st[0] !== 'id:0' && st[1] > 0, jj = ok ? javaOf(st[0], st[2]) : null; en.item = ok ? { id: jj.id, count: st[1], data: jj.data } : null; }
+                        });
+                        return es;
+                    }
+                    case 'raytrace': return mp(['raytrace', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? 1 : 0].join('\t'));
+                    case 'inmat': return mp(['inmat', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] === 'lava' ? 'lava' : 'water'].join('\t'));
+                    case 'cubes': return mp(['cubes', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5]].join('\t'));
+                    case 'setdriven': return mp(['setdriven', a[0] | 0, a[1] ? 1 : 0].join('\t'));
+                    case 'entpos': return mp(['setpos', a[0] | 0, +a[1], +a[2], +a[3]].join('\t'));
                     case 'accessories': {
                         var al = mp('accessories');
                         return Array.isArray(al) ? al.map(function (sl) {
@@ -2452,7 +2465,7 @@
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
-                    if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes,
+                    if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes, menuMixins: kind.menus || 0,
                         errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
                             .concat(kind.mixins ? ["changes to the game's own code (" + kind.mixins + (kind.mixins === 1 ? ' mixin)' : ' mixins)')] : []) });
                     var add = {}, enc = new TextEncoder();
@@ -2749,10 +2762,7 @@
             }
             function devicesOf(m, notes, hasManifest) {
                 var raw = m.devices !== undefined ? m.devices : m.device !== undefined ? m.device : m.platform !== undefined ? m.platform : m.platforms;
-                if (raw === undefined) {
-                    if (hasManifest) notes.push('say which devices it\'s made for: "devices": "any", "computer" or "mobile"');
-                    return '';
-                }
+                if (raw === undefined) return '';
                 var words = (Array.isArray(raw) ? raw : [raw]).map(function (w) { return String(w).toLowerCase().trim(); });
                 var pc = false, mobile = false, any = false;
                 words.forEach(function (w) {
@@ -3246,7 +3256,7 @@
                                 var fp2 = items ? '/data/images/gui/items.png' : '/data/images/terrain.png';
                                 var cells = cellsFor(items ? 'items' : 'blocks', m[2]);
                                 if (!cells.length) {
-                                    newTex[items ? 'items' : 'blocks'][id + ':' + m[2]] = data;
+                                    newTex[items ? 'items' : 'blocks'][id + ':' + m[2].toLowerCase()] = data;
                                     return;
                                 }
                                 cells.forEach(function (c) { changed[items ? 'items' : 'blocks'][c] = 1; });
@@ -3680,6 +3690,7 @@
                 var W = { oak: 1, spruce: 1, birch: 1, jungle: 1 };
                 var m;
                 var fixed = { stone_bricks: 'stonebrick', mossy_stone_bricks: 'stonebrick_mossy', cracked_stone_bricks: 'stonebrick_cracked',
+                    leaves_oak: 'leaves', leaves_oak_opaque: 'leaves_opaque', leaves_birch: 'leaves', leaves_birch_opaque: 'leaves_opaque',
                     chiseled_stone_bricks: 'stonebrick_carved', mossy_cobblestone: 'cobblestone_mossy', bricks: 'brick', smooth_stone: 'stone_slab_top',
                     smooth_stone_slab_side: 'stone_slab_side', sandstone: 'sandstone_normal', cut_sandstone: 'sandstone_smooth',
                     chiseled_sandstone: 'sandstone_carved', grass_block_top: 'grass_top', grass_block_side: 'grass_side',
@@ -4687,7 +4698,7 @@
                         lines.push(['smelt', inp, res, count].join('\t'));
                     } else bad(r.mod, r.file, 'unknown recipe "type": "' + (j.type || '') + '" (shaped, shapeless, smelting or fuel)');
                 });
-                var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4 };
+                var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4, segment: 5 };
                 Object.keys(mobs).forEach(function (key) {
                     var mb = mobs[key], j = mb.j, file = mb.file;
                     var mf = mobFiles[mb.mod + ':' + String(j.model || '').replace(/^[/]+/, '')]
@@ -4700,15 +4711,17 @@
                             return false;
                         });
                     }
-                    if (!mf) { bad(mb.mod, file, 'no model "' + (j.model || mb.name + '.geo.json') + '" (a Blockbench .geo.json or an OptiFine .jem in the mod)'); return; }
+                    var invisible = j.invisible === true;
+                    if (!mf && !invisible) { bad(mb.mod, file, 'no model "' + (j.model || mb.name + '.geo.json') + '" (a Blockbench .geo.json or an OptiFine .jem in the mod)'); return; }
                     var model;
-                    try {
+                    if (invisible) model = { parts: [], tw: 64, th: 32, warnings: [] };
+                    else try {
                         var mj = JSON.parse(dec.decode(mf.data));
                         model = /[.]jem$/i.test(mf.path) ? jemModel(mj) : geoModel(mj);
                     } catch (e) { bad(mb.mod, mf.path, "can't be read: " + e.message); return; }
                     if (model.warnings.indexOf('perface') >= 0) problem(mb.mod, mf.path, 'per-face UVs are drawn as box UVs (use "Box UV" in Blockbench for an exact match)');
                     if (model.warnings.indexOf('jpm') >= 0) problem(mb.mod, mf.path, 'parts in separate .jpm files are left out');
-                    if (!model.parts.length) { bad(mb.mod, mf.path, 'the model has no parts'); return; }
+                    if (!model.parts.length && !invisible) { bad(mb.mod, mf.path, 'the model has no parts'); return; }
                     var tf = texFiles[mb.mod + ':' + String(j.texture || '').replace(/^[/]+/, '')];
                     if (!tf) Object.keys(texFiles).some(function (k) {
                         if (k.indexOf(mb.mod + ':') !== 0) return false;
@@ -4719,11 +4732,12 @@
                     if (!tf && gameTex && gameTex[1].indexOf('..') < 0) {
                         try { tf = { data: FS.readFile('/data/images/' + gameTex[1].replace(/^[/]+/, '')) }; } catch (e) { tf = null; }
                     }
+                    if (!tf && invisible) try { tf = { data: FS.readFile('/data/images/mob/char.png') }; } catch (e) { tf = { data: new Uint8Array(0) }; }
                     if (!tf) { bad(mb.mod, file, 'no texture "' + (j.texture || mb.name + '.png') + '" in the mod' + (gameTex ? ' or the game' : '')); return; }
                     var texPath = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '.png';
                     try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + texPath, tf.data); } catch (e) { }
                     var beh = BEHAVIOURS[String(j.behaviour || j.behavior || 'passive').toLowerCase()];
-                    if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying or swimming)'); beh = 0; }
+                    if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying, swimming or segment)'); beh = 0; }
                     var num = function (v, d, lo, hi) { v = Number(v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
                     var size = Array.isArray(j.size) ? j.size : [0.9, 0.9];
                     var drops = '';
@@ -4786,6 +4800,11 @@
                         lines.push(['mobspawn', key, dim, light[0], light[1], h[0], h[1], on.join(';'), num(s.weight, 10, 1, 1000), Math.max(1, g[0]), Math.max(1, g[1]),
                                     (Array.isArray(s.biomes) ? s.biomes : (s.biomes ? [s.biomes] : [])).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, ''); }).join(';')].join('\t'));
                     });
+                    if (j.segments && typeof j.segments === 'object') {
+                        var sgName = String(j.segments.mob || '').replace(/^[a-z0-9_.-]+:/, ''), sgKey = mb.mod + ':' + sgName;
+                        if (!mobs[sgKey]) problem(mb.mod, file, '"segments": no creature "' + sgName + '" in the mod');
+                        else lines.push(['mobseg', key, sgKey, Math.round(num(j.segments.count, 8, 1, 64)), num(j.segments.spacing, 1, 0.25, 8)].join('\t'));
+                    }
                 });
                 ruleFiles.forEach(function (rf) {
                     rulesOf(rf.j, rf.mod, function (text) { bad(rf.mod, rf.file, text); }, ref).forEach(function (l) { lines.push('rule\t' + l); });
@@ -4937,6 +4956,15 @@
                 if (x.m && x.m.java) return '';
                 return probs && probs.length && x.enabled ? 1 : 2;
             }
+            function devicesFor(x) {
+                if (x.m.devices && !x.m.java) return x.m.devices;
+                if (x.m.java) {
+                    var rep = Module.mcJava && Module.mcJava.reportOf ? Module.mcJava.reportOf(cid(x)) : null;
+                    if (!rep) return '';
+                    return rep.gui ? 'computer' : 'any';
+                }
+                return 'any';
+            }
             api.list = function () {
                 var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
                 var desc = function (s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/\n/g, '\x1f').slice(0, 4000); };
@@ -4946,7 +4974,7 @@
                         .concat((problems[cid(x)] || []).map(function (p) { return (p.file ? p.file + ': ' : '') + p.text; }));
                     return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
                         .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
-                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '', supportOf(x, probs),
+                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, devicesFor(x), supportOf(x, probs),
                             clean(x.libUsers ? x.libUsers.map(function (y) { return y.m && y.m.name || y.id; }).join(', ') : '')]).join('\t');
                 }).join('\n');
             };

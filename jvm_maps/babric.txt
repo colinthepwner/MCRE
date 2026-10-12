@@ -876,6 +876,7 @@ F	net/minecraft/class_133	field_500	field_500	xDisplayPosition
 F	net/minecraft/class_133	field_501	field_501	yDisplayPosition
 F	net/minecraft/class_133	field_502	field_502	slotIndex
 F	net/minecraft/class_133	field_503	field_503	inventory
+F	net/minecraft/class_54	field_514	field_514	fishEntity
 F	net/minecraft/class_54	field_519	field_519	inventory
 F	net/minecraft/class_54	field_520	field_520	inventorySlots
 F	net/minecraft/class_54	field_523	field_523	score
@@ -892,6 +893,7 @@ F	net/minecraft/class_148	field_561	field_561	instance
 F	net/minecraft/class_148	field_562	field_562	recipes
 F	net/minecraft/class_142	field_564	field_564	item
 F	net/minecraft/class_142	field_565	field_565	age
+F	net/minecraft/class_142	field_566	field_566	delayBeforeCanPickup
 F	net/minecraft/class_142	field_569	field_569	health
 F	net/minecraft/class_162	field_573	field_573	boatSides
 F	net/minecraft/class_58	field_575	field_575	dirty
@@ -1028,6 +1030,9 @@ F	net/minecraft/class_127	field_1029	field_1029	moveForward
 F	net/minecraft/class_127	field_1033	field_1033	moveSpeed
 F	net/minecraft/class_127	field_1036	field_1036	health
 F	net/minecraft/class_127	field_1059	field_1059	entityAge
+F	net/minecraft/class_135	field_1066	field_1066	shake
+F	net/minecraft/class_135	field_1067	field_1067	angler
+F	net/minecraft/class_135	field_1068	field_1068	bobber
 F	net/minecraft/class_135	field_1073	field_1073	inGround
 F	net/minecraft/class_135	field_1075	field_1075	ticksInAir
 F	net/minecraft/class_266	field_1088	field_1088	rand
@@ -1195,7 +1200,11 @@ F	net/minecraft/class_57	field_1612	field_1612	inWater
 F	net/minecraft/class_57	field_1614	field_1614	air
 F	net/minecraft/class_57	field_1615	field_1615	isImmuneToFire
 F	net/minecraft/class_57	field_1616	field_1616	dataWatcher
+F	net/minecraft/class_57	field_1622	field_1622	ignoreFrustumCheck
 F	net/minecraft/class_57	field_1623	field_1623	onGround
+F	net/minecraft/class_57	field_1624	field_1624	isCollidedHorizontally
+F	net/minecraft/class_57	field_1625	field_1625	isCollidedVertically
+F	net/minecraft/class_57	field_1626	field_1626	isCollided
 F	net/minecraft/class_57	field_1628	field_1628	isInWeb
 F	net/minecraft/class_57	field_1630	field_1630	isDead
 F	net/minecraft/class_57	field_1631	field_1631	yOffset
@@ -1203,6 +1212,7 @@ F	net/minecraft/class_57	field_1632	field_1632	width
 F	net/minecraft/class_57	field_1633	field_1633	height
 F	net/minecraft/class_57	field_1636	field_1636	fallDistance
 F	net/minecraft/class_57	field_1640	field_1640	ySize
+F	net/minecraft/class_57	field_1642	field_1642	noClip
 F	net/minecraft/class_57	field_1644	field_1644	rand
 F	net/minecraft/class_57	field_1645	field_1645	ticksExisted
 F	net/minecraft/class_57	field_1646	field_1646	fireResistance
@@ -1540,6 +1550,7 @@ F	net/minecraft/class_617	field_2674	field_2674	rand
 F	net/minecraft/class_579	field_2678	field_2678	shadowSize
 F	net/minecraft/class_104	field_2681	field_2681	delay
 F	net/minecraft/class_104	field_2682	field_2682	yaw
+F	net/minecraft/class_61	field_2691	field_2691	points
 F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
 F	net/minecraft/class_71	field_2734	field_2734	slots
 F	net/minecraft/class_71	field_2735	field_2735	windowId
@@ -1572,11 +1583,14 @@ M	net/minecraft/class_23	method_84	()V	method_84	func_27374_a
 M	net/minecraft/class_25	method_86	(DDD)Lnet/minecraft/class_25;	method_86	addCoord
 M	net/minecraft/class_25	method_87	(DDDDDD)Lnet/minecraft/class_25;	method_87	getBoundingBox
 M	net/minecraft/class_25	method_90	(Lnet/minecraft/class_25;)Z	method_90	intersectsWith
+M	net/minecraft/class_25	method_91	(Lnet/minecraft/class_25;D)D	method_91	calculateXOffset
 M	net/minecraft/class_25	method_92	()Lnet/minecraft/class_25;	method_92	copy
 M	net/minecraft/class_25	method_93	(DDD)Lnet/minecraft/class_25;	method_93	expand
 M	net/minecraft/class_25	method_96	(Lnet/minecraft/class_25;)V	method_96	setBB
+M	net/minecraft/class_25	method_97	(Lnet/minecraft/class_25;D)D	method_97	calculateYOffset
 M	net/minecraft/class_25	method_98	(DDD)Lnet/minecraft/class_25;	method_98	getOffsetBoundingBox
 M	net/minecraft/class_25	method_99	(DDDDDD)Lnet/minecraft/class_25;	method_99	setBounds
+M	net/minecraft/class_25	method_101	(Lnet/minecraft/class_25;D)D	method_101	calculateZOffset
 M	net/minecraft/class_25	method_102	(DDD)Lnet/minecraft/class_25;	method_102	offset
 M	net/minecraft/class_25	method_106	()D	method_106	getAverageEdgeLength
 M	net/minecraft/class_32	method_117	(CI)V	method_117	keyTyped
@@ -1604,6 +1618,8 @@ M	net/minecraft/class_18	method_154	(IIIII)Z	method_154	setBlock
 M	net/minecraft/class_18	method_155	(IIIIII)Z	method_155	checkChunksExist
 M	net/minecraft/class_18	method_157	(IIILnet/minecraft/class_55;)V	method_157	setBlockTileEntity
 M	net/minecraft/class_18	method_159	(J)V	method_159	setWorldTime
+M	net/minecraft/class_18	method_169	(Lnet/minecraft/class_25;Lnet/minecraft/class_15;)Z	method_169	isMaterialInBB
+M	net/minecraft/class_18	method_170	(Lnet/minecraft/class_25;Lnet/minecraft/class_15;Lnet/minecraft/class_57;)Z	method_170	handleMaterialAcceleration
 M	net/minecraft/class_18	method_175	(Ljava/lang/Class;Lnet/minecraft/class_25;)Ljava/util/List;	method_175	getEntitiesWithinAABB
 M	net/minecraft/class_18	method_177	(Ljava/lang/String;)Lnet/minecraft/class_54;	method_177	getPlayerEntityByName
 M	net/minecraft/class_18	method_178	(Ljava/lang/String;DDDDDD)V	method_178	spawnParticle
@@ -1615,6 +1631,7 @@ M	net/minecraft/class_18	method_197	()Lnet/minecraft/class_51;	method_197	getChu
 M	net/minecraft/class_18	method_199	(II)Lnet/minecraft/class_43;	method_199	getChunkFromBlockCoords
 M	net/minecraft/class_18	method_200	(IIII)Z	method_200	setBlock
 M	net/minecraft/class_18	method_201	(IIIII)Z	method_201	setBlock
+M	net/minecraft/class_18	method_207	(Lnet/minecraft/class_25;Lnet/minecraft/class_15;)Z	method_207	isAABBInMaterial
 M	net/minecraft/class_18	method_208	(Ljava/lang/String;)I	method_208	getUniqueDataId
 M	net/minecraft/class_18	method_211	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_211	getEntitiesWithinAABBExcludingEntity
 M	net/minecraft/class_18	method_214	(II)Lnet/minecraft/class_43;	method_214	getChunkFromChunkCoords
@@ -1677,6 +1694,7 @@ M	net/minecraft/class_54	method_486	(Lnet/minecraft/class_134;)V	method_486	disp
 M	net/minecraft/class_54	method_488	(Lnet/minecraft/class_139;I)V	method_488	addStat
 M	net/minecraft/class_54	method_490	(Ljava/lang/String;)V	method_490	addChatMessage
 M	net/minecraft/class_54	method_493	()V	method_493	closeScreen
+M	net/minecraft/class_54	method_500	()V	method_500	swingItem
 M	net/minecraft/class_54	method_502	()Lnet/minecraft/class_31;	method_502	getCurrentEquippedItem
 M	net/minecraft/class_54	method_512	(Lnet/minecraft/class_139;)V	method_512	triggerAchievement
 M	net/minecraft/class_54	method_514	(Lnet/minecraft/class_17;)Z	method_514	canHarvestBlock
@@ -1775,6 +1793,7 @@ M	net/minecraft/class_134	method_951	(Lnet/minecraft/class_54;)Z	method_951	canI
 M	net/minecraft/class_134	method_952	()Ljava/lang/String;	method_952	getInvName
 M	net/minecraft/class_134	method_953	()I	method_953	getInventoryStackLimit
 M	net/minecraft/class_134	method_954	(I)Lnet/minecraft/class_31;	method_954	getStackInSlot
+M	net/minecraft/class_135	method_956	()I	method_956	catchFish
 M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_267;	method_958	getRandomSoundFromSoundPool
 M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
 M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
@@ -1854,20 +1873,25 @@ M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	int
 M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
 M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet
 M	net/minecraft/class_57	method_1334	()Z	method_1334	isInWater
+M	net/minecraft/class_57	method_1335	()Z	method_1335	handleLavaMovement
 M	net/minecraft/class_57	method_1340	(DDD)V	method_1340	setPosition
 M	net/minecraft/class_57	method_1341	(DDDFF)V	method_1341	setLocationAndAngles
 M	net/minecraft/class_57	method_1342	(FF)V	method_1342	setRotation
 M	net/minecraft/class_57	method_1346	(Lnet/minecraft/class_8;)V	method_1346	writeToNBT
+M	net/minecraft/class_57	method_1347	(DDD)D	method_1347	getDistanceSq
 M	net/minecraft/class_57	method_1348	(Lnet/minecraft/class_8;)V	method_1348	readFromNBT
 M	net/minecraft/class_57	method_1350	(DDD)D	method_1350	getDistance
 M	net/minecraft/class_57	method_1351	(Lnet/minecraft/class_57;)F	method_1351	getDistanceToEntity
+M	net/minecraft/class_57	method_1352	(Lnet/minecraft/class_57;)D	method_1352	getDistanceSqToEntity
 M	net/minecraft/class_57	method_1356	()Z	method_1356	canBeCollidedWith
 M	net/minecraft/class_57	method_1359	()Z	method_1359	isBurning
 M	net/minecraft/class_57	method_1364	(D)Z	method_1364	isInRangeToRenderDist
 M	net/minecraft/class_57	method_1366	()F	method_1366	getShadowSize
 M	net/minecraft/class_57	method_1370	()V	method_1370	onUpdate
+M	net/minecraft/class_57	method_1371	(DDD)V	method_1371	moveEntity
 M	net/minecraft/class_57	method_1373	()Z	method_1373	isSneaking
 M	net/minecraft/class_57	method_1378	()F	method_1378	getEyeHeight
+M	net/minecraft/class_57	method_1393	()Z	method_1393	handleWaterMovement
 M	net/minecraft/class_202	method_1396	(I)Lnet/minecraft/class_187;	method_1396	tagAt
 M	net/minecraft/class_202	method_1398	()I	method_1398	tagCount
 M	net/minecraft/class_428	method_1417	()I	method_1417	getMaxUses
