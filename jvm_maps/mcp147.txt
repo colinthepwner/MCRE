@@ -2287,6 +2287,7 @@ M	amq	a	(Lyc;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
 M	amq	a	(Lyc;IIIII)V	func_71852_a	breakBlock
 M	amq	a	(Lyc;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
 M	amq	a	(Lyc;IIILlq;)V	func_71869_a	onEntityCollidedWithBlock
+M	amq	a	(Lyc;IIILmd;)V	func_71860_a	onBlockPlacedBy
 M	amq	a	(Lyc;IIILqx;)V	func_71921_a	onBlockClicked
 M	amq	a	(Lyc;IIILqx;IFFF)Z	func_71903_a	onBlockActivated
 M	amq	a	(Lyc;Lqx;IIII)V	func_71893_a	harvestBlock
@@ -2341,6 +2342,7 @@ M	any	s	()V	func_70312_q	validate
 M	any	w_	()V	func_70313_j	invalidate
 M	aoa	a	(II)I	func_71858_a	getBlockTextureFromSideAndMetadata
 M	aoa	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
+M	aoa	a	(Lyc;IIILmd;)V	func_71860_a	onBlockPlacedBy
 M	aoa	a	(Lyc;IIILqx;IFFF)Z	func_71903_a	onBlockActivated
 M	aoa	b	()Z	func_71886_c	renderAsNormalBlock
 M	aoa	c	()Z	func_71926_d	isOpaqueCube

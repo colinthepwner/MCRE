@@ -666,11 +666,13 @@ C	net/minecraft/class_92	net/minecraft/src/RenderItem
 C	net/minecraft/class_96	net/minecraft/src/StatFileWriter
 C	net/minecraft/class_97	net/minecraft/src/GuiSlot
 C	net/minecraft/class_98	net/minecraft/src/StatCrafting
+C	net/minecraft/client/Minecraft	net/minecraft/client/Minecraft
 C	net/minecraft/client/Minecraft$class_636	net/minecraft/src/ThreadSleepForever
 C	net/minecraft/client/Minecraft$class_637	net/minecraft/src/StatStringFormatKeyInv
 C	net/minecraft/client/Minecraft$class_638	net/minecraft/src/GameWindowListener
 C	net/minecraft/client/Minecraft$class_639	net/minecraft/src/ThreadCheckHasPaid
 C	net/minecraft/client/Minecraft$class_640	net/minecraft/src/MinecraftImpl
+C	net/minecraft/client/MinecraftApplet	net/minecraft/client/MinecraftApplet
 C	net/minecraft/client/MinecraftApplet$class_641	net/minecraft/src/MinecraftAppletImpl
 C	net/minecraft/client/MinecraftApplet$class_642	net/minecraft/src/CanvasMinecraftApplet
 F	argo/jdom/JsonNodeType	NULL	NULL	NULL
@@ -851,6 +853,7 @@ F	net/minecraft/class_54	field_528	field_528	username
 F	net/minecraft/class_54	field_529	field_529	dimension
 F	net/minecraft/class_145	field_542	field_542	xPosition
 F	net/minecraft/class_145	field_543	field_543	yPosition
+F	net/minecraft/class_145	field_545	field_545	direction
 F	net/minecraft/class_146	field_547	field_547	attackStrength
 F	net/minecraft/class_156	field_558	field_558	time
 F	net/minecraft/class_148	field_561	field_561	instance
@@ -900,6 +903,9 @@ F	net/minecraft/class_206	field_759	field_759	IDtoClassMapping
 F	net/minecraft/class_206	field_760	field_760	classToIDMapping
 F	net/minecraft/class_210	field_784	field_784	entityId
 F	net/minecraft/class_211	field_786	field_786	message
+F	net/minecraft/class_213	field_792	field_792	field_22280_a
+F	net/minecraft/class_213	field_793	field_793	field_22279_b
+F	net/minecraft/class_213	field_794	field_794	bedDirection
 F	net/minecraft/class_215	field_797	field_797	pitch
 F	net/minecraft/class_215	field_800	field_800	entityId
 F	net/minecraft/class_215	field_801	field_801	type
@@ -1038,6 +1044,7 @@ F	net/minecraft/class_33	field_1371	field_1371	yPosition
 F	net/minecraft/class_33	field_1372	field_1372	displayString
 F	net/minecraft/class_33	field_1373	field_1373	id
 F	net/minecraft/class_33	field_1374	field_1374	enabled
+F	net/minecraft/class_107	field_1384	field_1384	direction
 F	net/minecraft/class_107	field_1385	field_1385	xPosition
 F	net/minecraft/class_107	field_1386	field_1386	yPosition
 F	net/minecraft/class_60	field_1399	field_1399	worldObj
@@ -1296,6 +1303,7 @@ F	net/minecraft/class_497	field_2021	field_2021	thePlayer
 F	net/minecraft/class_439	field_2032	field_2032	entityId
 F	net/minecraft/class_439	field_2033	field_2033	xPosition
 F	net/minecraft/class_439	field_2034	field_2034	yPosition
+F	net/minecraft/class_439	field_2036	field_2036	direction
 F	net/minecraft/class_439	field_2037	field_2037	title
 F	net/minecraft/class_440	field_2051	field_2051	pitch
 F	net/minecraft/class_67	field_2054	field_2054	instance
@@ -1419,6 +1427,18 @@ F	net/minecraft/class_71	field_2735	field_2735	windowId
 F	net/minecraft/class_56	field_2757	field_2757	Sky
 F	net/minecraft/class_56	field_2758	field_2758	Block
 F	net/minecraft/class_635	field_2763	field_2763	options
+F	net/minecraft/client/Minecraft	field_2774	field_2774	running
+F	net/minecraft/client/Minecraft	field_2775	field_2775	debug
+F	net/minecraft/client/Minecraft	field_2779	field_2779	isRaining
+F	net/minecraft/client/Minecraft	field_2784	field_2784	timer
+F	net/minecraft/client/Minecraft	field_2802	field_2802	displayWidth
+F	net/minecraft/client/Minecraft	field_2803	field_2803	displayHeight
+F	net/minecraft/client/Minecraft	field_2804	field_2804	theWorld
+F	net/minecraft/client/Minecraft	field_2806	field_2806	thePlayer
+F	net/minecraft/client/Minecraft	field_2814	field_2814	renderEngine
+F	net/minecraft/client/Minecraft	field_2815	field_2815	fontRenderer
+F	net/minecraft/client/Minecraft	field_2816	field_2816	currentScreen
+F	net/minecraft/client/Minecraft	field_2824	field_2824	gameSettings
 M	net/minecraft/class_7	method_6	(J)V	method_6	setWorldTime
 M	net/minecraft/class_7	method_15	()I	method_15	getSpawnX
 M	net/minecraft/class_7	method_17	()I	method_17	getSpawnY
@@ -1716,11 +1736,13 @@ M	net/minecraft/class_17	method_1600	(Lnet/minecraft/class_14;III)I	method_1600	
 M	net/minecraft/class_17	method_1602	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1602	updateTick
 M	net/minecraft/class_17	method_1603	(Ljava/util/Random;)I	method_1603	quantityDropped
 M	net/minecraft/class_17	method_1605	()V	method_1605	setBlockBoundsForItemRender
+M	net/minecraft/class_17	method_1606	(Lnet/minecraft/class_18;IIII)V	method_1606	onBlockPlaced
 M	net/minecraft/class_17	method_1607	(I)I	method_1607	getBlockTextureFromSide
 M	net/minecraft/class_17	method_1609	(Lnet/minecraft/class_18;IIII)V	method_1609	onNeighborBlockChange
 M	net/minecraft/class_17	method_1610	(Lnet/minecraft/class_18;IIILnet/minecraft/class_54;)V	method_1610	onBlockClicked
 M	net/minecraft/class_17	method_1611	(Lnet/minecraft/class_18;III)V	method_1611	onBlockAdded
 M	net/minecraft/class_17	method_1612	(Lnet/minecraft/class_18;IIII)V	method_1612	onBlockDestroyedByPlayer
+M	net/minecraft/class_17	method_1614	(Lnet/minecraft/class_18;IIILnet/minecraft/class_127;)V	method_1614	onBlockPlacedBy
 M	net/minecraft/class_17	method_1615	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1615	onEntityCollidedWithBlock
 M	net/minecraft/class_17	method_1617	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1617	randomDisplayTick
 M	net/minecraft/class_17	method_1619	()I	method_1619	getRenderBlockPass
@@ -1786,6 +1808,7 @@ M	net/minecraft/class_71	method_2086	(I)Lnet/minecraft/class_31;	method_2086	get
 M	net/minecraft/class_71	method_2087	(Lnet/minecraft/class_54;)V	method_2087	onCraftGuiClosed
 M	net/minecraft/class_71	method_2088	(Lnet/minecraft/class_134;)V	method_2088	onCraftMatrixChanged
 M	net/minecraft/class_71	method_2089	(ILnet/minecraft/class_31;)V	method_2089	putStackInSlot
+M	net/minecraft/client/Minecraft	method_2112	(Lnet/minecraft/class_32;)V	method_2112	displayGuiScreen
 S	net/minecraft/class_24	net/minecraft/class_139	
 S	net/minecraft/class_100	net/minecraft/class_153	
 S	net/minecraft/class_368	net/minecraft/class_153	
