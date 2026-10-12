@@ -1722,6 +1722,7 @@
                     }
                     case 'world': return mp('world');
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
+                    case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
@@ -1742,7 +1743,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1 };
             J.running = function () { return running; };
             J.dispense = function (json) {
                 if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
@@ -1943,6 +1944,7 @@
                     r.mods.forEach(function (m) { call(m, 'takenFromCrafting(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IInventory;)V', [cpl, cst, null]); });
                     return;
                 }
+                if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
@@ -3557,7 +3559,7 @@
                     index[String(b.name || ('bone' + i)).toLowerCase()] = parts.length;
                     var piv = v3(b.pivot, [0, 0, 0]), rot = v3(b.rotation || b.bind_pose_rotation, [0, 0, 0]);
                     var part = { name: String(b.name || ('bone' + i)).toLowerCase(), parentName: b.parent ? String(b.parent).toLowerCase() : '',
-                                 abs: jp(piv), rot: [rot[0] * R, rot[1] * R, rot[2] * R], boxes: [] };
+                                 abs: jp(piv), rot: [rot[0] * R, rot[1] * R, rot[2] * R], boxes: [], hidden: b.neverRender === true || b.never_render === true };
                     parts.push(part);
                     (b.cubes || []).forEach(function (c) {
                         if (!c || !Array.isArray(c.origin) || !Array.isArray(c.size)) return;
@@ -3590,7 +3592,7 @@
                     var o = [parentOrigin[0] - t[0], parentOrigin[1] - t[1], parentOrigin[2] - t[2]];
                     var r = Array.isArray(m.rotate) ? m.rotate.map(Number) : [0, 0, 0];
                     var name = String(m.id || m.part || ('part' + parts.length)).toLowerCase();
-                    var part = { name: name, parentName: parentName, abs: [-o[0], 24 - o[1], o[2]], rot: [r[0] * R, -r[1] * R, -r[2] * R], boxes: [] };
+                    var part = { name: name, parentName: parentName, abs: [-o[0], 24 - o[1], o[2]], rot: [r[0] * R, -r[1] * R, -r[2] * R], boxes: [], hidden: m.hidden === true };
                     parts.push(part);
                     var mirrorU = String(m.mirrorTexture || '').indexOf('u') >= 0;
                     (m.boxes || []).forEach(function (bx) {
@@ -3622,7 +3624,7 @@
                 var out = ordered.map(function (p) {
                     var par = parentOf(p);
                     return {
-                        name: p.name, parent: par ? ordered.indexOf(par) : -1,
+                        name: p.name, parent: par ? ordered.indexOf(par) : -1, hidden: !!p.hidden,
                         pivot: par ? [p.abs[0] - par.abs[0], p.abs[1] - par.abs[1], p.abs[2] - par.abs[2]] : p.abs.slice(),
                         rot: p.rot,
                         boxes: p.boxes.map(function (b) {
@@ -4431,9 +4433,12 @@
                         if (kind === 'wing') return /left|(^|_)l($|_)/.test(p.name) ? 6 : /right|(^|_)r($|_)/.test(p.name) ? 7 : (wings++ % 2 ? 7 : 6);
                         return ANIM[kind];
                     };
+                    var hiddenNames = Array.isArray(j.hidden_parts) ? j.hidden_parts.map(function (n) { return String(n).toLowerCase(); }) : [];
+                    hiddenNames.forEach(function (n) { if (!model.parts.some(function (p) { return p.name === n; })) problem(mb.mod, file, '"hidden_parts": the model has no part "' + n + '"'); });
                     model.parts.forEach(function (p, i) {
                         lines.push(['mobpart', key, i, p.parent, p.pivot.map(numStr).join(','), p.rot.map(function (r) { return numStr(r, 5); }).join(','), p.name, animOf(p),
-                                    p.boxes.map(function (b) { return b.map(function (v) { return numStr(v); }).join(','); }).join(';')].join('\t'));
+                                    p.boxes.map(function (b) { return b.map(function (v) { return numStr(v); }).join(','); }).join(';'),
+                                    p.hidden || hiddenNames.indexOf(p.name) >= 0 ? 1 : 0].join('\t'));
                     });
                     if (egg) {
                         var eggKey = key + '_spawn_egg';
@@ -5574,6 +5579,10 @@
                             healEntity: function (id, n) { act(mod, ['entheal', pid(id) | 0, Math.max(0, n | 0)]); },
                             removeEntity: function (id) { act(mod, ['entremove', pid(id) | 0]); },
                             setOnFire: function (id, seconds) { act(mod, ['entfire', pid(id) | 0, Math.max(0, seconds == null ? 8 : seconds | 0)]); },
+                            setPartVisible: function (id, part, visible) {
+                                var names = (Array.isArray(part) ? part : [part]).map(function (n) { return String(n).toLowerCase().replace(/[\t,]/g, ''); }).filter(Boolean);
+                                if (names.length) act(mod, ['entparts', pid(id) | 0, names.join(','), visible === false ? 0 : 1]);
+                            },
                             addEffect: function (id, effect, seconds, level) {
                                 act(mod, ['enteffect', pid(id) | 0, effectId(effect, 'world.addEffect'), Math.max(1, Math.round((seconds == null ? 30 : +seconds) * 20)), Math.max(0, Math.min(9, (level == null ? 1 : level | 0) - 1))]);
                             },

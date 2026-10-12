@@ -1395,6 +1395,7 @@ F	net/minecraft/class_163	field_2296	field_2296	rotateAngleY
 F	net/minecraft/class_163	field_2297	field_2297	rotateAngleZ
 F	net/minecraft/class_163	field_2298	field_2298	mirror
 F	net/minecraft/class_163	field_2299	field_2299	showModel
+F	net/minecraft/class_163	field_2300	field_2300	isHidden
 F	net/minecraft/class_163	field_2302	field_2302	faces
 F	net/minecraft/class_163	field_2303	field_2303	textureOffsetX
 F	net/minecraft/class_163	field_2304	field_2304	textureOffsetY
@@ -1648,6 +1649,7 @@ M	net/minecraft/class_153	method_793	()Z	method_793	getEnableSnow
 M	net/minecraft/class_153	method_794	()Z	method_794	canSpawnLightningBolt
 M	net/minecraft/class_153	method_795	()Lnet/minecraft/class_153;	method_795	setDisableRain
 M	net/minecraft/class_245	method_815	(Lnet/minecraft/class_173;)V	method_815	setRenderPassModel
+M	net/minecraft/class_245	method_822	(Lnet/minecraft/class_127;DDDFF)V	method_822	doRenderLiving
 M	net/minecraft/class_43	method_874	(II)I	method_874	getHeightValue
 M	net/minecraft/class_43	method_875	(III)I	method_875	getBlockMetadata
 M	net/minecraft/class_43	method_879	(III)Z	method_879	canBlockSeeTheSky
@@ -1738,6 +1740,7 @@ M	net/minecraft/class_26	method_1292	()V	method_1292	initialize
 M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
 M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
 M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
+M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
 M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
 M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet
 M	net/minecraft/class_57	method_1334	()Z	method_1334	isInWater
