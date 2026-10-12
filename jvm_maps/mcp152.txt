@@ -1548,6 +1548,7 @@ F	aab	x	field_72986_A	worldInfo
 F	aab	z	field_72988_C	mapStorage
 F	aav	A	field_76752_A	topBlock
 F	aav	B	field_76753_B	fillerBlock
+F	aav	C	field_76754_C	field_76754_C
 F	aav	D	field_76748_D	minHeight
 F	aav	E	field_76749_E	maxHeight
 F	aav	F	field_76750_F	temperature
@@ -1559,6 +1560,10 @@ F	aav	K	field_76762_K	spawnableCreatureList
 F	aav	L	field_76755_L	spawnableWaterCreatureList
 F	aav	M	field_82914_M	spawnableCaveCreatureList
 F	aav	N	field_76756_M	biomeID
+F	aav	O	field_76757_N	worldGeneratorTrees
+F	aav	P	field_76758_O	worldGeneratorBigTree
+F	aav	Q	field_76764_P	worldGeneratorForest
+F	aav	R	field_76763_Q	worldGeneratorSwamp
 F	aav	S	field_76766_R	enableSnow
 F	aav	T	field_76765_S	enableRain
 F	aav	a	field_76773_a	biomeList
@@ -1589,7 +1594,40 @@ F	aav	y	field_76791_y	biomeName
 F	aav	z	field_76790_z	color
 F	aaz	A	field_76802_A	flowersPerChunk
 F	aaz	B	field_76803_B	grassPerChunk
+F	aaz	C	field_76804_C	deadBushPerChunk
+F	aaz	D	field_76798_D	mushroomsPerChunk
+F	aaz	E	field_76799_E	reedsPerChunk
+F	aaz	F	field_76800_F	cactiPerChunk
+F	aaz	G	field_76801_G	sandPerChunk
+F	aaz	H	field_76805_H	sandPerChunk2
+F	aaz	I	field_76806_I	clayPerChunk
+F	aaz	J	field_76807_J	bigMushroomsPerChunk
+F	aaz	K	field_76808_K	generateLakes
+F	aaz	a	field_76815_a	currentWorld
+F	aaz	b	field_76813_b	randomGenerator
+F	aaz	c	field_76814_c	chunk_X
+F	aaz	d	field_76811_d	chunk_Z
 F	aaz	e	field_76812_e	biome
+F	aaz	f	field_76809_f	clayGen
+F	aaz	g	field_76810_g	sandGen
+F	aaz	h	field_76822_h	gravelAsSandGen
+F	aaz	i	field_76823_i	dirtGen
+F	aaz	j	field_76820_j	gravelGen
+F	aaz	k	field_76821_k	coalGen
+F	aaz	l	field_76818_l	ironGen
+F	aaz	m	field_76819_m	goldGen
+F	aaz	n	field_76816_n	redstoneGen
+F	aaz	o	field_76817_o	diamondGen
+F	aaz	p	field_76831_p	lapisGen
+F	aaz	q	field_76830_q	plantYellowGen
+F	aaz	r	field_76829_r	plantRedGen
+F	aaz	s	field_76828_s	mushroomBrownGen
+F	aaz	t	field_76827_t	mushroomRedGen
+F	aaz	u	field_76826_u	bigMushroomGen
+F	aaz	v	field_76825_v	reedGen
+F	aaz	w	field_76824_w	cactusGen
+F	aaz	x	field_76834_x	waterlilyGen
+F	aaz	y	field_76833_y	waterlilyPerChunk
 F	aaz	z	field_76832_z	treesPerChunk
 F	acj	d	field_75825_d	chunkSaveLocation
 F	acn	a	field_76579_a	worldObj
@@ -1608,6 +1646,7 @@ F	aif	C	field_76237_B	portal
 F	aif	D	field_76238_C	cake
 F	aif	E	field_76232_D	web
 F	aif	F	field_76233_E	piston
+F	aif	I	field_76239_H	replaceable
 F	aif	a	field_76249_a	air
 F	aif	b	field_76247_b	grass
 F	aif	c	field_76248_c	ground
@@ -2207,6 +2246,7 @@ F	net/minecraft/server/MinecraftServer	u	field_71316_v	serverStopped
 F	ng	aH	field_70750_az	texture
 F	ng	aO	field_70746_aG	landMovementFactor
 F	ng	aS	field_70734_aK	health
+F	ng	bC	field_70708_bq	entityAge
 F	ng	bI	field_70697_bw	moveSpeed
 F	ng	bK	field_70765_h	moveHelper
 F	ng	bL	field_70767_i	jumpHelper
@@ -2578,18 +2618,31 @@ M	aak	g	(III)Laif;	func_72803_f	getBlockMaterial
 M	aak	h	(III)I	func_72805_g	getBlockMetadata
 M	aak	r	(III)Laqp;	func_72796_p	getBlockTileEntity
 M	aav	a	(FF)Laav;	func_76732_a	setTemperatureRainfall
+M	aav	a	(I)Laav;	func_76733_a	func_76733_a
+M	aav	a	(Laab;Ljava/util/Random;II)V	func_76728_a	decorate
 M	aav	a	(Ljava/lang/String;)Laav;	func_76735_a	setBiomeName
+M	aav	a	(Ljava/util/Random;)Ladj;	func_76740_a	getRandomWorldGenForTrees
 M	aav	a	(Lnn;)Ljava/util/List;	func_76747_a	getSpawnableList
 M	aav	b	()Laav;	func_76742_b	setEnableSnow
 M	aav	b	(FF)Laav;	func_76725_b	setMinMaxHeight
 M	aav	b	(I)Laav;	func_76739_b	setColor
+M	aav	b	(Ljava/util/Random;)Ladj;	func_76730_b	getRandomWorldGenForGrass
 M	aav	c	()Z	func_76746_c	getEnableSnow
 M	aav	d	()Z	func_76738_d	canSpawnLightningBolt
+M	aav	e	()Z	func_76736_e	isHighHumidity
+M	aav	f	()F	func_76741_f	getSpawningChance
+M	aav	g	()I	func_76744_g	getIntRainfall
+M	aav	h	()I	func_76734_h	getIntTemperature
 M	aav	i	()F	func_76727_i	getFloatRainfall
 M	aav	j	()F	func_76743_j	getFloatTemperature
 M	aav	k	()I	func_76737_k	getBiomeGrassColor
 M	aav	l	()I	func_76726_l	getBiomeFoliageColor
 M	aav	m	()Laav;	func_76745_m	setDisableRain
+M	aaz	a	()V	func_76794_a	decorate
+M	aaz	a	(ILadj;II)V	func_76795_a	genStandardOre1
+M	aaz	a	(Laab;Ljava/util/Random;II)V	func_76796_a	decorate
+M	aaz	b	()V	func_76797_b	generateOres
+M	aaz	b	(ILadj;II)V	func_76793_b	genStandardOre2
 M	acn	a	()V	func_76556_a	generateLightBrightnessTable
 M	acn	a	(FF)[F	func_76560_a	calcSunriseSunsetColors
 M	acn	a	(II)Z	func_76566_a	canCoordinateBeSpawn
@@ -2703,6 +2756,7 @@ M	apa	c	(Laab;IIIII)V	func_71897_c	dropBlockAsItem
 M	apa	c	(Laak;III)I	func_71920_b	colorMultiplier
 M	apa	c	(Ljava/lang/String;)Lapa;	func_71864_b	setUnlocalizedName
 M	apa	d	()I	func_71857_b	getRenderType
+M	apa	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	apa	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	apa	g	(Laab;IIII)V	func_71898_d	onBlockDestroyedByPlayer
 M	apa	h	()I	func_71915_e	getMobilityFlag
@@ -3280,6 +3334,7 @@ M	mv	b	(I)Ljava/lang/String;	func_75617_a	getStringFromID
 M	mv	b	(Lmp;)Ljava/lang/String;	func_75621_b	getEntityString
 M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
 M	net/minecraft/client/Minecraft	a	(Laxr;)V	func_71373_a	displayGuiScreen
+M	net/minecraft/client/Minecraft	x	()Lnet/minecraft/client/Minecraft;	func_71410_x	getMinecraft
 M	net/minecraft/server/MinecraftServer	A	()[Ljava/lang/String;	func_71213_z	getAllUsernames
 M	net/minecraft/server/MinecraftServer	D	()Lnet/minecraft/server/MinecraftServer;	func_71276_C	getServer
 M	net/minecraft/server/MinecraftServer	E	()Laa;	func_71187_D	getCommandManager
@@ -3312,6 +3367,8 @@ M	ng	aA	()Lnz;	func_70605_aq	getMoveHelper
 M	ng	aB	()Lnx;	func_70683_ar	getJumpHelper
 M	ng	aC	()Lpx;	func_70661_as	getNavigator
 M	ng	aD	()Lpy;	func_70635_at	getEntitySenses
+M	ng	aE	()Ljava/util/Random;	func_70681_au	getRNG
+M	ng	aH	()I	func_70654_ax	getAge
 M	ng	aI	()F	func_70689_ay	getAIMoveSpeed
 M	ng	aQ	()I	func_70627_aG	getTalkInterval
 M	ng	aW	()I	func_70667_aM	getMaxHealth
@@ -3522,6 +3579,7 @@ M	wm	d	(Lbs;)V	func_77982_d	setTagCompound
 M	wm	e	()I	func_77976_d	getMaxStackSize
 M	wm	f	()Z	func_77985_e	isStackable
 M	wm	h	()Z	func_77981_g	getHasSubtypes
+M	wm	j	()I	func_77952_i	getItemDamageForDisplay
 M	wm	k	()I	func_77960_j	getItemDamage
 M	wm	l	()I	func_77958_k	getMaxDamage
 M	wm	m	()Lwm;	func_77946_l	copy
@@ -3578,6 +3636,1209 @@ M	zb	e	(Lng;)Z	func_77502_d	getSilkTouchModifier
 M	zb	f	(Lng;)I	func_77517_e	getFortuneModifier
 M	zb	g	(Lng;)I	func_77519_f	getLootingModifier
 M	zb	h	(Lng;)Z	func_77510_g	getAquaAffinityModifier
+R	GOLD	GOLD
+R	field_77485_a	theWorld
+R	field_77405_a	theWorld
+R	field_77440_a	theWorld
+R	field_77174_a	seed
+R	SURVIVAL	SURVIVAL
+R	CREATIVE	CREATIVE
+R	field_77154_e	id
+R	field_77151_f	name
+R	field_77139_a	worldTypes
+R	field_77137_b	DEFAULT
+R	field_77138_c	FLAT
+R	field_77135_d	LARGE_BIOMES
+R	field_77136_e	DEFAULT_1_1
+R	field_82748_f	worldTypeId
+R	field_77133_f	worldType
+R	field_77134_g	generatorVersion
+R	field_77140_h	canBeCreated
+R	field_77141_i	isWorldTypeVersioned
+R	Sky	Sky
+R	Block	Block
+R	field_77187_a	random
+R	field_72818_a	chunkX
+R	field_72816_b	chunkZ
+R	field_72815_e	worldObj
+R	field_77183_a	xCoord
+R	field_77181_b	yCoord
+R	field_77182_c	zCoord
+R	field_77179_d	blockID
+R	field_76923_d	blockID
+R	field_76930_a	x
+R	field_76928_b	y
+R	field_76929_c	z
+R	field_76891_c	biomes
+R	field_76888_d	xPosition
+R	field_76889_e	zPosition
+R	field_76946_f	rainfall
+R	field_76585_a	data
+R	field_76637_e	worldObj
+R	field_76635_g	xPosition
+R	field_76647_h	zPosition
+R	field_76646_k	isTerrainPopulated
+R	field_76689_a	data
+R	field_76692_f	data
+R	field_76693_g	blocks
+R	field_76702_h	entities
+R	field_76703_i	tileEntities
+R	field_76701_k	x
+R	field_76699_l	z
+R	field_76716_d	offsets
+R	field_76722_b	chunkX
+R	field_76723_c	chunkZ
+R	field_73163_a	worldObj
+R	field_73161_b	random
+R	field_73175_o	worldObj
+R	field_75040_a	range
+R	field_75038_b	rand
+R	field_75039_c	worldObj
+R	field_73210_d	noise3
+R	field_73220_k	rand
+R	field_73230_p	worldObj
+R	field_76505_b	rand
+R	field_76506_c	worldObj
+R	field_76501_f	height
+R	field_76518_a	clayBlockId
+R	field_76517_b	numberOfBlocks
+R	field_76516_a	deadBushID
+R	field_76528_a	plantBlockId
+R	field_76527_a	field_76527_a
+R	field_76526_b	field_76526_b
+R	field_76525_a	hellLavaID
+R	field_94524_b	field_94524_b
+R	field_76523_a	mushroomType
+R	field_76524_a	blockIndex
+R	field_76522_a	baseHeight
+R	field_76520_b	woodMetadata
+R	field_76521_c	leavesMetadata
+R	field_76540_a	sandID
+R	field_76539_b	radius
+R	field_76537_a	liquidBlockId
+R	field_76535_a	tallGrassID
+R	field_76534_b	tallGrassMetadata
+R	field_76533_a	minTreeHeight
+R	field_76531_b	vinesGrow
+R	field_76532_c	metaWood
+R	field_76530_d	metaLeaves
+R	field_78897_a	minX
+R	field_78895_b	minY
+R	field_78896_c	minZ
+R	field_78893_d	maxX
+R	field_78894_e	maxY
+R	field_78892_f	maxZ
+R	field_74887_e	boundingBox
+R	field_75074_b	boundingBox
+R	field_76315_a	xCoord
+R	field_76313_b	yCoord
+R	field_76314_c	zCoord
+R	field_76306_b	octaves
+R	field_75909_a	parent
+R	field_75851_b	count
+R	field_75839_a	xCoord
+R	field_75837_b	yCoord
+R	field_75838_c	zCoord
+R	field_75835_d	index
+R	field_75840_j	hash
+R	field_75866_b	path
+R	field_76200_c	dimension
+R	field_76197_d	scale
+R	field_76213_e	data
+R	field_76172_a	parent
+R	field_72294_a	rand
+R	field_72293_a	random
+R	field_72197_a	mushroomType
+R	field_73664_a	x
+R	field_73662_b	y
+R	field_73663_c	z
+R	mobs	mobs
+R	players	players
+R	field_72218_a	blockType
+R	field_70417_a	record
+R	field_72166_a	powered
+R	field_82539_a	types
+R	field_82136_e	levels
+R	field_70376_r	rand
+R	field_70416_a	note
+R	field_70344_d	extending
+R	field_70342_f	progress
+R	field_96684_b	name
+R	field_71611_a	identifier
+R	field_71595_a	bc
+R	field_71621_M	data
+R	field_71788_a	random
+R	field_71787_b	strength
+R	field_71845_a	random
+R	field_71844_b	strength
+R	field_71830_a	S
+R	field_71784_a	key
+R	field_74827_c	info
+R	field_74619_a	elements
+R	field_74730_a	elements
+R	field_74625_a	NULL
+R	field_74729_a	key
+R	field_74663_a	stack
+R	field_74662_b	root
+R	field_74636_a	index
+R	STRING	STRING
+R	NULL	NULL
+R	field_74620_b	value
+R	field_74617_a	fields
+R	field_74627_a	value
+R	field_74665_a	column
+R	field_74664_b	row
+R	field_74577_b	mc
+R	field_74578_c	closing
+R	field_74532_a	mc
+R	field_74500_a	mc
+R	field_82887_a	mc
+R	field_74534_a	arguments
+R	field_74536_a	mc
+R	field_74421_a	mc
+R	field_74503_a	mc
+R	field_79002_a	mc
+R	UNKNOWN	UNKNOWN
+R	field_73725_b	mc
+R	field_74286_b	username
+R	field_73772_a	mc
+R	field_73910_c	options
+R	field_73923_C	seed
+R	field_73916_E	worldTypeId
+R	field_73842_c	rand
+R	field_73839_d	mc
+R	field_78316_a	pattern
+R	field_78315_c	line
+R	field_78322_c	gameSettings
+R	field_78320_d	fontRenderer
+R	field_74051_d	options
+R	field_77233_a	mc
+R	field_77228_g	width
+R	field_77231_b	top
+R	field_77232_c	bottom
+R	field_77230_e	mouseX
+R	field_77227_f	mouseY
+R	field_77240_h	height
+R	field_77241_i	right
+R	field_77238_j	left
+R	field_74113_c	mouseX
+R	field_74111_d	mouseY
+R	field_82323_o	beacon
+R	field_73755_j	nextPage
+R	field_74217_o	brewingStand
+R	field_82317_b	commandBlock
+R	field_82250_a	mc
+R	field_74242_o	inventory
+R	field_78061_a	instance
+R	field_78059_b	rand
+R	field_74216_x	rand
+R	field_74207_v	theItemStack
+R	field_73749_j	mirrored
+R	field_71513_a	description
+R	field_78071_a	posX
+R	field_78069_b	posY
+R	field_78080_s	rand
+R	field_73776_a	particles
+R	field_73775_b	mc
+R	field_73988_b	lines
+R	field_72558_b	mapStorage
+R	field_72557_e	rand
+R	field_72563_h	mc
+R	field_74258_b	cancelled
+R	field_78821_a	ip
+R	field_78819_b	port
+R	field_73235_d	worldObj
+R	field_78776_a	mc
+R	field_73037_M	mc
+R	field_78831_a	name
+R	field_78859_a	mc
+R	field_78878_a	worldObj
+R	field_78877_c	renderer
+R	field_78875_d	rand
+R	field_70594_ar	age
+R	field_78901_c	jump
+R	field_78899_d	sneak
+R	field_78903_e	gameSettings
+R	field_78916_B	tileEntities
+R	field_78924_a	worldObj
+R	field_78923_c	posX
+R	field_78920_d	posY
+R	field_78921_e	posZ
+R	field_78545_a	instance
+R	field_78537_ab	random
+R	field_78531_r	mc
+R	field_78455_a	mc
+R	field_72762_a	tileEntities
+R	field_72769_h	theWorld
+R	field_72770_i	renderEngine
+R	field_72777_q	mc
+R	field_78398_a	instance
+R	field_78402_m	color
+R	field_78400_o	hasTexture
+R	field_78407_w	yOffset
+R	field_78416_y	normal
+R	field_78563_e	instance
+R	field_78550_b	xPosition
+R	field_78551_c	yPosition
+R	field_78549_d	zPosition
+R	field_78727_a	instance
+R	field_78724_e	renderEngine
+R	field_78722_g	worldObj
+R	field_78733_k	options
+R	field_78736_p	fontRenderer
+R	field_77073_a	scale
+R	field_77109_a	modelBipedMain
+R	field_94191_c	width
+R	field_94188_d	height
+R	field_94187_f	holder
+R	field_94233_j	width
+R	field_94234_k	height
+R	field_94313_f	maxHeight
+R	field_94289_d	width
+R	field_94290_e	height
+R	field_94204_c	width
+R	field_94201_d	height
+R	field_94271_a	instance
+R	field_76963_a	instance
+R	field_76960_e	renderEngine
+R	field_76957_f	worldObj
+R	field_76964_n	fontRenderer
+R	field_71349_l	mc
+R	field_77312_b	mc
+R	field_77388_c	hash
+R	field_82476_c	thePlayer
+R	field_77379_b	soundPoolSounds
+R	field_77380_c	soundPoolStreaming
+R	field_77377_d	soundPoolMusic
+R	field_77375_f	options
+R	field_77376_g	loaded
+R	field_77382_h	rand
+R	field_77464_c	rand
+R	field_73976_a	rand
+R	field_73526_a	entityId
+R	field_73524_b	xPosition
+R	field_73525_c	yPosition
+R	field_73522_d	zPosition
+R	field_92077_h	pitch
+R	field_92078_i	yaw
+R	field_73527_h	type
+R	field_73533_a	entityId
+R	field_73531_b	posX
+R	field_73532_c	posY
+R	field_73529_d	posZ
+R	field_73536_b	posX
+R	field_73537_c	posY
+R	field_73534_d	posZ
+R	field_73496_a	entityId
+R	field_73494_b	type
+R	field_73495_c	xPosition
+R	field_73492_d	yPosition
+R	field_73493_e	zPosition
+R	field_73500_i	yaw
+R	field_73497_j	pitch
+R	field_73501_t	metadata
+R	field_73508_a	entityId
+R	field_73506_b	xPosition
+R	field_73507_c	yPosition
+R	field_73504_d	zPosition
+R	field_73505_e	direction
+R	field_73503_f	title
+R	field_73516_a	entityId
+R	field_73514_b	name
+R	field_73515_c	xPosition
+R	field_73512_d	yPosition
+R	field_73513_e	zPosition
+R	field_73510_f	rotation
+R	field_73511_g	pitch
+R	field_73518_h	currentItem
+R	field_73519_i	metadata
+R	field_73470_a	entityId
+R	field_73471_b	amount
+R	field_73474_a	text
+R	field_73476_b	message
+R	field_73477_c	isServer
+R	field_73452_a	xPosition
+R	field_73450_b	zPosition
+R	field_73448_d	size
+R	field_73468_a	language
+R	field_73456_b	username
+R	field_73438_a	itemID
+R	field_73435_a	windowId
+R	field_73434_c	accepted
+R	field_73446_a	windowId
+R	field_73445_b	enchantment
+R	field_73440_d	action
+R	field_73441_e	itemStack
+R	field_73432_a	windowId
+R	field_73431_a	windowId
+R	field_73427_a	windowId
+R	field_73426_b	itemStack
+R	field_73634_a	windowId
+R	field_73637_a	windowId
+R	field_73628_b	length
+R	field_73629_c	data
+R	field_73631_a	reason
+R	field_73627_a	entityId
+R	field_73566_c	posX
+R	field_73563_d	posY
+R	field_73564_e	posZ
+R	field_98207_b	posX
+R	field_98208_c	posY
+R	field_98205_d	posZ
+R	field_98206_e	offsetX
+R	field_98203_f	offsetY
+R	field_98204_g	offsetZ
+R	field_98210_h	speed
+R	field_73574_f	pitch
+R	field_73558_e	dimension
+R	field_73554_a	entityId
+R	field_73552_b	xPosition
+R	field_73553_c	yPosition
+R	field_73550_d	zPosition
+R	field_73551_e	yaw
+R	field_73548_f	pitch
+R	field_73549_g	rotating
+R	field_73545_a	xPosition
+R	field_73543_b	yPosition
+R	field_73544_c	zPosition
+R	field_73542_e	yaw
+R	field_73539_f	pitch
+R	field_73540_g	onGround
+R	field_73547_i	rotating
+R	field_73360_b	isFlying
+R	field_73361_c	allowFlying
+R	field_73358_d	isCreativeMode
+R	field_73345_a	xPosition
+R	field_73343_b	yPosition
+R	field_73344_c	zPosition
+R	field_73341_d	face
+R	field_73342_e	status
+R	field_73367_a	entityId
+R	field_73366_b	state
+R	field_73368_a	entityId
+R	field_73375_a	entityId
+R	field_73374_b	effectId
+R	field_73383_a	entityId
+R	field_73386_a	id
+R	field_73385_a	slot
+R	field_73384_b	itemStack
+R	field_73393_a	entityId
+R	field_73392_b	metadata
+R	field_73390_a	entityId
+R	field_73388_b	motionX
+R	field_73389_c	motionY
+R	field_73387_d	motionZ
+R	field_73398_b	slot
+R	field_73638_b	food
+R	field_96483_c	change
+R	field_96489_f	mode
+R	field_73297_a	entityId
+R	field_96487_c	value
+R	field_73300_a	xPosition
+R	field_73298_b	yPosition
+R	field_73299_c	zPosition
+R	field_73301_a	time
+R	field_73311_a	xPosition
+R	field_73309_b	yPosition
+R	field_73310_c	zPosition
+R	field_73319_a	entityId
+R	field_73317_b	xPosition
+R	field_73318_c	yPosition
+R	field_73315_d	zPosition
+R	field_73316_e	yaw
+R	field_73314_f	pitch
+R	field_73329_a	entityId
+R	field_73327_b	posX
+R	field_73328_c	posY
+R	field_73325_d	posZ
+R	field_73334_a	xPosition
+R	field_73332_b	yPosition
+R	field_73333_c	zPosition
+R	field_73337_e	pitch
+R	field_73425_a	xPosition
+R	field_73423_b	yPosition
+R	field_73424_c	zPosition
+R	field_73421_d	type
+R	field_73422_e	metadata
+R	field_73420_a	entityId
+R	field_73418_b	effectId
+R	field_73417_d	duration
+R	field_73415_a	xPosition
+R	field_73413_b	yPosition
+R	field_73414_c	zPosition
+R	field_73411_d	direction
+R	field_73412_e	itemStack
+R	field_73410_g	yOffset
+R	field_73697_c	username
+R	field_73693_g	reason
+R	field_74267_a	mcServer
+R	field_74274_a	mcServer
+R	field_74272_a	mcServer
+R	field_74270_a	mcServer
+R	field_73674_a	logger
+R	field_71340_o	settings
+R	field_72428_a	server
+R	field_72795_a	theWorld
+R	field_72783_a	mcServer
+R	field_72699_b	players
+R	field_73263_b	players
+R	field_73251_h	worldObj
+R	field_73092_a	theWorld
+R	field_73098_k	posX
+R	field_73095_l	posY
+R	field_73096_m	posZ
+R	field_73135_l	motionZ
+R	field_72537_e	rand
+R	field_72534_f	mcServer
+R	field_72573_d	mcServer
+R	field_71750_c	mcServer
+R	field_72673_b	output
+R	field_70010_a	instance
+R	field_72619_a	running
+R	field_72617_b	server
+R	field_72640_t	time
+R	field_72639_u	output
+R	field_75983_a	itemID
+R	field_75964_a	instance
+R	field_76055_a	slots
+R	field_76053_b	count
+R	field_76050_f	keySet
+R	field_76150_a	key
+R	field_76148_b	value
+R	field_76147_d	hash
+R	field_76343_a	first
+R	field_76342_b	second
+R	field_76292_a	itemWeight
+R	field_76297_b	theItemId
+R	field_76295_d	theMinimumChanceToGenerateItem
+R	field_76296_e	theMaximumChanceToGenerateItem
+R	field_70479_a	name
+R	field_76371_c	lava
+R	field_76367_g	cactus
+R	field_76377_j	generic
+R	field_82727_n	wither
+R	field_82728_o	anvil
+R	field_76415_H	id
+R	field_76416_I	name
+R	field_76418_K	isBadEffect
+R	field_76425_a	potionTypes
+R	field_76424_c	moveSpeed
+R	field_76421_d	moveSlowdown
+R	field_76422_e	digSpeed
+R	field_76419_f	digSlowdown
+R	field_76420_g	damageBoost
+R	field_76432_h	heal
+R	field_76433_i	harm
+R	field_76430_j	jump
+R	field_76431_k	confusion
+R	field_76428_l	regeneration
+R	field_76429_m	resistance
+R	field_76426_n	fireResistance
+R	field_76427_o	waterBreathing
+R	field_76441_p	invisibility
+R	field_76440_q	blindness
+R	field_76439_r	nightVision
+R	field_76438_s	hunger
+R	field_76437_t	weakness
+R	field_76436_u	poison
+R	field_82731_v	wither
+R	field_76434_w	field_76434_w
+R	field_76443_y	field_76443_y
+R	field_76462_a	potionID
+R	field_76460_b	duration
+R	field_76461_c	amplifier
+R	field_85080_a	blockID
+R	field_70523_b	xPosition
+R	field_70524_c	yPosition
+R	field_70521_d	zPosition
+R	field_71481_b	mc
+R	field_75702_A	title
+R	field_75699_D	offsetX
+R	field_75700_E	offsetY
+R	Skeleton	Skeleton
+R	field_75663_a	entity
+R	field_75659_a	entity
+R	field_75656_e	posX
+R	field_75653_f	posY
+R	field_75654_g	posZ
+R	field_75648_a	entity
+R	field_75646_b	posX
+R	field_75647_c	posY
+R	field_75644_d	posZ
+R	field_75645_e	speed
+R	field_75385_b	thePlayer
+R	field_75394_a	theWorld
+R	field_75393_c	moveSpeed
+R	field_75364_c	theWorld
+R	field_75369_e	movementSpeed
+R	field_75367_f	theWorld
+R	field_75342_a	theWorld
+R	field_75254_a	mutexBits
+R	field_75733_a	action
+R	field_75731_b	priority
+R	field_75732_c	tasks
+R	field_75448_d	worldObj
+R	field_75443_a	worldObj
+R	field_75418_b	movementSpeed
+R	field_75433_e	movementSpeed
+R	field_75411_a	theWorld
+R	field_75265_b	speed
+R	field_75457_a	entity
+R	field_75455_b	xPosition
+R	field_75456_c	yPosition
+R	field_75453_d	zPosition
+R	field_75454_e	speed
+R	field_75276_a	villager
+R	field_75305_a	irongolem
+R	field_75460_a	parent
+R	field_75513_b	worldObj
+R	field_75511_d	speed
+R	field_75481_a	posX
+R	field_75479_b	posY
+R	field_75480_c	posZ
+R	field_75586_a	worldObj
+R	field_75537_a	worldObj
+R	field_75556_a	worldObj
+R	field_70258_b	name
+R	field_70260_b	health
+R	field_70980_b	targetX
+R	field_70981_c	targetY
+R	field_70993_bI	target
+R	field_70978_d	targetZ
+R	field_71583_a	offsetX
+R	field_71581_b	offsetZ
+R	field_82373_c	directions
+R	field_71582_c	directionToFacing
+R	field_71579_d	facingToDirection
+R	field_71578_g	rotateLeft
+R	field_71584_h	bedDirection
+R	field_70287_a	blockID
+R	field_70285_b	metadata
+R	field_94110_c	fuel
+R	field_96634_a	theItemStack
+R	field_70255_ao	damage
+R	field_70224_b	targetX
+R	field_70225_c	targetY
+R	field_70222_d	targetZ
+R	field_82876_a	beacon
+R	field_75226_a	brewingStand
+R	field_75244_a	player
+R	field_75161_g	worldObj
+R	field_75164_h	posX
+R	field_75165_i	posY
+R	field_75163_j	posZ
+R	field_75173_i	posX
+R	field_75170_j	posY
+R	field_75171_k	posZ
+R	field_75169_l	rand
+R	field_70484_a	container
+R	field_75227_a	container
+R	field_75158_e	furnace
+R	field_82862_h	thePlayer
+R	field_75236_a	armorType
+R	field_75235_b	parent
+R	field_70475_c	thePlayer
+R	field_75177_g	theWorld
+R	field_75232_b	thePlayer
+R	field_82860_h	theWorld
+R	field_82855_n	thePlayer
+R	field_82875_a	theWorld
+R	field_82872_e	anvil
+R	field_75238_b	thePlayer
+R	field_77859_b	dyeColors
+R	common	common
+R	field_77837_a	recordName
+R	field_90044_b	records
+R	field_82809_c	soilId
+R	field_77839_a	blockType
+R	none	none
+R	block	block
+R	bow	bow
+R	field_77606_a	smeltingBase
+R	field_77598_a	instance
+R	field_77597_b	recipes
+R	field_77494_b	entityLiving
+R	field_77496_b	source
+R	field_77287_j	worldObj
+R	toString	toString
+R	values	values
+R	func_77480_a	getGrassColor
+R	func_72980_b	playSound
+R	func_72963_a	initialize
+R	func_94576_a	getEntitiesWithinAABBExcludingEntity
+R	func_72835_b	tick
+R	func_72915_b	setLightValue
+R	func_96439_d	notifyBlocksOfNeighborChange
+R	func_72948_g	getFogColor
+R	func_72870_g	updateEntity
+R	func_72808_j	getBrightness
+R	call	call
+R	func_77439_a	getChunkProvider
+R	func_72710_a	markBlockForUpdate
+R	func_72708_a	spawnParticle
+R	func_72704_a	playSound
+R	func_72706_a	playAuxSFX
+R	func_77160_d	getSeed
+R	func_77162_e	getGameType
+R	func_77165_h	getTerrainType
+R	func_77163_i	areCommandsAllowed
+R	func_77148_a	getID
+R	func_77149_b	getName
+R	func_77127_a	getWorldTypeName
+R	func_77124_a	setCanBeCreated
+R	func_77128_b	getTranslateName
+R	func_77131_c	getGeneratorVersion
+R	func_77126_d	getCanBeCreated
+R	func_82747_f	getWorldTypeID
+R	valueOf	valueOf
+R	func_72800_K	getHeight
+R	func_82732_R	getWorldVec3Pool
+R	func_72807_a	getBiomeGenForCoords
+R	func_72798_a	getBlockId
+R	func_72799_c	isAirBlock
+R	func_72803_f	getBlockMaterial
+R	func_72805_g	getBlockMetadata
+R	func_72796_p	getBlockTileEntity
+R	compareTo	compareTo
+R	equals	equals
+R	hashCode	hashCode
+R	func_76919_a	getX
+R	func_76921_b	getY
+R	func_76920_c	getZ
+R	func_76918_d	getEventID
+R	func_76916_f	getBlockID
+R	func_76837_b	getBiomeGenAt
+R	func_76885_a	getBiomeGenAt
+R	func_70006_a	sendChatToPlayer
+R	func_70005_c_	getCommandSenderName
+R	func_76935_a	getBiomeGenAt
+R	func_76931_a	getBiomeGenAt
+R	func_76934_b	getTemperatures
+R	func_76728_a	decorate
+R	func_76740_a	getRandomWorldGenForTrees
+R	func_76730_b	getRandomWorldGenForGrass
+R	func_76737_k	getBiomeGrassColor
+R	func_76726_l	getBiomeFoliageColor
+R	func_76794_a	decorate
+R	func_76484_a	generate
+R	func_73153_a	populate
+R	func_73154_d	provideChunk
+R	func_76582_a	get
+R	func_76581_a	set
+R	func_76590_a	generateHeightMap
+R	func_76610_a	getBlockID
+R	func_76592_a	setBlockIDWithMetadata
+R	func_76633_a	setLightValue
+R	func_76603_b	generateSkylightMap
+R	func_76611_b	getHeightValue
+R	func_76589_b	setBlockMetadata
+R	func_76631_c	onChunkLoad
+R	func_76628_c	getBlockMetadata
+R	func_76629_c	getBlockLightValue
+R	func_76623_d	onChunkUnload
+R	func_76619_d	canBlockSeeTheSky
+R	func_76630_e	setChunkModified
+R	func_76621_g	isEmpty
+R	func_76626_d	getPrecipitationHeight
+R	func_76663_a	isEmpty
+R	func_76686_a	get
+R	func_76691_a	load
+R	func_76706_a	write
+R	func_76712_a	write
+R	func_76562_b	getFogColor
+R	func_76556_a	generateLightBrightnessTable
+R	func_76566_a	canCoordinateBeSpawn
+R	func_76563_a	calculateCelestialAngle
+R	func_76572_b	registerWorldChunkManager
+R	func_76569_d	isSurfaceWorld
+R	func_76567_e	canRespawnHere
+R	func_80007_l	getDimensionName
+R	func_76560_a	calcSunriseSunsetColors
+R	func_76571_f	getCloudHeight
+R	func_76557_i	getAverageGroundLevel
+R	func_75036_a	generate
+R	func_76487_a	setScale
+R	func_98152_d	getAllUsernames
+R	func_76529_b	growVines
+R	func_78886_a	offset
+R	func_78885_a	intersectsWith
+R	func_78884_a	intersectsWith
+R	func_78890_b	isVecInside
+R	func_71542_c	getAllUsernames
+R	func_74874_b	getBoundingBox
+R	func_75071_a	getBoundingBox
+R	func_74925_d	getWorldChunkManager
+R	func_74889_b	getAverageGroundLevel
+R	func_76310_a	grad
+R	func_76311_b	lerp
+R	func_76305_a	generateNoiseOctaves
+R	func_76304_a	generateNoiseOctaves
+R	func_76220_a	isSolid
+R	func_76224_d	isLiquid
+R	func_75902_a	nextInt
+R	func_75829_a	distanceTo
+R	func_76184_a	readFromNBT
+R	func_76187_b	writeToNBT
+R	func_75763_a	getChunkLoader
+R	func_76063_b	getSeed
+R	func_76079_c	getSpawnX
+R	func_76068_b	setWorldTime
+R	func_76075_d	getSpawnY
+R	func_76074_e	getSpawnZ
+R	func_82573_f	getWorldTotalTime
+R	func_76073_f	getWorldTime
+R	func_76076_i	getDimension
+R	func_76065_j	getWorldName
+R	func_76061_m	isThundering
+R	func_76059_o	isRaining
+R	func_76077_q	getGameType
+R	func_76093_s	isHardcoreModeEnabled
+R	func_76067_t	getTerrainType
+R	func_76086_u	areCommandsAllowed
+R	func_75803_c	getWorldInfo
+R	func_85129_h	getWorldTime
+R	func_85120_o	getGameType
+R	func_75787_a	compareTo
+R	func_75788_b	getDisplayName
+R	func_75789_g	isHardcoreModeEnabled
+R	func_75758_b	getMapFileFromName
+R	func_75762_c	checkSessionLock
+R	func_75760_g	getWorldDirectoryName
+R	run	run
+R	func_71899_b	damageDropped
+R	func_71858_a	getIcon
+R	func_71879_a	getSubBlocks
+R	func_71860_a	onBlockPlacedBy
+R	func_71903_a	onBlockActivated
+R	func_94332_a	registerIcons
+R	func_71886_c	renderAsNormalBlock
+R	func_71926_d	isOpaqueCube
+R	func_71857_b	getRenderType
+R	func_71859_p_	tickRate
+R	func_71863_a	onNeighborBlockChange
+R	func_71852_a	breakBlock
+R	func_71847_b	updateTick
+R	func_71869_a	onEntityCollidedWithBlock
+R	func_71872_e	getCollisionBoundingBoxFromPool
+R	func_71930_b	canPlaceBlockAt
+R	func_71919_f	setBlockBoundsForItemRender
+R	func_71915_e	getMobilityFlag
+R	func_71861_g	onBlockAdded
+R	func_71925_a	quantityDropped
+R	func_72274_a	createNewTileEntity
+R	func_71885_a	idDropped
+R	func_71914_a	dropBlockAsItemWithChance
+R	func_72227_n	setBounds
+R	func_71862_a	randomDisplayTick
+R	func_71854_d	canBlockStay
+R	func_72263_d_	canThisPlantGrowOnThisBlockID
+R	func_85104_a	onBlockPlaced
+R	func_71921_a	onBlockClicked
+R	func_72260_l	getOrientation
+R	func_94442_h_	getInventory
+R	func_71883_b	onBlockEventReceived
+R	func_71893_a	harvestBlock
+R	func_71898_d	onBlockDestroyedByPlayer
+R	func_82526_n	dispense
+R	func_71895_b	getBlockTexture
+R	func_71935_l	isCollidable
+R	func_71856_s_	getRenderBlockPass
+R	func_71889_f_	getRenderColor
+R	func_71920_b	colorMultiplier
+R	func_71933_m	getBlockColor
+R	func_71910_a	quantityDroppedWithBonus
+R	func_70307_a	readFromNBT
+R	func_70310_b	writeToNBT
+R	func_71891_b	onEntityWalking
+R	func_72176_l	glow
+R	func_72265_d	getState
+R	func_72676_a	getBreakSound
+R	func_72145_a	playSoundEffect
+R	func_70301_a	getStackInSlot
+R	func_70298_a	decrStackSize
+R	func_70299_a	setInventorySlotContents
+R	func_70300_a	isUseableByPlayer
+R	func_70303_b	getInvName
+R	func_70304_b	getStackInSlotOnClosing
+R	func_94041_b	isStackValidForSlot
+R	func_94042_c	isInvNameLocalized
+R	func_70297_j_	getInventoryStackLimit
+R	func_70295_k_	openChest
+R	func_70305_f	closeChest
+R	func_70316_g	updateEntity
+R	func_70302_i_	getSizeInventory
+R	func_70319_e	getDescriptionPacket
+R	func_70315_b	receiveClientEvent
+R	func_70321_h	updateContainingBlockInfo
+R	func_70313_j	invalidate
+R	func_70364_a	openChest
+R	func_70365_a	isUseableByPlayer
+R	func_70366_b	closeChest
+R	func_70400_i	isBurning
+R	func_70314_l	getWorldObj
+R	func_70296_d	onInventoryChanged
+R	func_70337_b	getOffsetX
+R	func_70334_c	getOffsetY
+R	func_70332_d	getOffsetZ
+R	func_70322_n	getBlockMetadata
+R	func_72445_d	squareDistanceTo
+R	func_96679_b	getName
+R	func_96678_d	getDisplayName
+R	compare	compare
+R	func_71612_a	branch
+R	func_71609_b	getId
+R	func_71805_a	init
+R	init	init
+R	func_71819_a	shift
+R	available	available
+R	read	read
+R	skip	skip
+R	write	write
+R	func_71783_a	getKey
+R	func_74818_a	setup
+R	func_74830_a	toLowerCase
+R	func_74785_a	format
+R	func_74787_a	format
+R	func_74788_a	parse
+R	parse	parse
+R	func_74616_a	getType
+R	getText	getText
+R	func_74604_a	build
+R	func_74686_a	with
+R	func_74688_a	matches
+R	func_74564_a	read
+R	func_74565_b	read
+R	func_74552_a	parse
+R	func_74502_a	getType
+R	func_100015_a	isKeyDown
+R	func_74305_a	parseFloat
+R	func_73866_w_	initGui
+R	func_73863_a	drawScreen
+R	func_73875_a	actionPerformed
+R	func_73869_a	keyTyped
+R	func_73864_a	mouseClicked
+R	func_73878_a	confirmClicked
+R	func_73874_b	onGuiClosed
+R	func_73876_c	updateScreen
+R	func_73868_f	doesGuiPauseGame
+R	func_77221_c	drawBackground
+R	func_73873_v_	drawDefaultBackground
+R	func_78262_a	trimStringToWidth
+R	func_73831_a	updateTick
+R	func_73737_a	drawButton
+R	func_77211_a	drawScreen
+R	func_77219_a	actionPerformed
+R	func_73740_a	mouseReleased
+R	func_73738_a	getHoverState
+R	func_73739_b	mouseDragged
+R	func_73736_c	mousePressed
+R	func_74130_a	getMinecraft
+R	func_74149_a	drawGradientRect
+R	func_74185_a	drawGuiContainerBackgroundLayer
+R	func_74189_g	drawGuiContainerForegroundLayer
+R	func_71112_a	sendProgressBarUpdate
+R	func_71111_a	sendSlotContents
+R	func_74191_a	handleMouseClick
+R	func_73879_b	mouseMovedOrUp
+R	func_74229_i	getInventory
+R	func_75145_c	canInteractWith
+R	func_82846_b	transferStackInSlot
+R	func_75219_a	getSlotStackLimit
+R	func_75209_a	decrStackSize
+R	func_82870_a	onPickupFromSlot
+R	func_75214_a	isItemValid
+R	func_75212_b	getBackgroundIconIndex
+R	func_75211_c	getStack
+R	func_75215_d	putStack
+R	func_75216_d	getHasStack
+R	func_75218_e	onSlotChanged
+R	func_71501_a	getDescription
+R	func_78064_b	setDead
+R	func_73773_a	draw
+R	func_78236_a	draw
+R	func_74257_b	isCancelled
+R	func_72838_d	spawnEntityInWorld
+R	func_70071_h_	onUpdate
+R	func_71150_b	setHealth
+R	func_82482_a	dispense
+R	func_70013_c	getBrightness
+R	func_70046_E	getBoundingBox
+R	func_70088_a	entityInit
+R	func_85030_a	playSound
+R	func_71001_a	onItemPickup
+R	func_70062_b	setCurrentItemOrArmor
+R	func_70047_e	getEyeHeight
+R	func_78913_a	setPosition
+R	func_78914_f	markDirty
+R	func_78381_a	draw
+R	func_78547_a	setPosition
+R	func_78558_a	getInstance
+R	func_78559_a	normalize
+R	func_78560_b	init
+R	func_76986_a	doRender
+R	func_77031_a	doRenderLiving
+R	func_78717_a	set
+R	func_94186_b	getOriginX
+R	func_94185_c	getOriginY
+R	func_94211_a	getOriginX
+R	func_94214_a	getInterpolatedU
+R	func_94218_a	init
+R	func_94216_b	getOriginY
+R	func_94207_b	getInterpolatedV
+R	func_94209_e	getMinU
+R	func_94212_f	getMaxU
+R	func_94206_g	getMinV
+R	func_94210_h	getMaxV
+R	func_94215_i	getIconName
+R	func_94213_j	getSheetWidth
+R	func_94208_k	getSheetHeight
+R	func_94306_e	getTexture
+R	func_94277_a	bindTexture
+R	func_94276_e	getHeight
+R	func_94199_b	getHeight
+R	func_94194_d	rotate
+R	func_94263_a	init
+R	func_94267_b	instance
+R	func_94245_a	registerIcon
+R	func_94246_d	getTexture
+R	func_71262_S	isDedicatedServer
+R	func_71225_e	canStructuresSpawn
+R	func_71265_f	getGameType
+R	func_71232_g	getDifficulty
+R	func_71217_p	tick
+R	func_76973_a	getType
+R	func_71746_d	getServer
+R	func_77306_b	getMinecraft
+R	func_77366_a	playSoundFX
+R	func_77364_b	playSound
+R	func_77372_a	addSound
+R	func_77374_b	addStreaming
+R	func_77365_c	addMusic
+R	func_77458_a	getRandomSoundFromSoundPool
+R	func_77459_a	addSound
+R	func_74735_a	load
+R	func_74734_a	write
+R	func_74732_a	getId
+R	func_74737_b	copy
+R	func_74800_a	write
+R	func_74794_a	read
+R	func_74797_a	read
+R	func_74795_b	write
+R	func_73489_c	getMetadata
+R	func_73473_d	getText
+R	func_73462_i	getDifficulty
+R	func_98196_i	getOffsetX
+R	func_98201_j	getOffsetY
+R	func_98199_k	getOffsetZ
+R	func_73571_i	getVolume
+R	func_73573_j	getPitch
+R	func_73346_h	isCreativeMode
+R	func_73391_d	getMetadata
+R	func_73322_d	getEntityId
+R	func_73405_i	getItemStack
+R	func_73688_c	parse
+R	func_73706_a	put
+R	func_73709_b	remove
+R	func_82499_a	getProjectileEntity
+R	func_82487_b	dispenseStack
+R	func_82485_a	playDispenseSound
+R	func_82498_a	func_82498_a
+R	func_82500_b	func_82500_b
+R	func_72374_b	onTick
+R	func_71213_z	getAllUsernames
+R	func_71270_I	getFolderName
+R	func_71244_g	logInfo
+R	func_71236_h	logWarning
+R	func_71201_j	logSevere
+R	func_71249_w	getMinecraftVersion
+R	func_71233_x	getCurrentPlayerCount
+R	func_71275_y	getMaxPlayers
+R	func_71203_ab	getConfigurationManager
+R	func_71742_a	getType
+R	func_73074_a	onBlockClicked
+R	func_72688_a	getMinecraftServer
+R	func_73254_a	onUpdate
+R	func_73043_a	onBlockEventReceived
+R	func_73081_b	getGameType
+R	func_72609_b	logInfo
+R	func_72606_c	logWarning
+R	func_72610_d	logSevere
+R	func_75843_a	format
+R	func_98233_a	logInfo
+R	func_98236_b	logWarning
+R	func_98232_c	logSevere
+R	format	format
+R	clear	clear
+R	containsKey	containsKey
+R	get	get
+R	isEmpty	isEmpty
+R	keySet	keySet
+R	put	put
+R	remove	remove
+R	size	size
+R	func_76041_a	lookup
+R	func_76157_a	hash
+R	func_76163_a	add
+R	func_76159_d	remove
+R	func_76146_a	getKey
+R	func_76316_a	onInventoryChanged
+R	func_76403_b	isInstant
+R	func_76393_a	getName
+R	func_76399_b	setIconIndex
+R	func_76390_b	setPotionName
+R	func_76396_c	getId
+R	func_76398_f	isBadEffect
+R	func_76456_a	getPotionID
+R	func_76455_a	onUpdate
+R	func_76459_b	getDuration
+R	func_76458_c	getAmplifier
+R	func_76453_d	getEffectName
+R	func_70105_a	setSize
+R	func_70085_c	interact
+R	func_70631_g_	isChild
+R	func_70076_C	kill
+R	func_70022_Q	getEntityString
+R	func_70035_c	getInventory
+R	func_70115_ae	isRiding
+R	func_82704_a	isEntityApplicable
+R	main	main
+R	destroy	destroy
+R	start	start
+R	stop	stop
+R	func_71227_R	textureSize
+R	func_82333_j	getRotation
+R	func_70643_av	getAITarget
+R	func_70684_aJ	isPlayer
+R	func_70664_aZ	jump
+R	func_75683_a	getWatchableObjectByte
+R	func_75682_a	addObject
+R	func_75693_b	getWatchableObjectShort
+R	func_75692_b	updateObject
+R	func_75679_c	getWatchableObjectInt
+R	func_75681_e	getWatchableObjectString
+R	func_82710_f	getWatchableObjectItemStack
+R	func_82708_h	setObjectWatched
+R	func_75669_b	getObject
+R	func_70902_q	getOwner
+R	func_75250_a	shouldExecute
+R	func_75253_b	continueExecuting
+R	func_75249_e	startExecuting
+R	func_75251_c	resetTask
+R	func_75246_d	updateTask
+R	func_75248_a	setMutexBits
+R	func_75247_h	getMutexBits
+R	func_75486_a	getAvoidsWater
+R	func_75492_a	tryMoveToXYZ
+R	func_75489_a	setSpeed
+R	func_75497_a	tryMoveToEntityLiving
+R	func_75491_a	setAvoidsWater
+R	func_75498_b	setBreakDoors
+R	func_75490_c	setEnterDoors
+R	func_75505_d	getPath
+R	func_75504_d	setAvoidSun
+R	func_75495_e	setCanSwim
+R	func_75500_f	noPath
+R	func_75499_g	clearPathEntity
+R	func_75474_b	getDistanceSquared
+R	func_75560_a	tick
+R	func_75528_a	tick
+R	func_75544_a	tick
+R	func_70667_aM	getMaxHealth
+R	func_70599_aP	getSoundVolume
+R	func_70639_aQ	getLivingSound
+R	func_70621_aR	getHurtSound
+R	func_70673_aS	getDeathSound
+R	func_70650_aV	isAIEnabled
+R	func_70633_aT	getDropItemId
+R	func_70627_aG	getTalkInterval
+R	func_70692_ba	canDespawn
+R	func_70073_O	getTexture
+R	func_70023_ak	getEntityName
+R	func_70090_H	isInWater
+R	func_82372_a	getMovementDirection
+R	func_70658_aO	getTotalArmorValue
+R	func_70668_bt	getCreatureAttribute
+R	func_70690_d	addPotionEffect
+R	func_70283_d	getWorld
+R	func_70106_y	setDead
+R	func_70515_d	explode
+R	func_70027_ad	isBurning
+R	func_82193_c	getAttackStrength
+R	func_70805_n	getAttackStrength
+R	func_70438_a	getStrVsBlock
+R	func_70442_a	writeToNBT
+R	func_70443_b	readFromNBT
+R	func_70186_c	setThrowableHeading
+R	func_75118_a	onUpdate
+R	func_75111_a	addStats
+R	func_75142_b	detectAndSendChanges
+R	func_75137_b	updateProgressBar
+R	func_75134_a	onCraftGuiClosed
+R	func_75130_a	onCraftMatrixChanged
+R	func_75210_a	onCrafting
+R	func_75208_c	onCrafting
+R	func_82869_a	canTakeStack
+R	func_77647_b	getMetadata
+R	func_77618_c	getIconFromDamageForRenderPass
+R	func_82814_b	getColor
+R	func_77617_a	getIconFromDamage
+R	func_77648_a	onItemUse
+R	func_77659_a	onItemRightClick
+R	func_77619_b	getItemEnchantability
+R	func_94581_a	registerIcons
+R	func_77654_b	onEaten
+R	func_77626_a	getMaxItemUseDuration
+R	func_77662_d	isFull3D
+R	func_77667_c	getUnlocalizedName
+R	func_77633_a	getSubItems
+R	func_82790_a	getColorFromItemStack
+R	func_78012_e	getTabIconItemIndex
+R	func_77636_d	hasEffect
+R	func_77845_h	isWolfsFavoriteMeat
+R	func_77657_g	getLocalizedName
+R	func_77941_a	onBlockDestroyed
+R	func_77980_a	onCrafting
+R	func_77967_a	getStrVsBlock
+R	func_77961_a	hitEntity
+R	func_77954_c	getIconIndex
+R	func_77988_m	getMaxItemUseDuration
+R	func_77962_s	hasEffect
+R	func_77663_a	onUpdate
+R	func_77622_d	onCreated
+R	func_77628_j	getItemDisplayName
+R	func_90043_g	getRecordTitle
+R	func_71526_a	parseInt
+R	func_71525_a	compareTo
+R	func_77644_a	hitEntity
+R	func_77641_a	canHarvestBlock
+R	func_77660_a	onBlockDestroyed
+R	func_77638_a	getStrVsBlock
+R	func_77570_a	getRecipeSize
+R	func_77569_a	matches
+R	func_77571_b	getRecipeOutput
+R	func_77602_a	smelting
+R	func_77600_a	addSmelting
+R	func_77599_b	getSmeltingList
+R	func_77603_b	getSmeltingResult
+R	func_77594_a	getInstance
+R	func_92103_a	addRecipe
+R	func_77592_b	getRecipeList
+R	func_77596_b	addShapelessRecipe
+R	func_77321_a	getMinEnchantability
+R	func_77325_b	getMaxLevel
+R	func_77317_b	getMaxEnchantability
+R	func_77320_a	getName
+R	func_77323_a	calcModifierLiving
+R	func_92089_a	canApply
+R	func_77326_a	canApplyTogether
+R	func_77318_a	calcModifierDamage
+R	func_98270_a	readFromNBT
+R	func_98280_b	writeToNBT
+R	func_77271_a	getChunkPosition
+R	func_77466_a	getFoliageColorPine
+R	func_77470_a	getFoliageColor
+R	func_77469_b	getFoliageColorBirch
+R	func_77468_c	getFoliageColorBasic
 S	aus	java/lang/Thread	
 S	avk	java/applet/Applet	java/applet/AppletStub
 S	awd	java/lang/Error	

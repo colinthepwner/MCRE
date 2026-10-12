@@ -279,7 +279,9 @@ VM.prototype.addClassFile = function (name, bytes, source) {
 
 VM.prototype.defineFromBytes = function (expectName, bytes, source, parsed) {
 	var cf = parsed || JVM.parseClassFile(bytes);
-	if (this.mapClass || this.mapMember) JVM.remapClassFile(this, cf);
+	var prevDef = this.$defining;
+	this.$defining = { name: cf.name, fields: cf.fields.map(function (f) { return f.name; }) };
+	try { if (this.mapClass || this.mapMember) JVM.remapClassFile(this, cf); } finally { this.$defining = prevDef; }
 	var name = cf.name;
 	var c = new JClass(this, name);
 	c.cf = cf;
@@ -3585,23 +3587,30 @@ function installUtil(vm) {
 		'requireNonNullElse(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { return a[0] !== null ? a[0] : a[1]; },
 	} });
 
-	var MULT = 0x5DEECE66Dn, MASK = (1n << 48n) - 1n;
+	var MULT = 0x5DEECE66Dn, MASK = (1n << 48n) - 1n, MH = 0x5DE, ML = 0xECE66D, T24 = 16777216;
+	var POW = []; for (var pb = 0; pb <= 48; pb++) POW[pb] = Math.pow(2, pb);
+	var setSeed = function (self, s) {
+		self.$hi = Number(s >> 24n); self.$lo = Number(s & 0xFFFFFFn);
+	};
 	var next = function (self, bits) {
-		self.$seed = (self.$seed * MULT + 0xBn) & MASK;
-		return Number(BigInt.asIntN(32, self.$seed >> BigInt(48 - bits)));
+		var lo = self.$lo * ML + 0xB, carry = Math.floor(lo / T24);
+		lo -= carry * T24;
+		var hi = (self.$hi * ML + self.$lo * MH + carry) % T24;
+		self.$hi = hi; self.$lo = lo;
+		return Math.floor((hi * T24 + lo) / POW[48 - bits]) | 0;
 	};
 	var seedUniq = 8682522807148012n;
 	def('java/util/Random', {
 		methods: {
-			'<init>()V': function (vm, self) { seedUniq = BigInt.asIntN(64, seedUniq * 181783497276652981n); self.$seed = (BigInt.asIntN(64, seedUniq ^ BigInt(Date.now()) * 1000000n) ^ MULT) & MASK; },
-			'<init>(J)V': function (vm, self, a) { self.$seed = (a[0] ^ MULT) & MASK; self.$gauss = undefined; },
-			'setSeed(J)V': function (vm, self, a) { self.$seed = (a[0] ^ MULT) & MASK; self.$gauss = undefined; },
+			'<init>()V': function (vm, self) { seedUniq = BigInt.asIntN(64, seedUniq * 181783497276652981n); setSeed(self, (BigInt.asIntN(64, seedUniq ^ BigInt(Date.now()) * 1000000n) ^ MULT) & MASK); },
+			'<init>(J)V': function (vm, self, a) { setSeed(self, (a[0] ^ MULT) & MASK); self.$gauss = undefined; },
+			'setSeed(J)V': function (vm, self, a) { setSeed(self, (a[0] ^ MULT) & MASK); self.$gauss = undefined; },
 			'next(I)I': function (vm, self, a) { return next(self, a[0]); },
 			'nextInt()I': function (vm, self) { return next(self, 32); },
 			'nextInt(I)I': function (vm, self, a) {
 				var bound = a[0];
 				if (bound <= 0) vm.throwNew('java/lang/IllegalArgumentException', 'bound must be positive');
-				if ((bound & -bound) === bound) return Number((BigInt(bound) * BigInt(next(self, 31))) >> 31n);
+				if ((bound & -bound) === bound) return Math.floor(next(self, 31) / (2147483648 / bound));
 				var bits, val;
 				do { bits = next(self, 31); val = bits % bound; } while (bits - val + (bound - 1) > 2147483647);
 				return val;
@@ -4396,6 +4405,26 @@ function installLibs(vm) {
 		'addAll(Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableList$Builder;': function (vm, self, a) { self.$items = self.$items.concat(toArr(vm, a[0])); return self; },
 		'build()Lcom/google/common/collect/ImmutableList;': function (vm, self) { return list(vm, self.$items.slice()); },
 	} });
+	var set = function (vm, items) {
+		var s = vm.newObject(vm.loadClass(GU + 'collect/ImmutableSet')); vm.callVirtual(s, '<init>', '()V', []);
+		items.forEach(function (x) { vm.callVirtual(s, 'add', '(' + OBJ + ')Z', [x]); });
+		return s;
+	};
+	var setStatics = {};
+	for (var n2 = 0; n2 <= 6; n2++) setStatics['of(' + new Array(n2 + 1).join(OBJ) + ')Lcom/google/common/collect/ImmutableSet;'] = function (vm, nm, a) { return set(vm, a.slice()); };
+	setStatics['of([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableSet;'] = function (vm, nm, a) { return set(vm, toArr(vm, a[0])); };
+	setStatics['copyOf(Ljava/util/Collection;)Lcom/google/common/collect/ImmutableSet;'] = function (vm, nm, a) { return set(vm, toArr(vm, a[0])); };
+	setStatics['copyOf(Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableSet;'] = function (vm, nm, a) { return set(vm, toArr(vm, a[0])); };
+	setStatics['copyOf([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableSet;'] = function (vm, nm, a) { return set(vm, toArr(vm, a[0])); };
+	setStatics['builder()Lcom/google/common/collect/ImmutableSet$Builder;'] = function (vm) { var b = vm.newObject(vm.loadClass(GU + 'collect/ImmutableSet$Builder')); b.$items = []; return b; };
+	def(GU + 'collect/ImmutableSet', { super: 'java/util/LinkedHashSet', staticMethods: setStatics });
+	def(GU + 'collect/ImmutableSet$Builder', { methods: {
+		'<init>()V': function (vm, self) { self.$items = []; },
+		'add(Ljava/lang/Object;)Lcom/google/common/collect/ImmutableSet$Builder;': function (vm, self, a) { (self.$items = self.$items || []).push(a[0]); return self; },
+		'add([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableSet$Builder;': function (vm, self, a) { self.$items = (self.$items || []).concat(toArr(vm, a[0])); return self; },
+		'addAll(Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableSet$Builder;': function (vm, self, a) { self.$items = (self.$items || []).concat(toArr(vm, a[0])); return self; },
+		'build()Lcom/google/common/collect/ImmutableSet;': function (vm, self) { return set(vm, (self.$items || []).slice()); },
+	} });
 	var mapStatics = {};
 	for (var k = 0; k <= 5; k++) mapStatics['of(' + new Array(2 * k + 1).join(OBJ) + ')Lcom/google/common/collect/ImmutableMap;'] = function (vm, nm, a) { var p = []; for (var i = 0; i + 1 < a.length; i += 2) p.push([a[i], a[i + 1]]); return map(vm, p); };
 	mapStatics['copyOf(Ljava/util/Map;)Lcom/google/common/collect/ImmutableMap;'] = function (vm, nm, a) { var m = map(vm, []); vm.callVirtual(m, 'putAll', '(Ljava/util/Map;)V', [a[0]]); return m; };
@@ -4982,6 +5011,7 @@ function loadMap(vm, text) {
 		else if (p[0] === 'F') { fld[p[1] + '.' + p[2]] = p[4]; srg[p[3]] = p[4]; }
 		else if (p[0] === 'M') { mth[p[1] + '.' + p[2] + p[3]] = p[5]; srg[p[4]] = p[5]; }
 		else if (p[0] === 'S') sup[p[1]] = [p[2]].concat(p[3] ? p[3].split(',') : []);
+		else if (p[0] === 'R') { if (!srg[p[1]]) srg[p[1]] = p[2]; }
 	}
 	MODLOADER_CLASSES.forEach(function (n) { cls[n] = SRC + n; rev[SRC + n] = n; });
 	var map = { cls: cls, rev: rev, fld: fld, mth: mth, srg: srg, sup: sup };
@@ -4995,13 +5025,14 @@ function loadMap(vm, text) {
 	vm.mapClass = function (n) {
 		var m = cls[n];
 		if (m) return m;
-		if (n.indexOf('net/minecraft/') === 0 && n.indexOf(SRC) !== 0) {
+		if (n.indexOf('net/minecraft/') === 0 && n.indexOf(SRC) !== 0 && !vm.natives[n]) {
 			var simple = n.substring(n.lastIndexOf('/') + 1);
 			if (rev[SRC + simple] !== undefined || vm.natives[SRC + simple]) return SRC + simple;
 		}
 		return prevClass ? prevClass(n) : null;
 	};
 	vm.mapMember = function (owner, name, desc, isMethod) {
+		if (!isMethod && srg[name] && !cls[owner] && declaresField(vm, owner, name)) return name;
 		if (srg[name]) return srg[name];
 		var q = [owner], seen = Object.create(null);
 		while (q.length) {
@@ -5022,6 +5053,7 @@ function loadMap(vm, text) {
 
 function declaresField(vm, name, field) {
 	var cache = vm.declFields || (vm.declFields = Object.create(null));
+	if (vm.$defining && vm.$defining.name === name) return vm.$defining.fields.indexOf(field) >= 0;
 	var set = cache[name];
 	if (!set) {
 		set = Object.create(null);
@@ -5089,7 +5121,7 @@ JVM.classHeader = classHeader;
 var JObject = JVM.JObject, SRC = 'net/minecraft/src/';
 var L = function (n) { return 'L' + SRC + n + ';'; };
 
-var VANILLA_BLOCKS = 'stone 1,grass 2,dirt 3,cobblestone 4,planks 5,sapling 6,bedrock 7,waterMoving 8,waterStill 9,lavaMoving 10,lavaStill 11,sand 12,gravel 13,oreGold 14,oreIron 15,oreCoal 16,wood 17,leaves 18,sponge 19,glass 20,oreLapis 21,blockLapis 22,dispenser 23,sandStone 24,music 25,bed 26,railPowered 27,railDetector 28,pistonStickyBase 29,web 30,tallGrass 31,deadBush 32,pistonBase 33,pistonExtension 34,cloth 35,pistonMoving 36,plantYellow 37,plantRed 38,mushroomBrown 39,mushroomRed 40,blockGold 41,blockIron 42,stoneDoubleSlab 43,stoneSingleSlab 44,brick 45,tnt 46,bookShelf 47,cobblestoneMossy 48,obsidian 49,torchWood 50,fire 51,mobSpawner 52,stairsWoodOak 53,chest 54,redstoneWire 55,oreDiamond 56,blockDiamond 57,workbench 58,crops 59,tilledField 60,furnaceIdle 61,furnaceBurning 62,signPost 63,doorWood 64,ladder 65,rail 66,stairsCobblestone 67,signWall 68,lever 69,pressurePlateStone 70,doorIron 71,pressurePlatePlanks 72,oreRedstone 73,oreRedstoneGlowing 74,torchRedstoneIdle 75,torchRedstoneActive 76,stoneButton 77,snow 78,ice 79,blockSnow 80,cactus 81,blockClay 82,reed 83,jukebox 84,fence 85,pumpkin 86,netherrack 87,slowSand 88,glowStone 89,portal 90,pumpkinLantern 91,cake 92,redstoneRepeaterIdle 93,redstoneRepeaterActive 94,lockedChest 95,trapdoor 96,silverfish 97,stoneBrick 98,mushroomCapBrown 99,mushroomCapRed 100,fenceIron 101,thinGlass 102,melon 103,pumpkinStem 104,melonStem 105,vine 106,fenceGate 107,stairsBrick 108,stairsStoneBrick 109,mycelium 110,waterlily 111,netherBrick 112,netherFence 113,stairsNetherBrick 114,netherStalk 115,enchantmentTable 116,brewingStand 117,cauldron 118,endPortal 119,endPortalFrame 120,whiteStone 121,dragonEgg 122,redstoneLampIdle 123,redstoneLampActive 124,woodDoubleSlab 125,woodSingleSlab 126,cocoaPlant 127,stairsSandStone 128,oreEmerald 129,enderChest 130,tripWireSource 131,tripWire 132,blockEmerald 133,stairsWoodSpruce 134,stairsWoodBirch 135,stairsWoodJungle 136,commandBlock 137,beacon 138,cobblestoneWall 139,flowerPot 140,carrot 141,potato 142,woodenButton 143,skull 144,anvil 145,chestTrapped 146,pressurePlateGold 147,pressurePlateIron 148,redstoneComparatorIdle 149,redstoneComparatorActive 150,daylightSensor 151,blockRedstone 152,oreNetherQuartz 153,hopperBlock 154,blockNetherQuartz 155,stairsNetherQuartz 156,railActivator 157,dropper 158';
+var VANILLA_BLOCKS = 'stone 1,grass 2,dirt 3,cobblestone 4,planks 5,sapling 6,bedrock 7,waterMoving 8,waterStill 9,lavaMoving 10,lavaStill 11,sand 12,gravel 13,oreGold 14,oreIron 15,oreCoal 16,wood 17,leaves 18,sponge 19,glass 20,oreLapis 21,blockLapis 22,dispenser 23,sandStone 24,music 25,bed 26,railPowered 27,railDetector 28,pistonStickyBase 29,web 30,tallGrass 31,deadBush 32,pistonBase 33,pistonExtension 34,cloth 35,pistonMoving 36,plantYellow 37,plantRed 38,mushroomBrown 39,mushroomRed 40,blockGold 41,blockIron 42,stoneDoubleSlab 43,stoneSingleSlab 44,brick 45,tnt 46,bookShelf 47,cobblestoneMossy 48,obsidian 49,torchWood 50,fire 51,mobSpawner 52,stairsWoodOak 53,chest 54,redstoneWire 55,oreDiamond 56,blockDiamond 57,workbench 58,crops 59,tilledField 60,furnaceIdle 61,furnaceBurning 62,signPost 63,doorWood 64,ladder 65,rail 66,stairsCobblestone 67,signWall 68,lever 69,pressurePlateStone 70,doorIron 71,pressurePlatePlanks 72,oreRedstone 73,oreRedstoneGlowing 74,torchRedstoneIdle 75,torchRedstoneActive 76,stoneButton 77,snow 78,ice 79,blockSnow 80,cactus 81,blockClay 82,reed 83,jukebox 84,fence 85,pumpkin 86,netherrack 87,slowSand 88,glowStone 89,portal 90,pumpkinLantern 91,cake 92,redstoneRepeaterIdle 93,redstoneRepeaterActive 94,lockedChest 95,trapdoor 96,silverfish 97,stoneBrick 98,mushroomCapBrown 99,mushroomCapRed 100,fenceIron 101,thinGlass 102,melon 103,pumpkinStem 104,melonStem 105,vine 106,fenceGate 107,stairsBrick 108,stairsStoneBrick 109,mycelium 110,waterlily 111,netherBrick 112,netherFence 113,stairsNetherBrick 114,netherStalk 115,enchantmentTable 116,brewingStand 117,cauldron 118,endPortal 119,endPortalFrame 120,whiteStone 121,dragonEgg 122,redstoneLampIdle 123,redstoneLampActive 124,woodDoubleSlab 125,woodSingleSlab 126,cocoaPlant 127,stairsSandStone 128,oreEmerald 129,enderChest 130,tripWireSource 131,tripWire 132,blockEmerald 133,stairsWoodSpruce 134,stairsWoodBirch 135,stairsWoodJungle 136,commandBlock 137,beacon 138,cobblestoneWall 139,flowerPot 140,carrot 141,potato 142,woodenButton 143,skull 144,anvil 145,chestTrapped 146,pressurePlateGold 147,pressurePlateIron 148,redstoneComparatorIdle 149,redstoneComparatorActive 150,daylightSensor 151,blockRedstone 152,oreNetherQuartz 153,hopperBlock 154,blockNetherQuartz 155,stairsNetherQuartz 156,railActivator 157,dropper 158,stainedClay 159,hay 170,carpet 171,hardenedClay 172,coalBlock 173';
 var VANILLA_ITEMS = 'shovelIron 256,pickaxeIron 257,axeIron 258,flintAndSteel 259,appleRed 260,bow 261,arrow 262,coal 263,diamond 264,ingotIron 265,ingotGold 266,swordIron 267,swordWood 268,shovelWood 269,pickaxeWood 270,axeWood 271,swordStone 272,shovelStone 273,pickaxeStone 274,axeStone 275,swordDiamond 276,shovelDiamond 277,pickaxeDiamond 278,axeDiamond 279,stick 280,bowlEmpty 281,bowlSoup 282,swordGold 283,shovelGold 284,pickaxeGold 285,axeGold 286,silk 287,feather 288,gunpowder 289,hoeWood 290,hoeStone 291,hoeIron 292,hoeDiamond 293,hoeGold 294,seeds 295,wheat 296,bread 297,helmetLeather 298,plateLeather 299,legsLeather 300,bootsLeather 301,helmetChain 302,plateChain 303,legsChain 304,bootsChain 305,helmetIron 306,plateIron 307,legsIron 308,bootsIron 309,helmetDiamond 310,plateDiamond 311,legsDiamond 312,bootsDiamond 313,helmetGold 314,plateGold 315,legsGold 316,bootsGold 317,flint 318,porkRaw 319,porkCooked 320,painting 321,appleGold 322,sign 323,doorWood 324,bucketEmpty 325,bucketWater 326,bucketLava 327,minecartEmpty 328,saddle 329,doorIron 330,redstone 331,snowball 332,boat 333,leather 334,bucketMilk 335,brick 336,clay 337,reed 338,paper 339,book 340,slimeBall 341,minecartCrate 342,minecartPowered 343,egg 344,compass 345,fishingRod 346,pocketSundial 347,lightStoneDust 348,fishRaw 349,fishCooked 350,dyePowder 351,bone 352,sugar 353,cake 354,bed 355,redstoneRepeater 356,cookie 357,map 358,shears 359,melon 360,pumpkinSeeds 361,melonSeeds 362,beefRaw 363,beefCooked 364,chickenRaw 365,chickenCooked 366,rottenFlesh 367,enderPearl 368,blazeRod 369,ghastTear 370,goldNugget 371,netherStalkSeeds 372,potion 373,glassBottle 374,spiderEye 375,fermentedSpiderEye 376,blazePowder 377,magmaCream 378,brewingStand 379,cauldron 380,eyeOfEnder 381,speckledMelon 382,monsterPlacer 383,expBottle 384,fireballCharge 385,writableBook 386,writtenBook 387,emerald 388,itemFrame 389,flowerPot 390,carrot 391,potato 392,bakedPotato 393,poisonousPotato 394,emptyMap 395,goldenCarrot 396,skull 397,carrotOnAStick 398,netherStar 399,pumpkinPie 400,firework 401,fireworkCharge 402,enchantedBook 403,comparator 404,netherrackBrick 405,netherQuartz 406,tntMinecart 407,hopperMinecart 408,record13 2256,recordCat 2257,recordBlocks 2258,recordChirp 2259,recordFar 2260,recordMall 2261,recordMellohi 2262,recordStal 2263,recordStrad 2264,recordWard 2265,record11 2266,recordWait 2267';
 var VANILLA_IDS = {};
 (VANILLA_BLOCKS + ',' + VANILLA_ITEMS).split(',').forEach(function (kv) { VANILLA_IDS[+kv.split(' ')[1]] = true; });
@@ -5193,6 +5225,7 @@ function installMc152(vm) {
 		},
 	});
 	delete vm.natives[SRC + 'ModLoader'].staticMethods['addEntityRenderer?'];
+	vm.$minecraftObj = minecraftObj;
 	function minecraftObj(vm) {
 		var mc = vm.mcInstance || (vm.mcInstance = vm.newObject(vm.loadClass('net/minecraft/client/Minecraft')));
 		if (vm.game && vm.game.mode === 'run') { mc[':theWorld'] = worldObj(vm); mc[':thePlayer'] = playerObj(vm, null); }
@@ -5585,6 +5618,20 @@ function installMc152(vm) {
 		c.statics.offsetsZForSide = intArr(vm, [0, 0, -1, 1, 0, 0]);
 		c.statics.facings = JVM.javaArray(vm, 'Ljava/lang/String;', ['DOWN', 'UP', 'NORTH', 'SOUTH', 'WEST', 'EAST']);
 	} });
+	var nested = function (vm, rows) { var r = vm.newArray('[I', rows.length); rows.forEach(function (v, i) { r.a[i] = intArr(vm, v); }); return r; };
+	def('Direction', { statics: { offsetX: null, offsetZ: null, directions: null, directionToFacing: null, facingToDirection: null, rotateOpposite: null, rotateRight: null, rotateLeft: null, bedDirection: null }, clinit: function (vm, c) {
+		c.statics.offsetX = intArr(vm, [0, -1, 0, 1]);
+		c.statics.offsetZ = intArr(vm, [1, 0, -1, 0]);
+		c.statics.directions = JVM.javaArray(vm, 'Ljava/lang/String;', ['SOUTH', 'WEST', 'NORTH', 'EAST']);
+		c.statics.directionToFacing = intArr(vm, [3, 4, 2, 5]);
+		c.statics.facingToDirection = intArr(vm, [-1, -1, 2, 0, 1, 3]);
+		c.statics.rotateOpposite = intArr(vm, [2, 3, 0, 1]);
+		c.statics.rotateRight = intArr(vm, [1, 2, 3, 0]);
+		c.statics.rotateLeft = intArr(vm, [3, 0, 1, 2]);
+		c.statics.bedDirection = nested(vm, [[1, 0, 3, 2, 5, 4], [1, 0, 5, 4, 2, 3], [1, 0, 2, 3, 4, 5], [1, 0, 4, 5, 3, 2]]);
+	}, staticMethods: {
+		'getMovementDirection(DD)I': function (vm, n, a) { return Math.abs(a[0]) > Math.abs(a[1]) ? (a[0] > 0 ? 1 : 3) : (a[1] > 0 ? 2 : 0); },
+	} });
 	def('BlockPistonBase', { super: SRC + 'Block', methods: {
 		'<init>(IZ)V': function (vm, self, a) {
 			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
@@ -5631,6 +5678,9 @@ function installMc152(vm) {
 	if (JVM.installDispense) JVM.installDispense(vm);
 	if (JVM.installModBiomes) JVM.installModBiomes(vm);
 	if (JVM.installEnchantments) JVM.installEnchantments(vm);
+	if (JVM.installWorldGen16) JVM.installWorldGen16(vm);
+	if (JVM.installForge16) JVM.installForge16(vm);
+	if (JVM.installLiving16) JVM.installLiving16(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 }
 
@@ -5961,6 +6011,7 @@ JVM.collectContent = function (vm, modId) {
 	var tex = function (icon) {
 		if (!icon || !icon.$name) return null;
 		var n = icon.$name, p = n.indexOf(':');
+		if (icon.$vanilla) return { mod: null, name: n, vanilla: true };
 		return p >= 0 ? { mod: n.substring(0, p), name: n.substring(p + 1) } : { mod: null, name: n };
 	};
 	var legacy = function (o, side, meta) {
@@ -6002,7 +6053,7 @@ JVM.collectContent = function (vm, modId) {
 			var lt = legacy(b, s, meta);
 			if (lt) { faces[FACE[s]] = lt.name; if (!lt.vanilla) out.textures['blocks/' + lt.name] = lt; continue; }
 			var t = tex(safe(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [s, meta]); }, null));
-			if (t) { faces[FACE[s]] = t.name; out.textures['blocks/' + t.name] = t; }
+			if (t) { faces[FACE[s]] = t.name; if (!t.vanilla) out.textures['blocks/' + t.name] = t; }
 		}
 		var rc = overrides(b, ['getRenderColor(I)I']) ? safe(function () { return vm.callVirtual(b, 'getRenderColor', '(I)I', [meta]); }, 0xffffff) : 0xffffff;
 		if (typeof rc === 'number' && (rc & 0xffffff) !== 0xffffff) {
@@ -6010,7 +6061,7 @@ JVM.collectContent = function (vm, modId) {
 			Object.keys(faces).forEach(function (f) {
 				var t0 = out.textures['blocks/' + faces[f]];
 				if (!t0 || t0.tint != null) return;
-				var nt = Object.assign({}, t0, { name: t0.name + '_t' + hex, tint: rc & 0xffffff });
+				var nt = Object.assign({}, t0, { name: t0.name + '_t' + hex, tint: rc & 0xffffff, base: t0.name });
 				out.textures['blocks/' + nt.name] = nt;
 				faces[f] = nt.name;
 			});
@@ -6035,8 +6086,11 @@ JVM.collectContent = function (vm, modId) {
 		if (cnt !== 1 && drop > 0) json.drop_count = cnt;
 		var box = ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].map(function (k) { return Math.round(b[':' + k] * 16); });
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
+		var rtype = safe(function () { return vm.callVirtual(b, 'getRenderType', '()I', []); }, 0);
+		if (rtype === 1) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
+		if (r.burn && r.burn[id] && r.burn[id][1] > 0) json.flammable = true;
 		if (stFiles && JVM.stationModel && b.$stConnected) {
 			var cm = safe(function () { return JVM.stationModel(vm, b, stFiles, 'connect'); }, null);
 			if (cm) {
@@ -6151,7 +6205,7 @@ JVM.collectContent = function (vm, modId) {
 	r.smelting.forEach(function (s) {
 		if ((s.mod || '') !== modId) return;
 		var res = stackRef(s.out);
-		if (res) out.recipes.push({ type: 'smelting', input: ref(s.input, 0), result: res, count: s.out[':stackSize'] });
+		if (res) out.recipes.push({ type: 'smelting', input: ref(s.input, s.meta | 0), result: res, count: s.out[':stackSize'] });
 	});
 	Object.keys(r.lang).forEach(function (k) { out.lang[k] = r.lang[k]; });
 	if (JVM.collectMobs) {
@@ -6282,7 +6336,7 @@ JVM.variantsOf = function (vm, o) {
 	return o.$variants;
 };
 JVM.installMc152 = installMc152;
-JVM.mc152 = { worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
+JVM.mc152 = { minecraftObj: function (vm) { return vm.$minecraftObj ? vm.$minecraftObj(vm) : null; }, worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
 })();
 
 (function () {
@@ -7747,6 +7801,1371 @@ JVM.forgeState = function (vm) { return vm.mcReg && vm.mcReg.forge || null; };
 (function () {
 'use strict';
 
+var SRC = 'net/minecraft/src/', FORGE = 'net/minecraftforge/';
+function L(n) { return 'L' + (n.indexOf('/') < 0 ? SRC + n : n) + ';'; }
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+
+	var MC = vm.natives['net/minecraft/client/Minecraft'];
+	if (MC) MC.staticMethods = Object.assign({}, MC.staticMethods || {}, {
+		'getMinecraft()Lnet/minecraft/client/Minecraft;': function (vm) { return JVM.mc152.minecraftObj ? JVM.mc152.minecraftObj(vm) : null; },
+	});
+
+	var CT = vm.natives[SRC + 'CreativeTabs'];
+	if (CT) CT.staticMethods = Object.assign({}, CT.staticMethods || {}, {
+		'getNextID()I': function (vm) {
+			var c = vm.loadClass(SRC + 'CreativeTabs'); vm.initClass(c);
+			var a = c.statics.creativeTabArray;
+			return a && a.a ? a.a.length : 12;
+		},
+	});
+
+	var B = vm.natives[SRC + 'Block'];
+	if (B) B.staticMethods = Object.assign({}, B.staticMethods || {}, {
+		'setBurnProperties(III)V': function (vm, n, a) { var r = JVM.mc152.reg(vm); (r.burn || (r.burn = {}))[a[0]] = [a[1], a[2]]; },
+	});
+	var P = vm.natives[SRC + 'Potion'];
+	if (P) P.methods = Object.assign({}, P.methods || {}, {
+		'setIconIndex(II)Lnet/minecraft/src/Potion;': function (vm, self, a) { self.$icon = [a[0], a[1]]; return self; },
+	});
+	var IS = vm.natives[SRC + 'ItemStack'];
+	if (IS) IS.methods = Object.assign({}, IS.methods || {}, {
+		'getItemDamageForDisplay()I': function (vm, self) { return self[':itemDamage'] | 0; },
+	});
+	def(SRC + 'ColorizerFoliage', { staticMethods: {} });
+	var CF = vm.natives[SRC + 'ColorizerFoliage'];
+	if (CF) CF.staticMethods = Object.assign({}, CF.staticMethods || {}, {
+		'getFoliageColorPine()I': function () { return 0x619961; },
+		'getFoliageColorBirch()I': function () { return 0x80a755; },
+		'getFoliageColorBasic()I': function () { return 0x48b518; },
+	});
+	def(SRC + 'ItemRecord', { super: SRC + 'Item', statics: { records: null }, fields: { recordName: 'Ljava/lang/String;' },
+		clinit: function (vm, c) { var m = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); c.statics.records = m; },
+		methods: {
+			'<init>(ILjava/lang/String;)V': function (vm, self, a) {
+				var item = vm.loadClass(SRC + 'Item');
+				var k = item.findDeclared ? item.findDeclared('<init>(I)V') : null;
+				if (k) vm.invoke(k, self, [a[0]]);
+				self[':recordName'] = a[1];
+				self[':maxStackSize'] = 1;
+				var c = vm.loadClass(SRC + 'ItemRecord'); vm.initClass(c);
+				vm.callVirtual(c.statics.records, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [a[1], self]);
+			},
+			'getRecordTitle()Ljava/lang/String;': function (vm, self) { return 'C418 - ' + self[':recordName']; },
+		} });
+	def(FORGE + 'common/IShearable', { access: I });
+	def(SRC + 'IAnimals', { access: I });
+	def('cpw/mods/fml/client/registry/ISimpleBlockRenderingHandler', { access: I });
+	var BL = vm.natives[SRC + 'Block'];
+	if (BL) BL.methods = Object.assign({}, BL.methods || {}, {
+		'setLightOpacity(I)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':lightOpacity'] = a[0]; return self; },
+	});
+
+	var FL = FORGE + 'fluids/';
+	var chain = function (field) { return function (vm, self, a) { self[':' + field] = a[0]; return self; }; };
+	def(FL + 'Fluid', { fields: { fluidName: 'Ljava/lang/String;', blockID: 'I', luminosity: 'I', density: 'I', temperature: 'I', viscosity: 'I', isGaseous: 'Z', unlocalizedName: 'Ljava/lang/String;' }, methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self[':fluidName'] = String(a[0]).toLowerCase(); self[':unlocalizedName'] = self[':fluidName']; self[':blockID'] = -1; self[':density'] = 1000; self[':temperature'] = 295; self[':viscosity'] = 1000; },
+		'setBlockID(I)Lnet/minecraftforge/fluids/Fluid;': chain('blockID'),
+		'setBlockID(Lnet/minecraft/src/Block;)Lnet/minecraftforge/fluids/Fluid;': function (vm, self, a) { self[':blockID'] = a[0] ? a[0][':blockID'] : -1; return self; },
+		'setLuminosity(I)Lnet/minecraftforge/fluids/Fluid;': chain('luminosity'),
+		'setDensity(I)Lnet/minecraftforge/fluids/Fluid;': chain('density'),
+		'setTemperature(I)Lnet/minecraftforge/fluids/Fluid;': chain('temperature'),
+		'setViscosity(I)Lnet/minecraftforge/fluids/Fluid;': chain('viscosity'),
+		'setGaseous(Z)Lnet/minecraftforge/fluids/Fluid;': chain('isGaseous'),
+		'setUnlocalizedName(Ljava/lang/String;)Lnet/minecraftforge/fluids/Fluid;': chain('unlocalizedName'),
+		'getName()Ljava/lang/String;': function (vm, self) { return self[':fluidName']; },
+		'getBlockID()I': function (vm, self) { return self[':blockID']; },
+		'canBePlacedInWorld()Z': function (vm, self) { return self[':blockID'] > 0 ? 1 : 0; },
+		'getLuminosity()I': function (vm, self) { return self[':luminosity'] | 0; },
+		'getDensity()I': function (vm, self) { return self[':density'] | 0; },
+		'getViscosity()I': function (vm, self) { return self[':viscosity'] | 0; },
+		'getTemperature()I': function (vm, self) { return self[':temperature'] | 0; },
+		'isGaseous()Z': function (vm, self) { return self[':isGaseous'] ? 1 : 0; },
+		'getUnlocalizedName()Ljava/lang/String;': function (vm, self) { return 'fluid.' + self[':unlocalizedName']; },
+		'setIcons(Lnet/minecraft/src/Icon;Lnet/minecraft/src/Icon;)Lnet/minecraftforge/fluids/Fluid;': function (vm, self, a) { self.$still = a[0]; self.$flowing = a[1]; return self; },
+		'setIcons(Lnet/minecraft/src/Icon;)Lnet/minecraftforge/fluids/Fluid;': function (vm, self, a) { self.$still = self.$flowing = a[0]; return self; },
+		'setStillIcon(Lnet/minecraft/src/Icon;)Lnet/minecraftforge/fluids/Fluid;': function (vm, self, a) { self.$still = a[0]; return self; },
+		'setFlowingIcon(Lnet/minecraft/src/Icon;)Lnet/minecraftforge/fluids/Fluid;': function (vm, self, a) { self.$flowing = a[0]; return self; },
+		'getIcon()Lnet/minecraft/src/Icon;': function (vm, self) { return self.$still || null; },
+	} });
+	var fluids = function (vm) { var r = JVM.mc152.reg(vm); return r.fluids || (r.fluids = {}); };
+	def(FL + 'FluidRegistry', { staticMethods: {
+		'registerFluid(Lnet/minecraftforge/fluids/Fluid;)Z': function (vm, n, a) { var f = fluids(vm); if (!a[0]) return 0; var k = a[0][':fluidName']; if (f[k]) return 0; f[k] = a[0]; return 1; },
+		'isFluidRegistered(Ljava/lang/String;)Z': function (vm, n, a) { return fluids(vm)[String(a[0]).toLowerCase()] ? 1 : 0; },
+		'isFluidRegistered(Lnet/minecraftforge/fluids/Fluid;)Z': function (vm, n, a) { return a[0] && fluids(vm)[a[0][':fluidName']] ? 1 : 0; },
+		'getFluid(Ljava/lang/String;)Lnet/minecraftforge/fluids/Fluid;': function (vm, n, a) { return fluids(vm)[String(a[0]).toLowerCase()] || null; },
+		'getFluidID(Ljava/lang/String;)I': function (vm, n, a) { return Object.keys(fluids(vm)).indexOf(String(a[0]).toLowerCase()) + 1; },
+	} });
+	def(FL + 'FluidStack', { fields: { amount: 'I', fluidID: 'I' }, methods: {
+		'<init>(Lnet/minecraftforge/fluids/Fluid;I)V': function (vm, self, a) { self.$fluid = a[0]; self[':amount'] = a[1]; },
+		'getFluid()Lnet/minecraftforge/fluids/Fluid;': function (vm, self) { return self.$fluid || null; },
+	} });
+	def(FL + 'FluidContainerRegistry', { staticMethods: {
+		'registerFluidContainer(Lnet/minecraftforge/fluids/FluidStack;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'registerFluidContainer(Lnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+	} });
+	def(FL + 'IFluidBlock', { access: I });
+	var fluidBlockInit = function (vm, self, a) {
+		var bk = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+		if (bk) vm.invoke(bk, self, [a[0], a[2]]);
+		self.$fluid = a[1];
+		self[':quantaPerBlock'] = 8; self[':tickRate'] = 5; self[':stack'] = null;
+		var dm = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(dm, '<init>', '()V', []); self[':displacementIds'] = dm;
+		if (a[1]) a[1][':blockID'] = a[0];
+	};
+	def(FL + 'BlockFluidBase', { super: SRC + 'Block', interfaces: [FL + 'IFluidBlock'], fields: { quantaPerBlock: 'I', tickRate: 'I', stack: 'L' + FL + 'FluidStack;' }, methods: {
+		'<init>(ILnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/Material;)V': fluidBlockInit,
+		'setQuantaPerBlock(I)Lnet/minecraftforge/fluids/BlockFluidBase;': function (vm, self, a) { self[':quantaPerBlock'] = a[0]; return self; },
+		'setTickRate(I)Lnet/minecraftforge/fluids/BlockFluidBase;': function (vm, self, a) { self[':tickRate'] = a[0]; return self; },
+		'setRenderPass(I)Lnet/minecraftforge/fluids/BlockFluidBase;': function (vm, self) { return self; },
+		'setMaxScaledLight(I)Lnet/minecraftforge/fluids/BlockFluidBase;': function (vm, self) { return self; },
+		'getFluid()Lnet/minecraftforge/fluids/Fluid;': function (vm, self) { return self.$fluid || null; },
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+	} });
+	def(FL + 'BlockFluidClassic', { super: FL + 'BlockFluidBase', methods: {
+		'<init>(ILnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/Material;)V': fluidBlockInit,
+	} });
+	def(FL + 'BlockFluidFinite', { super: FL + 'BlockFluidBase', methods: {
+		'<init>(ILnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/Material;)V': fluidBlockInit,
+	} });
+
+	def(SRC + 'IRecipe', { access: I, abstractMethods: { 'getRecipeOutput()Lnet/minecraft/src/ItemStack;': true } });
+	var FR = SRC + 'FurnaceRecipes';
+	var smelt = function (vm, id, meta, out) { if (out) JVM.mc152.reg(vm).smelting.push({ mod: vm.currentMod, input: id, meta: meta, out: out }); };
+	def(FR, { statics: { smeltingBase: null }, clinit: function (vm, c) { c.statics.smeltingBase = vm.newObject(c); }, methods: {
+		'addSmelting(ILnet/minecraft/src/ItemStack;F)V': function (vm, self, a) { smelt(vm, a[0], 0, a[1]); },
+		'addSmelting(IILnet/minecraft/src/ItemStack;F)V': function (vm, self, a) { smelt(vm, a[0], a[1], a[2]); },
+		'getSmeltingResult(Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var st = a[0]; if (!st) return null;
+			var hit = JVM.mc152.reg(vm).smelting.filter(function (s) { return s.input === st[':itemID'] && (s.meta | 0) === (st[':itemDamage'] | 0); })[0];
+			return hit ? hit.out : null;
+		},
+		'getSmeltingList()Ljava/util/Map;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); return m; },
+	}, staticMethods: {
+		'smelting()Lnet/minecraft/src/FurnaceRecipes;': function (vm) { var c = vm.loadClass(FR); vm.initClass(c); return c.statics.smeltingBase; },
+	} });
+	def(FORGE + 'event/entity/living/EnderTeleportEvent', { super: FORGE + 'event/entity/living/LivingEvent', fields: { targetX: 'D', targetY: 'D', targetZ: 'D', attackDamage: 'I' } });
+
+	var OPT = 'com/google/common/base/Optional';
+	var mk = function (vm, v) { var o = vm.newObject(vm.loadClass(OPT)); o.$v = v === undefined ? null : v; return o; };
+	def(OPT, { methods: {
+		'isPresent()Z': function (vm, self) { return self.$v !== null ? 1 : 0; },
+		'get()Ljava/lang/Object;': function (vm, self) { if (self.$v === null) vm.throwNew('java/lang/IllegalStateException', 'Optional.get() cannot be called on an absent value'); return self.$v; },
+		'or(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return self.$v !== null ? self.$v : a[0]; },
+		'orNull()Ljava/lang/Object;': function (vm, self) { return self.$v; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$v === self.$v ? 1 : 0; },
+	}, staticMethods: {
+		'absent()Lcom/google/common/base/Optional;': function (vm) { return mk(vm, null); },
+		'of(Ljava/lang/Object;)Lcom/google/common/base/Optional;': function (vm, n, a) { if (a[0] === null) vm.throwNew('java/lang/NullPointerException', 'Optional.of(null)'); return mk(vm, a[0]); },
+		'fromNullable(Ljava/lang/Object;)Lcom/google/common/base/Optional;': function (vm, n, a) { return mk(vm, a[0]); },
+	} });
+
+	def(SRC + 'IProjectile', { access: I, abstractMethods: { 'setThrowableHeading(DDDFF)V': true } });
+	def(SRC + 'IPlayerUsage', { access: I });
+
+	var ev = function (name, sup, fields) { def(FORGE + name, { super: FORGE + sup, fields: fields || {} }); };
+	ev('event/entity/living/LivingEvent$LivingUpdateEvent', 'event/entity/living/LivingEvent');
+	ev('event/entity/living/LivingEvent$LivingJumpEvent', 'event/entity/living/LivingEvent');
+	ev('event/entity/living/LivingHurtEvent', 'event/entity/living/LivingEvent', { source: L('DamageSource'), ammount: 'F' });
+	ev('event/entity/player/EntityInteractEvent', 'event/entity/player/PlayerEvent', { target: L('Entity') });
+	ev('event/entity/player/FillBucketEvent', 'event/entity/player/PlayerEvent', { current: L('ItemStack'), result: L('ItemStack'), world: L('World'), target: L('MovingObjectPosition') });
+	ev('event/entity/EntityEvent$EnteringChunk', 'event/entity/EntityEvent', { newChunkX: 'I', newChunkZ: 'I', oldChunkX: 'I', oldChunkZ: 'I' });
+	ev('event/terraingen/BiomeEvent', 'event/Event', { biome: L('BiomeGenBase') });
+	['GetVillageBlockID', 'GetVillageBlockMeta', 'GetFoliageColor', 'GetGrassColor', 'GetWaterColor', 'CreateDecorator', 'BiomeColor'].forEach(function (k) {
+		ev('event/terraingen/BiomeEvent$' + k, 'event/terraingen/BiomeEvent', { original: 'I', replacement: 'I', type: 'I', newColor: 'I', originalColor: 'I' });
+	});
+	var TG = 'event/terraingen/';
+	var en = function (name, vals) {
+		var n = FORGE + TG + name, st = {};
+		vals.forEach(function (v) { st[v] = null; });
+		def(n, { super: 'java/lang/Enum', statics: st, clinit: function (vm, c) {
+			c.$values = vals.map(function (v, i) { var o = vm.newObject(c); o.$name = v; o.$ordinal = i; c.statics[v] = o; return o; });
+		} });
+		vm.natives[n].staticMethods = {};
+		vm.natives[n].staticMethods['values()[L' + n + ';'] = function (vm) { var c = vm.loadClass(n); vm.initClass(c); return JVM.javaArray(vm, 'L' + n + ';', c.$values.slice()); };
+	};
+	en('DecorateBiomeEvent$Decorate$EventType', ['BIG_SHROOM', 'CACTUS', 'CLAY', 'DEAD_BUSH', 'LILYPAD', 'FLOWERS', 'GRASS', 'LAKE', 'PUMPKIN', 'REED', 'SAND', 'SAND_PASS2', 'SHROOM', 'TREE', 'CUSTOM']);
+	en('OreGenEvent$GenerateMinable$EventType', ['COAL', 'DIAMOND', 'DIRT', 'GOLD', 'GRAVEL', 'IRON', 'LAPIS', 'REDSTONE', 'QUARTZ', 'CUSTOM']);
+	en('PopulateChunkEvent$Populate$EventType', ['DUNGEON', 'FIRE', 'GLOWSTONE', 'ICE', 'LAKE', 'LAVA', 'NETHER_LAVA', 'ANIMALS', 'CUSTOM']);
+	en('InitMapGenEvent$EventType', ['CAVE', 'MINESHAFT', 'NETHER_BRIDGE', 'NETHER_CAVE', 'RAVINE', 'SCATTERED_FEATURE', 'STRONGHOLD', 'VILLAGE', 'CUSTOM']);
+	var WRIJ = '(Lnet/minecraft/src/World;Ljava/util/Random;II)V';
+	var setWR = function (vm, self, a) { self[':world'] = a[0]; self[':rand'] = a[1]; self[':chunkX'] = a[2]; self[':chunkZ'] = a[3]; };
+	var wrFields = { world: L('World'), rand: 'Ljava/util/Random;', chunkX: 'I', chunkZ: 'I' };
+	var evm = function (sig, fn) { var m = {}; m['<init>' + sig] = fn; return m; };
+	def(FORGE + TG + 'DecorateBiomeEvent', { super: FORGE + 'event/Event', fields: wrFields, methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'DecorateBiomeEvent$Pre', { super: FORGE + TG + 'DecorateBiomeEvent', methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'DecorateBiomeEvent$Post', { super: FORGE + TG + 'DecorateBiomeEvent', methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'DecorateBiomeEvent$Decorate', { super: FORGE + TG + 'DecorateBiomeEvent', fields: { type: 'L' + FORGE + TG + 'DecorateBiomeEvent$Decorate$EventType;' },
+		methods: evm('(Lnet/minecraft/src/World;Ljava/util/Random;IILnet/minecraftforge/event/terraingen/DecorateBiomeEvent$Decorate$EventType;)V', function (vm, self, a) { setWR(vm, self, a); self[':type'] = a[4]; }) });
+	def(FORGE + TG + 'OreGenEvent', { super: FORGE + 'event/Event', fields: wrFields, methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'OreGenEvent$Pre', { super: FORGE + TG + 'OreGenEvent', methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'OreGenEvent$Post', { super: FORGE + TG + 'OreGenEvent', methods: evm(WRIJ, setWR) });
+	def(FORGE + TG + 'OreGenEvent$GenerateMinable', { super: FORGE + TG + 'OreGenEvent', fields: { type: 'L' + FORGE + TG + 'OreGenEvent$GenerateMinable$EventType;', generator: L('WorldGenerator') } });
+	var PCE = '(Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/World;Ljava/util/Random;IIZ)V';
+	var setPC = function (vm, self, a) { self[':chunkProvider'] = a[0]; self[':world'] = a[1]; self[':rand'] = a[2]; self[':chunkX'] = a[3]; self[':chunkZ'] = a[4]; self[':hasVillageGenerated'] = a[5]; };
+	var pcFields = { chunkProvider: L('IChunkProvider'), world: L('World'), rand: 'Ljava/util/Random;', chunkX: 'I', chunkZ: 'I', hasVillageGenerated: 'Z' };
+	def(FORGE + TG + 'ChunkProviderEvent', { super: FORGE + 'event/Event', fields: { chunkProvider: L('IChunkProvider') } });
+	def(FORGE + TG + 'ChunkProviderEvent$ReplaceBiomeBlocks', { super: FORGE + TG + 'ChunkProviderEvent', fields: { chunkX: 'I', chunkZ: 'I', blockArray: '[B', biomeArray: '[' + L('BiomeGenBase') },
+		methods: evm('(Lnet/minecraft/src/IChunkProvider;II[B[Lnet/minecraft/src/BiomeGenBase;)V', function (vm, self, a) { self[':chunkProvider'] = a[0]; self[':chunkX'] = a[1]; self[':chunkZ'] = a[2]; self[':blockArray'] = a[3]; self[':biomeArray'] = a[4]; }) });
+	def(FORGE + TG + 'PopulateChunkEvent', { super: FORGE + TG + 'ChunkProviderEvent', fields: pcFields, methods: evm(PCE, setPC) });
+	def(FORGE + TG + 'PopulateChunkEvent$Pre', { super: FORGE + TG + 'PopulateChunkEvent', methods: evm(PCE, setPC) });
+	def(FORGE + TG + 'PopulateChunkEvent$Post', { super: FORGE + TG + 'PopulateChunkEvent', methods: evm(PCE, setPC) });
+	def(FORGE + TG + 'PopulateChunkEvent$Populate', { super: FORGE + TG + 'PopulateChunkEvent', fields: { type: 'L' + FORGE + TG + 'PopulateChunkEvent$Populate$EventType;' } });
+	def(FORGE + TG + 'InitMapGenEvent', { super: FORGE + 'event/Event', fields: { type: 'L' + FORGE + TG + 'InitMapGenEvent$EventType;', originalGen: L('MapGenBase'), newGen: L('MapGenBase') } });
+	var postOn = function (vm, busName, cls, fill) {
+		var mf = vm.loadClass(FORGE + 'common/MinecraftForge'); vm.initClass(mf);
+		var bus = mf.statics[busName], ev = vm.newObject(vm.loadClass(FORGE + TG + cls));
+		fill(ev);
+		if (bus && bus.$listeners && bus.$listeners.length) vm.callVirtual(bus, 'post', '(Lnet/minecraftforge/event/Event;)Z', [ev]);
+		return !(ev.$result && ev.$result.$name === 'DENY');
+	};
+	def(FORGE + TG + 'TerrainGen', { staticMethods: {
+		'decorate(Lnet/minecraft/src/World;Ljava/util/Random;IILnet/minecraftforge/event/terraingen/DecorateBiomeEvent$Decorate$EventType;)Z': function (vm, n, a) {
+			return postOn(vm, 'TERRAIN_GEN_BUS', 'DecorateBiomeEvent$Decorate', function (e) { setWR(vm, e, a); e[':type'] = a[4]; }) ? 1 : 0;
+		},
+		'populate(Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/World;Ljava/util/Random;IIZLnet/minecraftforge/event/terraingen/PopulateChunkEvent$Populate$EventType;)Z': function (vm, n, a) {
+			return postOn(vm, 'TERRAIN_GEN_BUS', 'PopulateChunkEvent$Populate', function (e) { setPC(vm, e, a); e[':type'] = a[6]; }) ? 1 : 0;
+		},
+		'generateOre(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/WorldGenerator;IILnet/minecraftforge/event/terraingen/OreGenEvent$GenerateMinable$EventType;)Z': function (vm, n, a) {
+			return postOn(vm, 'ORE_GEN_BUS', 'OreGenEvent$GenerateMinable', function (e) { e[':world'] = a[0]; e[':rand'] = a[1]; e[':generator'] = a[2]; e[':chunkX'] = a[3]; e[':chunkZ'] = a[4]; e[':type'] = a[5]; }) ? 1 : 0;
+		},
+		'getModdedMapGen(Lnet/minecraft/src/MapGenBase;Lnet/minecraftforge/event/terraingen/InitMapGenEvent$EventType;)Lnet/minecraft/src/MapGenBase;': function (vm, n, a) { return a[0]; },
+		'getModdedNoiseGenerators(Lnet/minecraft/src/World;Ljava/util/Random;[Lnet/minecraft/src/NoiseGeneratorOctaves;)[Lnet/minecraft/src/NoiseGeneratorOctaves;': function (vm, n, a) { return a[2]; },
+	} });
+	ev('event/terraingen/WorldTypeEvent', 'event/Event', { worldType: L('WorldType') });
+	ev('event/terraingen/WorldTypeEvent$BiomeSize', 'event/terraingen/WorldTypeEvent', { originalSize: 'B', newSize: 'B' });
+	ev('event/terraingen/WorldTypeEvent$InitBiomeGens', 'event/terraingen/WorldTypeEvent', { seed: 'J', originalBiomeGens: '[L' + SRC + 'GenLayer;', newBiomeGens: '[L' + SRC + 'GenLayer;' });
+}
+
+JVM.installForge16 = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var GEN = 'generate(Lnet/minecraft/src/World;Ljava/util/Random;III)Z';
+var GENS = '(Lnet/minecraft/src/World;Ljava/util/Random;III)Z';
+
+var B = { air: 0, stone: 1, grass: 2, dirt: 3, cobble: 4, wood: 17, leaves: 18, sand: 12, gravel: 13, waterMoving: 8, waterStill: 9,
+	lavaMoving: 10, lavaStill: 11, tallGrass: 31, deadBush: 32, plantYellow: 37, plantRed: 38, mushroomBrown: 39, mushroomRed: 40,
+	mossy: 48, fire: 51, spawner: 52, chest: 54, farmland: 60, snow: 78, ice: 79, cactus: 81, clay: 82, reed: 83, pumpkin: 86,
+	netherrack: 87, glowstone: 89, capBrown: 99, capRed: 100, vine: 106, mycelium: 110, waterlily: 111, sandstone: 24, slab: 44 };
+
+var MAT = {};
+[[0, 'air'], [1, 'rock'], [2, 'grass'], [3, 'ground'], [4, 'rock'], [5, 'wood'], [6, 'plants'], [7, 'rock'], [8, 'water'], [9, 'water'],
+ [10, 'lava'], [11, 'lava'], [12, 'sand'], [13, 'sand'], [17, 'wood'], [18, 'leaves'], [19, 'sponge'], [20, 'glass'], [24, 'rock'],
+ [26, 'cloth'], [30, 'web'], [31, 'vine'], [32, 'vine'], [35, 'cloth'], [37, 'plants'], [38, 'plants'], [39, 'plants'], [40, 'plants'],
+ [46, 'tnt'], [47, 'wood'], [50, 'circuits'], [51, 'fire'], [53, 'wood'], [54, 'wood'], [55, 'circuits'], [58, 'wood'], [59, 'plants'],
+ [60, 'ground'], [63, 'wood'], [64, 'wood'], [65, 'circuits'], [66, 'circuits'], [68, 'wood'], [72, 'wood'], [75, 'circuits'],
+ [76, 'circuits'], [78, 'snow'], [79, 'ice'], [80, 'craftedSnow'], [81, 'cactus'], [82, 'clay'], [83, 'plants'], [84, 'wood'],
+ [85, 'wood'], [86, 'pumpkin'], [88, 'sand'], [89, 'glass'], [90, 'portal'], [91, 'pumpkin'], [92, 'cake'], [96, 'wood'], [99, 'wood'],
+ [100, 'wood'], [102, 'glass'], [103, 'pumpkin'], [104, 'plants'], [105, 'plants'], [106, 'vine'], [107, 'wood'], [110, 'grass'],
+ [111, 'plants'], [115, 'plants'], [122, 'dragonEgg'], [125, 'wood'], [126, 'wood'], [127, 'plants'], [134, 'wood'], [135, 'wood'],
+ [136, 'wood'], [141, 'plants'], [142, 'plants'], [143, 'circuits'], [170, 'grass'], [171, 'cloth']].forEach(function (p) { MAT[p[0]] = p[1]; });
+JVM.vanillaMaterial = function (id) { return MAT[id] || 'rock'; };
+
+var SEE = {};
+[0, 6, 8, 9, 10, 11, 18, 20, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 44, 50, 51, 52, 53, 54, 55, 59, 60, 63, 64, 65, 66, 67,
+ 68, 69, 70, 71, 72, 75, 76, 77, 78, 79, 81, 83, 85, 88, 90, 92, 93, 94, 95, 96, 101, 102, 104, 105, 106, 107, 108, 109, 111, 113, 114,
+ 115, 116, 117, 118, 119, 120, 122, 126, 127, 128, 130, 131, 132, 134, 135, 136, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+ 149, 150, 151, 154, 156, 157, 171].forEach(function (i) { SEE[i] = 1; });
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, s); };
+	var RN = vm.natives['java/util/Random'].methods;
+	var nInt = RN['nextInt(I)I'], nFloat = RN['nextFloat()F'], nDouble = RN['nextDouble()D'], nBool = RN['nextBoolean()Z'];
+	var ri = function (r, n) { return r.cls.native ? nInt(vm, r, [n]) : vm.callVirtual(r, 'nextInt', '(I)I', [n]); };
+	var rf = function (r) { return r.cls.native ? nFloat(vm, r, []) : vm.callVirtual(r, 'nextFloat', '()F', []); };
+	var rd = function (r) { return r.cls.native ? nDouble(vm, r, []) : vm.callVirtual(r, 'nextDouble', '()D', []); };
+	var rb = function (r) { return r.cls.native ? nBool(vm, r, []) : vm.callVirtual(r, 'nextBoolean', '()Z', []); };
+
+	var id = function (w, x, y, z) { return y < 0 || y > 255 ? 0 : vm.callVirtual(w, 'getBlockId', '(III)I', [x, y, z]); };
+	var meta = function (w, x, y, z) { return vm.callVirtual(w, 'getBlockMetadata', '(III)I', [x, y, z]); };
+	var put = function (w, x, y, z, b, m, fl) { if (y >= 0 && y < 256) vm.callVirtual(w, 'setBlock', '(IIIIII)Z', [x, y, z, b, m | 0, fl == null ? 3 : fl]); };
+	var heightAt = function (w, x, z) { return vm.callVirtual(w, 'getHeightValue', '(II)I', [x, z]); };
+	var topSolid = function (w, x, z) { return vm.callVirtual(w, 'getTopSolidOrLiquidBlock', '(II)I', [x, z]); };
+	var blocks = function () { var c = vm.loadClass(SRC + 'Block'); if (c.initState !== 2) vm.initClass(c); return c.statics.blocksList.a; };
+	var blockOf = function (i) { return i > 0 ? blocks()[i] || null : null; };
+	var matName = function (i) {
+		if (!i) return 'air';
+		var b = blockOf(i);
+		if (b && !b.$vanilla && b[':blockMaterial']) return b[':blockMaterial'].$name || 'rock';
+		return MAT[i] || 'rock';
+	};
+	var LIQ = { water: 1, lava: 1 }, NONSOLID = { air: 1, water: 1, lava: 1, plants: 1, vine: 1, fire: 1, circuits: 1, snow: 1, portal: 1, web: 1 };
+	var isLeaves = function (i) { return i === B.leaves || (i > 0 && matName(i) === 'leaves'); };
+	var isWood = function (i) { return i === B.wood || (i > 0 && !blockOf(i) ? false : i > 0 && blockOf(i) && !blockOf(i).$vanilla && matName(i) === 'wood'); };
+	var opq = {};
+	var opaque = function (i) {
+		if (!i) return false;
+		if (opq[i] !== undefined) return opq[i];
+		var b = blockOf(i), v;
+		if (b && !b.$vanilla) { v = true; JVM.run(vm, function () { v = !!vm.callVirtual(b, 'isOpaqueCube', '()Z', []); }); }
+		else v = !SEE[i];
+		return (opq[i] = v);
+	};
+	var replaceable = function (i) { return !i || !opaque(i) && !isWood(i) && i !== B.waterStill && i !== B.waterMoving && i !== B.lavaStill && i !== B.lavaMoving; };
+	var soil = function (i) { return i === B.grass || i === B.dirt || i === B.farmland; };
+	var stays = function (w, b, x, y, z) {
+		var below = id(w, x, y - 1, z);
+		switch (b) {
+			case B.tallGrass: case B.plantYellow: case B.plantRed: case 6: return soil(below) || sustains(w, below, x, y - 1, z, b);
+			case B.deadBush: return below === B.sand;
+			case B.mushroomBrown: case B.mushroomRed: return below === B.mycelium || below > 0 && opaque(below);
+			case B.cactus:
+				if (!replaceable(id(w, x - 1, y, z)) || !replaceable(id(w, x + 1, y, z)) || !replaceable(id(w, x, y, z - 1)) || !replaceable(id(w, x, y, z + 1))) return false;
+				if (NONSOLID[matName(id(w, x - 1, y, z))] !== 1 || NONSOLID[matName(id(w, x + 1, y, z))] !== 1 || NONSOLID[matName(id(w, x, y, z - 1))] !== 1 || NONSOLID[matName(id(w, x, y, z + 1))] !== 1) return false;
+				return below === B.cactus || below === B.sand;
+			case B.reed:
+				if (below === B.reed) return true;
+				if (below !== B.grass && below !== B.dirt && below !== B.sand) return false;
+				return water(id(w, x - 1, y - 1, z)) || water(id(w, x + 1, y - 1, z)) || water(id(w, x, y - 1, z - 1)) || water(id(w, x, y - 1, z + 1));
+			case B.waterlily: return below === B.waterStill && meta(w, x, y - 1, z) === 0;
+			case B.pumpkin: return below > 0 && NONSOLID[matName(below)] !== 1;
+		}
+		var o = blockOf(b);
+		if (!o || o.$vanilla) return true;
+		var ok = true;
+		JVM.run(vm, function () { ok = !!vm.callVirtual(o, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [w, x, y, z]); });
+		return ok;
+	};
+	var water = function (i) { return i === B.waterStill || i === B.waterMoving || (i > 0 && matName(i) === 'water'); };
+	var sustains = function (w, soilId, x, y, z, plant) {
+		var s = blockOf(soilId);
+		if (!s || s.$vanilla) return false;
+		var ok = false;
+		JVM.run(vm, function () {
+			var fd = vm.loadClass('net/minecraftforge/common/ForgeDirection'); vm.initClass(fd);
+			var up = fd.statics.UP || null;
+			ok = !!vm.callVirtual(s, 'canSustainPlant', '(Lnet/minecraft/src/World;IIILnet/minecraftforge/common/ForgeDirection;Lnet/minecraftforge/common/IPlantable;)Z', [w, x, y, z, up, blockOf(plant)]);
+		});
+		return ok;
+	};
+	JVM.worldgenStays = stays;
+
+	var BL = vm.natives[SRC + 'Block'];
+	if (BL && !BL.$matWrapped) {
+		BL.$matWrapped = true;
+		var ci = BL.clinit;
+		BL.clinit = function (vm, c) {
+			ci(vm, c);
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			c.statics.blocksList.a.forEach(function (b, i) { if (b && b.$vanilla && MAT[i]) b[':blockMaterial'] = mc.statics[MAT[i]] || b[':blockMaterial']; });
+		};
+	}
+
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+	var idef = function (n) { if (!vm.natives[n]) vm.defineNative(n, { access: I }); };
+	['net/minecraftforge/common/IPlantable', 'java/util/concurrent/Callable', SRC + 'EntityOwnable', SRC + 'IRangedAttackMob', SRC + 'IInvBasic'].forEach(idef);
+	var PT = ['Plains', 'Desert', 'Beach', 'Cave', 'Water', 'Nether', 'Crop'], pst = {};
+	PT.forEach(function (t) { pst[t] = null; });
+	if (!vm.natives['net/minecraftforge/common/EnumPlantType']) vm.defineNative('net/minecraftforge/common/EnumPlantType', { super: 'java/lang/Enum', statics: pst, clinit: function (vm, c) {
+		c.$values = PT.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
+	} });
+	def('WeightedRandomItem', { fields: { itemWeight: 'I' }, methods: { '<init>(I)V': function (vm, self, a) { self[':itemWeight'] = a[0]; } } });
+	def('WeightedRandomChestContent', { super: SRC + 'WeightedRandomItem', fields: { theItemId: 'L' + SRC + 'ItemStack;', theMinimumChanceToGenerateItem: 'I', theMaximumChanceToGenerateItem: 'I' }, methods: {
+		'<init>(Lnet/minecraft/src/ItemStack;III)V': function (vm, self, a) { self[':theItemId'] = a[0]; self[':theMinimumChanceToGenerateItem'] = a[1]; self[':theMaximumChanceToGenerateItem'] = a[2]; self[':itemWeight'] = a[3]; },
+		'<init>(IIIII)V': function (vm, self, a) {
+			var st = vm.newObject(vm.loadClass(SRC + 'ItemStack')); vm.callVirtual(st, '<init>', '(III)V', [a[0], 1, a[1]]);
+			self[':theItemId'] = st; self[':theMinimumChanceToGenerateItem'] = a[2]; self[':theMaximumChanceToGenerateItem'] = a[3]; self[':itemWeight'] = a[4];
+		},
+	} });
+	var CGH = 'net/minecraftforge/common/ChestGenHooks', LCGH = 'L' + CGH + ';', WRC = 'L' + SRC + 'WeightedRandomChestContent;';
+	var chests = function (vm) { var r = JVM.mc152.reg(vm); return r.chestLoot || (r.chestLoot = {}); };
+	var info = function (vm, cat) {
+		var c = chests(vm), k = String(cat);
+		if (!c[k]) { var o = vm.newObject(vm.loadClass(CGH)); o.$cat = k; o.$items = []; o.$min = 3; o.$max = 8; c[k] = o; }
+		return c[k];
+	};
+	if (!vm.natives[CGH]) vm.defineNative(CGH, { statics: { DUNGEON_CHEST: null, MINESHAFT_CORRIDOR: null, PYRAMID_DESERT_CHEST: null, PYRAMID_JUNGLE_CHEST: null, PYRAMID_JUNGLE_DISPENSER: null, STRONGHOLD_CORRIDOR: null, STRONGHOLD_LIBRARY: null, STRONGHOLD_CROSSING: null, VILLAGE_BLACKSMITH: null, BONUS_CHEST: null },
+		clinit: function (vm, c) {
+			var n = { DUNGEON_CHEST: 'dungeonChest', MINESHAFT_CORRIDOR: 'mineshaftCorridor', PYRAMID_DESERT_CHEST: 'pyramidDesertyChest', PYRAMID_JUNGLE_CHEST: 'pyramidJungleChest',
+				PYRAMID_JUNGLE_DISPENSER: 'pyramidJungleDispenser', STRONGHOLD_CORRIDOR: 'strongholdCorridor', STRONGHOLD_LIBRARY: 'strongholdLibrary', STRONGHOLD_CROSSING: 'strongholdCrossing',
+				VILLAGE_BLACKSMITH: 'villageBlacksmith', BONUS_CHEST: 'bonusChest' };
+			Object.keys(n).forEach(function (k) { c.statics[k] = n[k]; });
+		},
+		staticMethods: (function () {
+			var m = {};
+			m['getInfo(Ljava/lang/String;)' + LCGH] = function (vm, n, a) { return info(vm, a[0]); };
+			m['addItem(Ljava/lang/String;' + WRC + ')V'] = function (vm, n, a) { info(vm, a[0]).$items.push(a[1]); };
+			m['removeItem(Ljava/lang/String;Lnet/minecraft/src/ItemStack;)V'] = function () {};
+			m['getItems(Ljava/lang/String;Ljava/util/Random;)[' + WRC] = function (vm, n, a) { return JVM.javaArray(vm, WRC, info(vm, a[0]).$items.slice()); };
+			m['getCount(Ljava/lang/String;Ljava/util/Random;)I'] = function (vm, n, a) { var i = info(vm, a[0]); return i.$min + ri(a[1], Math.max(1, i.$max - i.$min + 1)); };
+			m['getOneItem(Ljava/lang/String;Ljava/util/Random;)Lnet/minecraft/src/ItemStack;'] = function (vm, n, a) { var it = info(vm, a[0]).$items; return it.length ? it[ri(a[1], it.length)][':theItemId'] : null; };
+			return m;
+		})(),
+		methods: (function () {
+			var m = {};
+			m['addItem(' + WRC + ')V'] = function (vm, self, a) { if (a[0]) self.$items.push(a[0]); };
+			m['removeItem(Lnet/minecraft/src/ItemStack;)V'] = function () {};
+			m['getItems(Ljava/util/Random;)[' + WRC] = function (vm, self) { return JVM.javaArray(vm, WRC, self.$items.slice()); };
+			m['getCount(Ljava/util/Random;)I'] = function (vm, self, a) { return self.$min + ri(a[0], Math.max(1, self.$max - self.$min + 1)); };
+			m['setMin(I)V'] = function (vm, self, a) { self.$min = a[0]; };
+			m['setMax(I)V'] = function (vm, self, a) { self.$max = a[0]; };
+			m['getMin()I'] = function (vm, self) { return self.$min; };
+			m['getMax()I'] = function (vm, self) { return self.$max; };
+			return m;
+		})() });
+	var BG0 = vm.natives[SRC + 'BiomeGenBase'];
+	if (BG0) BG0.methods = Object.assign({}, BG0.methods, {
+		'func_76733_a(I)Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) { self[':field_76754_C'] = a[0]; return self; },
+	});
+
+	var VTEX = { 1: 'stone', 2: ['dirt', 'grass_top', 'grass_side'], 3: 'dirt', 4: 'cobblestone', 5: 'planks_oak', 7: 'bedrock', 8: 'water_still', 9: 'water_still',
+		10: 'lava_still', 11: 'lava_still', 12: 'sand', 13: 'gravel', 14: 'gold_ore', 15: 'iron_ore', 16: 'coal_ore', 17: ['log_oak_top', 'log_oak_top', 'log_oak'], 18: 'leaves_oak',
+		19: 'sponge', 20: 'glass', 21: 'lapis_ore', 22: 'lapis_block', 24: ['sandstone_bottom', 'sandstone_top', 'sandstone_normal'], 35: 'wool_colored_white',
+		41: 'gold_block', 42: 'iron_block', 45: 'brick', 47: ['planks_oak', 'planks_oak', 'bookshelf'], 48: 'cobblestone_mossy', 49: 'obsidian', 56: 'diamond_ore',
+		57: 'diamond_block', 73: 'redstone_ore', 78: 'snow', 79: 'ice', 80: 'snow', 81: ['cactus_bottom', 'cactus_top', 'cactus_side'], 82: 'clay', 87: 'netherrack',
+		88: 'soul_sand', 89: 'glowstone', 98: 'stonebrick', 110: ['dirt', 'mycelium_top', 'mycelium_side'], 112: 'nether_brick', 121: 'end_stone', 129: 'emerald_ore',
+		133: 'emerald_block', 152: 'redstone_block', 155: 'quartz_block_side', 172: 'hardened_clay', 173: 'coal_block' };
+	var vIcons = {};
+	var vIcon = function (n) { if (!vIcons[n]) { var o = vm.newObject(vm.loadClass('mcre/Icon')); o.$name = n; o.$vanilla = true; vIcons[n] = o; } return vIcons[n]; };
+	if (BL && BL.methods && !BL.$vtex) {
+		BL.$vtex = true;
+		var gi = BL.methods['getIcon(II)Lnet/minecraft/src/Icon;'];
+		BL.methods['getIcon(II)Lnet/minecraft/src/Icon;'] = function (vm, self, a) {
+			if (self.$vanilla && VTEX[self[':blockID']]) { var v = VTEX[self[':blockID']]; return vIcon(typeof v === 'string' ? v : v[a[0] === 0 ? 0 : a[0] === 1 ? 1 : 2]); }
+			return gi(vm, self, a);
+		};
+	}
+
+	var plantsMat = function () { var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc); return mc.statics.plants; };
+	var flowerInit = function (vm, self, bid, mat) {
+		var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+		if (k) vm.invoke(k, self, [bid, mat || plantsMat()]);
+		self[':needsRandomTick'] = 1;
+		self[':minX'] = 0.3; self[':minY'] = 0; self[':minZ'] = 0.3; self[':maxX'] = 0.7; self[':maxY'] = 0.6; self[':maxZ'] = 0.7;
+	};
+	def('BlockFlower', { super: SRC + 'Block', interfaces: ['net/minecraftforge/common/IPlantable'], methods: {
+		'<init>(ILnet/minecraft/src/Material;)V': function (vm, self, a) { flowerInit(vm, self, a[0], a[1]); },
+		'<init>(I)V': function (vm, self, a) { flowerInit(vm, self, a[0], null); },
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var i = id(a[0], a[1], a[2], a[3]);
+			if (i && !replaceable(i)) return 0;
+			return vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]]);
+		},
+		'canThisPlantGrowOnThisBlockID(I)Z': function (vm, self, a) { return soil(a[0]) ? 1 : 0; },
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var below = id(a[0], a[1], a[2] - 1, a[3]);
+			if (vm.callVirtual(self, 'canThisPlantGrowOnThisBlockID', '(I)Z', [below])) return 1;
+			return sustains(a[0], below, a[1], a[2] - 1, a[3], self[':blockID']) ? 1 : 0;
+		},
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+		'getRenderType()I': function () { return 1; },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'getPlantType(Lnet/minecraft/src/World;III)Lnet/minecraftforge/common/EnumPlantType;': function (vm) {
+			var e = vm.loadClass('net/minecraftforge/common/EnumPlantType'); vm.initClass(e); return e.statics.Plains || null;
+		},
+		'getPlantID(Lnet/minecraft/src/World;III)I': function (vm, self) { return self[':blockID']; },
+		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
+	} });
+	def('BlockBush', { super: SRC + 'BlockFlower' });
+
+	var WG = SRC + 'WorldGenerator';
+	var superInit = function (self, notify) { self[':doBlockNotify'] = notify ? 1 : 0; };
+	var gset = function (self, w, x, y, z, b, m) { put(w, x, y, z, b, m, self[':doBlockNotify'] ? 3 : 2); };
+	var gen = function (name, ctors, fn, fields) {
+		var m = {};
+		Object.keys(ctors).forEach(function (k) { m[k] = ctors[k]; });
+		m[GEN] = function (vm, self, a) { return fn(self, a[0], a[1], a[2], a[3], a[4]) ? 1 : 0; };
+		def(name, { super: WG, methods: m, fields: fields || {} });
+	};
+	var scatter = function (r, x, n) { return x + ri(r, n) - ri(r, n); };
+
+	gen('WorldGenTallGrass', { '<init>(II)V': function (vm, self, a) { self[':tallGrassID'] = a[0]; self[':tallGrassMetadata'] = a[1]; } }, function (self, w, r, x, y, z) {
+		var l;
+		for (; ((l = id(w, x, y, z)) === 0 || isLeaves(l)) && y > 0; --y);
+		for (var i = 0; i < 128; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && stays(w, self[':tallGrassID'], a, b, c)) put(w, a, b, c, self[':tallGrassID'], self[':tallGrassMetadata'], 2);
+		}
+		return true;
+	});
+	gen('WorldGenFlowers', { '<init>(I)V': function (vm, self, a) { self[':plantBlockId'] = a[0]; self[':plantBlockMeta'] = 0; },
+		'<init>(II)V': function (vm, self, a) { self[':plantBlockId'] = a[0]; self[':plantBlockMeta'] = a[1]; } }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 64; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && b < 127 && stays(w, self[':plantBlockId'], a, b, c)) put(w, a, b, c, self[':plantBlockId'], self[':plantBlockMeta'], 2);
+		}
+		return true;
+	});
+	gen('WorldGenDeadBush', { '<init>(I)V': function (vm, self, a) { self[':deadBushID'] = a[0]; } }, function (self, w, r, x, y, z) {
+		var l;
+		for (; ((l = id(w, x, y, z)) === 0 || isLeaves(l)) && y > 0; --y);
+		for (var i = 0; i < 4; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && stays(w, self[':deadBushID'], a, b, c)) put(w, a, b, c, self[':deadBushID'], 0, 2);
+		}
+		return true;
+	});
+	gen('WorldGenReed', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 20; ++i) {
+			var a = x + ri(r, 4) - ri(r, 4), c = z + ri(r, 4) - ri(r, 4);
+			if (id(w, a, y, c) !== 0) continue;
+			if (!(water(id(w, a - 1, y - 1, c)) || water(id(w, a + 1, y - 1, c)) || water(id(w, a, y - 1, c - 1)) || water(id(w, a, y - 1, c + 1)))) continue;
+			var h = 2 + ri(r, ri(r, 3) + 1);
+			for (var k = 0; k < h; ++k) if (stays(w, B.reed, a, y + k, c)) put(w, a, y + k, c, B.reed, 0, 2);
+		}
+		return true;
+	});
+	gen('WorldGenCactus', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 10; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) !== 0) continue;
+			var h = 1 + ri(r, ri(r, 3) + 1);
+			for (var k = 0; k < h; ++k) if (stays(w, B.cactus, a, b + k, c)) put(w, a, b + k, c, B.cactus, 0, 2);
+		}
+		return true;
+	});
+	gen('WorldGenWaterlily', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 10; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && stays(w, B.waterlily, a, b, c)) put(w, a, b, c, B.waterlily, 0, 2);
+		}
+		return true;
+	});
+	gen('WorldGenPumpkin', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 64; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && id(w, a, b - 1, c) === B.grass && stays(w, B.pumpkin, a, b, c)) put(w, a, b, c, B.pumpkin, ri(r, 4), 2);
+		}
+		return true;
+	});
+	var disc = function (w, r, x, y, z, radius, half, block, from) {
+		if (matName(id(w, x, y, z)) !== 'water') return false;
+		var l = ri(r, radius - 2) + 2;
+		for (var a = x - l; a <= x + l; ++a) for (var c = z - l; c <= z + l; ++c) {
+			var dx = a - x, dz = c - z;
+			if (dx * dx + dz * dz > l * l) continue;
+			for (var b = y - half; b <= y + half; ++b) { var o = id(w, a, b, c); if (from.indexOf(o) >= 0) put(w, a, b, c, block, 0, 2); }
+		}
+		return true;
+	};
+	gen('WorldGenSand', { '<init>(II)V': function (vm, self, a) { self[':radius'] = a[0]; self[':sandID'] = a[1]; } }, function (self, w, r, x, y, z) {
+		if (self.$gameOwned) return true;
+		return disc(w, r, x, y, z, self[':radius'], 2, self[':sandID'], [B.dirt, B.grass]);
+	});
+	gen('WorldGenClay', { '<init>(I)V': function (vm, self, a) { self[':numberOfBlocks'] = a[0]; self[':clayBlockId'] = B.clay; } }, function (self, w, r, x, y, z) {
+		if (self.$gameOwned) return true;
+		return disc(w, r, x, y, z, self[':numberOfBlocks'], 1, self[':clayBlockId'] || B.clay, [B.dirt, B.clay]);
+	});
+
+	gen('WorldGenLakes', { '<init>(I)V': function (vm, self, a) { self[':blockIndex'] = a[0]; } }, function (self, w, r, x, y, z) {
+		var liq = self[':blockIndex'];
+		x -= 8; z -= 8;
+		for (; y > 5 && id(w, x, y, z) === 0; --y);
+		if (y <= 4) return false;
+		y -= 4;
+		var ab = new Uint8Array(2048), n = ri(r, 4) + 4, i, j, k, l;
+		for (i = 0; i < n; ++i) {
+			var d0 = rd(r) * 6 + 3, d1 = rd(r) * 4 + 2, d2 = rd(r) * 6 + 3;
+			var d3 = rd(r) * (16 - d0 - 2) + 1 + d0 / 2, d4 = rd(r) * (8 - d1 - 4) + 2 + d1 / 2, d5 = rd(r) * (16 - d2 - 2) + 1 + d2 / 2;
+			for (j = 1; j < 15; ++j) for (k = 1; k < 15; ++k) for (l = 1; l < 7; ++l) {
+				var d6 = (j - d3) / (d0 / 2), d7 = (l - d4) / (d1 / 2), d8 = (k - d5) / (d2 / 2);
+				if (d6 * d6 + d7 * d7 + d8 * d8 < 1) ab[(j * 16 + k) * 8 + l] = 1;
+			}
+		}
+		var edge = function (j, k, l) {
+			var q = (j * 16 + k) * 8 + l;
+			return !ab[q] && (j < 15 && ab[q + 128] || j > 0 && ab[q - 128] || k < 15 && ab[q + 8] || k > 0 && ab[q - 8] || l < 7 && ab[q + 1] || l > 0 && ab[q - 1]);
+		};
+		for (j = 0; j < 16; ++j) for (k = 0; k < 16; ++k) for (l = 0; l < 8; ++l) {
+			if (!edge(j, k, l)) continue;
+			var m = matName(id(w, x + j, y + l, z + k));
+			if (l >= 4 && LIQ[m]) return false;
+			if (l < 4 && NONSOLID[m] && id(w, x + j, y + l, z + k) !== liq) return false;
+		}
+		for (j = 0; j < 16; ++j) for (k = 0; k < 16; ++k) for (l = 0; l < 8; ++l)
+			if (ab[(j * 16 + k) * 8 + l]) put(w, x + j, y + l, z + k, l >= 4 ? 0 : liq, 0, 2);
+		for (j = 0; j < 16; ++j) for (k = 0; k < 16; ++k) for (l = 4; l < 8; ++l)
+			if (ab[(j * 16 + k) * 8 + l] && id(w, x + j, y + l - 1, z + k) === B.dirt) put(w, x + j, y + l - 1, z + k, B.grass, 0, 2);
+		var lm = matName(liq);
+		if (lm === 'lava') for (j = 0; j < 16; ++j) for (k = 0; k < 16; ++k) for (l = 0; l < 8; ++l)
+			if (edge(j, k, l) && (l < 4 || ri(r, 2) !== 0) && !NONSOLID[matName(id(w, x + j, y + l, z + k))]) put(w, x + j, y + l, z + k, B.stone, 0, 2);
+		return true;
+	});
+	gen('WorldGenLiquids', { '<init>(I)V': function (vm, self, a) { self[':liquidBlockId'] = a[0]; } }, function (self, w, r, x, y, z) {
+		if (id(w, x, y + 1, z) !== B.stone || id(w, x, y - 1, z) !== B.stone) return false;
+		var here = id(w, x, y, z);
+		if (here !== 0 && here !== B.stone) return false;
+		var s = 0, a = 0, n = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+		n.forEach(function (d) { var o = id(w, x + d[0], y, z + d[1]); if (o === B.stone) s++; if (o === 0) a++; });
+		if (s === 3 && a === 1) put(w, x, y, z, self[':liquidBlockId'], 0, 2);
+		return true;
+	});
+
+	gen('WorldGenBigMushroom', { '<init>()V': function (vm, self) { self[':mushroomType'] = -1; superInit(self, false); },
+		'<init>(I)V': function (vm, self, a) { self[':mushroomType'] = a[0]; superInit(self, true); } }, function (self, w, r, x, y, z) {
+		var t = self[':mushroomType'];
+		if (t < 0) t = ri(r, 2);
+		var h = ri(r, 3) + 4, ok = true, j, k, l;
+		if (y < 1 || y + h + 1 >= 256) return false;
+		for (j = y; j <= y + 1 + h; ++j) {
+			var b0 = j <= y + 3 ? 0 : 3;
+			for (k = x - b0; k <= x + b0 && ok; ++k) for (l = z - b0; l <= z + b0 && ok; ++l) {
+				var o = id(w, k, j, l);
+				if (o !== 0 && !isLeaves(o)) ok = false;
+			}
+		}
+		if (!ok) return false;
+		var g = id(w, x, y - 1, z);
+		if (g !== B.dirt && g !== B.grass && g !== B.mycelium) return false;
+		var top = t === 1 ? y + h - 3 : y + h;
+		for (j = top; j <= y + h; ++j) {
+			var s = 1;
+			if (j < y + h) ++s;
+			if (t === 0) s = 3;
+			for (k = x - s; k <= x + s; ++k) for (l = z - s; l <= z + s; ++l) {
+				var d = 5;
+				if (k === x - s) --d; if (k === x + s) ++d; if (l === z - s) d -= 3; if (l === z + s) d += 3;
+				if (t === 0 || j < y + h) {
+					if ((k === x - s || k === x + s) && (l === z - s || l === z + s)) continue;
+					if (k === x - (s - 1) && l === z - s) d = 1; if (k === x - s && l === z - (s - 1)) d = 1;
+					if (k === x + (s - 1) && l === z - s) d = 3; if (k === x + s && l === z - (s - 1)) d = 3;
+					if (k === x - (s - 1) && l === z + s) d = 7; if (k === x - s && l === z + (s - 1)) d = 7;
+					if (k === x + (s - 1) && l === z + s) d = 9; if (k === x + s && l === z + (s - 1)) d = 9;
+				}
+				if (d === 5 && j < y + h) d = 0;
+				if ((d !== 0 || y >= y + h - 1) && !opaque(id(w, k, j, l))) gset(self, w, k, j, l, B.capBrown + t, d);
+			}
+		}
+		for (j = 0; j < h; ++j) if (!opaque(id(w, x, y + j, z))) gset(self, w, x, y + j, z, B.capBrown + t, 10);
+		return true;
+	});
+
+	var room = function (w, x, y, z, h, radiusAt) {
+		if (y < 1 || y + h + 1 > 256) return false;
+		for (var j = y; j <= y + 1 + h; ++j) {
+			var b = radiusAt(j);
+			for (var k = x - b; k <= x + b; ++k) for (var l = z - b; l <= z + b; ++l) {
+				if (j < 0 || j >= 256) return false;
+				var o = id(w, k, j, l);
+				if (o !== 0 && !isLeaves(o) && o !== B.grass && o !== B.dirt && !isWood(o)) return false;
+			}
+		}
+		return true;
+	};
+	var growVines = function (w, x, y, z, m) {
+		put(w, x, y, z, B.vine, m, 2);
+		for (var i = 4; id(w, x, --y, z) === 0 && i > 0; --i) put(w, x, y, z, B.vine, m, 2);
+	};
+	var crown = function (self, w, r, x, y, z, h, rad0, leaves, lmeta) {
+		for (var j = y - 3 + h; j <= y + h; ++j) {
+			var dy = j - (y + h), s = rad0 + 1 - ((dy / 2) | 0);
+			for (var k = x - s; k <= x + s; ++k) for (var l = z - s; l <= z + s; ++l) {
+				if (Math.abs(k - x) !== s || Math.abs(l - z) !== s || ri(r, 2) !== 0 && dy !== 0) {
+					var o = id(w, k, j, l);
+					if (o === 0 || isLeaves(o) || !opaque(o) && !isWood(o)) gset(self, w, k, j, l, leaves, lmeta);
+				}
+			}
+		}
+	};
+	var oak = function (self, w, r, x, y, z) {
+		var h = ri(r, 3) + (self[':minTreeHeight'] || 4);
+		if (!room(w, x, y, z, h, function (j) { return j === y ? 0 : j >= y + 1 + h - 2 ? 2 : 1; })) return false;
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		crown(self, w, r, x, y, z, h, 0, B.leaves, self[':metaLeaves'] | 0);
+		var vines = !!self[':vinesGrow'];
+		for (var k = 0; k < h; ++k) {
+			var o = id(w, x, y + k, z);
+			if (o === 0 || isLeaves(o)) {
+				gset(self, w, x, y + k, z, B.wood, self[':metaWood'] | 0);
+				if (vines && k > 0) {
+					if (ri(r, 3) > 0 && id(w, x - 1, y + k, z) === 0) gset(self, w, x - 1, y + k, z, B.vine, 8);
+					if (ri(r, 3) > 0 && id(w, x + 1, y + k, z) === 0) gset(self, w, x + 1, y + k, z, B.vine, 2);
+					if (ri(r, 3) > 0 && id(w, x, y + k, z - 1) === 0) gset(self, w, x, y + k, z - 1, B.vine, 1);
+					if (ri(r, 3) > 0 && id(w, x, y + k, z + 1) === 0) gset(self, w, x, y + k, z + 1, B.vine, 4);
+				}
+			}
+		}
+		if (vines) {
+			for (var j = y - 3 + h; j <= y + h; ++j) {
+				var s = 2 - (((j - (y + h)) / 2) | 0);
+				for (var a = x - s; a <= x + s; ++a) for (var c = z - s; c <= z + s; ++c) {
+					if (!isLeaves(id(w, a, j, c))) continue;
+					if (ri(r, 4) === 0 && id(w, a - 1, j, c) === 0) growVines(w, a - 1, j, c, 8);
+					if (ri(r, 4) === 0 && id(w, a + 1, j, c) === 0) growVines(w, a + 1, j, c, 2);
+					if (ri(r, 4) === 0 && id(w, a, j, c - 1) === 0) growVines(w, a, j, c - 1, 1);
+					if (ri(r, 4) === 0 && id(w, a, j, c + 1) === 0) growVines(w, a, j, c + 1, 4);
+				}
+			}
+		}
+		return true;
+	};
+	gen('WorldGenTrees', {
+		'<init>(Z)V': function (vm, self, a) { superInit(self, a[0]); self[':minTreeHeight'] = 4; self[':metaWood'] = 0; self[':metaLeaves'] = 0; self[':vinesGrow'] = 0; },
+		'<init>(ZIIIZ)V': function (vm, self, a) { superInit(self, a[0]); self[':minTreeHeight'] = a[1]; self[':metaWood'] = a[2]; self[':metaLeaves'] = a[3]; self[':vinesGrow'] = a[4]; },
+	}, oak);
+	gen('WorldGenForest', { '<init>(Z)V': function (vm, self, a) { superInit(self, a[0]); } }, function (self, w, r, x, y, z) {
+		var h = ri(r, 3) + 5;
+		if (!room(w, x, y, z, h, function (j) { return j === y ? 0 : j >= y + 1 + h - 2 ? 2 : 1; })) return false;
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		crown(self, w, r, x, y, z, h, 0, B.leaves, 2);
+		for (var k = 0; k < h; ++k) { var o = id(w, x, y + k, z); if (o === 0 || isLeaves(o)) gset(self, w, x, y + k, z, B.wood, 2); }
+		return true;
+	});
+	gen('WorldGenSwamp', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		var h = ri(r, 4) + 5;
+		for (; matName(id(w, x, y - 1, z)) === 'water'; --y);
+		if (!room(w, x, y, z, h, function (j) { return j === y ? 0 : j >= y + 1 + h - 2 ? 3 : 1; })) return false;
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		crown(self, w, r, x, y, z, h, 1, B.leaves, 0);
+		for (var k = 0; k < h; ++k) { var o = id(w, x, y + k, z); if (o === 0 || isLeaves(o) || water(o)) gset(self, w, x, y + k, z, B.wood, 0); }
+		for (var j = y - 3 + h; j <= y + h; ++j) {
+			var s = 2 - (((j - (y + h)) / 2) | 0);
+			for (var a = x - s; a <= x + s; ++a) for (var c = z - s; c <= z + s; ++c) {
+				if (!isLeaves(id(w, a, j, c))) continue;
+				if (ri(r, 4) === 0 && id(w, a - 1, j, c) === 0) growVines(w, a - 1, j, c, 8);
+				if (ri(r, 4) === 0 && id(w, a + 1, j, c) === 0) growVines(w, a + 1, j, c, 2);
+				if (ri(r, 4) === 0 && id(w, a, j, c - 1) === 0) growVines(w, a, j, c - 1, 1);
+				if (ri(r, 4) === 0 && id(w, a, j, c + 1) === 0) growVines(w, a, j, c + 1, 4);
+			}
+		}
+		return true;
+	});
+	gen('WorldGenBigTree', { '<init>(Z)V': function (vm, self, a) { superInit(self, a[0]); } }, function (self, w, r, x, y, z) {
+		var h = ri(r, 5) + 7;
+		if (!room(w, x, y, z, h, function (j) { return j <= y + 1 ? 0 : j >= y + h - 4 ? 2 : 1; })) return false;
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		crown(self, w, r, x, y, z, h, 1, B.leaves, 0);
+		crown(self, w, r, x, y - 2, z, h, 1, B.leaves, 0);
+		for (var k = 0; k < h; ++k) { var o = id(w, x, y + k, z); if (o === 0 || isLeaves(o)) gset(self, w, x, y + k, z, B.wood, 0); }
+		return true;
+	});
+	gen('WorldGenShrub', { '<init>(II)V': function (vm, self, a) { self[':field_76527_a'] = a[1]; self[':field_76526_b'] = a[0]; self[':leavesMeta'] = a[1]; self[':woodMeta'] = a[0]; } }, function (self, w, r, x, y, z) {
+		var l;
+		for (; ((l = id(w, x, y, z)) === 0 || isLeaves(l)) && y > 0; --y);
+		l = id(w, x, y, z);
+		if (l !== B.dirt && l !== B.grass && !sustains(w, l, x, y, z, 6)) return true;
+		++y;
+		gset(self, w, x, y, z, B.wood, self[':woodMeta'] | 0);
+		for (var j = y; j <= y + 2; ++j) {
+			var s = 2 - (j - y);
+			for (var a = x - s; a <= x + s; ++a) for (var c = z - s; c <= z + s; ++c)
+				if ((Math.abs(a - x) !== s || Math.abs(c - z) !== s || ri(r, 2) !== 0) && !opaque(id(w, a, j, c))) gset(self, w, a, j, c, B.leaves, self[':leavesMeta'] | 0);
+		}
+		return true;
+	});
+	gen('WorldGenTaiga2', { '<init>(Z)V': function (vm, self, a) { superInit(self, a[0]); } }, function (self, w, r, x, y, z) {
+		var h = ri(r, 4) + 6, bare = 1 + ri(r, 2), leafH = h - bare, maxR = 2 + ri(r, 2);
+		if (y < 1 || y + h + 1 > 256) return false;
+		for (var j = y; j <= y + 1 + h; ++j) {
+			var b = j - y < bare ? 0 : maxR;
+			for (var k = x - b; k <= x + b; ++k) for (var l = z - b; l <= z + b; ++l) { var o = id(w, k, j, l); if (o !== 0 && !isLeaves(o)) return false; }
+		}
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		var rad = ri(r, 2), step = 1, first = 0;
+		for (var d = 0; d <= leafH; ++d) {
+			var yy = y + h - d;
+			for (var a = x - rad; a <= x + rad; ++a) for (var c = z - rad; c <= z + rad; ++c)
+				if ((Math.abs(a - x) !== rad || Math.abs(c - z) !== rad || rad <= 0) && !opaque(id(w, a, yy, c))) gset(self, w, a, yy, c, B.leaves, 1);
+			if (rad >= step) { rad = first; first = 1; ++step; if (step > maxR) step = maxR; } else ++rad;
+		}
+		var cut = ri(r, 3);
+		for (var t = 0; t < h - cut; ++t) { var o2 = id(w, x, y + t, z); if (o2 === 0 || isLeaves(o2)) gset(self, w, x, y + t, z, B.wood, 1); }
+		return true;
+	});
+	gen('WorldGenTaiga1', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		var h = ri(r, 5) + 7, bare = h - ri(r, 2) - 3, leafH = h - bare, maxR = 1 + ri(r, leafH + 1);
+		if (y < 1 || y + h + 1 > 256) return false;
+		for (var j = y; j <= y + 1 + h; ++j) {
+			var b = j - y < bare ? 0 : maxR;
+			for (var k = x - b; k <= x + b; ++k) for (var l = z - b; l <= z + b; ++l) { var o = id(w, k, j, l); if (o !== 0 && o !== B.leaves) return false; }
+		}
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		put(w, x, y - 1, z, B.dirt, 0, 2);
+		var rad = 0;
+		for (var yy = y + h; yy >= y + bare; --yy) {
+			for (var a = x - rad; a <= x + rad; ++a) for (var c = z - rad; c <= z + rad; ++c)
+				if ((Math.abs(a - x) !== rad || Math.abs(c - z) !== rad || rad <= 0) && !opaque(id(w, a, yy, c))) gset(self, w, a, yy, c, B.leaves, 1);
+			if (rad >= 1 && yy === y + bare + 1) --rad; else if (rad < maxR) ++rad;
+		}
+		for (var t = 0; t < h - 1; ++t) { var o2 = id(w, x, y + t, z); if (o2 === 0 || isLeaves(o2)) gset(self, w, x, y + t, z, B.wood, 1); }
+		return true;
+	});
+	gen('WorldGenHugeTrees', { '<init>(ZIII)V': function (vm, self, a) { superInit(self, a[0]); self[':baseHeight'] = a[1]; self[':woodMetadata'] = a[2]; self[':leavesMetadata'] = a[3]; } }, function (self, w, r, x, y, z) {
+		var h = ri(r, 3) + self[':baseHeight'], wm = self[':woodMetadata'] | 0, lm = self[':leavesMetadata'] | 0;
+		if (!room(w, x, y, z, h, function (j) { return j === y ? 1 : j >= y + 1 + h - 2 ? 2 : 1; })) return false;
+		if (!soil(id(w, x, y - 1, z)) || y >= 256 - h - 1) return false;
+		[[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (d) { put(w, x + d[0], y - 1, z + d[1], B.dirt, 0, 2); });
+		var blob = function (cx, cy, cz, rr) {
+			for (var j = cy - 2; j <= cy; ++j) {
+				var s = rr - (j - cy);
+				for (var a = cx - s; a <= cx + s + 1; ++a) for (var c = cz - s; c <= cz + s + 1; ++c) {
+					var dx = a - cx, dz = c - cz;
+					if (dx < 0 && dz < 0 || dx * dx + dz * dz <= s * s || (dx - 1) * (dx - 1) + (dz - 1) * (dz - 1) <= s * s) {
+						var o = id(w, a, j, c);
+						if (o === 0 || isLeaves(o)) gset(self, w, a, j, c, B.leaves, lm);
+					}
+				}
+			}
+		};
+		blob(x, y + h, z, 2);
+		for (var yy = y + h - 2 - ri(r, 4); yy > y + h / 2; yy -= 2 + ri(r, 4)) {
+			var ang = rf(r) * Math.PI * 2, bx = x + ((0.5 + Math.cos(ang) * 4) | 0), bz = z + ((0.5 + Math.sin(ang) * 4) | 0);
+			blob(bx, yy, bz, 0);
+			for (var b = 0; b < 5; ++b) gset(self, w, x + ((1.5 + Math.cos(ang) * b) | 0), yy - 3 + ((b / 2) | 0), z + ((1.5 + Math.sin(ang) * b) | 0), B.wood, wm);
+		}
+		for (var t = 0; t < h; ++t) {
+			[[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (d) {
+				var o = id(w, x + d[0], y + t, z + d[1]);
+				if (o === 0 || isLeaves(o)) gset(self, w, x + d[0], y + t, z + d[1], B.wood, wm);
+			});
+			if (t > 0) {
+				if (ri(r, 3) > 0 && id(w, x - 1, y + t, z) === 0) gset(self, w, x - 1, y + t, z, B.vine, 8);
+				if (ri(r, 3) > 0 && id(w, x, y + t, z - 1) === 0) gset(self, w, x, y + t, z - 1, B.vine, 1);
+				if (ri(r, 3) > 0 && id(w, x + 2, y + t, z) === 0) gset(self, w, x + 2, y + t, z, B.vine, 2);
+				if (ri(r, 3) > 0 && id(w, x, y + t, z + 2) === 0) gset(self, w, x, y + t, z + 2, B.vine, 4);
+			}
+		}
+		return true;
+	});
+	gen('WorldGenVines', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		var x0 = x, z0 = z;
+		var SIDES = [[0, 1, 1], [0, -1, 4], [1, 0, 8], [-1, 0, 2]];
+		for (; y < 128; ++y) {
+			if (id(w, x, y, z) === 0) {
+				for (var s = 0; s < 4; ++s) {
+					var o = id(w, x + SIDES[s][0], y, z + SIDES[s][1]);
+					if (o && opaque(o) && !NONSOLID[matName(o)]) { put(w, x, y, z, B.vine, SIDES[s][2], 2); break; }
+				}
+			} else { x = x0 + ri(r, 4) - ri(r, 4); z = z0 + ri(r, 4) - ri(r, 4); }
+		}
+		return true;
+	});
+
+	gen('WorldGenFire', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		for (var i = 0; i < 64; ++i) {
+			var a = scatter(r, x, 8), b = scatter(r, y, 4), c = scatter(r, z, 8);
+			if (id(w, a, b, c) === 0 && id(w, a, b - 1, c) === B.netherrack) put(w, a, b, c, B.fire, 0, 2);
+		}
+		return true;
+	});
+	gen('WorldGenHellLava', { '<init>(IZ)V': function (vm, self, a) { self[':hellLavaID'] = a[0]; self[':field_94524_b'] = a[1]; } }, function (self, w, r, x, y, z) {
+		if (id(w, x, y + 1, z) !== B.netherrack) return false;
+		var here = id(w, x, y, z);
+		if (here !== 0 && here !== B.netherrack) return false;
+		var n = 0, a = 0;
+		[[-1, 0, 0], [1, 0, 0], [0, 0, -1], [0, 0, 1], [0, -1, 0]].forEach(function (d) { var o = id(w, x + d[0], y + d[1], z + d[2]); if (o === B.netherrack) n++; if (o === 0) a++; });
+		if (!self[':field_94524_b'] && n === 4 && a === 1 || n === 5) put(w, x, y, z, self[':hellLavaID'], 0, 2);
+		return true;
+	});
+	var glow = function (dir) { return function (self, w, r, x, y, z) {
+		if (id(w, x, y, z) !== 0) return false;
+		if (id(w, x, y - dir, z) !== B.netherrack) return false;
+		put(w, x, y, z, B.glowstone, 0, 2);
+		for (var i = 0; i < 1500; ++i) {
+			var a = x + ri(r, 8) - ri(r, 8), b = y + dir * -ri(r, 12), c = z + ri(r, 8) - ri(r, 8);
+			if (id(w, a, b, c) !== 0) continue;
+			var n = 0;
+			[[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]].forEach(function (d) { if (id(w, a + d[0], b + d[1], c + d[2]) === B.glowstone) n++; });
+			if (n === 1) put(w, a, b, c, B.glowstone, 0, 2);
+		}
+		return true;
+	}; };
+	gen('WorldGenGlowStone1', { '<init>()V': function () {} }, glow(-1));
+	gen('WorldGenGlowStone2', { '<init>()V': function () {} }, glow(-1));
+
+	gen('WorldGenDesertWells', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		while (id(w, x, y, z) === 0 && y > 2) --y;
+		if (id(w, x, y, z) !== B.sand) return false;
+		var i, j, k;
+		for (i = -2; i <= 2; ++i) for (j = -2; j <= 2; ++j) if (id(w, x + i, y - 1, z + j) === 0 && id(w, x + i, y - 2, z + j) === 0) return false;
+		for (k = -1; k <= 0; ++k) for (i = -2; i <= 2; ++i) for (j = -2; j <= 2; ++j) put(w, x + i, y + k, z + j, B.sandstone, 0, 2);
+		put(w, x, y, z, B.waterMoving, 0, 2);
+		put(w, x - 1, y, z, B.waterMoving, 0, 2); put(w, x + 1, y, z, B.waterMoving, 0, 2);
+		put(w, x, y, z - 1, B.waterMoving, 0, 2); put(w, x, y, z + 1, B.waterMoving, 0, 2);
+		for (i = -2; i <= 2; ++i) for (j = -2; j <= 2; ++j) if (i === -2 || i === 2 || j === -2 || j === 2) put(w, x + i, y + 1, z + j, B.sandstone, 0, 2);
+		put(w, x + 2, y + 1, z, B.slab, 1, 2); put(w, x - 2, y + 1, z, B.slab, 1, 2);
+		put(w, x, y + 1, z + 2, B.slab, 1, 2); put(w, x, y + 1, z - 2, B.slab, 1, 2);
+		for (i = -1; i <= 1; ++i) for (j = -1; j <= 1; ++j) put(w, x + i, y + 4, z + j, i === 0 && j === 0 ? B.sandstone : B.slab, i === 0 && j === 0 ? 0 : 1, 2);
+		for (k = 1; k <= 3; ++k) { put(w, x - 1, y + k, z - 1, B.sandstone, 0, 2); put(w, x - 1, y + k, z + 1, B.sandstone, 0, 2); put(w, x + 1, y + k, z - 1, B.sandstone, 0, 2); put(w, x + 1, y + k, z + 1, B.sandstone, 0, 2); }
+		return true;
+	});
+	gen('WorldGenDungeons', { '<init>()V': function () {} }, function (self, w, r, x, y, z) {
+		var rx = ri(r, 2) + 2, rz = ri(r, 2) + 2, holes = 0, i, j, k;
+		for (i = x - rx - 1; i <= x + rx + 1; ++i) for (j = y - 1; j <= y + 4; ++j) for (k = z - rz - 1; k <= z + rz + 1; ++k) {
+			var m = matName(id(w, i, j, k));
+			if (j === y - 1 && NONSOLID[m]) return false;
+			if (j === y + 4 && NONSOLID[m]) return false;
+			if ((i === x - rx - 1 || i === x + rx + 1 || k === z - rz - 1 || k === z + rz + 1) && j === y && id(w, i, j, k) === 0 && id(w, i, j + 1, k) === 0) ++holes;
+		}
+		if (holes < 1 || holes > 5) return false;
+		for (i = x - rx - 1; i <= x + rx + 1; ++i) for (j = y + 3; j >= y - 1; --j) for (k = z - rz - 1; k <= z + rz + 1; ++k) {
+			if (i !== x - rx - 1 && j !== y - 1 && k !== z - rz - 1 && i !== x + rx + 1 && j !== y + 4 && k !== z + rz + 1) put(w, i, j, k, 0, 0, 2);
+			else if (j >= 0 && NONSOLID[matName(id(w, i, j - 1, k))]) put(w, i, j, k, 0, 0, 2);
+			else if (!NONSOLID[matName(id(w, i, j, k))]) put(w, i, j, k, j === y - 1 && ri(r, 4) !== 0 ? B.mossy : B.cobble, 0, 2);
+		}
+		for (var c = 0; c < 2; ++c) for (var t = 0; t < 3; ++t) {
+			var cx = x + ri(r, rx * 2 + 1) - rx, cz = z + ri(r, rz * 2 + 1) - rz;
+			if (id(w, cx, y, cz) !== 0) continue;
+			var walls = 0;
+			[[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(function (d) { if (!NONSOLID[matName(id(w, cx + d[0], y, cz + d[1]))]) walls++; });
+			if (walls === 1) { put(w, cx, y, cz, B.chest, 0, 2); break; }
+		}
+		put(w, x, y, z, B.spawner, 0, 2);
+		return true;
+	});
+
+	var newGen = function (name, desc, args) {
+		var o = vm.newObject(vm.loadClass(SRC + name));
+		vm.callVirtual(o, '<init>', desc, args);
+		return o;
+	};
+	var decorInit = function (vm, self, biome) {
+		self[':biome'] = biome;
+		var own = function (o) { o.$gameOwned = true; return o; };
+		self[':clayGen'] = own(newGen('WorldGenClay', '(I)V', [4]));
+		self[':sandGen'] = own(newGen('WorldGenSand', '(II)V', [7, B.sand]));
+		self[':gravelAsSandGen'] = own(newGen('WorldGenSand', '(II)V', [6, B.gravel]));
+		var ore = function (b, n) { return own(newGen('WorldGenMinable', '(II)V', [b, n])); };
+		self[':dirtGen'] = ore(B.dirt, 32); self[':gravelGen'] = ore(B.gravel, 32); self[':coalGen'] = ore(16, 16); self[':ironGen'] = ore(15, 8);
+		self[':goldGen'] = ore(14, 8); self[':redstoneGen'] = ore(73, 7); self[':diamondGen'] = ore(56, 7); self[':lapisGen'] = ore(21, 6);
+		self[':plantYellowGen'] = newGen('WorldGenFlowers', '(I)V', [B.plantYellow]);
+		self[':plantRedGen'] = newGen('WorldGenFlowers', '(I)V', [B.plantRed]);
+		self[':mushroomBrownGen'] = newGen('WorldGenFlowers', '(I)V', [B.mushroomBrown]);
+		self[':mushroomRedGen'] = newGen('WorldGenFlowers', '(I)V', [B.mushroomRed]);
+		self[':bigMushroomGen'] = newGen('WorldGenBigMushroom', '()V', []);
+		self[':reedGen'] = newGen('WorldGenReed', '()V', []);
+		self[':cactusGen'] = newGen('WorldGenCactus', '()V', []);
+		self[':waterlilyGen'] = newGen('WorldGenWaterlily', '()V', []);
+		self[':waterlilyPerChunk'] = 0; self[':treesPerChunk'] = 0; self[':flowersPerChunk'] = 2; self[':grassPerChunk'] = 1;
+		self[':deadBushPerChunk'] = 0; self[':mushroomsPerChunk'] = 0; self[':reedsPerChunk'] = 0; self[':cactiPerChunk'] = 0;
+		self[':sandPerChunk'] = 1; self[':sandPerChunk2'] = 3; self[':clayPerChunk'] = 1; self[':bigMushroomsPerChunk'] = 0;
+		self[':generateLakes'] = 1;
+	};
+	JVM.decorInit = decorInit;
+	var call = function (o, name, desc, args) { return vm.callVirtual(o, name, desc, args || []); };
+	var G = function (g, w, r, x, y, z) { if (g) call(g, 'generate', GENS, [w, r, x, y, z]); };
+	def('BiomeDecorator', { fields: {
+		currentWorld: 'Lnet/minecraft/src/World;', randomGenerator: 'Ljava/util/Random;', chunk_X: 'I', chunk_Z: 'I', biome: 'Lnet/minecraft/src/BiomeGenBase;',
+		clayGen: 'L' + WG + ';', sandGen: 'L' + WG + ';', gravelAsSandGen: 'L' + WG + ';', dirtGen: 'L' + WG + ';', gravelGen: 'L' + WG + ';',
+		coalGen: 'L' + WG + ';', ironGen: 'L' + WG + ';', goldGen: 'L' + WG + ';', redstoneGen: 'L' + WG + ';', diamondGen: 'L' + WG + ';', lapisGen: 'L' + WG + ';',
+		plantYellowGen: 'L' + WG + ';', plantRedGen: 'L' + WG + ';', mushroomBrownGen: 'L' + WG + ';', mushroomRedGen: 'L' + WG + ';',
+		bigMushroomGen: 'L' + WG + ';', reedGen: 'L' + WG + ';', cactusGen: 'L' + WG + ';', waterlilyGen: 'L' + WG + ';',
+		waterlilyPerChunk: 'I', treesPerChunk: 'I', flowersPerChunk: 'I', grassPerChunk: 'I', deadBushPerChunk: 'I', mushroomsPerChunk: 'I',
+		reedsPerChunk: 'I', cactiPerChunk: 'I', sandPerChunk: 'I', sandPerChunk2: 'I', clayPerChunk: 'I', bigMushroomsPerChunk: 'I', generateLakes: 'Z',
+	}, methods: {
+		'<init>(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, self, a) { decorInit(vm, self, a[0]); },
+		'decorate(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, self, a) {
+			if (self[':currentWorld']) vm.throwNew('java/lang/RuntimeException', 'Already decorating!!');
+			self[':currentWorld'] = a[0]; self[':randomGenerator'] = a[1]; self[':chunk_X'] = a[2]; self[':chunk_Z'] = a[3];
+			try { call(self, 'decorate', '()V'); } finally { self[':currentWorld'] = null; self[':randomGenerator'] = null; }
+		},
+		'decorate()V': function (vm, self) {
+			var w = self[':currentWorld'], r = self[':randomGenerator'], cx = self[':chunk_X'], cz = self[':chunk_Z'], b = self[':biome'];
+			var i, j, k, l, m;
+			var px = function () { return cx + ri(r, 16) + 8; }, pz = function () { return cz + ri(r, 16) + 8; };
+			call(self, 'generateOres', '()V');
+			for (i = 0; i < self[':sandPerChunk2']; ++i) { j = px(); k = pz(); G(self[':sandGen'], w, r, j, topSolid(w, j, k), k); }
+			for (i = 0; i < self[':clayPerChunk']; ++i) { j = px(); k = pz(); G(self[':clayGen'], w, r, j, topSolid(w, j, k), k); }
+			for (i = 0; i < self[':sandPerChunk']; ++i) { j = px(); k = pz(); G(self[':gravelAsSandGen'], w, r, j, topSolid(w, j, k), k); }
+			var trees = self[':treesPerChunk'];
+			if (ri(r, 10) === 0) ++trees;
+			for (i = 0; i < trees; ++i) {
+				j = px(); k = pz();
+				var tg = call(b, 'getRandomWorldGenForTrees', '(Ljava/util/Random;)Lnet/minecraft/src/WorldGenerator;', [r]);
+				if (tg) { call(tg, 'setScale', '(DDD)V', [1, 1, 1]); G(tg, w, r, j, heightAt(w, j, k), k); }
+			}
+			for (i = 0; i < self[':bigMushroomsPerChunk']; ++i) { j = px(); k = pz(); G(self[':bigMushroomGen'], w, r, j, heightAt(w, j, k), k); }
+			for (i = 0; i < self[':flowersPerChunk']; ++i) {
+				j = px(); k = ri(r, 128); l = pz(); G(self[':plantYellowGen'], w, r, j, k, l);
+				if (ri(r, 4) === 0) { j = px(); k = ri(r, 128); l = pz(); G(self[':plantRedGen'], w, r, j, k, l); }
+			}
+			for (i = 0; i < self[':grassPerChunk']; ++i) {
+				j = px(); k = ri(r, 128); l = pz();
+				G(call(b, 'getRandomWorldGenForGrass', '(Ljava/util/Random;)Lnet/minecraft/src/WorldGenerator;', [r]), w, r, j, k, l);
+			}
+			for (i = 0; i < self[':deadBushPerChunk']; ++i) { j = px(); k = ri(r, 128); l = pz(); G(newGen('WorldGenDeadBush', '(I)V', [B.deadBush]), w, r, j, k, l); }
+			for (i = 0; i < self[':waterlilyPerChunk']; ++i) {
+				j = px(); k = pz();
+				for (l = ri(r, 128); l > 0 && id(w, j, l - 1, k) === 0; --l);
+				G(self[':waterlilyGen'], w, r, j, l, k);
+			}
+			for (i = 0; i < self[':mushroomsPerChunk']; ++i) {
+				if (ri(r, 4) === 0) { j = px(); k = pz(); l = heightAt(w, j, k); G(self[':mushroomBrownGen'], w, r, j, l, k); }
+				if (ri(r, 8) === 0) { j = px(); k = pz(); l = ri(r, 128); G(self[':mushroomRedGen'], w, r, j, l, k); }
+			}
+			if (ri(r, 4) === 0) { j = px(); k = ri(r, 128); l = pz(); G(self[':mushroomBrownGen'], w, r, j, k, l); }
+			if (ri(r, 8) === 0) { j = px(); k = ri(r, 128); l = pz(); G(self[':mushroomRedGen'], w, r, j, k, l); }
+			for (i = 0; i < self[':reedsPerChunk']; ++i) { j = px(); k = pz(); l = ri(r, 128); G(self[':reedGen'], w, r, j, l, k); }
+			for (i = 0; i < 10; ++i) { j = px(); k = ri(r, 128); l = pz(); G(self[':reedGen'], w, r, j, k, l); }
+			if (ri(r, 32) === 0) { j = px(); k = ri(r, 128); l = pz(); G(newGen('WorldGenPumpkin', '()V', []), w, r, j, k, l); }
+			for (i = 0; i < self[':cactiPerChunk']; ++i) { j = px(); k = ri(r, 128); l = pz(); G(self[':cactusGen'], w, r, j, k, l); }
+			if (self[':generateLakes']) {
+				for (i = 0; i < 50; ++i) { j = px(); k = ri(r, ri(r, 120) + 8); l = pz(); G(newGen('WorldGenLiquids', '(I)V', [B.waterMoving]), w, r, j, k, l); }
+				for (i = 0; i < 20; ++i) { j = px(); k = ri(r, ri(r, ri(r, 112) + 8) + 8); l = pz(); G(newGen('WorldGenLiquids', '(I)V', [B.lavaMoving]), w, r, j, k, l); }
+			}
+		},
+		'genStandardOre1(ILnet/minecraft/src/WorldGenerator;II)V': function (vm, self, a) {
+			var w = self[':currentWorld'], r = self[':randomGenerator'];
+			for (var i = 0; i < a[0]; ++i) {
+				var x = self[':chunk_X'] + ri(r, 16), y = ri(r, a[3] - a[2]) + a[2], z = self[':chunk_Z'] + ri(r, 16);
+				G(a[1], w, r, x, y, z);
+			}
+		},
+		'genStandardOre2(ILnet/minecraft/src/WorldGenerator;II)V': function (vm, self, a) {
+			var w = self[':currentWorld'], r = self[':randomGenerator'];
+			for (var i = 0; i < a[0]; ++i) {
+				var x = self[':chunk_X'] + ri(r, 16), y = ri(r, a[3]) + ri(r, a[3]) + (a[2] - a[3]), z = self[':chunk_Z'] + ri(r, 16);
+				G(a[1], w, r, x, y, z);
+			}
+		},
+		'generateOres()V': function (vm, self) {
+			var O1 = 'genStandardOre1', O2 = 'genStandardOre2', D = '(ILnet/minecraft/src/WorldGenerator;II)V';
+			call(self, O1, D, [20, self[':dirtGen'], 0, 128]); call(self, O1, D, [10, self[':gravelGen'], 0, 128]);
+			call(self, O1, D, [20, self[':coalGen'], 0, 128]); call(self, O1, D, [20, self[':ironGen'], 0, 64]);
+			call(self, O1, D, [2, self[':goldGen'], 0, 32]); call(self, O1, D, [8, self[':redstoneGen'], 0, 16]);
+			call(self, O1, D, [1, self[':diamondGen'], 0, 16]); call(self, O2, D, [1, self[':lapisGen'], 16, 16]);
+		},
+	} });
+	var MIN = vm.natives[SRC + 'WorldGenMinable'], mg = MIN && MIN.methods[GEN];
+	if (mg && !MIN.$owned) { MIN.$owned = true; MIN.methods[GEN] = function (vm, self, a) { return self.$gameOwned ? 1 : mg(vm, self, a); }; }
+
+	var BG = vm.natives[SRC + 'BiomeGenBase'];
+	if (BG) {
+		BG.methods = Object.assign({}, BG.methods, {
+			'getRandomWorldGenForTrees(Ljava/util/Random;)Lnet/minecraft/src/WorldGenerator;': function (vm, self, a) {
+				treeGens(self);
+				return ri(a[0], 10) === 0 ? self[':worldGeneratorBigTree'] : self[':worldGeneratorTrees'];
+			},
+			'getRandomWorldGenForGrass(Ljava/util/Random;)Lnet/minecraft/src/WorldGenerator;': function () { return newGen('WorldGenTallGrass', '(II)V', [B.tallGrass, 1]); },
+			'decorate(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, self, a) {
+				var d = self[':theBiomeDecorator'];
+				if (d) call(d, 'decorate', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [a[0], a[1], a[2], a[3]]);
+			},
+			'getBiomeGrassColor()I': function (vm, self) { if (self.$grass != null) return self.$grass; self.$defaultColor = true; return 0x79c05a; },
+			'getBiomeFoliageColor()I': function (vm, self) { if (self.$leaves != null) return self.$leaves; self.$defaultColor = true; return 0x59ae30; },
+			'getIntTemperature()I': function (vm, self) { return (self[':temperature'] * 65536) | 0; },
+			'getIntRainfall()I': function (vm, self) { return (self[':rainfall'] * 65536) | 0; },
+			'getFloatTemperature()F': function (vm, self) { return self[':temperature'] != null ? self[':temperature'] : 0.5; },
+			'getFloatRainfall()F': function (vm, self) { return self[':rainfall'] != null ? self[':rainfall'] : 0.5; },
+			'getEnableSnow()Z': function (vm, self) { return self[':enableSnow'] ? 1 : 0; },
+			'isHighHumidity()Z': function (vm, self) { return self[':rainfall'] > 0.85 ? 1 : 0; },
+			'getSpawningChance()F': function () { return 0.1; },
+			'getSpawnableList(Lnet/minecraft/src/EnumCreatureType;)Ljava/util/List;': function (vm, self, a) {
+				var n = a[0] && a[0].$name;
+				var k = n === 'monster' ? 'spawnableMonsterList' : n === 'creature' ? 'spawnableCreatureList' : n === 'waterCreature' ? 'spawnableWaterCreatureList' : n === 'ambient' ? 'spawnableCaveCreatureList' : null;
+				return k && self[':' + k] || JVM.newList(vm, []);
+			},
+		});
+		BG.fields = Object.assign({}, BG.fields, { worldGeneratorTrees: 'L' + SRC + 'WorldGenTrees;', worldGeneratorBigTree: 'L' + SRC + 'WorldGenBigTree;',
+			worldGeneratorForest: 'L' + SRC + 'WorldGenForest;', worldGeneratorSwamp: 'L' + SRC + 'WorldGenSwamp;', color: 'I', field_76754_C: 'I', enableSnow: 'Z', enableRain: 'Z', waterColorMultiplier: 'I' });
+	}
+	function treeGens(b) {
+		if (b[':worldGeneratorTrees']) return;
+		b[':worldGeneratorTrees'] = newGen('WorldGenTrees', '(Z)V', [0]);
+		b[':worldGeneratorBigTree'] = newGen('WorldGenBigTree', '(Z)V', [0]);
+		b[':worldGeneratorForest'] = newGen('WorldGenForest', '(Z)V', [0]);
+		b[':worldGeneratorSwamp'] = newGen('WorldGenSwamp', '()V', []);
+	}
+	vm.$biomeTreeGens = treeGens;
+
+	var WT = SRC + 'WorldType', BGD = 'Lnet/minecraft/src/BiomeGenBase;';
+	var addToType = function (vm, self, b) { if (b && JVM.placeModBiome) JVM.placeModBiome(vm, b, ['*land'], 10); };
+	var wtStat = { worldTypes: null, DEFAULT: null, FLAT: null, LARGE_BIOMES: null, DEFAULT_1_1: null, base12Biomes: null };
+	def('WorldType', { statics: wtStat, fields: { worldType: 'Ljava/lang/String;', generatorVersion: 'I', canBeCreated: 'Z', isWorldTypeVersioned: 'Z', worldTypeId: 'I' },
+		clinit: function (vm, c) {
+			c.statics.worldTypes = vm.newArray('L' + WT + ';', 16);
+			var mk = function (i, n) { var o = vm.newObject(c); o[':worldTypeId'] = i; o[':worldType'] = n; o[':canBeCreated'] = 1; o.$biomes = []; c.statics.worldTypes.a[i] = o; return o; };
+			c.statics.DEFAULT = mk(0, 'default'); c.statics.FLAT = mk(1, 'flat'); c.statics.LARGE_BIOMES = mk(2, 'largeBiomes'); c.statics.DEFAULT_1_1 = mk(8, 'default_1_1');
+			c.statics.base12Biomes = vm.newArray(BGD, 0);
+		},
+		methods: {
+			'<init>(ILjava/lang/String;)V': function (vm, self, a) { wtInit(vm, self, a[0], a[1]); },
+			'<init>(ILjava/lang/String;I)V': function (vm, self, a) { wtInit(vm, self, a[0], a[1]); self[':generatorVersion'] = a[2]; },
+			'getWorldTypeName()Ljava/lang/String;': function (vm, self) { return self[':worldType']; },
+			'getTranslateName()Ljava/lang/String;': function (vm, self) { return 'generator.' + self[':worldType']; },
+			'getWorldTypeID()I': function (vm, self) { return self[':worldTypeId']; },
+			'getGeneratorVersion()I': function (vm, self) { return self[':generatorVersion'] | 0; },
+			'getCanBeCreated()Z': function (vm, self) { return self[':canBeCreated'] ? 1 : 0; },
+			'setCanBeCreated(Z)Lnet/minecraft/src/WorldType;': function (vm, self, a) { self[':canBeCreated'] = a[0]; return self; },
+			'addNewBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, self, a) { (self.$biomes = self.$biomes || []).push(a[0]); addToType(vm, self, a[0]); },
+			'removeBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+			'removeAllBiomes()V': function (vm, self) { self.$biomes = []; },
+			'getBiomesForWorldType()[Lnet/minecraft/src/BiomeGenBase;': function (vm, self) { return JVM.javaArray(vm, BGD, (self.$biomes || []).slice()); },
+			'getSeaLevel(Lnet/minecraft/src/World;)I': function () { return 64; },
+			'hasVoidParticles(Z)Z': function () { return 0; },
+			'voidFadeMagnitude()D': function () { return 0.03125; },
+			'handleSlimeSpawnReduction(Ljava/util/Random;Lnet/minecraft/src/World;)Z': function () { return 0; },
+		} });
+	function wtInit(vm, self, i, n) {
+		var c = vm.loadClass(WT); vm.initClass(c);
+		self[':worldTypeId'] = i; self[':worldType'] = n; self[':canBeCreated'] = 1; self.$biomes = [];
+		if (i >= 0 && i < c.statics.worldTypes.a.length) c.statics.worldTypes.a[i] = self;
+	}
+
+	var FC = 'net/minecraftforge/common/';
+	var fdef = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	fdef(FC + 'BiomeManager', { staticMethods: {
+		'addVillageBiome(Lnet/minecraft/src/BiomeGenBase;Z)V': function () {}, 'removeVillageBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+		'addStrongholdBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {}, 'removeStrongholdBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+		'addSpawnBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {}, 'removeSpawnBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+	} });
+	var TYPES = ['FOREST', 'PLAINS', 'MOUNTAIN', 'HILLS', 'SWAMP', 'WATER', 'DESERT', 'FROZEN', 'JUNGLE', 'WASTELAND', 'BEACH', 'NETHER', 'END', 'MUSHROOM', 'MAGICAL'];
+	var tst = {}; TYPES.forEach(function (t) { tst[t] = null; });
+	fdef(FC + 'BiomeDictionary$Type', { super: 'java/lang/Enum', statics: tst, clinit: function (vm, c) {
+		c.$values = TYPES.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
+	} });
+	vm.natives[FC + 'BiomeDictionary$Type'].staticMethods = { 'values()[Lnet/minecraftforge/common/BiomeDictionary$Type;': function (vm) { var c = vm.loadClass(FC + 'BiomeDictionary$Type'); vm.initClass(c); return JVM.javaArray(vm, 'L' + FC + 'BiomeDictionary$Type;', c.$values.slice()); } };
+	var TD = '[Lnet/minecraftforge/common/BiomeDictionary$Type;';
+	fdef(FC + 'BiomeDictionary', { staticMethods: (function () {
+		var m = {};
+		m['registerBiomeType(' + BGD + TD + ')Z'] = function (vm, n, a) { if (!a[0]) return 0; a[0].$types = (a[0].$types || []).concat(a[1] ? Array.prototype.map.call(a[1].a, function (t) { return t && t.$name; }) : []); return 1; };
+		m['isBiomeRegistered(Lnet/minecraft/src/BiomeGenBase;)Z'] = function (vm, n, a) { return a[0] && a[0].$types ? 1 : 0; };
+		m['isBiomeOfType(Lnet/minecraft/src/BiomeGenBase;Lnet/minecraftforge/common/BiomeDictionary$Type;)Z'] = function (vm, n, a) { return a[0] && a[1] && (a[0].$types || []).indexOf(a[1].$name) >= 0 ? 1 : 0; };
+		m['getTypesForBiome(Lnet/minecraft/src/BiomeGenBase;)' + TD] = function (vm, n, a) {
+			var c = vm.loadClass(FC + 'BiomeDictionary$Type'); vm.initClass(c);
+			return JVM.javaArray(vm, 'L' + FC + 'BiomeDictionary$Type;', ((a[0] && a[0].$types) || []).map(function (t) { return c.statics[t]; }));
+		};
+		m['makeBestGuess(Lnet/minecraft/src/BiomeGenBase;)V'] = function () {};
+		return m;
+	})() });
+}
+JVM.installWorldGen16 = install;
+
+JVM.javaDecorated = function (vm, b) {
+	if (!b || b.$javaDecor !== undefined) return b ? b.$javaDecor : false;
+	var d = b[':theBiomeDecorator'], yes = !!(d && d.cls && !d.cls.native);
+	for (var c = b.cls; !yes && c && !c.native; c = c.superClass) if (c.findDeclared('decorate(Lnet/minecraft/src/World;Ljava/util/Random;II)V')) yes = true;
+	return (b.$javaDecor = yes);
+};
+var GAME_GENS = { dirtGen: ['field_76823_i', 3], gravelGen: ['field_76820_j', 13], coalGen: ['field_76821_k', 16], ironGen: ['field_76818_l', 15],
+	goldGen: ['field_76819_m', 14], redstoneGen: ['field_76816_n', 73], diamondGen: ['field_76817_o', 56], lapisGen: ['field_76831_p', 21],
+	clayGen: ['field_76809_f', 82], sandGen: ['field_76810_g', 12], gravelAsSandGen: ['field_76822_h', 13] };
+function gameOres(d) {
+	if (!d || d.$oresChecked) return;
+	d.$oresChecked = true;
+	Object.keys(GAME_GENS).forEach(function (k) {
+		[k, GAME_GENS[k][0]].forEach(function (f) {
+			var g = d[':' + f];
+			if (!g || !g.cls) return;
+			var b = g[':minableBlockId'] != null ? g[':minableBlockId'] : g[':sandID'] != null ? g[':sandID'] : g[':clayBlockId'];
+			if (b === GAME_GENS[k][1]) g.$gameOwned = true;
+		});
+	});
+}
+JVM.decorWantsGen = function (vm) {
+	var r = vm.mcReg;
+	return !!(r && r.modBiomes && r.modBiomes.some(function (p) { return JVM.javaDecorated(vm, p.b); }));
+};
+JVM.decorGenerate = function (vm, world, cx, cz, rnd) {
+	var b = JVM.biomeAt ? JVM.biomeAt(vm, cx * 16 + 16, cz * 16 + 16) : null;
+	if (!b || !b.$biomeKey || !JVM.javaDecorated(vm, b)) return;
+	gameOres(b[':theBiomeDecorator']);
+	vm.currentMod = b.$mod || vm.currentMod;
+	JVM.run(vm, function () {
+		var S = BigInt(vm.mcSeed | 0), R = vm.newObject(vm.loadClass('java/util/Random'));
+		vm.callVirtual(R, '<init>', '(J)V', [S]);
+		var l1 = vm.callVirtual(R, 'nextLong', '()J', []) / 2n * 2n + 1n, l2 = vm.callVirtual(R, 'nextLong', '()J', []) / 2n * 2n + 1n;
+		vm.callVirtual(R, 'setSeed', '(J)V', [BigInt.asIntN(64, BigInt.asIntN(64, BigInt(cx) * l1 + BigInt(cz) * l2) ^ S)]);
+		vm.callVirtual(b, 'decorate', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, R, cx * 16, cz * 16]);
+	});
+};
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var A = SRC + 'Attribute', AI = SRC + 'AttributeInstance', AM = SRC + 'AttributeModifier', MAP = SRC + 'BaseAttributeMap';
+var LA = 'L' + A + ';', LAI = 'L' + AI + ';', LAM = 'L' + AM + ';';
+
+var SHARED = { maxHealth: ['generic.maxHealth', 20, 0, Number.MAX_VALUE], followRange: ['generic.followRange', 32, 0, 2048],
+	knockbackResistance: ['generic.knockbackResistance', 0, 0, 1], movementSpeed: ['generic.movementSpeed', 0.7, 0, Number.MAX_VALUE],
+	attackDamage: ['generic.attackDamage', 2, 0, Number.MAX_VALUE] };
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+	var attrName = function (a) { return a ? (a.$name != null ? a.$name : String(vm.callVirtual(a, 'getAttributeUnlocalizedName', '()Ljava/lang/String;', []))) : ''; };
+
+	def(A, { access: I });
+	var baseInit = function (self, name, dflt) { self.$name = String(name); self.$dflt = +dflt; self.$watch = false; };
+	def(SRC + 'BaseAttribute', { interfaces: [A], methods: {
+		'<init>(Ljava/lang/String;D)V': function (vm, self, a) { baseInit(self, a[0], a[1]); },
+		'getAttributeUnlocalizedName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'getDefaultValue()D': function (vm, self) { return self.$dflt; },
+		'getShouldWatch()Z': function (vm, self) { return self.$watch ? 1 : 0; },
+		'func_111112_a(Z)Lnet/minecraft/src/BaseAttribute;': function (vm, self, a) { self.$watch = !!a[0]; return self; },
+		'clampValue(D)D': function (vm, self, a) { return a[0]; },
+		'func_111109_a(D)D': function (vm, self, a) { return a[0]; },
+		'hashCode()I': function (vm, self) { var h = 0; for (var i = 0; i < self.$name.length; i++) h = (h * 31 + self.$name.charCodeAt(i)) | 0; return h; },
+	} });
+	var clamp = function (self, v) { return Math.max(self.$min, Math.min(self.$max, v)); };
+	def(SRC + 'RangedAttribute', { super: SRC + 'BaseAttribute', methods: {
+		'<init>(Ljava/lang/String;DDD)V': function (vm, self, a) { baseInit(self, a[0], a[1]); self.$min = a[2]; self.$max = a[3]; },
+		'clampValue(D)D': function (vm, self, a) { return clamp(self, a[0]); },
+		'func_111109_a(D)D': function (vm, self, a) { return clamp(self, a[0]); },
+		'func_111117_a(Ljava/lang/String;)Lnet/minecraft/src/RangedAttribute;': function (vm, self, a) { self.$desc = a[0]; return self; },
+		'setDescription(Ljava/lang/String;)Lnet/minecraft/src/RangedAttribute;': function (vm, self, a) { self.$desc = a[0]; return self; },
+		'func_111116_f()Ljava/lang/String;': function (vm, self) { return self.$desc || ''; },
+		'getDescription()Ljava/lang/String;': function (vm, self) { return self.$desc || ''; },
+	} });
+	var sst = {}; Object.keys(SHARED).forEach(function (k) { sst[k] = null; });
+	def(SRC + 'SharedMonsterAttributes', { statics: sst, clinit: function (vm, c) {
+		var rc = vm.loadClass(SRC + 'RangedAttribute');
+		Object.keys(SHARED).forEach(function (k) { var s = SHARED[k], o = vm.newObject(rc); baseInit(o, s[0], s[1]); o.$min = s[2]; o.$max = s[3]; c.statics[k] = o; });
+	} });
+
+	def(AM, { methods: {
+		'<init>(Ljava/lang/String;DI)V': function (vm, self, a) { self.$id = 'm' + Math.random(); self.$label = a[0]; self.$amount = a[1]; self.$op = a[2]; },
+		'<init>(Ljava/util/UUID;Ljava/lang/String;DI)V': function (vm, self, a) { self.$uuid = a[0]; self.$id = a[0] ? String(vm.callVirtual(a[0], 'toString', '()Ljava/lang/String;', [])) : 'm' + Math.random(); self.$label = a[1]; self.$amount = a[2]; self.$op = a[3]; },
+		'getID()Ljava/util/UUID;': function (vm, self) { return self.$uuid || null; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$label; },
+		'getOperation()I': function (vm, self) { return self.$op; },
+		'getAmount()D': function (vm, self) { return self.$amount; },
+		'isSaved()Z': function () { return 1; },
+		'setSaved(Z)Lnet/minecraft/src/AttributeModifier;': function (vm, self) { return self; },
+	} });
+
+	var value = function (inst) {
+		var base = inst.$base, v = base;
+		inst.$mods.forEach(function (m) { if (m.$op === 0) v += m.$amount; });
+		var v2 = v;
+		inst.$mods.forEach(function (m) { if (m.$op === 1) v2 += v * m.$amount; });
+		inst.$mods.forEach(function (m) { if (m.$op === 2) v2 *= 1 + m.$amount; });
+		return inst.$attr && inst.$attr.$min != null ? clamp(inst.$attr, v2) : v2;
+	};
+	var instMethods = {
+		'getAttribute()Lnet/minecraft/src/Attribute;': function (vm, self) { return self.$attr; },
+		'func_111123_a()Lnet/minecraft/src/Attribute;': function (vm, self) { return self.$attr; },
+		'getBaseValue()D': function (vm, self) { return self.$base; },
+		'setAttribute(D)V': function (vm, self, a) { self.$base = +a[0]; },
+		'getAttributeValue()D': function (vm, self) { return value(self); },
+		'applyModifier(Lnet/minecraft/src/AttributeModifier;)V': function (vm, self, a) { if (a[0] && self.$mods.indexOf(a[0]) < 0) self.$mods.push(a[0]); },
+		'removeModifier(Lnet/minecraft/src/AttributeModifier;)V': function (vm, self, a) { self.$mods = self.$mods.filter(function (m) { return m !== a[0] && !(a[0] && m.$id === a[0].$id); }); },
+		'getModifier(Ljava/util/UUID;)Lnet/minecraft/src/AttributeModifier;': function (vm, self, a) {
+			var id = a[0] ? String(vm.callVirtual(a[0], 'toString', '()Ljava/lang/String;', [])) : null;
+			return self.$mods.filter(function (m) { return m.$id === id; })[0] || null;
+		},
+		'func_111122_c()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, self.$mods.slice()); },
+		'func_142049_d()V': function (vm, self) { self.$mods = []; },
+	};
+	def(AI, { access: I });
+	def(SRC + 'ModifiableAttributeInstance', { interfaces: [AI], methods: Object.assign({
+		'<init>(Lnet/minecraft/src/BaseAttributeMap;Lnet/minecraft/src/Attribute;)V': function (vm, self, a) { self.$attr = a[1]; self.$base = a[1] ? a[1].$dflt : 0; self.$mods = []; },
+	}, instMethods) });
+	var newInst = function (attr) {
+		var o = vm.newObject(vm.loadClass(SRC + 'ModifiableAttributeInstance'));
+		o.$attr = attr; o.$base = attr && attr.$dflt != null ? attr.$dflt : 0; o.$mods = [];
+		return o;
+	};
+
+	var register = function (vm, self, a) {
+		var n = attrName(a[0]);
+		if (self.$attrs[n]) vm.throwNew('java/lang/IllegalArgumentException', 'Attribute is already registered!');
+		return (self.$attrs[n] = newInst(a[0]));
+	};
+	var mapMethods = {
+		'<init>()V': function (vm, self) { self.$attrs = {}; },
+		'func_111150_b(Lnet/minecraft/src/Attribute;)Lnet/minecraft/src/AttributeInstance;': register,
+		'registerAttribute(Lnet/minecraft/src/Attribute;)Lnet/minecraft/src/AttributeInstance;': register,
+		'getAttributeInstance(Lnet/minecraft/src/Attribute;)Lnet/minecraft/src/AttributeInstance;': function (vm, self, a) { return self.$attrs[attrName(a[0])] || null; },
+		'getAttributeInstanceByName(Ljava/lang/String;)Lnet/minecraft/src/AttributeInstance;': function (vm, self, a) { return self.$attrs[String(a[0])] || null; },
+		'getAllAttributes()Ljava/util/Collection;': function (vm, self) { var s = self.$attrs; return JVM.newList(vm, Object.keys(s).map(function (k) { return s[k]; })); },
+		'applyAttributeModifiers(Lcom/google/common/collect/Multimap;)V': function () {},
+		'removeAttributeModifiers(Lcom/google/common/collect/Multimap;)V': function () {},
+		'func_111148_a(Lcom/google/common/collect/Multimap;)V': function () {},
+		'func_111147_b(Lcom/google/common/collect/Multimap;)V': function () {},
+	};
+	def(MAP, { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: mapMethods });
+	def(SRC + 'ServersideAttributeMap', { super: MAP, methods: { '<init>()V': function (vm, self) { self.$attrs = {}; } } });
+	var mapOf = function (ent) {
+		if (!ent.$amap) { ent.$amap = vm.newObject(vm.loadClass(SRC + 'ServersideAttributeMap')); ent.$amap.$attrs = {}; }
+		return ent.$amap;
+	};
+	var shared = function (k) { var c = vm.loadClass(SRC + 'SharedMonsterAttributes'); vm.initClass(c); return c.statics[k]; };
+	var reg = function (ent, k) { var m = mapOf(ent), a = shared(k); if (!m.$attrs[a.$name]) m.$attrs[a.$name] = newInst(a); };
+	JVM.attrValue = function (ent, name) { var m = ent && ent.$amap, i = m && m.$attrs[name]; return i ? value(i) : null; };
+
+	var living = {
+		'getEntityAttribute(Lnet/minecraft/src/Attribute;)Lnet/minecraft/src/AttributeInstance;': function (vm, self, a) {
+			var m = mapOf(self), n = attrName(a[0]);
+			return m.$attrs[n] || null;
+		},
+		'getAttributeMap()Lnet/minecraft/src/BaseAttributeMap;': function (vm, self) { return mapOf(self); },
+		'applyEntityAttributes()V': function (vm, self) {
+			reg(self, 'maxHealth'); reg(self, 'knockbackResistance'); reg(self, 'movementSpeed'); reg(self, 'followRange');
+			if (JVM.mc152 && self.cls && chainHas(self.cls, 'EntityMob')) reg(self, 'attackDamage');
+		},
+		'getHealth()F': function (vm, self) { return self[':health'] != null ? +self[':health'] : vm.callVirtual(self, 'getMaxHealth', '()F', []); },
+		'setHealth(F)V': function (vm, self, a) { self[':health'] = Math.max(0, Math.min(+a[0], vm.callVirtual(self, 'getMaxHealth', '()F', []))); },
+		'getMaxHealth()F': function (vm, self) { var v = JVM.attrValue(self, 'generic.maxHealth'); return v == null ? 20 : v; },
+		'heal(F)V': function (vm, self, a) { var h = vm.callVirtual(self, 'getHealth', '()F', []); if (h > 0) vm.callVirtual(self, 'setHealth', '(F)V', [h + a[0]]); },
+		'getCreatureAttribute()Lnet/minecraft/src/EnumCreatureAttribute;': function () { return null; },
+		'getAbsorptionAmount()F': function () { return 0; },
+		'setAbsorptionAmount(F)V': function () {},
+		'getTotalArmorValue()I': function () { return 0; },
+		'getRNG()Ljava/util/Random;': function (vm, self) { return self[':rand']; },
+		'getAge()I': function (vm, self) { return self[':entityAge'] | 0; },
+		'isChild()Z': function () { return 0; },
+		'getLastAttacker()Lnet/minecraft/src/EntityLivingBase;': function () { return null; },
+		'getAITarget()Lnet/minecraft/src/EntityLivingBase;': function () { return null; },
+	};
+	function chainHas(c, n) { for (; c; c = c.superClass) if (c.name === SRC + n) return true; return false; }
+	def(SRC + 'EntityLivingBase', { super: SRC + 'Entity', access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: living });
+	var EL = vm.natives[SRC + 'EntityLiving'];
+	if (EL && !vm.classes[SRC + 'EntityLiving']) EL.super = SRC + 'EntityLivingBase';
+	if (EL) Object.keys(living).forEach(function (k) { if (!EL.methods[k]) EL.methods[k] = living[k]; });
+	JVM.livingAttributes = function (vm, self) {
+		if (self.$amap) return;
+		mapOf(self);
+		JVM.run(vm, function () {
+			vm.callVirtual(self, 'applyEntityAttributes', '()V', []);
+			var hm = JVM.attrValue(self, 'generic.maxHealth');
+			if (hm != null && self[':health'] == null) self[':health'] = hm;
+		});
+	};
+
+	var rlInit = function (self, d, p) { self.$domain = String(d).toLowerCase(); self.$path = String(p); };
+	def(SRC + 'ResourceLocation', { methods: {
+		'<init>(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { rlInit(self, a[0] == null ? 'minecraft' : a[0], a[1]); },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) {
+			var s = String(a[0]), i = s.indexOf(':');
+			if (i >= 0) rlInit(self, s.substring(0, i) || 'minecraft', s.substring(i + 1)); else rlInit(self, 'minecraft', s);
+		},
+		'getResourcePath()Ljava/lang/String;': function (vm, self) { return self.$path; },
+		'getResourceDomain()Ljava/lang/String;': function (vm, self) { return self.$domain; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$domain + ':' + self.$path; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$path === self.$path && a[0].$domain === self.$domain ? 1 : 0; },
+		'hashCode()I': function (vm, self) { var s = self.$domain + ':' + self.$path, h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; },
+	} });
+
+	var plain = function (n) { def(SRC + n, { methods: { '<init>(Lnet/minecraft/src/EntityLiving;)V': function () {} } }); };
+	['EntityMoveHelper', 'EntityLookHelper', 'EntityJumpHelper', 'EntitySenses', 'EntityBodyHelper'].forEach(plain);
+	def(SRC + 'PathNavigate', { methods: {
+		'<init>(Lnet/minecraft/src/EntityLiving;Lnet/minecraft/src/World;)V': function () {},
+		'setAvoidsWater(Z)V': function () {}, 'setCanSwim(Z)V': function () {}, 'setBreakDoors(Z)V': function () {}, 'setEnterDoors(Z)V': function () {},
+		'setAvoidSun(Z)V': function () {}, 'getAvoidsWater()Z': function () { return 0; }, 'noPath()Z': function () { return 1; }, 'clearPathEntity()V': function () {},
+		'tryMoveToXYZ(DDDD)Z': function () { return 0; }, 'tryMoveToEntityLiving(Lnet/minecraft/src/Entity;D)Z': function () { return 0; },
+		'setSpeed(D)V': function () {},
+	} });
+	def(SRC + 'EntityAIBase', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, abstractMethods: { 'shouldExecute()Z': true }, fields: { mutexBits: 'I' }, methods: {
+		'<init>()V': function () {},
+		'continueExecuting()Z': function (vm, self) { return vm.callVirtual(self, 'shouldExecute', '()Z', []); },
+		'isInterruptible()Z': function () { return 1; },
+		'startExecuting()V': function () {}, 'resetTask()V': function () {}, 'updateTask()V': function () {},
+		'setMutexBits(I)V': function (vm, self, a) { self[':mutexBits'] = a[0]; },
+		'getMutexBits()I': function (vm, self) { return self[':mutexBits'] | 0; },
+	} });
+}
+JVM.installLiving16 = install;
+})();
+
+(function () {
+'use strict';
+
 var SRC = 'net/minecraft/src/';
 var POTIONS = [null, 'moveSpeed', 'moveSlowdown', 'digSpeed', 'digSlowdown', 'damageBoost', 'heal', 'harm', 'jump', 'confusion',
 	'regeneration', 'resistance', 'fireResistance', 'waterBreathing', 'invisibility', 'blindness', 'nightVision', 'hunger',
@@ -8317,6 +9736,7 @@ function installMobs(vm) {
 		self[':lookHelper'] = newOf(vm, SRC + 'EntityLookHelper');
 		self[':jumpHelper'] = newOf(vm, SRC + 'EntityJumpHelper');
 		self[':senses'] = newOf(vm, SRC + 'EntitySenses');
+		if (JVM.livingAttributes) JVM.livingAttributes(vm, self);
 	};
 	var player = function (fn, other) { return function (vm, self, a) { return isPlayer(self) ? fn(vm, self, a) : other(vm, self, a); }; };
 	addTo('EntityLiving', {
@@ -8387,6 +9807,8 @@ function installMobs(vm) {
 		self[':topBlock'] = 2; self[':fillerBlock'] = 3; self[':minHeight'] = 0.1; self[':maxHeight'] = 0.3; self[':temperature'] = 0.5; self[':rainfall'] = 0.5;
 		self[':waterColorMultiplier'] = 0xffffff; self[':enableRain'] = 1; self[':color'] = 0;
 		self[':theBiomeDecorator'] = vm.newObject(vm.loadClass(SRC + 'BiomeDecorator'));
+		if (JVM.decorInit) JVM.decorInit(vm, self[':theBiomeDecorator'], self);
+		if (vm.$biomeTreeGens) vm.$biomeTreeGens(self);
 	}
 	vm.natives[SRC + 'BiomeGenBase'].anyInit = function (vm, self, args) { biomeInit(vm, self, typeof args[0] === 'number' ? args[0] : 0); };
 	vm.natives[SRC + 'BiomeGenBase'].fields = { biomeName: 'Ljava/lang/String;', biomeID: 'I', topBlock: 'B', fillerBlock: 'B', minHeight: 'F', maxHeight: 'F', temperature: 'F', rainfall: 'F',
@@ -8606,9 +10028,16 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			size: [+ent[':width'] || 0.6, +ent[':height'] || 1.8],
 			xp: ent[':experienceValue'] || (behaviour === 'hostile' ? 5 : 1),
 		};
+		if (own('applyEntityAttributes()V') && JVM.attrValue) {
+			var ah = JVM.attrValue(ent, 'generic.maxHealth'), asp = JVM.attrValue(ent, 'generic.movementSpeed');
+			if (ah != null) json.health = Math.round(ah);
+			if (asp != null) json.speed = Math.max(0.05, Math.min(1, asp));
+		}
 		if (behaviour === 'hostile' || behaviour === 'neutral') {
 			var dmg = e.cls.findMethod('getAttackStrength(Lnet/minecraft/src/Entity;)I') ? safe(function () { return vm.callVirtual(ent, 'getAttackStrength', '(Lnet/minecraft/src/Entity;)I', [null]); }, 2) : (ent[':attackStrength'] || 2);
 			json.damage = dmg;
+			var ad = JVM.attrValue && own('applyEntityAttributes()V') ? JVM.attrValue(ent, 'generic.attackDamage') : null;
+			if (ad != null) json.damage = Math.round(ad);
 		}
 		if (ent[':isImmuneToFire']) json.fire_immune = true;
 		if (has('EntityZombie') || has('EntitySkeleton')) json.burns_in_daylight = true;
@@ -10067,7 +11496,7 @@ function installDispense(vm) {
 		'playDispenseSound(Lnet/minecraft/src/IBlockSource;)V': function (vm, self, a) { auxSfx(vm, 1002, a[0].$bx, a[0].$by, a[0].$bz, 0); },
 		'func_82498_a()F': function () { return 6; },
 		'func_82500_b()F': function () { return 1.1; },
-	}, abstractMethods: ['getProjectileEntity(Lnet/minecraft/src/World;Lnet/minecraft/src/IPosition;)Lnet/minecraft/src/IProjectile;'] });
+	}, abstractMethods: { 'getProjectileEntity(Lnet/minecraft/src/World;Lnet/minecraft/src/IPosition;)Lnet/minecraft/src/IProjectile;': true } });
 
 	var wspec = vm.natives[SRC + 'World'];
 	if (wspec) wspec.methods = Object.assign({}, wspec.methods, {
@@ -10299,15 +11728,19 @@ JVM.guessMapVersion = function (classBytes, maps) {
 	});
 	var score = {};
 	Object.keys(sets).forEach(function (t) { score[t] = 0; });
+	var packaged = 0;
 	classBytes.slice(0, 80).forEach(function (b) {
 		var cf;
 		try { cf = JVM.parseClassFile(b); } catch (e) { return; }
 		cf.cp.forEach(function (e) {
-			if (!e || (e.tag !== 10 && e.tag !== 11)) return;
+			if (!e) return;
+			if (e.tag === 7 && typeof e.v === 'string' && /^net[/]minecraft[/](?!src[/]|client[/]Minecraft$|server[/]MinecraftServer$)[a-z]+[/]/.test(e.v)) packaged++;
+			if (e.tag !== 10 && e.tag !== 11) return;
 			var key = e.owner + '.' + e.name + e.desc;
 			Object.keys(sets).forEach(function (t) { if (sets[t].has(key)) score[t]++; });
 		});
 	});
+	if (packaged >= 3 && score.mcp164 !== undefined) score.mcp164 += packaged;
 	var PREF = ['mcp152', 'mcp151', 'mcp147', 'mcp164'], best = null;
 	PREF.concat(Object.keys(score).filter(function (t) { return PREF.indexOf(t) < 0; })).forEach(function (t) { if (score[t] !== undefined && (!best || score[t] > score[best])) best = t; });
 	return { tag: best, score: best ? score[best] : 0, scores: score };
@@ -10349,7 +11782,7 @@ JVM.javaKind = function (vm, classes, files) {
 	var forge = classes.some(function (c) { var s = vm.sources[c]; return s && JVM.bytesHave ? JVM.bytesHave(s.bytes, 'Lcpw/mods/fml/common/Mod;') : false; });
 	out.loader = forge ? 'Forge' : mlEntry ? 'ModLoader' : '';
 	var ver = mi && mi[0] && mi[0].mcversion;
-	if (ver) out.version = String(ver).replace(/^Minecraft\s*/i, '');
+	if (ver && /^\s*(Minecraft\s*)?\d+\.\d+/i.test(String(ver))) out.version = String(ver).replace(/^Minecraft\s*/i, '');
 	var map = vm.nameMap;
 	var vanilla = map ? classes.filter(function (c) { return c.indexOf('/') < 0 && map.cls[c] !== undefined; }).length : 0;
 	if (!forge && !mlEntry) {
@@ -12385,6 +13818,7 @@ function place(vm, b, hosts, weight) {
 	var r = reg(vm);
 	(r.biomeKeys || (r.biomeKeys = {}))[b.$biomeKey] = b;
 }
+JVM.placeModBiome = place;
 function providerBiomes(p) { return p ? (p.$biomes || []).slice() : []; }
 
 function install(vm) {
@@ -12563,13 +13997,15 @@ JVM.collectBiomes = function (vm, modId, ref, safe) {
 		if (b[':enableSnow']) j.snow = true;
 		if (b[':enableRain'] === 0) j.rain = false;
 		var own = function (sig) { for (var c = b.cls; c && !c.native; c = c.superClass) if (c.findDeclared(sig)) return true; return false; };
-		var g = b.$grass != null ? b.$grass : own('getBiomeGrassColor()I') ? safe(function () { return vm.callVirtual(b, 'getBiomeGrassColor', '()I', []); }, null) : null;
-		var f = b.$leaves != null ? b.$leaves : own('getBiomeFoliageColor()I') ? safe(function () { return vm.callVirtual(b, 'getBiomeFoliageColor', '()I', []); }, null) : null;
+		var ask = function (fn) { b.$defaultColor = false; var v = safe(function () { return vm.callVirtual(b, fn, '()I', []); }, null); return b.$defaultColor ? null : v; };
+		var g = b.$grass != null ? b.$grass : own('getBiomeGrassColor()I') ? ask('getBiomeGrassColor') : null;
+		var f = b.$leaves != null ? b.$leaves : own('getBiomeFoliageColor()I') ? ask('getBiomeFoliageColor') : null;
 		var hex = function (v) { return '#' + ('00000' + ((v >>> 0) & 0xffffff).toString(16)).slice(-6); };
 		if (typeof g === 'number') j.grass_color = hex(g);
 		if (typeof f === 'number') j.foliage_color = hex(f);
 		var d = b[':theBiomeDecorator'];
-		if (d) {
+		if (JVM.javaDecorated && JVM.javaDecorated(vm, b)) { j.trees = 'none'; j.flowers_per_chunk = 0; j.grass_per_chunk = 0; }
+		else if (d) {
 			var t = d[':treesPerChunk'];
 			if (typeof t === 'number') { if (t < 0) j.trees = 'none'; else j.trees_per_chunk = t; }
 			if (typeof d[':flowersPerChunk'] === 'number') j.flowers_per_chunk = Math.max(0, d[':flowersPerChunk']);

@@ -1842,7 +1842,8 @@
                 genRefs = {}; genIds = {};
                 var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm)) ||
                     (window.JVM && window.JVM.hasJavaDims && window.JVM.hasJavaDims(vm)) ||
-                    (window.JVM && window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm))));
+                    (window.JVM && window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm)) ||
+                    (window.JVM && window.JVM.decorWantsGen && window.JVM.decorWantsGen(vm))));
                 if (Module._mcJavaGenOn) Module._mcJavaGenOn(on ? 1 : 0);
                 return on;
             };
@@ -1882,7 +1883,8 @@
                 var fg = !!(window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm));
                 var sg = !!(window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm));
                 var dk = dimKeyOf(dim);
-                if (!gm.length && !fg && !sg && !dk) return;
+                var dg = dim === 0 && !!(window.JVM.decorWantsGen && window.JVM.decorWantsGen(vm));
+                if (!gm.length && !fg && !sg && !dk && !dg) return;
                 var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim;
                 if (!running) {
                     javaMods = {};
@@ -1905,6 +1907,7 @@
                                 else vm.callVirtual(m, 'generateNether', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, rnd, cx * 16, cz * 16]);
                             });
                         });
+                        if (dg) JV.decorGenerate(vm, world, cx, cz, rnd);
                         if (dk && JV.dimPopulate) JV.dimPopulate(vm, dk, cx, cz);
                         if (fg) JV.forgeGenerate(vm, cx, cz);
                         if (sg) JV.stationGenerate(vm, world, cx, cz, rnd, dim);
@@ -2266,7 +2269,18 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            J.pickTag = function (list) {
+                if (!list.length) return Promise.resolve({ tag: null, losers: [] });
+                return loadJvm().then(function (JVM) {
+                    return Promise.all(list.map(function (e) { return versionTag(JVM, e.files).then(function (v) { return { id: e.id, rank: e.rank, tag: v.tag || 'mcp152' }; }, function () { return null; }); }));
+                }).then(function (vs) {
+                    vs = vs.filter(Boolean).sort(function (a, b) { return a.rank - b.rank; });
+                    var tag = vs.length ? vs[0].tag : null;
+                    J.wantTag = tag;
+                    return { tag: tag, losers: vs.filter(function (v) { return v.tag !== tag; }).map(function (v) { return v.id; }), versionOf: function (t) { return window.JVM && window.JVM.versionOfTag ? window.JVM.versionOfTag[t] : t; } };
+                });
+            };
             var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164'];
             function versionTag(JVM, files) {
                 var said = null;
@@ -2278,6 +2292,7 @@
                     var mi = files['mcmod.info'] && JSON.parse(new TextDecoder().decode(files['mcmod.info']).replace(/^\uFEFF/, ''));
                     if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
                     said = mi && mi[0] && mi[0].mcversion ? String(mi[0].mcversion).replace(/^Minecraft\s*/i, '') : null;
+                    if (said && !/^\d+\.\d+/.test(said)) said = null;
                 } catch (e) { said = null; }
                 var tag = said && JVM.mapTagFor ? JVM.mapTagFor(said) : null;
                 if (tag) return Promise.resolve({ tag: tag, said: said });
@@ -2296,8 +2311,9 @@
                 var JVM = null;
                 return loadJvm().then(function (j) { JVM = j; return JVM.expandNestedJars ? JVM.expandNestedJars(files) : files; })
                     .then(function () { return versionTag(JVM, files); }).then(function (ver) {
-                    if (ver.tag && vm && vm.$tag && vm.$tag !== ver.tag) {
-                        var why = 'made for Minecraft ' + JVM.versionOfTag[ver.tag] + ', but the Java mods already on are for ' + JVM.versionOfTag[vm.$tag] + ' - only one version\'s mods run at a time';
+                    var want = J.wantTag || (vm && vm.$tag);
+                    if (ver.tag && want && want !== ver.tag) {
+                        var why = 'made for Minecraft ' + JVM.versionOfTag[ver.tag] + ', but the newest Java mods on are for ' + JVM.versionOfTag[want] + ' - one version\'s Java mods run at a time';
                         J.reports[modId] = JVM.javaReport(vm, modId, { loader: '', version: JVM.versionOfTag[ver.tag], cant: why });
                         problem('', "Can't run: " + why);
                         return (J.pre[modId] = { skip: true });
@@ -2440,12 +2456,17 @@
                             else add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = fb;
                             return;
                         }
-                        var cands = [];
-                        if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kind + '/' + t.name + '.png', 'assets/' + t.mod + '/textures/' + kind + '/' + t.name + '.png');
-                        cands.push('textures/' + kind + '/' + t.name + '.png');
+                        var nm = t.base || t.name, cands = [];
+                        [kind, kind === 'items' ? 'blocks' : 'items'].forEach(function (kd) {
+                            if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kd + '/' + nm + '.png', 'assets/' + t.mod + '/textures/' + kd + '/' + nm + '.png');
+                            cands.push('textures/' + kd + '/' + nm + '.png');
+                        });
                         for (var i = 0; i < cands.length; i++) {
                             var hit = files[cands[i]] || files[Object.keys(files).filter(function (f) { return f.toLowerCase() === cands[i].toLowerCase(); })[0]];
-                            if (hit) { add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = hit; break; }
+                            if (!hit) continue;
+                            if (t.tint != null) (function (src, out) { cuts.push(tintPng(src, t.tint).then(function (png) { add[out] = png || src; })); })(hit, 'textures/' + kind + '/' + t.name.toLowerCase() + '.png');
+                            else add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = hit;
+                            break;
                         }
                     });
                     if (JVM.javaSounds) { var snds = JVM.javaSounds(vm, modId, files); Object.keys(snds).forEach(function (k) { if (!add[k]) add[k] = snds[k]; }); }
@@ -3067,13 +3088,33 @@
                 settingDecls = {};
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
                 if (Module.mcJava) Module.mcJava.begin();
-                var javaPre = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
-                    var id = cid(x);
+                var javaFiles = {};
+                var javaPick = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
-                        if (Module.mcJava.hasClasses(files)) return Module.mcJava.preload(id, files, function (file, text) { problem(id, file, text, 'load'); });
+                        if (Module.mcJava.hasClasses(files)) javaFiles[cid(x)] = { x: x, files: files };
                     }, function () { });
-                }, Promise.resolve());
+                }, Promise.resolve()).then(function () {
+                    var rankOf = function (x) { return x.justAdded ? -1 : mods.indexOf(x); };
+                    var list = Object.keys(javaFiles).map(function (id) { return { id: id, files: javaFiles[id].files, rank: rankOf(javaFiles[id].x) }; });
+                    return Module.mcJava.pickTag(list);
+                }).then(function (pick) {
+                    if (!pick || !pick.losers.length || session) return;
+                    var top = Object.keys(javaFiles).map(function (id) { return javaFiles[id].x; }).sort(function (a, b) { return (a.justAdded ? -1 : mods.indexOf(a)) - (b.justAdded ? -1 : mods.indexOf(b)); })[0];
+                    if (!top || !top.justAdded) return;
+                    var names = [];
+                    pick.losers.forEach(function (id) { var lx = javaFiles[id] && javaFiles[id].x; if (lx && lx.enabled) { lx.enabled = false; names.push(lx.m && lx.m.name || id); delete javaFiles[id]; } });
+                    on = on.filter(function (x) { return x.enabled; });
+                    if (names.length) {
+                        writeState();
+                        applyNote = ('Turned off ' + names.join(', ') + ' - Java mods for one Minecraft version run at a time, and ' + (top.m && top.m.name || 'the new mod') + ' is for ' + pick.versionOf(pick.tag) + '. Turn them back on in Mods to switch back.');
+                    }
+                });
+                var javaPre = !Module.mcJava ? Promise.resolve() : javaPick.then(function () {
+                    return Object.keys(javaFiles).reduce(function (pr, id) {
+                        return pr.then(function () { return Module.mcJava.preload(id, javaFiles[id].files, function (file, text) { problem(id, file, text, 'load'); }); });
+                    }, Promise.resolve());
+                });
                 return on.reduce(function (pr, x) {
                     var id = cid(x);
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
@@ -4599,14 +4640,17 @@
                 });
             }
 
+            var applyNote = '';
             function reapply(tell, ask) {
                 if (busy) { again = true; return Promise.resolve(); }
                 var keep = status;
                 busy = true; bump('Applying mods...');
                 return applyAll(ask).then(function (unknown) {
                     busy = false;
-                    var n = api.problemCount();
-                    bump(n ? n + (n === 1 ? ' problem' : ' problems') + ' in your mods - choose a mod to see them' : keep);
+                    var n = api.problemCount(), note = applyNote;
+                    applyNote = '';
+                    var probs = n + (n === 1 ? ' problem' : ' problems');
+                    bump(note ? note + (n ? ' (' + probs + ' - choose a mod to see them)' : '') : n ? probs + ' in your mods - choose a mod to see them' : keep);
                     if (tell && Module._mcModsApplied) Module._mcModsApplied();
                     applied++;
                     if (again) { again = false; return reapply(tell); }
@@ -4729,6 +4773,7 @@
                 var i = find(id);
                 if (i < 0 || mods[i].err) return;
                 mods[i].enabled = !mods[i].enabled;
+                if (mods[i].enabled) { mods.forEach(function (x) { x.justAdded = false; }); mods[i].justAdded = true; }
                 var turned = [];
                 (function need(x, seen) {
                     if (seen[x.id]) return;
@@ -5000,7 +5045,8 @@
                         FS.mkdirTree(LIB);
                         FS.writeFile(LIB + '/' + m.id + '.zip', bytes);
                         if (i >= 0) mods.splice(i, 1);
-                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m) });
+                        mods.forEach(function (x) { x.justAdded = false; });
+                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m), justAdded: true });
                         writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
                         return Promise.resolve(reapply(true)).then(function () { return true; });
                     });
