@@ -1162,6 +1162,7 @@
             Module.mcGameRules.define('afkKickSeconds', 120, 'A joined player AFK this long is disconnected (0: never); they fade out over this time', [0, 86400]);
             Module.mcGameRules.define('afkFade', true, 'AFK players fade out');
             Module.mcGameRules.define('announceAchievements', true, 'Chat tells everyone when a player earns an achievement (mods\' achievements)');
+            Module.mcGameRules.define('modDimensionTravel', true, 'Mods\' portals and world.travel take players to mods\' dimensions');
             Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
             Module.mcGameRules.define('keepJoinedPlayers', true, "The world keeps joined players' inventory, armour, food, experience and spot for when they come back");
             Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
@@ -2568,7 +2569,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$|dimensions\/)/i.test(k)
                         || /\.class$/i.test(k);
                 });
             }
@@ -2893,6 +2894,7 @@
                 say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
                 say(count(/^biomes[/][^/]+[.]json$/i), 'biome', 'biomes');
                 say(count(/^enchantments[/][^/]+[.]json$/i), 'enchantment', 'enchantments');
+                say(count(/^dimensions[/][^/]+[.]json$/i), 'dimension', 'dimensions');
                 say(count(/^(assets[/][^/]+[/])?models[/].+[.]json$/i), 'model', 'models');
                 say(count(/^mobs?[/][^/]+[.]json$/i), 'creature', 'creatures');
                 if (count(/^rules[/][^/]+[.]json$/i)) parts.push('rules');
@@ -3110,7 +3112,7 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
-                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes|enchantments)\/([^\/]+)\.json$/i.exec(path))) {
+                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
@@ -3654,7 +3656,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3667,6 +3669,7 @@
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'enchantments') { enchFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
+                    if (c.kind === 'dimensions') { dimFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     var key = c.mod + ':' + c.name;
                     if (c.kind === 'blocks') blocks[key] = { mod: c.mod, name: c.name, j: j, file: c.file };
@@ -3674,6 +3677,39 @@
                     else if (c.kind === 'worldgen') worldgen.push({ mod: c.mod, name: c.name, j: j, file: c.file });
                     else recipes.push({ mod: c.mod, j: j, file: c.file });
                 });
+                Module.mcModDims = {};
+                var dimIds = {}, takenDim = {};
+                var fnv = function (s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i) & 255; h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; };
+                var TERRAINS = { overworld: 1, nether: 1, end: 1, flat: 1, void: 1, script: 1 };
+                var colourOf = function (v, mod, file, what) {
+                    if (v == null) return -1;
+                    var m = /^#?([0-9a-f]{6})$/i.exec(String(v));
+                    if (!m) { problem(mod, file, '"' + what + '" should be "#rrggbb"'); return -1; }
+                    return parseInt(m[1], 16);
+                };
+                dimFiles.sort(function (a, b) { return (a.mod + ':' + a.name) < (b.mod + ':' + b.name) ? -1 : 1; }).forEach(function (d) {
+                    var j = d.j, key = d.mod + ':' + d.name;
+                    var terrain = String(j.terrain || 'overworld').toLowerCase();
+                    if (!TERRAINS[terrain] || (terrain === 'script' && !d.java)) { bad(d.mod, d.file, 'unknown "terrain": "' + j.terrain + '" (overworld, nether, end, flat or void)'); terrain = 'overworld'; }
+                    var id = 2 + fnv(key) % 97;
+                    for (var n = 0; takenDim[id] && n < 200; n++) id = id >= 98 ? 2 : id + 1;
+                    takenDim[id] = true; dimIds[key] = id;
+                    var name = String(j.name || d.name.replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })).replace(/[\t\r\n]+/g, ' ').trim().slice(0, 64);
+                    Module.mcModDims[key] = { id: id, name: name };
+                    var t = j.time == null || j.time === 'cycle' ? -1 : { day: 0, noon: 0, sunset: 0.25, night: 0.5, midnight: 0.5, sunrise: 0.75 }[String(j.time)];
+                    if (t === undefined) { t = Number(j.time); if (!isFinite(t)) { problem(d.mod, d.file, '"time": "cycle", "day", "night", "sunset", "sunrise" or 0-1'); t = -1; } else t = Math.max(0, Math.min(1, t)); }
+                    var layers = Array.isArray(j.layers) ? j.layers.map(function (l) {
+                        var r = ref(l && l.block, d.mod, d.file);
+                        return r ? r + '*' + Math.max(1, Math.min(128, (l.count | 0) || 1)) : '';
+                    }).filter(Boolean) : [];
+                    if (terrain === 'flat' && !layers.length) layers = ['id:7*1', 'id:3*3', 'id:2*1'];
+                    var num = function (v, dflt, lo, hi) { v = Number(v); if (!isFinite(v)) v = dflt; return Math.max(lo, Math.min(hi, v)); };
+                    lines.push(['dimension', key, id, terrain, name, colourOf(j.sky_color, d.mod, d.file, 'sky_color'), colourOf(j.fog_color, d.mod, d.file, 'fog_color'),
+                                j.ceiling ? 1 : 0, num(j.light, j.ceiling ? 0.2 : 0.05, 0, 1), t, layers.join(',') || '-', num(j.scale, 1, 0.01, 100),
+                                j.arrival_block ? (ref(j.arrival_block, d.mod, d.file) || '-') : '-', j.mobs === false ? 0 : 1, j.respawn ? 1 : 0,
+                                j.clouds === false ? 0 : 1].join('\t'));
+                });
+                var dimRef = function (v, mod) { v = String(v || '').toLowerCase(); return dimIds[v] || dimIds[mod + ':' + v] || 0; };
                 contentKeys = {};
                 Object.keys(blocks).forEach(function (k) { contentKeys[k] = 'block'; });
                 Object.keys(items).forEach(function (k) { contentKeys[k] = 'item'; });
@@ -3756,6 +3792,11 @@
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
+                    if (j.portal_to != null) {
+                        var pdim = dimRef(j.portal_to, b.mod);
+                        if (pdim) lines.push(['portalto', key, pdim].join('\t'));
+                        else problem(b.mod, b.file, '"portal_to": no dimension "' + j.portal_to + '" (dimensions/<name>.json)');
+                    }
                     if (j.neighbor_updates === true) lines.push(['neighbors', key].join('\t'));
                     var st = states[b.mod + ':' + b.name], rot = String(j.rotate || '').toLowerCase();
                     var mref = j.model;
@@ -5361,6 +5402,7 @@
                 var settings = {};
                 var cstore = {};
                 var keyIds = {};
+                var dimTable = {};
                 var isHost = false, warned = {};
                 function pid(p) { return (p && typeof p === 'object') ? p.id : p; }
                 function act(mod, a) { post({ t: 'act', mod: mod, a: a }); }
@@ -5579,6 +5621,13 @@
                             healEntity: function (id, n) { act(mod, ['entheal', pid(id) | 0, Math.max(0, n | 0)]); },
                             removeEntity: function (id) { act(mod, ['entremove', pid(id) | 0]); },
                             setOnFire: function (id, seconds) { act(mod, ['entfire', pid(id) | 0, Math.max(0, seconds == null ? 8 : seconds | 0)]); },
+                            travel: function (dimension) { act(mod, ['travel', String(dimension == null ? 'overworld' : dimension).toLowerCase().replace(/[\t]/g, '')]); },
+                            dimensions: function () {
+                                var out = [{ id: 0, key: 'overworld', name: 'Overworld' }, { id: -1, key: 'nether', name: 'The Nether' }, { id: 1, key: 'end', name: 'The End' }];
+                                var md = dimTable || {};
+                                Object.keys(md).forEach(function (k) { out.push({ id: md[k].id, key: k, name: md[k].name }); });
+                                return out;
+                            },
                             setPartVisible: function (id, part, visible) {
                                 var names = (Array.isArray(part) ? part : [part]).map(function (n) { return String(n).toLowerCase().replace(/[\t,]/g, ''); }).filter(Boolean);
                                 if (names.length) act(mod, ['entparts', pid(id) | 0, names.join(','), visible === false ? 0 : 1]);
@@ -5748,6 +5797,7 @@
                         settings = d.settings || {};
                         cstore = d.cstore || {};
                         keyIds = d.keyIds || {};
+                        dimTable = d.dims || {};
                         store = d.store || {};
                         isHost = !!d.host;
                         if (isHost && Object.keys(store).some(function (k) { return /#blocks$/.test(k) && store[k] && Object.keys(store[k]).length; })) watchBlocks();
@@ -6187,7 +6237,7 @@
                     worker.onerror = function (x) { console.warn('[mods] script error', x.message); chat('[mods] script error: ' + x.message); };
                     worker.postMessage({ t: 'load', scripts: scripts, store: side === 'host' ? loadStore() : {}, host: side === 'host',
                                          settings: W() && W().allSettings ? W().allSettings() : {}, cstore: readClientStore(),
-                                         keyIds: W() && W().keyIds ? W().keyIds() : {} });
+                                         keyIds: W() && W().keyIds ? W().keyIds() : {}, dims: Module.mcModDims || {} });
                     if (side === 'host') toWorker({ t: 'start', folder: folder, dimension: e.dimension, player: me });
                     toWorker({ t: 'start', client: true, dimension: e.dimension, player: me });
                     return;

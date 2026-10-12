@@ -46,7 +46,7 @@
       "author": "Minecraft RE",
       "version": "1.0",
       "devices": "any",
-      "description": "Decorative blocks: shapes (slab, pillar, carpet, a pixel box), a light, an icy tile, a falling block and a block model that turns to face you.",
+      "description": "Decorative blocks: shapes (slab, pillar, carpet, a pixel box), a light, an icy tile, a falling block, a block model that turns to face you - and a portal to a dimension of its own.",
       "url": "blocks_example.zip",
       "tags": [
         "blocks"
