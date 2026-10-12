@@ -1537,6 +1537,104 @@
         })();
 
         (function () {
+            var J = Module.mcJava = {};
+            var jvmPromise = null, maps = {}, vm = null;
+            function loadJvm() {
+                if (window.JVM) return Promise.resolve(window.JVM);
+                if (!jvmPromise) jvmPromise = new Promise(function (res, rej) {
+                    var s = document.createElement('script');
+                    s.src = 'jvm.js' + (MCRE_BUILD === 'dev' ? '?t=' + Date.now() : '?v=' + encodeURIComponent(MCRE_BUILD));
+                    s.onload = function () { window.JVM ? res(window.JVM) : rej(new Error('jvm.js did not load')); };
+                    s.onerror = function () { jvmPromise = null; rej(new Error('jvm.js could not be fetched')); };
+                    document.head.appendChild(s);
+                });
+                return jvmPromise;
+            }
+            function loadMap(name) {
+                if (maps[name] !== undefined) return Promise.resolve(maps[name]);
+                return fetch('jvm_maps/' + name + '.txt').then(function (r) { return r.ok ? r.text() : ''; }, function () { return ''; })
+                    .then(function (t) { maps[name] = t; return t; });
+            }
+            function folderFs(modId) {
+                var base = '/games/java/' + String(modId).replace(/[^\w.-]/g, '_');
+                var abs = function (p) { return base + (p ? '/' + p : ''); };
+                var stat = function (p) { try { return FS.stat(abs(p)); } catch (e) { return null; } };
+                return {
+                    read: function (p) { try { var st = stat(p); return st && !FS.isDir(st.mode) ? FS.readFile(abs(p)) : null; } catch (e) { return null; } },
+                    write: function (p, b) { try { var f = abs(p); FS.mkdirTree(f.slice(0, f.lastIndexOf('/'))); FS.writeFile(f, b); } catch (e) { } },
+                    exists: function (p) { return !!stat(p); },
+                    isDir: function (p) { var st = stat(p); return !!(st && FS.isDir(st.mode)); },
+                    list: function (p) { try { return FS.readdir(abs(p)).filter(function (n) { return n !== '.' && n !== '..'; }); } catch (e) { return []; } },
+                    mkdirs: function (p) { try { FS.mkdirTree(abs(p)); } catch (e) { } },
+                    remove: function (p) { try { FS.unlink(abs(p)); } catch (e) { try { FS.rmdir(abs(p)); } catch (e2) { } } },
+                };
+            }
+            J.hasClasses = function (files) { return Object.keys(files).some(function (k) { return /\.class$/i.test(k); }); };
+            J.begin = function () { vm = null; };
+            J.define = function (modId, files, problem) {
+                return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
+                    var JVM = r[0], map = r[1];
+                    if (!vm) {
+                        vm = JVM.create({
+                            log: function (level, text) {
+                                if (level === 'error') problem('', String(text).split('\n')[0]);
+                                (level === 'out' ? console.log : console.warn)('[java ' + (vm && vm.currentMod || '') + '] ' + text);
+                            },
+                            install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
+                        });
+                        vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
+                                    itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
+                    }
+                    vm.fs = folderFs(modId);
+                    var classes = [];
+                    Object.keys(files).forEach(function (k) {
+                        if (/\.class$/i.test(k)) {
+                            var cn = k.slice(0, -6);
+                            if (/(^|[/])(module-info|package-info)$/.test(cn)) return;
+                            vm.addClassFile(cn, files[k], modId);
+                            classes.push(cn);
+                        } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
+                    });
+                    var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
+                    if (!entry.length) {
+                        problem('', 'Java mod without a ModLoader mod_ class - Forge and Fabric mods are not supported yet');
+                        return {};
+                    }
+                    vm.currentMod = modId;
+                    entry.forEach(function (cn) {
+                        JVM.run(vm, function () {
+                            var o = vm.newObject(vm.loadClass(cn));
+                            vm.callVirtual(o, '<init>', '()V', []);
+                            vm.callVirtual(o, 'load', '()V', []);
+                        });
+                    });
+                    var c = JVM.collectContent(vm, modId);
+                    var add = {}, enc = new TextEncoder();
+                    var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
+                    Object.keys(c.blocks).forEach(function (k) { var b = c.blocks[k]; delete b.scripted; put('blocks/' + k + '.json', b); });
+                    Object.keys(c.items).forEach(function (k) { var it = c.items[k]; delete it.scripted; put('items/' + k + '.json', it); });
+                    c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
+                    Object.keys(c.textures).forEach(function (k) {
+                        var t = c.textures[k], kind = k.split('/')[0];
+                        var cands = [];
+                        if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kind + '/' + t.name + '.png', 'assets/' + t.mod + '/textures/' + kind + '/' + t.name + '.png');
+                        cands.push('textures/' + kind + '/' + t.name + '.png');
+                        for (var i = 0; i < cands.length; i++) {
+                            var hit = files[cands[i]] || files[Object.keys(files).filter(function (f) { return f.toLowerCase() === cands[i].toLowerCase(); })[0]];
+                            if (hit) { add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = hit; break; }
+                        }
+                    });
+                    var lang = Object.keys(c.lang).map(function (k) { return k + '=' + c.lang[k]; }).join('\n');
+                    if (lang) add['lang/en_us.lang'] = enc.encode(lang + '\n');
+                    return add;
+                }).catch(function (e) {
+                    problem('', 'Java mod could not run: ' + (e && e.message || e));
+                    return {};
+                });
+            };
+        })();
+
+        (function () {
             var LIB = '/games/mods', STATE = LIB + '/state.json', BUNDLED = '/data/mods';
             var MAX_ZIP = 64 * 1024 * 1024, MAX_FILES = 5000;
             var mods = [];
@@ -1674,12 +1772,30 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k);
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$)/i.test(k)
+                        || /\.class$/i.test(k);
                 });
             }
             function manifestOf(files, fallbackName) {
                 var dec = new TextDecoder(), m = {}, notes = [];
-                var base = String(fallbackName || 'mod').replace(/\.(zip|modpkg|mcpack|mcaddon)$/i, '');
+                var base = String(fallbackName || 'mod').replace(/\.(zip|modpkg|mcpack|mcaddon|jar)$/i, '');
+                if (!files['manifest.json']) {
+                    try {
+                        var jm = files['mcmod.info'] ? JSON.parse(dec.decode(files['mcmod.info'])) : null;
+                        if (jm && !Array.isArray(jm) && jm.modList) jm = jm.modList;
+                        jm = Array.isArray(jm) ? jm[0] : null;
+                        var fm = files['fabric.mod.json'] ? JSON.parse(dec.decode(files['fabric.mod.json'])) : null;
+                        var src = fm || jm;
+                        if (src) {
+                            var auth = (fm && fm.authors) || (jm && (jm.authorList || jm.authors)) || [];
+                            files['manifest.json'] = new TextEncoder().encode(JSON.stringify({
+                                id: String(src.id || src.modid || base).toLowerCase().replace(/[^a-z0-9_.-]/g, '_'),
+                                name: src.name || base, version: src.version || '', description: src.description || '',
+                                author: (Array.isArray(auth) ? auth : [auth]).map(function (a) { return typeof a === 'string' ? a : (a && a.name) || ''; }).join(', '),
+                            }));
+                        }
+                    } catch (e) { }
+                }
                 if (files['manifest.json']) {
                     try { m = JSON.parse(dec.decode(files['manifest.json'])) || {}; } catch (e) { m = {}; notes.push('broken manifest.json'); }
                     if (typeof m !== 'object' || Array.isArray(m)) m = {};
@@ -2051,10 +2167,20 @@
                 if (session) on = session.slice().reverse();
                 settingDecls = {};
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
+                if (Module.mcJava) Module.mcJava.begin();
                 return on.reduce(function (pr, x) {
                     var id = cid(x);
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
+                        if (!Module.mcJava || !Module.mcJava.hasClasses(files)) return files;
+                        return Module.mcJava.define(id, files, function (file, text) { problem(id, file, text, 'load'); }).then(function (add) {
+                            Object.keys(add).forEach(function (k) {
+                                if (k === 'lang/en_us.lang' && files[k]) { var a = files[k], b = add[k], m2 = new Uint8Array(a.length + 1 + b.length); m2.set(a); m2[a.length] = 10; m2.set(b, a.length + 1); files[k] = m2; }
+                                else files[k] = add[k];
+                            });
+                            return files;
+                        });
+                    }).then(function (files) {
                         var jobs = Promise.resolve();
                         var own = mods.indexOf(x) >= 0;
                         if (!settingDecls[id] && files['manifest.json']) {
@@ -3826,11 +3952,11 @@
                 box.innerHTML =
                     '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Add a mod</h2>' +
                     '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Choose a mod file (.zip), or drop it here. ' +
-                    'Java resource packs and old Pocket Edition ModPE scripts (.js, .modpkg) work too.</p>' +
+                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and ModLoader Java mods (.jar) work too.</p>' +
                     '<button data-browse style="display:block;width:100%;padding:12px;margin-bottom:14px;background:#4a8a4a;color:#fff;' +
                     'border:none;cursor:pointer;font-size:14px;font-family:monospace">Browse mods</button>' +
                     '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +
-                    'Choose file<input type="file" accept=".zip,application/zip,.js,.modpkg" style="display:none"></label>' +
+                    'Choose file<input type="file" accept=".zip,application/zip,.js,.modpkg,.jar,application/java-archive" style="display:none"></label>' +
                     (api.canFolder() ?
                         '<div style="border-top:1px solid #555;margin:4px 0 14px;padding-top:12px;font-size:12px;color:#aaa;line-height:1.4">' +
                         'Making a mod? Open its folder instead: the game reads it straight from your disk. ' +
