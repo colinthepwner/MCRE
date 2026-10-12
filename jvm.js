@@ -404,6 +404,11 @@ VM.prototype.invoke = function (m, self, args) {
 		}
 		return this.unpluggedValue(m.sig.ret);
 	}
+	if (JVM.tryJit && !m.$noJit) {
+		m.$calls = (m.$calls | 0);
+		JVM.tryJit(this, m);
+		if (m.fn) return m.fn(this, self, args);
+	}
 	return JVM.interpret(this, m, self, args);
 };
 
@@ -1306,11 +1311,523 @@ function linkIndy(vm, cls, e) {
 }
 
 JVM.interpret = interpret;
+JVM.interpHelpers = { MISSING: MISSING, resolveStatic: resolveStatic, resolveStaticMethod: resolveStaticMethod, resolveSpecial: resolveSpecial, missing: missing };
 JVM.linkIndy = linkIndy;
 JVM.methodHandle = methodHandle;
 JVM.methodType = methodType;
 JVM.f2i = f2i;
 JVM.f2l = f2l;
+})();
+
+(function () {
+'use strict';
+
+var TOP = JVM.TOP, JavaThrow = JVM.JavaThrow, parseDesc = JVM.parseDesc, isWide = JVM.isWide, defaultOf = JVM.defaultOf;
+var ARRAY_TYPES = { 4: 'Z', 5: 'C', 6: 'F', 7: 'D', 8: 'B', 9: 'S', 10: 'I', 11: 'J' };
+var MAX_BYTES = 60000;
+
+function u2(b, p) { return (b[p] << 8) | b[p + 1]; }
+function s2(b, p) { return ((b[p] << 24) >> 16) | b[p + 1]; }
+function s4(b, p) { return (b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]; }
+function q(s) { return JSON.stringify(s); }
+
+function makeRT(vm) {
+	var rt = {
+		TOP: TOP, L: function (v) { return BigInt.asIntN(64, v); },
+		f2i: JVM.f2i, f2l: JVM.f2l, defaultOf: defaultOf,
+		npe: function (msg) { vm.throwNew('java/lang/NullPointerException', msg); },
+		aiob: function (arr, i) {
+			if (arr === null || arr === undefined) vm.throwNew('java/lang/NullPointerException', 'array access');
+			vm.throwNew('java/lang/ArrayIndexOutOfBoundsException', 'Index ' + i + ' out of bounds for length ' + arr.a.length);
+		},
+		div0: function () { vm.throwNew('java/lang/ArithmeticException', '/ by zero'); },
+		stop: function () { var err = new Error('stopped: ran too long'); err.vmStop = true; err.trace = vm.currentTrace ? vm.currentTrace() : null; throw err; },
+		JavaThrow: JavaThrow,
+		strCls: null,
+		stringField: function (s, name) { return name === 'count' ? s.length : null; },
+		multi: function multi(type, counts, d) {
+			var arr = vm.newArray(type.substring(1), counts[d]);
+			if (d + 1 < counts.length) for (var i = 0; i < counts[d]; i++) arr.a[i] = multi(type.substring(1), counts, d + 1);
+			return arr;
+		},
+		findHandler: function (code, pc, ex) {
+			var hs = code.handlers;
+			for (var i = 0; i < hs.length; i++) {
+				var h = hs[i];
+				if (pc < h.start || pc >= h.end) continue;
+				if (!h.type) return h.handler;
+				var hc = h.$c || (h.$c = vm.loadClass(h.type));
+				if (vm.isInstance(ex, hc)) return h.handler;
+			}
+			return -1;
+		},
+		cast: function (v, cc) {
+			if (v !== null && v !== undefined && !vm.isInstance(v, cc))
+				vm.throwNew('java/lang/ClassCastException', vm.classOf(v).name.replace(/[/]/g, '.') + ' cannot be cast to ' + cc.name.replace(/[/]/g, '.'));
+		},
+	};
+	return rt;
+}
+
+function instrLen(b, pc) {
+	var op = b[pc];
+	switch (op) {
+	case 0x10: case 0x12: case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: case 0x36: case 0x37: case 0x38: case 0x39: case 0x3a:
+	case 0xbc: case 0xa9: return 2;
+	case 0x11: case 0x13: case 0x14: case 0x84: case 0xb2: case 0xb3: case 0xb4: case 0xb5: case 0xb6: case 0xb7: case 0xb8:
+	case 0xbb: case 0xbd: case 0xc0: case 0xc1: case 0xa7: case 0xa8: case 0xc6: case 0xc7: return 3;
+	case 0xc5: return 4;
+	case 0xb9: case 0xba: case 0xc8: case 0xc9: return 5;
+	case 0xc4: return b[pc + 1] === 0x84 ? 6 : 4;
+	case 0xaa: { var o = (pc + 4) & ~3, lo = s4(b, o + 4), hi = s4(b, o + 8); return o - pc + 12 + (hi - lo + 1) * 4; }
+	case 0xab: { var o2 = (pc + 4) & ~3, np = s4(b, o2 + 4); return o2 - pc + 8 + np * 8; }
+	default: return (op >= 0x99 && op <= 0xa6) ? 3 : 1;
+	}
+}
+function effect(vm, m, b, pc, cp) {
+	var op = b[pc], len = instrLen(b, pc), e, sig, w;
+	var r = { pop: 0, push: 0, next: true, targets: [] };
+	var wd = function (desc) { return isWide(desc) ? 2 : 1; };
+	if (op >= 0x02 && op <= 0x08) r.push = 1;
+	else if (op === 0x01 || (op >= 0x0b && op <= 0x0d) || op === 0x10 || op === 0x11 || op === 0x12 || op === 0x13) r.push = 1;
+	else if (op === 0x09 || op === 0x0a || op === 0x0e || op === 0x0f || op === 0x14) r.push = 2;
+	else if (op === 0x15 || op === 0x17 || op === 0x19 || (op >= 0x1a && op <= 0x1d) || (op >= 0x22 && op <= 0x25) || (op >= 0x2a && op <= 0x2d)) r.push = 1;
+	else if (op === 0x16 || op === 0x18 || (op >= 0x1e && op <= 0x21) || (op >= 0x26 && op <= 0x29)) r.push = 2;
+	else if (op >= 0x2e && op <= 0x35) { r.pop = 2; r.push = (op === 0x2f || op === 0x31) ? 2 : 1; }
+	else if (op === 0x36 || op === 0x38 || op === 0x3a || (op >= 0x3b && op <= 0x3e) || (op >= 0x43 && op <= 0x46) || (op >= 0x4b && op <= 0x4e)) r.pop = 1;
+	else if (op === 0x37 || op === 0x39 || (op >= 0x3f && op <= 0x42) || (op >= 0x47 && op <= 0x4a)) r.pop = 2;
+	else if (op >= 0x4f && op <= 0x56) r.pop = (op === 0x50 || op === 0x52) ? 4 : 3;
+	else if (op === 0x57) r.pop = 1;
+	else if (op === 0x58) r.pop = 2;
+	else if (op === 0x59) { r.pop = 1; r.push = 2; }
+	else if (op === 0x5a) { r.pop = 2; r.push = 3; }
+	else if (op === 0x5b) { r.pop = 3; r.push = 4; }
+	else if (op === 0x5c) { r.pop = 2; r.push = 4; }
+	else if (op === 0x5d) { r.pop = 3; r.push = 5; }
+	else if (op === 0x5e) { r.pop = 4; r.push = 6; }
+	else if (op === 0x5f) { r.pop = 2; r.push = 2; }
+	else if ([0x60, 0x64, 0x68, 0x6c, 0x70, 0x78, 0x7a, 0x7c, 0x7e, 0x80, 0x82, 0x62, 0x66, 0x6a, 0x6e, 0x72].indexOf(op) >= 0) { r.pop = 2; r.push = 1; }
+	else if (op === 0x74 || op === 0x76) { r.pop = 1; r.push = 1; }
+	else if ([0x61, 0x65, 0x69, 0x6d, 0x71, 0x7f, 0x81, 0x83, 0x63, 0x67, 0x6b, 0x6f, 0x73].indexOf(op) >= 0) { r.pop = 4; r.push = 2; }
+	else if (op === 0x79 || op === 0x7b || op === 0x7d) { r.pop = 3; r.push = 2; }
+	else if (op === 0x75 || op === 0x77) { r.pop = 2; r.push = 2; }
+	else if (op === 0x84) { }
+	else if (op >= 0x85 && op <= 0x93) {
+		var from = { 0x85: 1, 0x86: 1, 0x87: 1, 0x88: 2, 0x89: 2, 0x8a: 2, 0x8b: 1, 0x8c: 1, 0x8d: 1, 0x8e: 2, 0x8f: 2, 0x90: 2, 0x91: 1, 0x92: 1, 0x93: 1 }[op];
+		var to = { 0x85: 2, 0x86: 1, 0x87: 2, 0x88: 1, 0x89: 1, 0x8a: 2, 0x8b: 1, 0x8c: 2, 0x8d: 2, 0x8e: 1, 0x8f: 2, 0x90: 1, 0x91: 1, 0x92: 1, 0x93: 1 }[op];
+		r.pop = from; r.push = to;
+	}
+	else if (op === 0x94 || op === 0x97 || op === 0x98) { r.pop = 4; r.push = 1; }
+	else if (op === 0x95 || op === 0x96) { r.pop = 2; r.push = 1; }
+	else if (op >= 0x99 && op <= 0x9e) { r.pop = 1; r.targets.push(pc + s2(b, pc + 1)); }
+	else if (op >= 0x9f && op <= 0xa6) { r.pop = 2; r.targets.push(pc + s2(b, pc + 1)); }
+	else if (op === 0xc6 || op === 0xc7) { r.pop = 1; r.targets.push(pc + s2(b, pc + 1)); }
+	else if (op === 0xa7) { r.next = false; r.targets.push(pc + s2(b, pc + 1)); }
+	else if (op === 0xc8) { r.next = false; r.targets.push(pc + s4(b, pc + 1)); }
+	else if (op === 0xaa) {
+		var o = (pc + 4) & ~3, lo = s4(b, o + 4), hi = s4(b, o + 8);
+		r.pop = 1; r.next = false; r.targets.push(pc + s4(b, o));
+		for (var k = 0; k <= hi - lo; k++) r.targets.push(pc + s4(b, o + 12 + k * 4));
+	}
+	else if (op === 0xab) {
+		var o2 = (pc + 4) & ~3, np = s4(b, o2 + 4);
+		r.pop = 1; r.next = false; r.targets.push(pc + s4(b, o2));
+		for (var k2 = 0; k2 < np; k2++) r.targets.push(pc + s4(b, o2 + 12 + k2 * 8));
+	}
+	else if (op >= 0xac && op <= 0xb1) { r.pop = op === 0xad || op === 0xaf ? 2 : op === 0xb1 ? 0 : 1; r.next = false; }
+	else if (op === 0xb2) { e = cp[u2(b, pc + 1)]; r.push = wd(e.desc); }
+	else if (op === 0xb3) { e = cp[u2(b, pc + 1)]; r.pop = wd(e.desc); }
+	else if (op === 0xb4) { e = cp[u2(b, pc + 1)]; r.pop = 1; r.push = wd(e.desc); }
+	else if (op === 0xb5) { e = cp[u2(b, pc + 1)]; r.pop = 1 + wd(e.desc); }
+	else if (op >= 0xb6 && op <= 0xb9) {
+		e = cp[u2(b, pc + 1)]; sig = parseDesc(e.desc);
+		w = 0; sig.args.forEach(function (t) { w += isWide(t) ? 2 : 1; });
+		r.pop = w + (op === 0xb8 ? 0 : 1);
+		r.push = sig.ret === 'V' ? 0 : wd(sig.ret);
+	}
+	else if (op === 0xba) {
+		e = cp[u2(b, pc + 1)]; sig = parseDesc(e.desc);
+		w = 0; sig.args.forEach(function (t) { w += isWide(t) ? 2 : 1; });
+		r.pop = w; r.push = sig.ret === 'V' ? 0 : wd(sig.ret);
+	}
+	else if (op === 0xbb) r.push = 1;
+	else if (op === 0xbc || op === 0xbd || op === 0xbe) { r.pop = 1; r.push = 1; }
+	else if (op === 0xbf) { r.pop = 1; r.next = false; }
+	else if (op === 0xc0) { r.pop = 1; r.push = 1; }
+	else if (op === 0xc1) { r.pop = 1; r.push = 1; }
+	else if (op === 0xc2 || op === 0xc3) r.pop = 1;
+	else if (op === 0xc4) {
+		var wop = b[pc + 1];
+		if (wop === 0x15 || wop === 0x17 || wop === 0x19) r.push = 1;
+		else if (wop === 0x16 || wop === 0x18) r.push = 2;
+		else if (wop === 0x36 || wop === 0x38 || wop === 0x3a) r.pop = 1;
+		else if (wop === 0x37 || wop === 0x39) r.pop = 2;
+		else if (wop === 0x84) { }
+		else return null;
+	}
+	else if (op === 0xc5) { r.pop = b[pc + 3]; r.push = 1; }
+	else if (op === 0x00) { }
+	else return null;
+	r.len = len;
+	return r;
+}
+
+function analyse(vm, m) {
+	var code = m.code, b = code.bytes, cp = m.cls.cf.cp, n = b.length;
+	var depth = new Int32Array(n).fill(-1), leaders = Object.create(null), effects = [];
+	var work = [];
+	var put = function (pc, d) {
+		if (pc < 0 || pc >= n) return false;
+		if (depth[pc] === -1) { depth[pc] = d; work.push(pc); return true; }
+		return depth[pc] === d;
+	};
+	leaders[0] = true;
+	if (!put(0, 0)) return null;
+	code.handlers.forEach(function (h) { leaders[h.handler] = true; leaders[h.start] = true; leaders[h.end] = true; put(h.handler, 1); });
+	while (work.length) {
+		var pc = work.pop(), d = depth[pc];
+		var ef = effects[pc] || (effects[pc] = effect(vm, m, b, pc, cp));
+		if (!ef) return null;
+		if (b[pc] === 0xbb && cp[u2(b, pc + 1)].v === 'java/lang/String') return null;
+		var nd = d - ef.pop + ef.push;
+		if (d - ef.pop < 0 || nd > code.maxStack + 2) return null;
+		for (var i = 0; i < ef.targets.length; i++) { leaders[ef.targets[i]] = true; if (!put(ef.targets[i], nd)) return null; }
+		if (ef.next) { if (ef.targets.length) leaders[pc + ef.len] = true; if (!put(pc + ef.len, nd)) return null; }
+	}
+	return { depth: depth, leaders: leaders, effects: effects };
+}
+
+function compile(vm, m) {
+	var code = m.code, b = code.bytes, cp = m.cls.cf.cp;
+	if (!code || b.length > MAX_BYTES) return null;
+	var an = analyse(vm, m);
+	if (!an) return null;
+	var depth = an.depth, leaders = an.leaders;
+	var consts = [];
+	var K = function (v) { consts.push(v); return 'k' + (consts.length - 1); };
+	var out = [];
+	var S = function (i) { return 's' + i; };
+	var Lv = function (i) { return 'l' + i; };
+	var hasHandlers = code.handlers.length > 0;
+	var maxS = code.maxStack + 2, maxL = Math.max(code.maxLocals, 1);
+	var pcs = [];
+	for (var p = 0; p < b.length; p += (an.effects[p] ? an.effects[p].len : instrLen(b, p))) pcs.push(p);
+	var jumpTo = function (t, from) { return (t <= from ? 'if (++vm.steps > vm.maxSteps) rt.stop(); ' : '') + 'pc = ' + t + '; continue loop;'; };
+	var br = function (cond, from) { var t = from + s2(b, from + 1); return 'if (' + cond + ') { ' + jumpTo(t, from) + ' }'; };
+	var openCase = function (pc) { out.push('case ' + pc + ':'); };
+
+	for (var ii = 0; ii < pcs.length; ii++) {
+		var pc = pcs[ii], d = depth[pc];
+		if (d < 0) continue;
+		var op = b[pc], e, sig, line = '';
+		if (leaders[pc] || ii === 0) openCase(pc);
+		else if (depth[pcs[ii - 1]] < 0) openCase(pc);
+		if (hasHandlers) line += 'cpc = ' + pc + '; ';
+		var top = d - 1;
+		switch (op) {
+		case 0x00: break;
+		case 0x01: line += S(d) + ' = null;'; break;
+		case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: case 0x07: case 0x08: line += S(d) + ' = ' + (op - 3) + ';'; break;
+		case 0x09: case 0x0a: line += S(d) + ' = ' + (op - 9) + 'n;'; break;
+		case 0x0b: case 0x0c: case 0x0d: line += S(d) + ' = ' + (op - 0x0b) + ';'; break;
+		case 0x0e: case 0x0f: line += S(d) + ' = ' + (op - 0x0e) + ';'; break;
+		case 0x10: line += S(d) + ' = ' + ((b[pc + 1] << 24) >> 24) + ';'; break;
+		case 0x11: line += S(d) + ' = ' + s2(b, pc + 1) + ';'; break;
+		case 0x12: case 0x13: {
+			var ce = cp[op === 0x12 ? b[pc + 1] : u2(b, pc + 1)];
+			if (ce.tag === 3 || ce.tag === 4) line += S(d) + ' = ' + (Object.is(ce.v, -0) ? '-0' : ce.v !== ce.v ? 'NaN' : ce.v === Infinity ? 'Infinity' : ce.v === -Infinity ? '-Infinity' : String(ce.v)) + ';';
+			else if (ce.tag === 8) line += S(d) + ' = ' + q(ce.v) + ';';
+			else if (ce.tag === 7) line += S(d) + ' = vm.classObject(' + K(ce) + '.$c || (' + K(ce) + '.$c = vm.loadClass(' + q(ce.v) + ')));';
+			else if (ce.tag === 16) line += S(d) + ' = JVM.methodType(vm, ' + q(ce.d) + ');';
+			else if (ce.tag === 15) line += S(d) + ' = JVM.methodHandle(vm, ' + K(m.cls) + ', ' + K(ce) + ');';
+			else line += S(d) + ' = null;';
+			break;
+		}
+		case 0x14: {
+			var ce2 = cp[u2(b, pc + 1)], v2 = ce2.v;
+			if (typeof v2 === 'bigint') line += S(d) + ' = ' + v2.toString() + 'n;';
+			else line += S(d) + ' = ' + (Object.is(v2, -0) ? '-0' : v2 !== v2 ? 'NaN' : v2 === Infinity ? 'Infinity' : v2 === -Infinity ? '-Infinity' : String(v2)) + ';';
+			break;
+		}
+		case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: line += S(d) + ' = ' + Lv(b[pc + 1]) + ';'; break;
+		case 0x1a: case 0x1b: case 0x1c: case 0x1d: line += S(d) + ' = ' + Lv(op - 0x1a) + ';'; break;
+		case 0x1e: case 0x1f: case 0x20: case 0x21: line += S(d) + ' = ' + Lv(op - 0x1e) + ';'; break;
+		case 0x22: case 0x23: case 0x24: case 0x25: line += S(d) + ' = ' + Lv(op - 0x22) + ';'; break;
+		case 0x26: case 0x27: case 0x28: case 0x29: line += S(d) + ' = ' + Lv(op - 0x26) + ';'; break;
+		case 0x2a: case 0x2b: case 0x2c: case 0x2d: line += S(d) + ' = ' + Lv(op - 0x2a) + ';'; break;
+		case 0x2e: case 0x2f: case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35:
+			line += 'ta = ' + S(top - 1) + '; ti = ' + S(top) + '; if (ta === null || ta === undefined || ti < 0 || ti >= ta.a.length) rt.aiob(ta, ti); ' + S(top - 1) + ' = ta.a[ti];';
+			break;
+		case 0x36: case 0x37: case 0x38: case 0x39: case 0x3a: line += Lv(b[pc + 1]) + ' = ' + S((op === 0x37 || op === 0x39) ? top - 1 : top) + ';'; break;
+		case 0x3b: case 0x3c: case 0x3d: case 0x3e: line += Lv(op - 0x3b) + ' = ' + S(top) + ';'; break;
+		case 0x3f: case 0x40: case 0x41: case 0x42: line += Lv(op - 0x3f) + ' = ' + S(top - 1) + ';'; break;
+		case 0x43: case 0x44: case 0x45: case 0x46: line += Lv(op - 0x43) + ' = ' + S(top) + ';'; break;
+		case 0x47: case 0x48: case 0x49: case 0x4a: line += Lv(op - 0x47) + ' = ' + S(top - 1) + ';'; break;
+		case 0x4b: case 0x4c: case 0x4d: case 0x4e: line += Lv(op - 0x4b) + ' = ' + S(top) + ';'; break;
+		case 0x4f: case 0x51: case 0x53: case 0x54: case 0x55: case 0x56: {
+			var arrS = S(top - 2), idxS = S(top - 1), valS = S(top);
+			line += 'ta = ' + arrS + '; ti = ' + idxS + '; if (ta === null || ta === undefined || ti < 0 || ti >= ta.a.length) rt.aiob(ta, ti); ';
+			if (op === 0x54) line += 'ta.a[ti] = ta.cls.name === "[Z" ? (' + valS + ' ? 1 : 0) : ' + valS + ';';
+			else line += 'ta.a[ti] = ' + valS + ';';
+			break;
+		}
+		case 0x50: case 0x52:
+			line += 'ta = ' + S(top - 3) + '; ti = ' + S(top - 2) + '; if (ta === null || ta === undefined || ti < 0 || ti >= ta.a.length) rt.aiob(ta, ti); ta.a[ti] = ' + S(top - 1) + ';';
+			break;
+		case 0x57: case 0x58: break;
+		case 0x59: line += S(d) + ' = ' + S(top) + ';'; break;
+		case 0x5a: line += S(d) + ' = ' + S(top) + '; ' + S(top) + ' = ' + S(top - 1) + '; ' + S(top - 1) + ' = ' + S(d) + ';'; break;
+		case 0x5b: line += S(d) + ' = ' + S(top) + '; ' + S(top) + ' = ' + S(top - 1) + '; ' + S(top - 1) + ' = ' + S(top - 2) + '; ' + S(top - 2) + ' = ' + S(d) + ';'; break;
+		case 0x5c: line += S(d) + ' = ' + S(top - 1) + '; ' + S(d + 1) + ' = ' + S(top) + ';'; break;
+		case 0x5d:
+			line += S(d + 1) + ' = ' + S(top) + '; ' + S(d) + ' = ' + S(top - 1) + '; ' + S(top) + ' = ' + S(top - 2) + '; ' + S(top - 1) + ' = ' + S(d + 1) + '; ' + S(top - 2) + ' = ' + S(d) + ';';
+			break;
+		case 0x5e:
+			line += S(d + 1) + ' = ' + S(top) + '; ' + S(d) + ' = ' + S(top - 1) + '; ' + S(top) + ' = ' + S(top - 2) + '; ' + S(top - 1) + ' = ' + S(top - 3) + '; ' + S(top - 2) + ' = ' + S(d + 1) + '; ' + S(top - 3) + ' = ' + S(d) + ';';
+			break;
+		case 0x5f: line += 'tv = ' + S(top) + '; ' + S(top) + ' = ' + S(top - 1) + '; ' + S(top - 1) + ' = tv;'; break;
+		case 0x60: line += S(top - 1) + ' = (' + S(top - 1) + ' + ' + S(top) + ') | 0;'; break;
+		case 0x64: line += S(top - 1) + ' = (' + S(top - 1) + ' - ' + S(top) + ') | 0;'; break;
+		case 0x68: line += S(top - 1) + ' = Math.imul(' + S(top - 1) + ', ' + S(top) + ');'; break;
+		case 0x6c: line += 'if (' + S(top) + ' === 0) rt.div0(); ' + S(top - 1) + ' = (' + S(top - 1) + ' / ' + S(top) + ') | 0;'; break;
+		case 0x70: line += 'if (' + S(top) + ' === 0) rt.div0(); ' + S(top - 1) + ' = (' + S(top - 1) + ' % ' + S(top) + ') | 0;'; break;
+		case 0x74: line += S(top) + ' = (-' + S(top) + ') | 0;'; break;
+		case 0x78: line += S(top - 1) + ' = ' + S(top - 1) + ' << (' + S(top) + ' & 31);'; break;
+		case 0x7a: line += S(top - 1) + ' = ' + S(top - 1) + ' >> (' + S(top) + ' & 31);'; break;
+		case 0x7c: line += S(top - 1) + ' = (' + S(top - 1) + ' >>> (' + S(top) + ' & 31)) | 0;'; break;
+		case 0x7e: line += S(top - 1) + ' = ' + S(top - 1) + ' & ' + S(top) + ';'; break;
+		case 0x80: line += S(top - 1) + ' = ' + S(top - 1) + ' | ' + S(top) + ';'; break;
+		case 0x82: line += S(top - 1) + ' = ' + S(top - 1) + ' ^ ' + S(top) + ';'; break;
+		case 0x61: line += S(top - 3) + ' = rt.L(' + S(top - 3) + ' + ' + S(top - 1) + ');'; break;
+		case 0x65: line += S(top - 3) + ' = rt.L(' + S(top - 3) + ' - ' + S(top - 1) + ');'; break;
+		case 0x69: line += S(top - 3) + ' = rt.L(' + S(top - 3) + ' * ' + S(top - 1) + ');'; break;
+		case 0x6d: line += 'if (' + S(top - 1) + ' === 0n) rt.div0(); ' + S(top - 3) + ' = rt.L(' + S(top - 3) + ' / ' + S(top - 1) + ');'; break;
+		case 0x71: line += 'if (' + S(top - 1) + ' === 0n) rt.div0(); ' + S(top - 3) + ' = rt.L(' + S(top - 3) + ' % ' + S(top - 1) + ');'; break;
+		case 0x75: line += S(top - 1) + ' = rt.L(-' + S(top - 1) + ');'; break;
+		case 0x79: line += S(top - 2) + ' = rt.L(' + S(top - 2) + ' << BigInt(' + S(top) + ' & 63));'; break;
+		case 0x7b: line += S(top - 2) + ' = ' + S(top - 2) + ' >> BigInt(' + S(top) + ' & 63);'; break;
+		case 0x7d: line += S(top - 2) + ' = rt.L(BigInt.asUintN(64, ' + S(top - 2) + ') >> BigInt(' + S(top) + ' & 63));'; break;
+		case 0x7f: line += S(top - 3) + ' = ' + S(top - 3) + ' & ' + S(top - 1) + ';'; break;
+		case 0x81: line += S(top - 3) + ' = ' + S(top - 3) + ' | ' + S(top - 1) + ';'; break;
+		case 0x83: line += S(top - 3) + ' = ' + S(top - 3) + ' ^ ' + S(top - 1) + ';'; break;
+		case 0x62: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ' + ' + S(top) + ');'; break;
+		case 0x66: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ' - ' + S(top) + ');'; break;
+		case 0x6a: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ' * ' + S(top) + ');'; break;
+		case 0x6e: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ' / ' + S(top) + ');'; break;
+		case 0x72: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ' % ' + S(top) + ');'; break;
+		case 0x76: line += S(top) + ' = -' + S(top) + ';'; break;
+		case 0x63: line += S(top - 3) + ' = ' + S(top - 3) + ' + ' + S(top - 1) + ';'; break;
+		case 0x67: line += S(top - 3) + ' = ' + S(top - 3) + ' - ' + S(top - 1) + ';'; break;
+		case 0x6b: line += S(top - 3) + ' = ' + S(top - 3) + ' * ' + S(top - 1) + ';'; break;
+		case 0x6f: line += S(top - 3) + ' = ' + S(top - 3) + ' / ' + S(top - 1) + ';'; break;
+		case 0x73: line += S(top - 3) + ' = ' + S(top - 3) + ' % ' + S(top - 1) + ';'; break;
+		case 0x77: line += S(top - 1) + ' = -' + S(top - 1) + ';'; break;
+		case 0x84: line += Lv(b[pc + 1]) + ' = (' + Lv(b[pc + 1]) + ' + ' + ((b[pc + 2] << 24) >> 24) + ') | 0;'; break;
+		case 0x85: line += S(top) + ' = BigInt(' + S(top) + ');'; break;
+		case 0x86: line += S(top) + ' = Math.fround(' + S(top) + ');'; break;
+		case 0x87: break;
+		case 0x88: line += S(top - 1) + ' = Number(BigInt.asIntN(32, ' + S(top - 1) + '));'; break;
+		case 0x89: line += S(top - 1) + ' = Math.fround(Number(' + S(top - 1) + '));'; break;
+		case 0x8a: line += S(top - 1) + ' = Number(' + S(top - 1) + ');'; break;
+		case 0x8b: line += S(top) + ' = rt.f2i(' + S(top) + ');'; break;
+		case 0x8c: line += S(top) + ' = rt.f2l(' + S(top) + ');'; break;
+		case 0x8d: break;
+		case 0x8e: line += S(top - 1) + ' = rt.f2i(' + S(top - 1) + ');'; break;
+		case 0x8f: line += S(top - 1) + ' = rt.f2l(' + S(top - 1) + ');'; break;
+		case 0x90: line += S(top - 1) + ' = Math.fround(' + S(top - 1) + ');'; break;
+		case 0x91: line += S(top) + ' = (' + S(top) + ' << 24) >> 24;'; break;
+		case 0x92: line += S(top) + ' = ' + S(top) + ' & 0xffff;'; break;
+		case 0x93: line += S(top) + ' = (' + S(top) + ' << 16) >> 16;'; break;
+		case 0x94: line += 'ta = ' + S(top - 3) + '; tv = ' + S(top - 1) + '; ' + S(top - 3) + ' = ta > tv ? 1 : ta < tv ? -1 : 0;'; break;
+		case 0x95: case 0x96:
+			line += 'ta = ' + S(top - 1) + '; tv = ' + S(top) + '; ' + S(top - 1) + ' = ta > tv ? 1 : ta < tv ? -1 : ta === tv ? 0 : ' + (op === 0x95 ? -1 : 1) + ';'; break;
+		case 0x97: case 0x98:
+			line += 'ta = ' + S(top - 3) + '; tv = ' + S(top - 1) + '; ' + S(top - 3) + ' = ta > tv ? 1 : ta < tv ? -1 : ta === tv ? 0 : ' + (op === 0x97 ? -1 : 1) + ';'; break;
+		case 0x99: line += br(S(top) + ' === 0', pc); break;
+		case 0x9a: line += br(S(top) + ' !== 0', pc); break;
+		case 0x9b: line += br(S(top) + ' < 0', pc); break;
+		case 0x9c: line += br(S(top) + ' >= 0', pc); break;
+		case 0x9d: line += br(S(top) + ' > 0', pc); break;
+		case 0x9e: line += br(S(top) + ' <= 0', pc); break;
+		case 0x9f: case 0xa5: line += br(S(top - 1) + ' === ' + S(top), pc); break;
+		case 0xa0: case 0xa6: line += br(S(top - 1) + ' !== ' + S(top), pc); break;
+		case 0xa1: line += br(S(top - 1) + ' < ' + S(top), pc); break;
+		case 0xa2: line += br(S(top - 1) + ' >= ' + S(top), pc); break;
+		case 0xa3: line += br(S(top - 1) + ' > ' + S(top), pc); break;
+		case 0xa4: line += br(S(top - 1) + ' <= ' + S(top), pc); break;
+		case 0xc6: line += br('(' + S(top) + ' === null || ' + S(top) + ' === undefined)', pc); break;
+		case 0xc7: line += br('(' + S(top) + ' !== null && ' + S(top) + ' !== undefined)', pc); break;
+		case 0xa7: line += jumpTo(pc + s2(b, pc + 1), pc); break;
+		case 0xc8: line += jumpTo(pc + s4(b, pc + 1), pc); break;
+		case 0xaa: {
+			var o = (pc + 4) & ~3, lo = s4(b, o + 4), hi = s4(b, o + 8);
+			line += 'switch (' + S(top) + ') { ';
+			for (var k = 0; k <= hi - lo; k++) line += 'case ' + (lo + k) + ': ' + jumpTo(pc + s4(b, o + 12 + k * 4), pc) + ' ';
+			line += 'default: ' + jumpTo(pc + s4(b, o), pc) + ' }';
+			break;
+		}
+		case 0xab: {
+			var o2 = (pc + 4) & ~3, np = s4(b, o2 + 4);
+			line += 'switch (' + S(top) + ') { ';
+			for (var k2 = 0; k2 < np; k2++) line += 'case ' + s4(b, o2 + 8 + k2 * 8) + ': ' + jumpTo(pc + s4(b, o2 + 12 + k2 * 8), pc) + ' ';
+			line += 'default: ' + jumpTo(pc + s4(b, o2), pc) + ' }';
+			break;
+		}
+		case 0xac: case 0xae: case 0xb0: line += 'return ' + S(top) + ';'; break;
+		case 0xad: case 0xaf: line += 'return ' + S(top - 1) + ';'; break;
+		case 0xb1: line += 'return undefined;'; break;
+		case 0xb2: case 0xb3: {
+			e = cp[u2(b, pc + 1)];
+			var ek = K(e);
+			line += 'tf = ' + ek + '.$f || (' + ek + '.$f = rt.resolveStatic(' + ek + ')); if (tf.owner.initState !== 2) vm.initClass(tf.owner); ';
+			if (op === 0xb2) line += S(d) + ' = tf.missing ? rt.defaultOf(' + q(e.desc) + ') : tf.owner.statics[' + q(e.name) + '];';
+			else line += 'if (!tf.missing) tf.owner.statics[' + q(e.name) + '] = ' + S(isWide(e.desc) ? top - 1 : top) + ';';
+			break;
+		}
+		case 0xb4: {
+			e = cp[u2(b, pc + 1)];
+			line += 'to = ' + S(top) + '; if (to === null || to === undefined) rt.npe(' + q('reading ' + e.name) + '); tv = to[' + q(':' + e.name) + ']; ' +
+				'if (tv === undefined) tv = typeof to === "string" ? rt.stringField(to, ' + q(e.name) + ') : rt.defaultOf(' + q(e.desc) + '); ' + S(top) + ' = tv;';
+			break;
+		}
+		case 0xb5: {
+			e = cp[u2(b, pc + 1)];
+			var wide = isWide(e.desc), objS = S(wide ? top - 2 : top - 1), valS2 = S(wide ? top - 1 : top);
+			line += 'to = ' + objS + '; if (to === null || to === undefined) rt.npe(' + q('writing ' + e.name) + '); to[' + q(':' + e.name) + '] = ' + (e.desc === 'Z' ? '(' + valS2 + ' ? 1 : 0)' : valS2) + ';';
+			break;
+		}
+		case 0xb6: case 0xb7: case 0xb8: case 0xb9: {
+			e = cp[u2(b, pc + 1)];
+			sig = parseDesc(e.desc);
+			var aw = 0; sig.args.forEach(function (t) { aw += isWide(t) ? 2 : 1; });
+			var base = d - aw, argv = [], slot = base;
+			sig.args.forEach(function (t) { argv.push(S(slot)); slot += isWide(t) ? 2 : 1; });
+			var args = '[' + argv.join(', ') + ']';
+			var ek2 = K(e), site = K({ c: null, m: null });
+			var res = sig.ret === 'V' ? null : (op === 0xb8 ? S(base) : S(base - 1));
+			var call;
+			if (op === 0xb8) {
+				line += 'tm = ' + ek2 + '.$m || (' + ek2 + '.$m = rt.resolveStaticMethod(' + ek2 + ')); if (tm !== rt.MISSING && tm.cls.initState !== 2) vm.initClass(tm.cls); ';
+				call = 'tm === rt.MISSING ? vm.unpluggedValue(' + q(sig.ret) + ', null) : (tm.fn ? tm.fn(vm, null, ' + args + ') : vm.invoke(tm, null, ' + args + '))';
+			} else {
+				var recvS = S(base - 1);
+				line += 'to = ' + recvS + '; if (to === null || to === undefined) rt.npe(' + q('calling ' + e.name) + '); ';
+				if (op === 0xb7) line += 'tm = ' + ek2 + '.$m || (' + ek2 + '.$m = rt.resolveSpecial(' + ek2 + ')); ';
+				else line += 'tc = typeof to === "string" ? rt.strCls() : to.cls; if (tc !== ' + site + '.c) { ' + site + '.m = tc.findMethod(' + q(e.name + e.desc) + ') || rt.missing(tc, ' + ek2 + '); ' + site + '.c = tc; } tm = ' + site + '.m; ';
+				call = 'tm === rt.MISSING ? vm.unpluggedValue(' + q(sig.ret) + ', to) : (tm.fn ? tm.fn(vm, to, ' + args + ') : vm.invoke(tm, to, ' + args + '))';
+			}
+			if (res) {
+				line += 'tv = ' + call + '; ';
+				if (sig.ret === 'Z') line += 'if (typeof tv === "boolean") tv = tv ? 1 : 0; ';
+				line += res + ' = tv === undefined ? rt.defaultOf(' + q(sig.ret) + ') : tv;';
+			} else line += call + ';';
+			break;
+		}
+		case 0xba: {
+			e = cp[u2(b, pc + 1)];
+			sig = parseDesc(e.desc);
+			var aw2 = 0; sig.args.forEach(function (t) { aw2 += isWide(t) ? 2 : 1; });
+			var base2 = d - aw2, argv2 = [], slot2 = base2;
+			sig.args.forEach(function (t) { argv2.push(S(slot2)); slot2 += isWide(t) ? 2 : 1; });
+			var sk = K({ site: null, e: e });
+			line += 'ts = ' + sk + '.site || (' + sk + '.site = JVM.linkIndy(vm, ' + K(m.cls) + ', ' + sk + '.e)); tv = ts([' + argv2.join(', ') + ']);';
+			if (sig.ret !== 'V') line += ' ' + S(base2) + ' = tv;';
+			break;
+		}
+		case 0xbb: { e = cp[u2(b, pc + 1)]; var ck = K(e); line += S(d) + ' = vm.newObject(' + ck + '.$c || (' + ck + '.$c = vm.loadClass(' + q(e.v) + ')));'; break; }
+		case 0xbc: line += S(top) + ' = vm.newArray(' + q(ARRAY_TYPES[b[pc + 1]]) + ', ' + S(top) + ');'; break;
+		case 0xbd: { e = cp[u2(b, pc + 1)]; line += S(top) + ' = vm.newArray(' + q(e.v[0] === '[' ? e.v : 'L' + e.v + ';') + ', ' + S(top) + ');'; break; }
+		case 0xbe: line += 'if (' + S(top) + ' === null) rt.npe("array length"); ' + S(top) + ' = ' + S(top) + '.a.length;'; break;
+		case 0xbf: line += 'if (' + S(top) + ' === null) rt.npe("throw null"); throw new rt.JavaThrow(' + S(top) + ');'; break;
+		case 0xc0: { e = cp[u2(b, pc + 1)]; var ck2 = K(e); line += 'if (' + S(top) + ' !== null && ' + S(top) + ' !== undefined) rt.cast(' + S(top) + ', ' + ck2 + '.$c || (' + ck2 + '.$c = vm.loadClass(' + q(e.v) + ')));'; break; }
+		case 0xc1: { e = cp[u2(b, pc + 1)]; var ck3 = K(e); line += S(top) + ' = vm.isInstance(' + S(top) + ', ' + ck3 + '.$c || (' + ck3 + '.$c = vm.loadClass(' + q(e.v) + '))) ? 1 : 0;'; break; }
+		case 0xc2: case 0xc3: break;
+		case 0xc4: {
+			var wop = b[pc + 1], idx = u2(b, pc + 2);
+			if (wop === 0x15 || wop === 0x16 || wop === 0x17 || wop === 0x18 || wop === 0x19) line += S(d) + ' = ' + Lv(idx) + ';';
+			else if (wop === 0x36 || wop === 0x38 || wop === 0x3a) line += Lv(idx) + ' = ' + S(top) + ';';
+			else if (wop === 0x37 || wop === 0x39) line += Lv(idx) + ' = ' + S(top - 1) + ';';
+			else if (wop === 0x84) line += Lv(idx) + ' = (' + Lv(idx) + ' + ' + s2(b, pc + 4) + ') | 0;';
+			if (idx + 2 > maxL) maxL = idx + 2;
+			break;
+		}
+		case 0xc5: {
+			e = cp[u2(b, pc + 1)];
+			var dims = b[pc + 3], cnt = [];
+			for (var z = 0; z < dims; z++) cnt.push(S(d - dims + z));
+			line += S(d - dims) + ' = rt.multi(' + q(e.v) + ', [' + cnt.join(', ') + '], 0);';
+			break;
+		}
+		default: return null;
+		}
+		out.push('\t' + line);
+	}
+	var decl = ['var pc = 0, cpc = 0, ta, ti, tv, to, tc, tm, tf, ts;'];
+	var ss = []; for (var si = 0; si < maxS + 2; si++) ss.push('s' + si);
+	decl.push('var ' + ss.join(', ') + ';');
+	var ls = []; for (var li = 0; li < maxL + 2; li++) ls.push('l' + li);
+	decl.push('var ' + ls.join(', ') + ';');
+	var init = [], slotN = 0;
+	if (!m.isStatic) init.push('l0 = self;'), slotN = 1;
+	m.sig.args.forEach(function (t, i) { init.push('l' + slotN + ' = args[' + i + '];'); slotN += isWide(t) ? 2 : 1; });
+	var body = out.join('\n');
+	var src =
+		decl.join('\n') + '\n' + init.join(' ') + '\n' +
+		'var frames = vm.frames || (vm.frames = []), frame = { m: M, pc: 0 }; frames.push(frame);\n' +
+		'try {\n' +
+		'loop: for (;;) {\n' +
+		(hasHandlers ? 'try {\n' : '') +
+		'switch (pc) {\n' + body + '\n' +
+		'default: throw new Error("jit: bad pc " + pc);\n' +
+		'}\n' +
+		(hasHandlers ?
+			'} catch (ex) {\n' +
+			'  if (ex && ex.vmStop) throw ex;\n' +
+			'  var je = vm.toJava(ex); var h = rt.findHandler(CODE, cpc, je.obj);\n' +
+			'  if (h < 0) throw je;\n' +
+			'  s0 = je.obj; pc = h; continue loop;\n' +
+			'}\n' : '') +
+		'}\n' +
+		'} catch (ex0) { if (ex0 && ex0.vmStop) throw ex0; throw vm.toJava(ex0); }\n' +
+		'finally { frame.pc = cpc; frames.pop(); }\n';
+	var names = ['vm', 'rt', 'JVM', 'M', 'CODE'], vals = [vm, null, JVM, m, code];
+	consts.forEach(function (c, i) { names.push('k' + i); vals.push(c); });
+	var factory;
+	try {
+		factory = new Function(names.join(', '), 'return function jit_' + (m.name.replace(/[^A-Za-z0-9_]/g, '_')) + '(vm, self, args) {\n' + src + '};');
+	} catch (err) {
+		if (vm.jitLog) vm.jitLog('jit: ' + m.cls.name + '.' + m.name + m.desc + ' did not build: ' + err.message);
+		return null;
+	}
+	vals[1] = rtOf(vm);
+	return factory.apply(null, vals);
+}
+
+function rtOf(vm) {
+	if (vm.$jitRT) return vm.$jitRT;
+	var rt = makeRT(vm), h = JVM.interpHelpers;
+	rt.MISSING = h.MISSING;
+	rt.resolveStatic = function (e) { return h.resolveStatic(vm, e); };
+	rt.resolveStaticMethod = function (e) { return h.resolveStaticMethod(vm, e); };
+	rt.resolveSpecial = function (e) { return h.resolveSpecial(vm, e); };
+	rt.missing = function (c, e) { return h.missing(vm, c, e); };
+	var sc = null;
+	rt.strCls = function () { return sc || (sc = vm.loadClass('java/lang/String')); };
+	return (vm.$jitRT = rt);
+}
+
+JVM.jit = true;
+JVM.jitThreshold = 1;
+JVM.tryJit = function (vm, m) {
+	if (!JVM.jit || m.$noJit || m.fn) return;
+	if (m.name === '<clinit>') { m.$noJit = true; return; }
+	if (++m.$calls < JVM.jitThreshold) return;
+	m.$noJit = true;
+	var f = null;
+	try { f = compile(vm, m); } catch (err) { f = null; if (vm.jitLog) vm.jitLog('jit: ' + m.cls.name + '.' + m.name + ' failed: ' + err.message); }
+	if (f) { m.fn = f; m.$jitted = true; JVM.jitCount = (JVM.jitCount | 0) + 1; }
+};
+JVM.jitCompile = compile;
 })();
 
 (function () {
@@ -5474,6 +5991,7 @@ JVM.collectContent = function (vm, modId) {
 		var b = r.blocks[idS], id = +idS;
 		if (b.$mod !== modId || b.$override) return;
 		safe(function () { vm.callVirtual(b, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [icons]); });
+		if (stFiles && JVM.stationConnected && safe(function () { return JVM.stationConnected(vm, b, stFiles); }, false)) b.$stConnected = true;
 		JVM.variantsOf(vm, b).forEach(function (meta) { blockEntry(b, id, meta); });
 	});
 	function blockEntry(b, id, meta) {
@@ -5519,7 +6037,13 @@ JVM.collectContent = function (vm, modId) {
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
-		if (stFiles && JVM.stationModel && b.$stStates) {
+		if (stFiles && JVM.stationModel && b.$stConnected) {
+			var cm = safe(function () { return JVM.stationModel(vm, b, stFiles, 'connect'); }, null);
+			if (cm) {
+				json.model = cm.model;
+				cm.textures.forEach(function (t) { out.textures['blocks/' + t.name] = t; });
+			}
+		} else if (stFiles && JVM.stationModel && b.$stStates) {
 			var def0 = JVM.stationState.metaOf(JVM.stationState.defaultOf(vm, b));
 			var ssm = safe(function () { return JVM.stationModel(vm, b, stFiles, meta); }, null);
 			if (ssm) {
@@ -5720,7 +6244,7 @@ JVM.variantsOf = function (vm, o) {
 	var out = [0];
 	o.$variants = out;
 	var isBlock = vm.isInstance(o, vm.loadClass(SRC + 'Block'));
-	if (isBlock && o.$stId && JVM.stationState && vm.$tag === 'babric') {
+	if (isBlock && o.$stId && JVM.stationState && vm.$tag === 'babric' && !o.$stConnected) {
 		var n = 0;
 		JVM.run(vm, function () { n = JVM.stationState.stateCount(vm, o); });
 		if (n > 1) {
@@ -11257,6 +11781,7 @@ JVM.stationModel = function (vm, o, files, stateIdx) {
 	if (!id || !files) return null;
 	var p = String(id).split(':');
 	var bs = json(files, 'assets/' + p[0] + '/stationapi/blockstates/' + p[1] + '.json');
+	if (stateIdx === 'connect' && bs) return connectedModel(vm, o, files, bs);
 	if (stateIdx != null && bs) return stateModel(vm, o, files, bs, stateIdx | 0);
 	var ref = null, facing = false;
 	if (bs && bs.variants) {
@@ -11350,6 +11875,64 @@ function turnElementsY(els, quarter) {
 		}
 		return out;
 	});
+}
+var CONN_KEYS = { north: 1, south: 2, west: 4, east: 8, up: 16, waterlogged: 0 };
+var CONN_NAMES = { 1: 'north', 2: 'south', 4: 'west', 8: 'east', 16: 'up' };
+JVM.stationConnected = function (vm, o, files) {
+	var id = o && o.$stId;
+	if (!id || !files || !JVM.stationState) return false;
+	var p = String(id).split(':');
+	var bs = json(files, 'assets/' + p[0] + '/stationapi/blockstates/' + p[1] + '.json');
+	if (!bs || !Array.isArray(bs.multipart)) return false;
+	var mgr = JVM.stationState.managerOf(vm, o);
+	if (!mgr.$props.length || !mgr.$props.every(function (pr) { return CONN_KEYS[pr.$name] !== undefined; })) return false;
+	return bs.multipart.every(function (part) {
+		var w = part && part.when;
+		if (!w) return true;
+		var alts = Array.isArray(w.OR) ? w.OR : Array.isArray(w.AND) ? w.AND : [w];
+		return alts.every(function (x) { return Object.keys(x || {}).every(function (k) { return CONN_KEYS[k] !== undefined; }); });
+	});
+};
+function connectedModel(vm, o, files, bs) {
+	var els = [], textures = {}, entries = [];
+	bs.multipart.forEach(function (part, i) {
+		if (!part) return;
+		var ap = Array.isArray(part.apply) ? part.apply[0] : part.apply;
+		if (!ap || !ap.model) return;
+		var w = part.when;
+		var alts = !w ? [{}] : Array.isArray(w.OR) ? w.OR : [w];
+		var pt = modelTextures(files, ap.model, 0), pe = elementsOf(files, pt);
+		if (!pe) return;
+		var pre = 'p' + i + '_';
+		Object.assign(textures, inlineTextures(files, pe.t, entries, pre));
+		alts.forEach(function (alt) {
+			var need = 0, needNot = 0, skip = false;
+			Object.keys(alt || {}).forEach(function (k) {
+				var bit = CONN_KEYS[k];
+				if (!bit) return;
+				var vals = String(alt[k]).toLowerCase().split('|');
+				if (vals.every(function (v) { return v === 'tall'; })) { skip = true; return; }
+				if (vals.some(function (v) { return v === 'true' || v === 'low' || v === 'side' || v === 'up'; })) need |= bit;
+				else if (vals.every(function (v) { return v === 'false' || v === 'none'; })) needNot |= bit;
+			});
+			if (skip) return;
+			var connect = null;
+			[1, 2, 4, 8, 16].forEach(function (bit) {
+				if (need & bit) (connect = connect || {})[CONN_NAMES[bit]] = true;
+				else if (needNot & bit) (connect = connect || {})[CONN_NAMES[bit]] = false;
+			});
+			var mine = pe.elements.map(function (e) {
+				var faces = {};
+				Object.keys(e.faces || {}).forEach(function (k) { var fc = Object.assign({}, e.faces[k]); if (typeof fc.texture === 'string' && fc.texture[0] === '#') fc.texture = '#' + pre + fc.texture.slice(1); faces[k] = fc; });
+				var ne = Object.assign({}, e, { faces: faces });
+				if (connect) ne.connect = connect;
+				return ne;
+			});
+			els = els.concat(turnElementsY(mine, Math.round((ap.y | 0) / 90)));
+		});
+	});
+	if (!els.length) return null;
+	return { model: { textures: textures, elements: els }, rotation: null, textures: entries };
 }
 function stateModel(vm, o, files, bs, idx) {
 	var props = JVM.stationState.propsOf(vm, o, idx), entries = [];
@@ -12356,6 +12939,14 @@ function install(vm) {
 	} });
 	def(SRC + 'MapGenCaves', { super: SRC + 'MapGenBase' });
 
+	if (!vm.natives[SRC + 'Vec3D']) def(SRC + 'Vec3D', { fields: { xCoord: 'D', yCoord: 'D', zCoord: 'D' }, methods: {
+		'addVector(DDD)Lnet/minecraft/src/Vec3D;': function (vm, self, a) { return vec3d(vm, self[':xCoord'] + a[0], self[':yCoord'] + a[1], self[':zCoord'] + a[2]); },
+		'lengthVector()D': function (vm, self) { return Math.sqrt(self[':xCoord'] * self[':xCoord'] + self[':yCoord'] * self[':yCoord'] + self[':zCoord'] * self[':zCoord']); },
+	}, staticMethods: {
+		'createVector(DDD)Lnet/minecraft/src/Vec3D;': function (vm, n, a) { return vec3d(vm, a[0], a[1], a[2]); },
+		'createVectorHelper(DDD)Lnet/minecraft/src/Vec3D;': function (vm, n, a) { return vec3d(vm, a[0], a[1], a[2]); },
+	} });
+
 	var WP = vm.natives[SRC + 'WorldProvider'];
 	if (WP) WP.methods = Object.assign({}, WP.methods, {
 		'<init>()V': function (vm, self) { self[':lightBrightnessTable'] = vm.newArray('F', 16); },
@@ -12377,6 +12968,12 @@ function install(vm) {
 			return Math.fround(f1 + (f - f1) / 3);
 		},
 		'getCloudHeight()F': function () { return 108; },
+		'func_4096_a(FF)Lnet/minecraft/src/Vec3D;': function (vm, self, a) {
+			var f = Math.cos(a[0] * Math.PI * 2) * 2 + 0.5;
+			if (f < 0) f = 0; if (f > 1) f = 1;
+			return vec3d(vm, 0.7529412 * (f * 0.94 + 0.06), 0.84705883 * (f * 0.94 + 0.06), 1 * (f * 0.91 + 0.09));
+		},
+		'calcSunriseSunsetColors(FF)[F': function () { return null; },
 		'canRespawnHere()Z': function () { return 1; },
 		'canCoordinateBeSpawn(II)Z': function () { return 1; },
 		'func_28112_c()Z': function () { return 1; },
@@ -12451,6 +13048,7 @@ function contentKeyOf(vm, javaKey) {
 	return c ? (c.$mod || '') + ':' + keyName(javaKey.split(':').pop()) : null;
 }
 
+function vec3d(vm, x, y, z) { var v = vm.newObject(vm.loadClass(SRC + 'Vec3D')); v[':xCoord'] = x; v[':yCoord'] = y; v[':zCoord'] = z; return v; }
 function callNamed(vm, o, names, args) {
 	var descs = ['(FF)Lnet/minecraft/src/Vec3D;', '(FF)Lnet/minecraft/src/Vec3;'];
 	for (var i = 0; i < names.length; i++) for (var j = 0; j < descs.length; j++) {
@@ -12490,6 +13088,15 @@ JVM.collectDims = function (vm, modId, safe) {
 				var h = function (v) { return ('0' + Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)).slice(-2); };
 				j.fog_color = '#' + h(fog[':xCoord']) + h(fog[':yCoord']) + h(fog[':zCoord']);
 			}
+			var lang = reg(vm).lang || {};
+			var msg = function (m) {
+				var k = safe(function () { return dim.cls.findMethod(m + '()Ljava/lang/String;') ? vm.callVirtual(dim, m, '()Ljava/lang/String;', []) : null; }, null);
+				if (!k) return null;
+				return lang[k] || lang[String(k).replace(/:/g, '\\:')] || null;
+			};
+			var em = msg('getEnteringTranslationKey'), lm = msg('getLeavingTranslationKey');
+			if (em) j.entering_message = em;
+			if (lm) j.leaving_message = lm;
 			var rs = safe(function () { return vm.callVirtual(dim, 'canRespawnHere', '()Z', []); }, 0);
 			if (rs) j.respawn = false;
 		}

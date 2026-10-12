@@ -1775,7 +1775,10 @@ M	net/minecraft/class_97	method_1256	(IIF)V	method_1256	drawScreen
 M	net/minecraft/class_97	method_1259	(Lnet/minecraft/class_33;)V	method_1259	actionPerformed
 M	net/minecraft/class_138	method_1281	()Z	method_1281	isBurning
 M	net/minecraft/class_26	method_1292	()V	method_1292	initialize
+M	net/minecraft/class_26	method_1293	(DDD)Lnet/minecraft/class_26;	method_1293	createVectorHelper
+M	net/minecraft/class_26	method_1297	(DDD)Lnet/minecraft/class_26;	method_1297	createVector
 M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
+M	net/minecraft/class_26	method_1301	(DDD)Lnet/minecraft/class_26;	method_1301	addVector
 M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
 M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
 M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
@@ -1855,6 +1858,8 @@ M	net/minecraft/class_257	method_1702	()Z	method_1702	isValid
 M	net/minecraft/class_257	method_1703	(III)I	method_1703	getNibble
 M	net/minecraft/class_257	method_1704	(IIII)V	method_1704	setNibble
 M	net/minecraft/class_52	method_1734	(Lnet/minecraft/class_50;)Lnet/minecraft/class_243;	method_1734	getChunkLoader
+M	net/minecraft/class_50	method_1761	(FF)[F	method_1761	calcSunriseSunsetColors
+M	net/minecraft/class_50	method_1762	(FF)Lnet/minecraft/class_26;	method_1762	func_4096_a
 M	net/minecraft/class_50	method_1763	()Z	method_1763	func_28112_c
 M	net/minecraft/class_50	method_1764	()F	method_1764	getCloudHeight
 M	net/minecraft/class_50	method_1765	()V	method_1765	generateLightBrightnessTable

@@ -2331,6 +2331,7 @@ F	zc	B	field_76803_B	grassPerChunk
 F	zc	e	field_76812_e	biome
 F	zc	z	field_76832_z	treesPerChunk
 M	aaq	a	()V	func_76556_a	generateLightBrightnessTable
+M	aaq	a	(FF)[F	func_76560_a	calcSunriseSunsetColors
 M	aaq	a	(II)Z	func_76566_a	canCoordinateBeSpawn
 M	aaq	a	(JF)F	func_76563_a	calculateCelestialAngle
 M	aaq	a	(Lyc;)V	func_76558_a	registerWorld

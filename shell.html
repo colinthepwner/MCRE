@@ -3741,7 +3741,9 @@
                     lines.push(['dimension', key, id, terrain, name, colourOf(j.sky_color, d.mod, d.file, 'sky_color'), colourOf(j.fog_color, d.mod, d.file, 'fog_color'),
                                 j.ceiling ? 1 : 0, num(j.light, j.ceiling ? 0.2 : 0.05, 0, 1), t, layers.join(',') || '-', num(j.scale, 1, 0.01, 100),
                                 j.arrival_block ? (ref(j.arrival_block, d.mod, d.file) || '-') : '-', j.mobs === false ? 0 : 1, j.respawn ? 1 : 0,
-                                j.clouds === false ? 0 : 1].join('\t'));
+                                j.clouds === false ? 0 : 1,
+                                String(j.entering_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-',
+                                String(j.leaving_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-'].join('\t'));
                 });
                 var dimRef = function (v, mod) { v = String(v || '').toLowerCase(); return dimIds[v] || dimIds[mod + ':' + v] || 0; };
                 contentKeys = {};
@@ -3991,6 +3993,12 @@
                     var out = [], num = function (v) { return Math.round(v * 1000) / 1000; };
                     rm.elements.slice(0, 256).forEach(function (el) {
                         if (!el || !Array.isArray(el.from) || !Array.isArray(el.to)) return;
+                        var CB = { north: 1, south: 2, west: 4, east: 8, up: 16 }, need = 0, needNot = 0;
+                        if (el.connect && typeof el.connect === 'object') Object.keys(el.connect).forEach(function (k) {
+                            var bit = CB[String(k).toLowerCase()];
+                            if (!bit) return;
+                            if (el.connect[k]) need |= bit; else needNot |= bit;
+                        });
                         var a = el.from.map(Number), b = el.to.map(Number);
                         var x0 = a[0], y0 = a[1], z0 = a[2], x1 = b[0], y1 = b[1], z1 = b[2];
                         var ro = el.rotation, rot = null;
@@ -4034,6 +4042,7 @@
                                 if (vx || vy) p = vturn(p);
                                 parts.push(num(p[0]), num(p[1]), num(p[2]), num(t[0]), num(t[1]));
                             }
+                            if (need || needNot) parts.push(need, needNot);
                             out.push(parts.join(','));
                         });
                     });

@@ -2608,6 +2608,7 @@ M	acq	k	()I	func_76737_k	getBiomeGrassColor
 M	acq	l	()I	func_76726_l	getBiomeFoliageColor
 M	acq	m	()Lacq;	func_76745_m	setDisableRain
 M	aei	a	()V	func_76556_a	generateLightBrightnessTable
+M	aei	a	(FF)[F	func_76560_a	calcSunriseSunsetColors
 M	aei	a	(II)Z	func_76566_a	canCoordinateBeSpawn
 M	aei	a	(JF)F	func_76563_a	calculateCelestialAngle
 M	aei	a	(Labw;)V	func_76558_a	registerWorld
