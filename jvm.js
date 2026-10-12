@@ -6241,7 +6241,10 @@ JVM.collectContent = function (vm, modId) {
 				var it2 = stackRef(args[i + 1]);
 				if (it2) key[ch] = it2;
 			}
-			if (rows.length && rows.every(function (r) { return typeof r === 'string'; })) out.recipes.push({ type: 'shaped', pattern: rows, key: key, result: res, count: count });
+			if (rows.length && rows.every(function (r) { return typeof r === 'string'; })) {
+				rows = rows.map(function (r) { return r.split('').map(function (c) { return c === ' ' || key[c] ? c : ' '; }).join(''); });
+				if (rows.some(function (r) { return /[^ ]/.test(r); })) out.recipes.push({ type: 'shaped', pattern: rows, key: key, result: res, count: count });
+			}
 			else vm.warnOnce('recipe:shape:' + modId, 'a crafting recipe in an unexpected form was left out');
 		} else {
 			var flat = rc.args.length === 1 && rc.args[0] instanceof JVM.JArray && rc.args[0].cls.name === '[Ljava/lang/Object;' ? Array.prototype.slice.call(rc.args[0].a) : rc.args;

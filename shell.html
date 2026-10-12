@@ -2534,8 +2534,8 @@
                 try { return JSON.parse(new TextDecoder().decode(FS.readFile(STATE))); } catch (e) { return { order: [], enabled: {} }; }
             }
             function writeState() {
-                var s = { order: mods.map(function (x) { return x.id; }), enabled: {} };
-                mods.forEach(function (x) { s.enabled[x.id] = !!x.enabled; });
+                var s = { order: mods.map(function (x) { return x.id; }), enabled: {}, support: supportSeen || readState().support || {}, onAt: {} };
+                mods.forEach(function (x) { s.enabled[x.id] = !!x.enabled; if (x.onAt) s.onAt[x.id] = x.onAt; });
                 try { FS.mkdirTree(LIB); FS.writeFile(STATE, JSON.stringify(s)); } catch (e) { console.warn('[mods] state', e); }
                 if (Module._syncSaves) Module._syncSaves();
             }
@@ -2677,7 +2677,8 @@
                 return { id: id, name: str(m.name, 48) || base.slice(0, 48) || id, version: str(m.version, 16), author: str(m.author, 48),
                          description: str(m.description, 4000), notes: notes,
                          deps: depsOf(m, notes), settings: settingsDeclOf(m, notes),
-                         devices: devicesOf(m, notes, !!files['manifest.json']) };
+                         devices: devicesOf(m, notes, !!files['manifest.json']),
+                         java: Object.keys(files).some(function (k) { return /[.]class$/i.test(k); }) };
             }
             function devicesOf(m, notes, hasManifest) {
                 var raw = m.devices !== undefined ? m.devices : m.device !== undefined ? m.device : m.platform !== undefined ? m.platform : m.platforms;
@@ -3003,6 +3004,7 @@
                     });
                     Object.keys(found).forEach(function (id) {
                         if (st.enabled && id in st.enabled) found[id].enabled = !!st.enabled[id];
+                        if (st.onAt && st.onAt[id]) found[id].onAt = st.onAt[id];
                     });
                     var order = (st.order || []).filter(function (id) { return found[id]; });
                     Object.keys(found).sort().forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
@@ -3102,19 +3104,19 @@
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
                 if (Module.mcJava) Module.mcJava.begin();
                 var javaFiles = {};
+                var rankOf = function (x) { return x.justAdded ? -1e15 : -(x.onAt || 0) * 1000 + mods.indexOf(x); };
                 var javaPick = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
                         if (Module.mcJava.hasClasses(files)) javaFiles[cid(x)] = { x: x, files: files };
                     }, function () { });
                 }, Promise.resolve()).then(function () {
-                    var rankOf = function (x) { return x.justAdded ? -1 : mods.indexOf(x); };
                     var list = Object.keys(javaFiles).map(function (id) { return { id: id, files: javaFiles[id].files, rank: rankOf(javaFiles[id].x) }; });
                     return Module.mcJava.pickTag(list);
                 }).then(function (pick) {
                     if (!pick || !pick.losers.length || session) return;
-                    var top = Object.keys(javaFiles).map(function (id) { return javaFiles[id].x; }).sort(function (a, b) { return (a.justAdded ? -1 : mods.indexOf(a)) - (b.justAdded ? -1 : mods.indexOf(b)); })[0];
-                    if (!top || !top.justAdded) return;
+                    var top = Object.keys(javaFiles).map(function (id) { return javaFiles[id].x; }).sort(function (a, b) { return rankOf(a) - rankOf(b); })[0];
+                    if (!top) return;
                     var names = [];
                     pick.losers.forEach(function (id) { var lx = javaFiles[id] && javaFiles[id].x; if (lx && lx.enabled) { lx.enabled = false; names.push(lx.m && lx.m.name || id); delete javaFiles[id]; } });
                     on = on.filter(function (x) { return x.enabled; });
@@ -4709,6 +4711,20 @@
             };
             api.version = function () { return version; };
             api.status = function () { return status; };
+            var supportSeen = null;
+            function supportOf(x, probs) {
+                if (!supportSeen) { try { supportSeen = readState().support || {}; } catch (e) { supportSeen = {}; } }
+                if (x.err) return 0;
+                var id = cid(x), rep = Module.mcJava && Module.mcJava.reportOf ? Module.mcJava.reportOf(id) : null;
+                if (rep && rep.status) supportSeen[id] = rep.status === 'cant' ? 0 : rep.status === 'partly' ? 1 : 2;
+                else if (/^(Java|Forge|Babric|ModLoader|Jar) mod\b/.test(x.contents || '')) {
+                    var c = x.contents;
+                    supportSeen[id] = /Can't run/.test(c) ? 0 : /Partly works/.test(c) ? 1 : /- Works\b/.test(c) ? 2 : supportSeen[id];
+                }
+                if (supportSeen[id] != null) return supportSeen[id];
+                if (x.m && x.m.java) return '';
+                return probs && probs.length && x.enabled ? 1 : 2;
+            }
             api.list = function () {
                 var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
                 var desc = function (s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/\n/g, '\x1f').slice(0, 4000); };
@@ -4718,7 +4734,7 @@
                         .concat((problems[cid(x)] || []).map(function (p) { return (p.file ? p.file + ': ' : '') + p.text; }));
                     return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
                         .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
-                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '']).join('\t');
+                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '', supportOf(x, probs)]).join('\t');
                 }).join('\n');
             };
             function modsOn() {
@@ -4805,7 +4821,7 @@
                 var i = find(id);
                 if (i < 0 || mods[i].err) return;
                 mods[i].enabled = !mods[i].enabled;
-                if (mods[i].enabled) { mods.forEach(function (x) { x.justAdded = false; }); mods[i].justAdded = true; }
+                if (mods[i].enabled) { mods.forEach(function (x) { x.justAdded = false; }); mods[i].justAdded = true; mods[i].onAt = Date.now(); }
                 var turned = [];
                 (function need(x, seen) {
                     if (seen[x.id]) return;
@@ -5078,7 +5094,7 @@
                         FS.writeFile(LIB + '/' + m.id + '.zip', bytes);
                         if (i >= 0) mods.splice(i, 1);
                         mods.forEach(function (x) { x.justAdded = false; });
-                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m), justAdded: true });
+                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m), justAdded: true, onAt: Date.now() });
                         writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
                         return Promise.resolve(reapply(true)).then(function () { return true; });
                     });
