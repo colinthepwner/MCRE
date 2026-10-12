@@ -1119,6 +1119,7 @@ F	net/minecraft/class_57	field_1632	field_1632	width
 F	net/minecraft/class_57	field_1633	field_1633	height
 F	net/minecraft/class_57	field_1640	field_1640	ySize
 F	net/minecraft/class_57	field_1644	field_1644	rand
+F	net/minecraft/class_57	field_1646	field_1646	fireResistance
 F	net/minecraft/class_57	field_1647	field_1647	fire
 F	net/minecraft/class_413	field_1662	field_1662	gameSettings
 F	net/minecraft/class_414	field_1663	field_1663	entityId
@@ -1332,6 +1333,7 @@ F	net/minecraft/class_534	field_2231	field_2231	x
 F	net/minecraft/class_534	field_2232	field_2232	y
 F	net/minecraft/class_534	field_2233	field_2233	z
 F	net/minecraft/class_519	field_2235	field_2235	temperature
+F	net/minecraft/class_519	field_2236	field_2236	humidity
 F	net/minecraft/class_538	field_2254	field_2254	rand
 F	net/minecraft/class_538	field_2260	field_2260	worldObj
 F	net/minecraft/class_549	field_2276	field_2276	fuel
@@ -1402,6 +1404,9 @@ F	net/minecraft/class_598	field_2594	field_2594	instance
 F	net/minecraft/class_600	field_2601	field_2601	squidBody
 F	net/minecraft/class_600	field_2602	field_2602	squidTentacles
 F	net/minecraft/class_616	field_2666	field_2666	scale
+F	net/minecraft/class_617	field_2668	field_2668	soundPoolSounds
+F	net/minecraft/class_617	field_2669	field_2669	soundPoolStreaming
+F	net/minecraft/class_617	field_2670	field_2670	soundPoolMusic
 F	net/minecraft/class_617	field_2672	field_2672	options
 F	net/minecraft/class_617	field_2673	field_2673	loaded
 F	net/minecraft/class_617	field_2674	field_2674	rand
@@ -1598,6 +1603,9 @@ M	net/minecraft/class_134	method_951	(Lnet/minecraft/class_54;)Z	method_951	canI
 M	net/minecraft/class_134	method_952	()Ljava/lang/String;	method_952	getInvName
 M	net/minecraft/class_134	method_953	()I	method_953	getInventoryStackLimit
 M	net/minecraft/class_134	method_954	(I)Lnet/minecraft/class_31;	method_954	getStackInSlot
+M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_267;	method_958	getRandomSoundFromSoundPool
+M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
+M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
 M	net/minecraft/class_300	method_992	()Lnet/minecraft/class_300;	method_992	getInstance
 M	net/minecraft/class_300	method_993	(Ljava/lang/String;)Ljava/lang/String;	method_993	translateKey
 M	net/minecraft/class_300	method_994	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	method_994	translateKeyFormat
@@ -1634,6 +1642,10 @@ M	net/minecraft/class_55	method_1075	()Lnet/minecraft/class_17;	method_1075	getB
 M	net/minecraft/class_55	method_1076	()V	method_1076	updateEntity
 M	net/minecraft/class_55	method_1077	(Lnet/minecraft/class_8;)V	method_1077	readFromNBT
 M	net/minecraft/class_55	method_1078	(Lnet/minecraft/class_8;)V	method_1078	writeToNBT
+M	net/minecraft/class_334	method_1079	()I	method_1079	getFoliageColorPine
+M	net/minecraft/class_334	method_1080	(DD)I	method_1080	getFoliageColor
+M	net/minecraft/class_334	method_1082	()I	method_1082	getFoliageColorBirch
+M	net/minecraft/class_334	method_1083	()I	method_1083	func_31073_c
 M	net/minecraft/class_76	method_1093	(Ljava/lang/String;Ljava/lang/String;)I	method_1093	getTextureForDownloadableImage
 M	net/minecraft/class_76	method_1097	(I)V	method_1097	bindTexture
 M	net/minecraft/class_76	method_1100	(Ljava/lang/String;)I	method_1100	getTexture
@@ -1725,6 +1737,11 @@ M	net/minecraft/class_14	method_1776	(III)I	method_1776	getBlockId
 M	net/minecraft/class_14	method_1777	(III)Lnet/minecraft/class_55;	method_1777	getBlockTileEntity
 M	net/minecraft/class_14	method_1778	(III)I	method_1778	getBlockMetadata
 M	net/minecraft/class_14	method_1779	(III)Lnet/minecraft/class_15;	method_1779	getBlockMaterial
+M	net/minecraft/class_14	method_1781	()Lnet/minecraft/class_519;	method_1781	getWorldChunkManager
+M	net/minecraft/class_519	method_1786	(II)D	method_1786	getTemperature
+M	net/minecraft/class_519	method_1787	(II)Lnet/minecraft/class_153;	method_1787	getBiomeGenAt
+M	net/minecraft/class_519	method_1788	(IIII)[Lnet/minecraft/class_153;	method_1788	func_4069_a
+M	net/minecraft/class_519	method_1790	([DIIII)[D	method_1790	getTemperatures
 M	net/minecraft/class_163	method_1815	(F)V	method_1815	render
 M	net/minecraft/class_163	method_1816	(FFF)V	method_1816	setRotationPoint
 M	net/minecraft/class_163	method_1817	(FFFIII)V	method_1817	addBox
@@ -1752,6 +1769,11 @@ M	net/minecraft/class_591	method_1958	()Ljava/lang/String;	method_1958	getDispla
 M	net/minecraft/class_475	method_1976	()F	method_1976	getVolume
 M	net/minecraft/class_475	method_1977	()F	method_1977	getPitch
 M	net/minecraft/class_68	method_2006	(DDD)V	method_2006	setPosition
+M	net/minecraft/class_617	method_2009	(Ljava/lang/String;FF)V	method_2009	playSoundFX
+M	net/minecraft/class_617	method_2011	(Ljava/lang/String;Ljava/io/File;)V	method_2011	addSound
+M	net/minecraft/class_617	method_2015	(Ljava/lang/String;FFFFF)V	method_2015	playSound
+M	net/minecraft/class_617	method_2016	(Ljava/lang/String;Ljava/io/File;)V	method_2016	addStreaming
+M	net/minecraft/class_617	method_2018	(Ljava/lang/String;Ljava/io/File;)V	method_2018	addMusic
 M	net/minecraft/class_579	method_2022	(Lnet/minecraft/class_57;DDDFF)V	method_2022	doRender
 M	net/minecraft/class_579	method_2026	(Ljava/lang/String;)V	method_2026	loadTexture
 M	net/minecraft/class_579	method_2029	(Lnet/minecraft/class_578;)V	method_2029	setRenderManager

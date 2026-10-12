@@ -1467,6 +1467,14 @@ function utf8String(arr, off, len) {
 function npe(vm, what) { vm.throwNew('java/lang/NullPointerException', what); }
 function str(vm, v) { return v === null || v === undefined ? 'null' : stringOf(vm, v, null); }
 
+function stackArray(vm, frames) {
+	var els = frames.slice().reverse().map(function (f) {
+		var i = f.lastIndexOf('.'), o = vm.newObject(vm.loadClass('java/lang/StackTraceElement'));
+		o.$c = f.substring(0, i).replace(/[/]/g, '.'); o.$m = f.substring(i + 1);
+		return o;
+	});
+	return javaArray(vm, 'Ljava/lang/StackTraceElement;', els);
+}
 function installLang(vm) {
 	var def = function (n, s) { vm.defineNative(n, s); };
 	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
@@ -1903,7 +1911,7 @@ function installLang(vm) {
 			'interrupt()V': function () {}, 'isAlive()Z': function () { return 0; }, 'join()V': function () {},
 			'setPriority(I)V': function () {}, 'isInterrupted()Z': function () { return 0; },
 			'getContextClassLoader()Ljava/lang/ClassLoader;': function (vm) { return JVM.classLoaderObj(vm); },
-			'getStackTrace()[Ljava/lang/StackTraceElement;': function (vm) { return vm.newArray('Ljava/lang/StackTraceElement;', 0); },
+			'getStackTrace()[Ljava/lang/StackTraceElement;': function (vm) { return stackArray(vm, vm.currentTrace ? vm.currentTrace() : []); },
 		},
 		staticMethods: {
 			'currentThread()Ljava/lang/Thread;': function (vm) { return vm.mainThread || (vm.mainThread = vm.newObject(vm.loadClass('java/lang/Thread'))); },
@@ -1942,7 +1950,7 @@ function installLang(vm) {
 			'printStackTrace()V': function (vm, self) { vm.log('err', vm.toJavaString(self)); },
 			'printStackTrace(Ljava/io/PrintStream;)V': function (vm, self) { vm.log('err', vm.toJavaString(self)); },
 			'fillInStackTrace()Ljava/lang/Throwable;': function (vm, self) { return self; },
-			'getStackTrace()[Ljava/lang/StackTraceElement;': function (vm) { return vm.newArray('Ljava/lang/StackTraceElement;', 0); },
+			'getStackTrace()[Ljava/lang/StackTraceElement;': function (vm, self) { return stackArray(vm, self.$jsStack || []); },
 			'setStackTrace([Ljava/lang/StackTraceElement;)V': function () {},
 			'addSuppressed(Ljava/lang/Throwable;)V': function () {},
 			'getSuppressed()[Ljava/lang/Throwable;': function (vm) { return vm.newArray('Ljava/lang/Throwable;', 0); },
@@ -2024,7 +2032,7 @@ function installLang(vm) {
 				return m ? (vm.initClass(self.$cls), vm.invoke(m, null, [])) : null;
 			},
 			'getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;': function (vm, self, a) { return JVM.resourceStream(vm, a[0], self.$cls); },
-			'getResource(Ljava/lang/String;)Ljava/net/URL;': function () { return null; },
+			'getResource(Ljava/lang/String;)Ljava/net/URL;': function (vm, self, a) { return JVM.resourceURL(vm, a[0], self.$cls); },
 			'getPackage()Ljava/lang/Package;': function () { return null; },
 			'getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;': function () { return null; },
 			'isAnnotationPresent(Ljava/lang/Class;)Z': function () { return 0; },
@@ -2043,7 +2051,7 @@ function installLang(vm) {
 		methods: {
 			'loadClass(Ljava/lang/String;)Ljava/lang/Class;': function (vm, self, a) { return JVM.forName(vm, a[0]); },
 			'getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;': function (vm, self, a) { return JVM.resourceStream(vm, a[0], null); },
-			'getResource(Ljava/lang/String;)Ljava/net/URL;': function () { return null; },
+			'getResource(Ljava/lang/String;)Ljava/net/URL;': function (vm, self, a) { return JVM.resourceURL(vm, a[0], null); },
 			'getParent()Ljava/lang/ClassLoader;': function () { return null; },
 		},
 		staticMethods: { 'getSystemClassLoader()Ljava/lang/ClassLoader;': function (vm) { return JVM.classLoaderObj(vm); } },
@@ -2091,7 +2099,13 @@ function installLang(vm) {
 		'invokeWithArguments([Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return self.$h.call(Array.prototype.slice.call(a[0].a)); },
 	} });
 	def('java/lang/invoke/MethodType', {});
-	def('java/lang/StackTraceElement', {});
+	def('java/lang/StackTraceElement', { methods: {
+		'getClassName()Ljava/lang/String;': function (vm, self) { return self.$c; },
+		'getMethodName()Ljava/lang/String;': function (vm, self) { return self.$m; },
+		'getFileName()Ljava/lang/String;': function (vm, self) { return self.$c.split('.').pop().split('$')[0] + '.java'; },
+		'getLineNumber()I': function () { return -1; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$c + '.' + self.$m + '(Unknown Source)'; },
+	} });
 	def('java/lang/Record', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: { '<init>()V': function () {} } });
 	var fnI = function (n, sam, extra) { var abs = {}; abs[sam] = true; def('java/util/function/' + n, { access: I, abstractMethods: abs, methods: extra || {} }); };
 	var O = 'Ljava/lang/Object;';
@@ -3364,6 +3378,16 @@ JVM.resourceStream = function (vm, name, cls) {
 	var r = vm.resources && vm.resources[n];
 	return r ? bytesStream(vm, r) : null;
 };
+JVM.resourceURL = function (vm, name, cls) {
+	if (name === null) return null;
+	var n = String(name);
+	if (n[0] === '/') n = n.substring(1);
+	else if (cls) { var pk = cls.name.substring(0, cls.name.lastIndexOf('/') + 1); n = pk + n; }
+	if (!(vm.resources && vm.resources[n])) return null;
+	var u = vm.newObject(vm.loadClass('java/net/URL'));
+	u.$res = n; u.$spec = 'jar:file:mod.jar!/' + n;
+	return u;
+};
 JVM.bytesStream = bytesStream;
 JVM.readAllBytes = readAllBytes;
 
@@ -3578,6 +3602,17 @@ function installIo(vm) {
 		'<init>(Ljava/io/File;Z)V': function (vm, self, a) { fileSink(vm, self, a[0].$path, a[1]); },
 	} });
 
+	def('java/net/URL', { methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$spec = String(a[0]); var m = /![/](.+)$/.exec(self.$spec); if (m && vm.resources[m[1]]) self.$res = m[1]; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$spec; },
+		'toExternalForm()Ljava/lang/String;': function (vm, self) { return self.$spec; },
+		'getPath()Ljava/lang/String;': function (vm, self) { return self.$spec.replace(/^[a-z]+:/, ''); },
+		'getFile()Ljava/lang/String;': function (vm, self) { return self.$spec.replace(/^[a-z]+:/, ''); },
+		'getProtocol()Ljava/lang/String;': function (vm, self) { return (/^([a-z]+):/.exec(self.$spec) || [0, 'file'])[1]; },
+		'openStream()Ljava/io/InputStream;': function (vm, self) { return self.$res ? JVM.resourceStream(vm, '/' + self.$res, null) : null; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$spec); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$spec === self.$spec ? 1 : 0; },
+	} });
 	def('java/io/File', {
 		interfaces: ['java/lang/Comparable'],
 		statics: { separator: '/', separatorChar: 47, pathSeparator: ':', pathSeparatorChar: 58 },
@@ -4665,6 +4700,8 @@ function installMc152(vm) {
 	if (JVM.installSettings) JVM.installSettings(vm);
 	if (JVM.installLegacy) JVM.installLegacy(vm);
 	if (JVM.installGui) JVM.installGui(vm);
+	if (JVM.installPotions) JVM.installPotions(vm);
+	installSounds(vm);
 	if (JVM.installStation) JVM.installStation(vm);
 	if (JVM.installStates) JVM.installStates(vm);
 }
@@ -4844,8 +4881,8 @@ function installWorld(vm, def) {
 		'blockExists(III)Z': function () { return 1; },
 		'doChunksNearChunkExist(IIII)Z': function () { return 1; },
 		'destroyBlock(IIIZ)Z': function (vm, self, a) { op(vm, 'destroy', a[0], a[1], a[2], a[3] ? 1 : 0); return 1; },
-		'playSoundEffect(DDDLjava/lang/String;FF)V': function (vm, self, a) { op(vm, 'sound', a[0], a[1], a[2], a[3], a[4], a[5]); },
-		'playSoundAtEntity(Lnet/minecraft/src/Entity;Ljava/lang/String;FF)V': function (vm, self, a) { op(vm, 'sound', a[0][':posX'], a[0][':posY'], a[0][':posZ'], a[1], a[2], a[3]); },
+		'playSoundEffect(DDDLjava/lang/String;FF)V': function (vm, self, a) { op(vm, 'sound', a[0], a[1], a[2], JVM.javaSoundName(a[3]), a[4], a[5]); },
+		'playSoundAtEntity(Lnet/minecraft/src/Entity;Ljava/lang/String;FF)V': function (vm, self, a) { op(vm, 'sound', a[0][':posX'], a[0][':posY'], a[0][':posZ'], JVM.javaSoundName(a[1]), a[2], a[3]); },
 		'spawnParticle(Ljava/lang/String;DDDDDD)V': function (vm, self, a) { op(vm, 'particle', a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
 		'spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) {
 			var e = a[0];
@@ -5045,6 +5082,9 @@ JVM.collectContent = function (vm, modId) {
 		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
 		var json = { name: langOf(it) || ('Item ' + id), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
 		if (it.$food) json.food = { hunger: it.$food[0], saturation: it.$food[1] };
+		if (it.$food && it.$foodEffect && JVM.effectName && JVM.effectName(it.$foodEffect.id))
+			json.food.effects = [{ effect: JVM.effectName(it.$foodEffect.id), seconds: it.$foodEffect.seconds, level: it.$foodEffect.level, chance: it.$foodEffect.chance }];
+		if (it.$food && it.$alwaysEdible) json.food.always_edible = true;
 		if (it.$tool && it.$toolMat) json.tool = { type: it.$tool, level: it.$toolMat.$m[0], uses: it.$toolMat.$m[1], speed: it.$toolMat.$m[2], damage: it.$toolMat.$m[3] };
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED)) { json.scripted = true; out.scripted.items[id] = true; }
@@ -5094,6 +5134,47 @@ JVM.collectContent = function (vm, modId) {
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
 	return out;
+};
+
+JVM.javaSoundName = function (name) {
+	var n = String(name == null ? '' : name);
+	if (n.indexOf(':') < 0 && n.indexOf('/') < 0) return n;
+	return n.replace(/[.](ogg|wav|mp3)$/i, '').replace(/\d+$/, '').replace(/[:/]/g, '.');
+};
+JVM.javaSounds = function (vm, modId, files) {
+	var out = {};
+	Object.keys(files || {}).forEach(function (k) {
+		var m = /^assets[/]([^/]+)[/]stationapi[/]sounds[/]sound[/](.+[.](ogg|wav|mp3))$/i.exec(k) || /^assets[/]([^/]+)[/]sound[/](.+[.](ogg|wav|mp3))$/i.exec(k);
+		if (m) out['sounds/' + m[1] + '/' + m[2]] = files[k];
+	});
+	(reg(vm).sounds || []).forEach(function (s) {
+		if ((s.mod || '') !== modId || !s.res || !vm.resources[s.res]) return;
+		var n = String(s.name).replace(/:/g, '/');
+		if (!/[.](ogg|wav|mp3)$/i.test(n)) n += s.res.slice(s.res.lastIndexOf('.'));
+		out['sounds/' + n] = vm.resources[s.res];
+	});
+	return out;
+};
+function installSounds(vm) {
+	var add = function (pool) { return function (vm, self, a) { (reg(vm).sounds = reg(vm).sounds || []).push({ mod: vm.currentMod, name: a[0], res: a[1] && a[1].$res, pool: self.$pool || pool }); return null; }; };
+	vm.defineNative(SRC + 'SoundPool', { methods: {
+		'addSound(Ljava/lang/String;Ljava/net/URL;)Lnet/minecraft/src/SoundPoolEntry;': add('sound'),
+		'addSound(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/src/SoundPoolEntry;': function (vm, self, a) { vm.warnOnce('snd:file', 'a sound from a file outside the mod is not available here'); return null; },
+		'getRandomSoundFromSoundPool(Ljava/lang/String;)Lnet/minecraft/src/SoundPoolEntry;': function () { return null; },
+	} });
+	var pool = function (vm, self, k) { var p = self[':' + k]; if (!p) { p = vm.newObject(vm.loadClass(SRC + 'SoundPool')); p.$pool = k; self[':' + k] = p; } return p; };
+	vm.defineNative(SRC + 'SoundManager', { fields: { soundPoolSounds: 'L' + SRC + 'SoundPool;', soundPoolStreaming: 'L' + SRC + 'SoundPool;', soundPoolMusic: 'L' + SRC + 'SoundPool;' }, methods: {
+		'<init>()V': function (vm, self) { ['soundPoolSounds', 'soundPoolStreaming', 'soundPoolMusic'].forEach(function (k) { pool(vm, self, k); }); },
+		'addSound(Ljava/lang/String;Ljava/io/File;)V': function (vm) { vm.warnOnce('snd:file', 'a sound from a file outside the mod is not available here'); },
+		'addStreaming(Ljava/lang/String;Ljava/io/File;)V': function () {},
+		'addMusic(Ljava/lang/String;Ljava/io/File;)V': function () {},
+		'playSound(Ljava/lang/String;FFFFF)V': function (vm, self, a) { op(vm, 'sound', a[1], a[2], a[3], JVM.javaSoundName(a[0]), a[4], a[5]); },
+		'playSoundFX(Ljava/lang/String;FF)V': function (vm, self, a) { op(vm, 'sound', 0, 0, 0, JVM.javaSoundName(a[0]), a[1], a[2]); },
+	} });
+}
+JVM.soundManagerObj = function (vm) {
+	if (!vm.$sndMgr) { vm.$sndMgr = vm.newObject(vm.loadClass(SRC + 'SoundManager')); vm.callVirtual(vm.$sndMgr, '<init>', '()V', []); }
+	return vm.$sndMgr;
 };
 
 JVM.contentName = function (vm, id) {
@@ -6313,6 +6394,7 @@ JVM.forgeLoad = function (vm, modClasses, allClasses, info) {
 		mods.forEach(function (mod) { JVM.forgePhase(vm, mod, ph[0]); });
 	});
 	f.state = 'AVAILABLE';
+	JVM.forgePost(vm, FORGE + 'client/event/sound/SoundLoadEvent', function (ev) { ev[':manager'] = JVM.soundManagerObj(vm); });
 	return mods;
 };
 JVM.forgePhase = function (vm, mod, phase) {
@@ -6569,6 +6651,83 @@ function installForge(vm) {
 
 JVM.installForge = installForge;
 JVM.forgeState = function (vm) { return vm.mcReg && vm.mcReg.forge || null; };
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var POTIONS = [null, 'moveSpeed', 'moveSlowdown', 'digSpeed', 'digSlowdown', 'damageBoost', 'heal', 'harm', 'jump', 'confusion',
+	'regeneration', 'resistance', 'fireResistance', 'waterBreathing', 'invisibility', 'blindness', 'nightVision', 'hunger',
+	'weakness', 'poison', 'wither', 'field_76434_w', 'field_76443_y'];
+var NAMES = [null, 'speed', 'slowness', 'haste', 'mining_fatigue', 'strength', 'instant_health', 'instant_damage', 'jump_boost', 'nausea',
+	'regeneration', 'resistance', 'fire_resistance', 'water_breathing', 'invisibility', 'blindness', 'night_vision', 'hunger', 'weakness', 'poison', 'wither'];
+JVM.effectName = function (id) { return NAMES[id] || null; };
+
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function entityId(o) { return o ? (o.$info && o.$info.id != null ? o.$info.id : o.$entityId != null ? o.$entityId : null) : null; }
+
+function installPotions(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var statics = { potionTypes: null };
+	POTIONS.forEach(function (n) { if (n) statics[n] = null; });
+	def('Potion', { statics: statics, fields: { id: 'I' }, clinit: function (vm, c) {
+		var arr = vm.newArray('L' + SRC + 'Potion;', 32);
+		POTIONS.forEach(function (n, i) {
+			if (!n) return;
+			var p = vm.newObject(c); p[':id'] = i; p.$name = 'potion.' + (NAMES[i] || n);
+			c.statics[n] = p; arr.a[i] = p;
+		});
+		c.statics.potionTypes = arr;
+	}, methods: {
+		'<init>(IZI)V': function (vm, self, a) { self[':id'] = a[0]; var c = vm.loadClass(SRC + 'Potion'); vm.initClass(c); c.statics.potionTypes.a[a[0]] = self; vm.warnOnce('potion:new', 'a new potion effect (not one of the game\'s) is not available here'); },
+		'getId()I': function (vm, self) { return self[':id']; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name || 'potion.empty'; },
+		'setPotionName(Ljava/lang/String;)Lnet/minecraft/src/Potion;': function (vm, self, a) { self.$name = a[0]; return self; },
+		'isInstant()Z': function (vm, self) { return self[':id'] === 6 || self[':id'] === 7 ? 1 : 0; },
+		'isBadEffect()Z': function (vm, self) { return [2, 4, 7, 9, 15, 17, 18, 19, 20].indexOf(self[':id']) >= 0 ? 1 : 0; },
+	} });
+	var pe = function (self, id, dur, amp) { self[':potionID'] = id; self[':duration'] = dur; self[':amplifier'] = amp; };
+	def('PotionEffect', { fields: { potionID: 'I', duration: 'I', amplifier: 'I' }, methods: {
+		'<init>(II)V': function (vm, self, a) { pe(self, a[0], a[1], 0); },
+		'<init>(III)V': function (vm, self, a) { pe(self, a[0], a[1], a[2]); },
+		'<init>(IIIZ)V': function (vm, self, a) { pe(self, a[0], a[1], a[2]); },
+		'<init>(Lnet/minecraft/src/PotionEffect;)V': function (vm, self, a) { pe(self, a[0][':potionID'], a[0][':duration'], a[0][':amplifier']); },
+		'getPotionID()I': function (vm, self) { return self[':potionID']; },
+		'getDuration()I': function (vm, self) { return self[':duration']; },
+		'getAmplifier()I': function (vm, self) { return self[':amplifier']; },
+		'getEffectName()Ljava/lang/String;': function (vm, self) { return 'potion.' + (NAMES[self[':potionID']] || 'empty'); },
+	} });
+	var L = vm.natives[SRC + 'EntityLiving'];
+	var effectsOf = function (vm, self) { var i = self.$info; return i && Array.isArray(i.effects) ? i.effects : []; };
+	L.methods = Object.assign({}, L.methods, {
+		'addPotionEffect(Lnet/minecraft/src/PotionEffect;)V': function (vm, self, a) {
+			var id = entityId(self), p = a[0];
+			if (id == null || !p) return;
+			if (!NAMES[p[':potionID']]) { vm.warnOnce('potion:id:' + p[':potionID'], 'potion effect ' + p[':potionID'] + ' is not one of the game\'s'); return; }
+			op(vm, 'effect', id, p[':potionID'], Math.max(1, p[':duration']), Math.max(0, p[':amplifier']));
+		},
+		'removePotionEffect(I)V': function (vm, self, a) { var id = entityId(self); if (id != null) op(vm, 'rmeffect', id, a[0]); },
+		'clearActivePotions()V': function (vm, self) { var id = entityId(self); if (id != null) op(vm, 'clreffect', id); },
+		'isPotionActive(Lnet/minecraft/src/Potion;)Z': function (vm, self, a) { var pid = a[0] && a[0][':id']; return effectsOf(vm, self).some(function (e) { return e.id === pid; }) ? 1 : 0; },
+		'isPotionActive(I)Z': function (vm, self, a) { return effectsOf(vm, self).some(function (e) { return e.id === a[0]; }) ? 1 : 0; },
+		'getActivePotionEffect(Lnet/minecraft/src/Potion;)Lnet/minecraft/src/PotionEffect;': function (vm, self, a) {
+			var pid = a[0] && a[0][':id'], e = effectsOf(vm, self).filter(function (x) { return x.id === pid; })[0];
+			if (!e) return null;
+			var o = vm.newObject(vm.loadClass(SRC + 'PotionEffect')); pe(o, e.id, e.ticks | 0, e.amp | 0); return o;
+		},
+		'getActivePotionEffects()Ljava/util/Collection;': function (vm, self) {
+			return JVM.newList(vm, effectsOf(vm, self).map(function (e) { var o = vm.newObject(vm.loadClass(SRC + 'PotionEffect')); pe(o, e.id, e.ticks | 0, e.amp | 0); return o; }));
+		},
+	});
+	var F = vm.natives[SRC + 'ItemFood'];
+	F.methods = Object.assign({}, F.methods, {
+		'setPotionEffect(IIIF)Lnet/minecraft/src/ItemFood;': function (vm, self, a) { self.$foodEffect = { id: a[0], seconds: a[1], level: a[2] + 1, chance: a[3] }; return self; },
+		'setAlwaysEdible()Lnet/minecraft/src/ItemFood;': function (vm, self) { self.$alwaysEdible = true; return self; },
+	});
+}
+
+JVM.installPotions = installPotions;
 })();
 
 (function () {
@@ -7212,6 +7371,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			hurt: own('getHurtSound()Ljava/lang/String;') || !stats ? str('getHurtSound') : stats[5],
 			death: own('getDeathSound()Ljava/lang/String;') || !stats ? str('getDeathSound') : stats[6] };
 		Object.keys(snd).forEach(function (k) { if (!snd[k]) delete snd[k]; });
+		Object.keys(snd).forEach(function (k) { if (snd[k]) snd[k] = JVM.javaSoundName(snd[k]); });
 		if (Object.keys(snd).length) json.sounds = snd;
 		var drop = safe(function () { return vm.callVirtual(ent, 'getDropItemId', '()I', []); }, 0);
 		if (drop > 0) { var dr = ref(drop, 0); if (dr) json.drops = [{ item: dr, count: [0, 2] }]; }
@@ -9100,6 +9260,31 @@ function installStation(vm) {
 		'register(Lnet/modificationstation/stationapi/api/client/color/item/ItemColorProvider;[Lnet/minecraft/src/Block;)V': tintTo('$stItemTint'),
 	} });
 	def(ST + 'item/ItemConvertible', { access: I });
+	[B, It].forEach(function (spec) { spec.interfaces = (spec.interfaces || []).concat([ST + 'item/ItemConvertible']); });
+	vm.defineNative(SRC + 'ChunkPosition', { fields: { x: 'I', y: 'I', z: 'I' }, methods: {
+		'<init>(III)V': function (vm, self, a) { self[':x'] = a[0]; self[':y'] = a[1]; self[':z'] = a[2]; },
+	} });
+	var biomeAt = function (vm, x, z) { var b = JVM.biomeAt ? JVM.biomeAt(vm, x, z) : null; if (!b) { var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c); b = c.statics.plains; } return b; };
+	var dArr = function (vm, n, v) { var a = vm.newArray('D', n); for (var i = 0; i < n; i++) a.a[i] = v; return a; };
+	vm.defineNative(SRC + 'WorldChunkManager', { fields: { temperature: '[D', humidity: '[D' }, methods: {
+		'getBiomeGenAt(II)Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) { return biomeAt(vm, a[0], a[1]); },
+		'func_4069_a(IIII)[Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) {
+			var n = Math.max(0, a[2] * a[3]), arr = vm.newArray('L' + SRC + 'BiomeGenBase;', n), b = biomeAt(vm, a[0], a[1]);
+			for (var i = 0; i < n; i++) arr.a[i] = b;
+			self[':temperature'] = dArr(vm, n, 0.8); self[':humidity'] = dArr(vm, n, 0.4);
+			return arr;
+		},
+		'getTemperature(II)D': function () { return 0.8; },
+		'getTemperatures([DIIII)[D': function (vm, self, a) { var n = a[3] * a[4]; var r = a[0] && a[0].a.length >= n ? a[0] : dArr(vm, n, 0); for (var i = 0; i < n; i++) r.a[i] = 0.8; return r; },
+	} });
+	var wcm = function (vm) { return vm.$wcm || (vm.$wcm = vm.newObject(vm.loadClass(SRC + 'WorldChunkManager'))); };
+	var Wn = vm.natives[SRC + 'World'];
+	if (Wn) Wn.methods = Object.assign({}, Wn.methods, { 'getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;': function (vm) { return wcm(vm); } });
+	vm.defineNative(SRC + 'ColorizerGrass', { staticMethods: { 'getGrassColor(DD)I': function () { return 0x91bd59; } } });
+	vm.defineNative(SRC + 'ColorizerFoliage', { staticMethods: {
+		'getFoliageColor(DD)I': function () { return 0x77ab2f; }, 'getFoliageColorBirch()I': function () { return 0x80a755; },
+		'getFoliageColorPine()I': function () { return 0x619961; }, 'func_31073_c()I': function () { return 0x48b518; },
+	} });
 	ev('client/event/color/block/BlockColorsRegisterEvent', null, { fields: { blockColors: 'L' + BC + 'BlockColors;' } });
 	ev('client/event/color/item/ItemColorsRegisterEvent', null, { fields: { itemColors: 'L' + IC + 'ItemColors;', blockColors: 'L' + BC + 'BlockColors;' } });
 	var DY = vm.natives[SRC + 'ItemDye'] || (vm.defineNative(SRC + 'ItemDye', { super: SRC + 'Item' }), vm.natives[SRC + 'ItemDye']);
@@ -9642,7 +9827,7 @@ JVM.stationTexture = function (vm, o, side, files) {
 	if (t && t.file && prov) {
 		var col = null;
 		JVM.run(vm, function () {
-			col = side >= 0 ? vm.callVirtual(prov, 'getColor', '(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)I', [JVM.stationState.defaultOf(vm, o), null, null, 0])
+			col = side >= 0 ? vm.callVirtual(prov, 'getColor', '(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)I', [JVM.stationState.defaultOf(vm, o), JVM.mc152.worldObj(vm), posAt(vm), 0])
 				: vm.callVirtual(prov, 'getColor', '(Lnet/minecraft/src/ItemStack;I)I', [JVM.mc152.newStack(vm, o[':itemID'], 1, 0), 0]);
 		});
 		if (typeof col === 'number' && (col & 0xffffff) !== 0xffffff) {
@@ -9652,6 +9837,7 @@ JVM.stationTexture = function (vm, o, side, files) {
 	}
 	return t;
 };
+function posAt(vm) { var p = vm.newObject(vm.loadClass(SRC + 'ChunkPosition')); p[':x'] = 0; p[':y'] = 64; p[':z'] = 0; return p; }
 function stationTex0(vm, o, side, files) {
 	var s = st(vm), isBlock = side >= 0;
 	if (o.$stTex) return texRef(files, o.$stTex);

@@ -1889,6 +1889,7 @@ F	lq	N	field_70130_N	width
 F	lq	O	field_70131_O	height
 F	lq	W	field_70139_V	ySize
 F	lq	aa	field_70146_Z	rand
+F	lq	ac	field_70174_ab	fireResistance
 F	lq	af	field_70178_ae	isImmuneToFire
 F	lq	ag	field_70180_af	dataWatcher
 F	lq	aq	field_71093_bK	dimension
@@ -2760,6 +2761,7 @@ M	lv	b	(Llq;)Ljava/lang/String;	func_75621_b	getEntityString
 M	md	O	()Ljava/lang/String;	func_70073_O	getTexture
 M	md	S	()Z	func_70089_S	isEntityAlive
 M	md	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	md	a	(Lll;)Z	func_70644_a	isPotionActive
 M	md	aA	()Loo;	func_70635_at	getEntitySenses
 M	md	aF	()F	func_70689_ay	getAIMoveSpeed
 M	md	aN	()I	func_70627_aG	getTalkInterval
@@ -2774,6 +2776,7 @@ M	md	ax	()Lmq;	func_70605_aq	getMoveHelper
 M	md	ay	()Lmo;	func_70683_ar	getJumpHelper
 M	md	az	()Lon;	func_70661_as	getNavigator
 M	md	b	(ILur;)V	func_70062_b	setCurrentItemOrArmor
+M	md	b	(Lll;)Llm;	func_70660_b	getActivePotionEffect
 M	md	bC	()Lmf;	func_70668_bt	getCreatureAttribute
 M	md	bD	()Lur;	func_70694_bm	getHeldItem
 M	md	ba	()Ljava/lang/String;	func_70673_aS	getDeathSound
@@ -2781,11 +2784,16 @@ M	md	bb	()I	func_70633_aT	getDropItemId
 M	md	be	()Z	func_70650_aV	isAIEnabled
 M	md	bj	()Z	func_70692_ba	canDespawn
 M	md	bw	()Z	func_70608_bn	isPlayerSleeping
+M	md	by	()V	func_70674_bp	clearActivePotions
+M	md	bz	()Ljava/util/Collection;	func_70651_bq	getActivePotionEffects
+M	md	d	(Llm;)V	func_70690_d	addPotionEffect
 M	md	e	()F	func_70047_e	getEyeHeight
 M	md	e	(F)V	func_70659_e	setAIMoveSpeed
 M	md	h_	()Z	func_70631_g_	isChild
 M	md	i	(I)V	func_70691_i	heal
 M	md	j	(I)V	func_70606_j	setEntityHealth
+M	md	m	(I)Z	func_82165_m	isPotionActive
+M	md	o	(I)V	func_82170_o	removePotionEffect
 M	md	q	(I)Lur;	func_82169_q	getCurrentArmor
 M	me	values	()[Lme;	values	values
 M	nd	a	()V	func_75774_a	onUpdateTasks
@@ -3066,6 +3074,7 @@ M	yc	l	(III)I	func_72883_k	getFullBlockLightValue
 M	yc	m	(III)I	func_72957_l	getBlockLightValue
 M	yc	q	(III)Lany;	func_72796_p	getBlockTileEntity
 M	yc	r	(III)V	func_72932_q	removeBlockTileEntity
+M	yc	t	()Lzd;	func_72959_q	getWorldChunkManager
 M	yc	u	()Z	func_72935_r	isDaytime
 M	ym	O	()I	func_72800_K	getHeight
 M	ym	S	()Laok;	func_82732_R	getWorldVec3Pool

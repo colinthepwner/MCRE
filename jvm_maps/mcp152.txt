@@ -2097,6 +2097,7 @@ F	mp	O	field_70130_N	width
 F	mp	P	field_70131_O	height
 F	mp	X	field_70139_V	ySize
 F	mp	ab	field_70146_Z	rand
+F	mp	ad	field_70174_ab	fireResistance
 F	mp	ag	field_70178_ae	isImmuneToFire
 F	mp	ah	field_70180_af	dataWatcher
 F	mp	ar	field_71093_bK	dimension
@@ -2451,6 +2452,7 @@ M	aab	m	(III)I	func_72883_k	getFullBlockLightValue
 M	aab	n	(III)I	func_72957_l	getBlockLightValue
 M	aab	r	(III)Laqp;	func_72796_p	getBlockTileEntity
 M	aab	s	(III)V	func_72932_q	removeBlockTileEntity
+M	aab	u	()Laba;	func_72959_q	getWorldChunkManager
 M	aab	v	()Z	func_72935_r	isDaytime
 M	aak	Q	()I	func_72800_K	getHeight
 M	aak	U	()Lard;	func_82732_R	getWorldVec3Pool
@@ -3071,6 +3073,7 @@ M	net/minecraft/server/MinecraftServer	z	()I	func_71275_y	getMaxPlayers
 M	ng	N	()Ljava/lang/String;	func_70073_O	getTexture
 M	ng	R	()Z	func_70089_S	isEntityAlive
 M	ng	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	ng	a	(Lmk;)Z	func_70644_a	isPotionActive
 M	ng	aA	()Lnz;	func_70605_aq	getMoveHelper
 M	ng	aB	()Lnx;	func_70683_ar	getJumpHelper
 M	ng	aC	()Lpx;	func_70661_as	getNavigator
@@ -3083,6 +3086,9 @@ M	ng	aZ	()I	func_70658_aO	getTotalArmorValue
 M	ng	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	ng	az	()Lny;	func_70671_ap	getLookHelper
 M	ng	b	(I)V	func_70606_j	setEntityHealth
+M	ng	b	(Lmk;)Lml;	func_70660_b	getActivePotionEffect
+M	ng	bB	()V	func_70674_bp	clearActivePotions
+M	ng	bC	()Ljava/util/Collection;	func_70651_bq	getActivePotionEffects
 M	ng	bF	()Lno;	func_70668_bt	getCreatureAttribute
 M	ng	bG	()Lwm;	func_70694_bm	getHeldItem
 M	ng	ba	()F	func_70599_aP	getSoundVolume
@@ -3094,10 +3100,13 @@ M	ng	bh	()Z	func_70650_aV	isAIEnabled
 M	ng	bm	()Z	func_70692_ba	canDespawn
 M	ng	bz	()Z	func_70608_bn	isPlayerSleeping
 M	ng	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
+M	ng	d	(Lml;)V	func_70690_d	addPotionEffect
 M	ng	e	()F	func_70047_e	getEyeHeight
 M	ng	e	(F)V	func_70659_e	setAIMoveSpeed
 M	ng	h_	()Z	func_70631_g_	isChild
 M	ng	j	(I)V	func_70691_i	heal
+M	ng	m	(I)Z	func_82165_m	isPotionActive
+M	ng	o	(I)V	func_82170_o	removePotionEffect
 M	ng	q	(I)Lwm;	func_82169_q	getCurrentArmor
 M	nn	values	()[Lnn;	values	values
 M	on	a	()V	func_75774_a	onUpdateTasks

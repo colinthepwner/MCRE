@@ -1658,6 +1658,9 @@
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
                         return mp('msg\t' + clean(a[0]));
                     case 'sound': return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
+                    case 'effect': return mp(['effect', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    case 'rmeffect': return mp(['rmeffect', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'clreffect': return mp(['clreffect', a[0] | 0].join('\t'));
                     case 'particle': return mp(['particle', clean(a[0]), +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
                     case 'explode': if (tiles) tiles = {}; return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
                     case 'time': return mp('time');
@@ -2338,6 +2341,7 @@
                             if (hit) { add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = hit; break; }
                         }
                     });
+                    if (JVM.javaSounds) { var snds = JVM.javaSounds(vm, modId, files); Object.keys(snds).forEach(function (k) { if (!add[k]) add[k] = snds[k]; }); }
                     var lang = Object.keys(c.lang).map(function (k) { return k + '=' + c.lang[k]; }).join('\n');
                     if (lang) add['lang/en_us.lang'] = enc.encode(lang + '\n');
                     return Promise.all(cuts).then(function () { return add; });

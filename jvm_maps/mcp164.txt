@@ -2116,6 +2116,7 @@ F	nn	O	field_70130_N	width
 F	nn	P	field_70131_O	height
 F	nn	X	field_70139_V	ySize
 F	nn	ab	field_70146_Z	rand
+F	nn	ad	field_70174_ab	fireResistance
 F	nn	ag	field_70178_ae	isImmuneToFire
 F	nn	ah	field_70180_af	dataWatcher
 F	nn	ar	field_71093_bK	dimension
@@ -2451,6 +2452,7 @@ M	abw	m	(III)I	func_72883_k	getFullBlockLightValue
 M	abw	n	(III)I	func_72957_l	getBlockLightValue
 M	abw	r	(III)Lasp;	func_72796_p	getBlockTileEntity
 M	abw	s	(III)V	func_72932_q	removeBlockTileEntity
+M	abw	u	()Lacv;	func_72959_q	getWorldChunkManager
 M	abw	v	()Z	func_72935_r	isDaytime
 M	acf	R	()I	func_72800_K	getHeight
 M	acf	V	()Latd;	func_82732_R	getWorldVec3Pool
