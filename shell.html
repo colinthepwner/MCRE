@@ -2338,9 +2338,10 @@
                                 x.err = '';
                             }).catch(function (e) { x.err = 'This mod ' + e.message; if (!x.dev) x.enabled = false; });
                         });
-                    }, Promise.resolve());
+                    }, Promise.resolve()).then(function () { listed = true; });
                 });
             }
+            var listed = false;
             function cid(x) { return x.contentId || x.id; }
 
             function keepOriginal(p) {
@@ -3750,6 +3751,7 @@
                     var n = api.problemCount();
                     bump(n ? n + (n === 1 ? ' problem' : ' problems') + ' in your mods - choose a mod to see them' : keep);
                     if (tell && Module._mcModsApplied) Module._mcModsApplied();
+                    applied++;
                     if (again) { again = false; return reapply(tell); }
                 }).catch(function (e) {
                     busy = false;
@@ -3759,6 +3761,7 @@
                 });
             }
             var failed = false;
+            var applied = 0;
 
             api.startup = function (done) {
                 var finished = false;
@@ -3783,6 +3786,84 @@
                         .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
                         .concat([probs.map(clean).join('\x1f'), x.m.settings && x.m.settings.length ? 1 : 0, x.m.devices || '']).join('\t');
                 }).join('\n');
+            };
+            function modsOn() {
+                if (!listed) return null;
+                return mods.filter(function (x) { return x.enabled && !x.err; })
+                    .map(function (x) { return { id: cid(x), name: String(x.m.name || cid(x)).replace(/[\t\r\n]/g, ' ') }; })
+                    .sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+            }
+            function worldList(folder) {
+                try {
+                    var t = FS.readFile(folder + '/mods.list', { encoding: 'utf8' }).split('\n');
+                    if (!/^mcre-mods /.test(t[0])) return null;
+                    return t.slice(1).filter(Boolean).map(function (l) { var p = l.split('\t'); return { id: p[0], name: p[1] || p[0] }; });
+                } catch (e) { return null; }
+            }
+            function worldDiff(folder) {
+                var now = modsOn(), was = worldList(folder);
+                if (!now || !was) return null;
+                var has = function (list, id) { return list.some(function (m) { return m.id === id; }); };
+                var on = was.filter(function (m) { return !has(now, m.id); }), off = now.filter(function (m) { return !has(was, m.id); });
+                if (!on.length && !off.length) return null;
+                var missing = on.filter(function (m) { return !byContentId(m.id); });
+                return { on: on, off: off, missing: missing };
+            }
+            Module.mcWorldMods = {
+                version: function () {
+                    var now = modsOn();
+                    if (!now) return -1;
+                    var s = now.map(function (m) { return m.id; }).join('\n'), h = 7;
+                    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+                    return ((h * 31 + applied) | 0) & 0x7fffffff;
+                },
+                record: function (folder) {
+                    var now = modsOn();
+                    if (!now) return;
+                    var text = 'mcre-mods 1\n' + now.map(function (m) { return m.id + '\t' + m.name; }).join('\n') + '\n';
+                    try {
+                        var old = null; try { old = FS.readFile(folder + '/mods.list', { encoding: 'utf8' }); } catch (e) { }
+                        if (old !== text) FS.writeFile(folder + '/mods.list', text);
+                    } catch (e) { }
+                },
+                diff: function (folder) {
+                    var d = worldDiff(folder);
+                    if (!d) return '';
+                    return d.missing.length ? 'Mods missing' : 'Other mods';
+                },
+                prompt: function (folder, worldName) {
+                    var d = worldDiff(folder);
+                    if (!d || document.getElementById('mcre-worldmods')) return;
+                    var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+                    var names = function (l) { return l.map(function (m) { return esc(m.name); }).join(', '); };
+                    var wrap = document.createElement('div');
+                    wrap.id = 'mcre-worldmods';
+                    wrap.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font:14px/1.45 sans-serif;color:#ddd';
+                    var html = '<div style="background:#3c3c3c;border:2px solid #888;max-width:420px;width:100%;max-height:90%;overflow:auto;padding:18px 20px">' +
+                        '<div style="color:#fff;font-size:17px;text-align:center;margin-bottom:10px">' + esc(worldName) + '</div>' +
+                        '<p style="margin:0 0 10px">This world was saved with a different set of mods. It opens again once exactly those mods are on.</p>';
+                    var on = d.on.filter(function (m) { return d.missing.indexOf(m) < 0; });
+                    if (on.length) html += '<p style="margin:0 0 8px"><b style="color:#9f9">Turn on:</b> ' + names(on) + '</p>';
+                    if (d.off.length) html += '<p style="margin:0 0 8px"><b style="color:#f99">Turn off:</b> ' + names(d.off) + '</p>';
+                    if (d.missing.length) html += '<p style="margin:0 0 8px"><b style="color:#fc6">Not installed:</b> ' + names(d.missing) + '</p>';
+                    html += '<div style="text-align:center;margin-top:14px">' +
+                        (d.missing.length ? '' : '<button data-switch style="padding:9px 18px;margin:4px;background:#4a8a4a;color:#fff;border:none;cursor:pointer;font:inherit">Switch mods</button>') +
+                        '<button data-close style="padding:9px 18px;margin:4px;background:#666;color:#fff;border:none;cursor:pointer;font:inherit">Close</button></div></div>';
+                    wrap.innerHTML = html;
+                    var close = function () { document.removeEventListener('keydown', key, true); if (wrap.parentNode) wrap.parentNode.removeChild(wrap); };
+                    var key = function (e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } };
+                    document.addEventListener('keydown', key, true);
+                    wrap.addEventListener('click', function (e) {
+                        if (e.target === wrap || e.target.hasAttribute('data-close')) close();
+                        else if (e.target.hasAttribute('data-switch')) {
+                            var want = {}; worldList(folder).forEach(function (m) { want[m.id] = true; });
+                            mods.forEach(function (x) { if (!x.err) x.enabled = !!want[cid(x)]; });
+                            writeState(); bump(); reapply(true);
+                            close();
+                        }
+                    });
+                    document.body.appendChild(wrap);
+                },
             };
             function find(id) { for (var i = 0; i < mods.length; i++) if (mods[i].id === id) return i; return -1; }
             function byContentId(id) { for (var i = 0; i < mods.length; i++) if (cid(mods[i]) === id || mods[i].id === id) return mods[i]; return null; }
