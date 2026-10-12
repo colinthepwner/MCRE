@@ -1660,6 +1660,7 @@
                         return sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0 ? { id: refToJava(sl[0]), count: sl[1], data: sl[2] | 0 } : null;
                     }
                     case 'world': return mp('world');
+                    case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
@@ -1694,8 +1695,9 @@
                 vm.game = bridge;
                 vm.mcPlayer = null; vm.mcWorld = null; vm.mcTicks = 0;
                 running = true;
+                if (window.JVM.tileLoad) window.JVM.tileLoad(vm, Object.keys(javaMods));
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
-                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) ? ['subscribe\tgametick'] : [];
+                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {};
             function genJava(raw) {
@@ -1788,6 +1790,7 @@
             };
             J.worldStop = function () {
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
+                if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
                 worldDir = null;
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
@@ -1824,6 +1827,10 @@
                         r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
+                    if (JV.tileTick) {
+                        JV.tileTick(vm);
+                        if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
+                    }
                     return;
                 }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
@@ -1832,8 +1839,8 @@
                     if (!blk || !javaMods[blk.$mod]) return;
                     var pl = M.playerObj(vm, null);
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
-                    else if (e.t === 'place') { call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]); }
-                    else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, e.data | 0]); call(blk, SIG.destroyedBy, [world, x, y, z, e.data | 0]); }
+                    else if (e.t === 'place') { if (JV.tilePlaced) JV.tilePlaced(vm, x, y, z); call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]); }
+                    else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, e.data | 0]); call(blk, SIG.destroyedBy, [world, x, y, z, e.data | 0]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
                     else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
                     else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
                     return;
@@ -1851,7 +1858,30 @@
                     else if (!out) bridge.op('setslot', slot, 0, 0, 0);
                 }
             };
-            J.begin = function () { vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            J.decls = {};
+            J.settingsOf = function (modId) { return J.decls[modId] || null; };
+            J.saveSettings = function (modId, values) {
+                if (!J.decls[modId] || !window.JVM || !window.JVM.applyJavaSettings) return false;
+                window.JVM.applyJavaSettings(folderFs(modId), values);
+                return true;
+            };
+            J.key = function (modId, id, down) { if (vm && running && window.JVM.javaKey) { vm.steps = 0; window.JVM.javaKey(vm, modId, id, down); } };
+            var keysDown = {};
+            function javaKeyEvent(e, down) {
+                if (!running || !Module.mcMods || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+                if (down && keysDown[e.code]) return;
+                if (down) keysDown[e.code] = 1; else delete keysDown[e.code];
+                if (down) { try { if (JSON.parse(UTF8ToString(Module._mcScreenInfo())).screen !== 'none') return; } catch (x) { } }
+                Object.keys(J.decls).forEach(function (modId) {
+                    var keys = J.decls[modId].filter(function (d) { return d.type === 'key'; });
+                    if (!keys.length) return;
+                    var vals = Module.mcMods.settingsOf(modId);
+                    keys.forEach(function (d) { if (vals[d.id] && vals[d.id] === e.code) J.key(modId, d.id, down); });
+                });
+            }
+            document.addEventListener('keydown', function (e) { javaKeyEvent(e, true); }, true);
+            document.addEventListener('keyup', function (e) { javaKeyEvent(e, false); }, true);
+            J.begin = function () { J.decls = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
             J.define = function (modId, files, problem) {
                 return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
                     var JVM = r[0], map = r[1];
@@ -1878,6 +1908,7 @@
                     });
                     var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;
+                    if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
                     var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
                     if (!entry.length && !forgeMods.length) {
                         problem('', 'Java mod without a ModLoader mod_ class or a Forge @Mod class - Fabric mods are not supported yet');
@@ -1885,6 +1916,7 @@
                     }
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
+                            if (JVM.mlProps) JVM.mlProps(vm, vm.loadClass(cn));
                             var o = vm.newObject(vm.loadClass(cn));
                             vm.callVirtual(o, '<init>', '()V', []);
                             vm.callVirtual(o, 'load', '()V', []);
@@ -1898,11 +1930,14 @@
                     }
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
+                    J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
                     Object.keys(c.items).forEach(function (k) { put('items/' + k + '.json', c.items[k]); });
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
+                    Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
+                    Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
                         var cands = [];
@@ -2469,6 +2504,13 @@
                                 if (k === 'lang/en_us.lang' && files[k]) { var a = files[k], b = add[k], m2 = new Uint8Array(a.length + 1 + b.length); m2.set(a); m2[a.length] = 10; m2.set(b, a.length + 1); files[k] = m2; }
                                 else files[k] = add[k];
                             });
+                            var jd = Module.mcJava.settingsOf(id);
+                            if (jd && jd.length) {
+                                settingDecls[id] = (settingDecls[id] || []).concat(jd);
+                                var all = readSettings(), mine = all[id] || {}, seeded = false;
+                                jd.forEach(function (d) { if (mine[d.id] === undefined && d.current !== undefined && d.current !== d.default) { mine[d.id] = d.current; seeded = true; } });
+                                if (seeded) { all[id] = mine; try { FS.mkdirTree(LIB); FS.writeFile(SETTINGS, JSON.stringify(all)); } catch (e) { } }
+                            }
                             return files;
                         });
                     }).then(function (files) {
@@ -3826,7 +3868,7 @@
                         .concat((problems[cid(x)] || []).map(function (p) { return (p.file ? p.file + ': ' : '') + p.text; }));
                     return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
                         .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
-                        .concat([probs.map(clean).join('\x1f'), x.m.settings && x.m.settings.length ? 1 : 0, x.m.devices || '']).join('\t');
+                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '']).join('\t');
                 }).join('\n');
             };
             function modsOn() {
@@ -3947,11 +3989,14 @@
             api.allSettings = function () { var o = {}; Object.keys(settingDecls).forEach(function (k) { o[k] = api.settingsOf(k); }); return o; };
             function saveSetting(modId, values) {
                 var all = readSettings();
+                var changed = JSON.stringify(all[modId] || {}) !== JSON.stringify(values);
                 all[modId] = values;
                 try { FS.mkdirTree(LIB); FS.writeFile(SETTINGS, JSON.stringify(all)); } catch (e) { console.warn('[mods] settings', e); }
                 if (Module._syncSaves) Module._syncSaves();
                 if (Module.mcScripts && Module.mcScripts.settingsChanged) Module.mcScripts.settingsChanged(modId, api.settingsOf(modId));
+                if (changed && Module.mcJava && Module.mcJava.saveSettings(modId, api.settingsOf(modId)) && !Module.mcJava.running()) reapply(true);
             }
+            api.savedSettings = function (modId) { return readSettings()[modId] || {}; };
             api.setSetting = function (modId, key, value) {
                 var decl = (settingDecls[modId] || []).filter(function (d) { return d.id === key; })[0];
                 if (!decl) return false;
@@ -3960,7 +4005,7 @@
                 saveSetting(modId, cur);
                 return true;
             };
-            api.hasSettings = function (id) { var x = byContentId(id); return !!(x && x.m && x.m.settings && x.m.settings.length); };
+            api.hasSettings = function (id) { var x = byContentId(id); return !!(x && x.m && x.m.settings && x.m.settings.length) || !!(settingDecls[id] && settingDecls[id].length); };
             api.keyBindings = function () {
                 var out = [];
                 Object.keys(settingDecls).forEach(function (modId) {
@@ -3998,8 +4043,10 @@
                 var box = document.createElement('div');
                 box.style.cssText = 'background:#3c3c3c;border:2px solid #888;padding:18px;width:100%;max-width:440px;max-height:100%;overflow:auto;box-sizing:border-box;color:#eee;font-family:monospace;font-size:14px';
                 var html = '<div style="font-size:16px;margin-bottom:12px;text-align:center">' + esc(name) + ' - settings</div>';
+                var lastGroup = '';
                 decl.forEach(function (d, i) {
                     var v = vals[d.id], f = 'mcre-set-' + i, row = '';
+                    if (d.group && d.group !== lastGroup) { lastGroup = d.group; html += '<div style="margin:14px 0 8px;padding-bottom:3px;border-bottom:1px solid #777;color:#ffd866">' + esc(d.group) + '</div>'; }
                     if (d.type === 'toggle') row = '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="' + f + '" type="checkbox"' + (v ? ' checked' : '') + ' style="width:18px;height:18px">' + esc(d.name) + '</label>';
                     else if (d.type === 'slider') row = '<div>' + esc(d.name) + ': <span id="' + f + '-v">' + esc(v) + '</span></div><input id="' + f + '" type="range" min="' + d.min + '" max="' + d.max + '" step="' + (d.step || 'any') + '" value="' + v + '" style="width:100%">';
                     else if (d.type === 'key') row = '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1">' + esc(d.name) + '<br><span style="color:#999;font-size:11px">also in Options &gt; Controls &gt; Key Bindings</span></span><button id="' + f + '" data-code="' + esc(v) +

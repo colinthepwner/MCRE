@@ -4301,7 +4301,10 @@ function installMc152(vm) {
 	installWorldGen(vm, def);
 	if (JVM.installModels) JVM.installModels(vm);
 	if (JVM.installServer) JVM.installServer(vm);
+	if (JVM.installMobs) JVM.installMobs(vm);
 	if (JVM.installForge) JVM.installForge(vm);
+	if (JVM.installTiles) JVM.installTiles(vm);
+	if (JVM.installSettings) JVM.installSettings(vm);
 }
 
 var SIN_TABLE = null;
@@ -4686,6 +4689,11 @@ JVM.collectContent = function (vm, modId) {
 		if (res) out.recipes.push({ type: 'smelting', input: ref(s.input, 0), result: res, count: s.out[':stackSize'] });
 	});
 	Object.keys(r.lang).forEach(function (k) { out.lang[k] = r.lang[k]; });
+	if (JVM.collectMobs) {
+		var cm = JVM.collectMobs(vm, modId, ref, safe);
+		out.mobs = cm.mobs; out.mobFiles = cm.files;
+		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
+	}
 	return out;
 };
 
@@ -4734,7 +4742,10 @@ function installModels(vm) {
 	var MB = 'Lnet/minecraft/src/ModelBase;', MR = 'Lnet/minecraft/src/ModelRenderer;';
 	def('ModelBase', { methods: {
 		'<init>()V': function (vm, self) { modelInit(vm, self); },
-		'render(Lnet/minecraft/src/Entity;FFFFFF)V': function () {},
+		'render(Lnet/minecraft/src/Entity;FFFFFF)V': function (vm, self) {
+			var v = self.$vanilla && self.$vanilla.m.drawn;
+			if (v) v.forEach(function (f) { var r = self[':' + f.replace(/\[\d+\]$/, '')]; if (r && r.a) r = r.a[+(/\[(\d+)\]$/.exec(f) || [0, 0])[1]]; if (r) r.$drawn = true; });
+		},
 		'setRotationAngles(FFFFFFLnet/minecraft/src/Entity;)V': function () {},
 		'setLivingAnimations(Lnet/minecraft/src/EntityLiving;FFF)V': function () {},
 		'getRandomModelBox(Ljava/util/Random;)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { var l = listArr(vm, self[':boxList']); return l.length ? l[vm.callVirtual(a[0], 'nextInt', '(I)I', [l.length])] : null; },
@@ -4771,7 +4782,7 @@ function installModels(vm) {
 		'addBox(FFFIIIF)V': function (vm, self, a) { addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
 		'setRotationPoint(FFF)V': function (vm, self, a) { self[':rotationPointX'] = a[0]; self[':rotationPointY'] = a[1]; self[':rotationPointZ'] = a[2]; },
 		'setTextureSize(II)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { self[':textureWidth'] = a[0]; self[':textureHeight'] = a[1]; return self; },
-		'render(F)V': function () {}, 'renderWithRotation(F)V': function () {}, 'postRender(F)V': function () {},
+		'render(F)V': function (vm, self) { self.$drawn = true; }, 'renderWithRotation(F)V': function (vm, self) { self.$drawn = true; }, 'postRender(F)V': function () {},
 	} });
 	def('ModelBox', { methods: {
 		'<init>(Lnet/minecraft/src/ModelRenderer;IIFFFIIIF)V': function (vm, self, a) {
@@ -4864,10 +4875,22 @@ JVM.modelData = function (vm, model) {
 	return { tw: model[':textureWidth'], th: model[':textureHeight'], parts: all.filter(function (r) { return !childSet.has(r); }).map(part) };
 };
 
+JVM.pose = function (vm, model, entity) {
+	var e = entity || vm.newObject(vm.loadClass(SRC + 'EntityLiving'));
+	JVM.run(vm, function () { vm.callVirtual(model, 'setLivingAnimations', '(Lnet/minecraft/src/EntityLiving;FFF)V', [e, 0, 0, 1]); });
+	JVM.run(vm, function () { vm.callVirtual(model, 'setRotationAngles', '(FFFFFFLnet/minecraft/src/Entity;)V', [0, 0, 0, 0, 0, 0.0625, e]); });
+};
+JVM.drawnParts = function (vm, model, entity) {
+	var all = listArr(vm, model[':boxList']);
+	all.forEach(function (r) { r.$drawn = false; });
+	JVM.run(vm, function () { vm.callVirtual(model, 'render', '(Lnet/minecraft/src/Entity;FFFFFF)V', [entity || vm.newObject(vm.loadClass(SRC + 'EntityLiving')), 0, 0, 0, 0, 0, 0.0625]); });
+	var drawn = all.filter(function (r) { return r.$drawn; });
+	return drawn.length ? drawn : null;
+};
 JVM.installModels = installModels;
 })();
 
-JVM.vanillaModels = {"ModelBat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"batHead":{"field":"batHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]],"children":["part0","part1"]},"batBody":{"field":"batBody","tex":[0,34],"pivot":[0,0,0],"boxes":[[-3,4,-3,6,12,6,0,[0,16],0],[-5,16,0,10,6,1,0,[0,34],0]],"children":["batRightWing","batLeftWing"]},"batRightWing":{"field":"batRightWing","tex":[42,0],"pivot":[0,0,0],"boxes":[[-12,1,1.5,10,16,1,0,[42,0],0]],"children":["batOuterRightWing"]},"batLeftWing":{"field":"batLeftWing","tex":[42,0],"pivot":[0,0,0],"mirror":1,"boxes":[[2,1,1.5,10,16,1,0,[42,0],1]],"children":["batOuterLeftWing"]},"batOuterRightWing":{"field":"batOuterRightWing","tex":[24,16],"pivot":[-12,1,1.5],"boxes":[[-8,1,0,8,12,1,0,[24,16],0]]},"batOuterLeftWing":{"field":"batOuterLeftWing","tex":[24,16],"pivot":[12,1,1.5],"mirror":1,"boxes":[[0,1,0,8,12,1,0,[24,16],1]]},"part0":{"tex":[24,0],"pivot":[0,0,0],"boxes":[[-4,-6,-2,3,4,1,0,[24,0],0]]},"part1":{"tex":[24,0],"pivot":[0,0,0],"mirror":1,"boxes":[[1,-6,-2,3,4,1,0,[24,0],1]]}}}}}},"ModelBiped":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedHead.pivot.1",1,1],["parts.bipedHeadwear.pivot.1",1,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["parts.bipedRightLeg.pivot.1",1,1],["parts.bipedLeftLeg.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]}}},"ModelBlaze":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"blazeSticks[0]":{"arrayField":"blazeSticks","index":0,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[1]":{"arrayField":"blazeSticks","index":1,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[2]":{"arrayField":"blazeSticks","index":2,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[3]":{"arrayField":"blazeSticks","index":3,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[4]":{"arrayField":"blazeSticks","index":4,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[5]":{"arrayField":"blazeSticks","index":5,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[6]":{"arrayField":"blazeSticks","index":6,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[7]":{"arrayField":"blazeSticks","index":7,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[8]":{"arrayField":"blazeSticks","index":8,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[9]":{"arrayField":"blazeSticks","index":9,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[10]":{"arrayField":"blazeSticks","index":10,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[11]":{"arrayField":"blazeSticks","index":11,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeHead":{"field":"blazeHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelBoat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"boatSides[0]":{"arrayField":"boatSides","index":0,"length":5,"tex":[0,8],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-12,-8,-3,24,16,4,0,[0,8],0]]},"boatSides[1]":{"arrayField":"boatSides","index":1,"length":5,"tex":[0,0],"pivot":[-11,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[2]":{"arrayField":"boatSides","index":2,"length":5,"tex":[0,0],"pivot":[11,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[3]":{"arrayField":"boatSides","index":3,"length":5,"tex":[0,0],"pivot":[0,4,-9],"rot":[0,3.1415927410125732,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[4]":{"arrayField":"boatSides","index":4,"length":5,"tex":[0,0],"pivot":[0,4,9],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]}}}}}},"ModelBook":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"coverRight":{"field":"coverRight","tex":[0,0],"pivot":[0,0,-1],"boxes":[[-6,-5,0,6,10,0,0,[0,0],0]]},"coverLeft":{"field":"coverLeft","tex":[16,0],"pivot":[0,0,1],"boxes":[[0,-5,0,6,10,0,0,[16,0],0]]},"pagesRight":{"field":"pagesRight","tex":[0,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.9900000095367432,5,8,1,0,[0,10],0]]},"pagesLeft":{"field":"pagesLeft","tex":[12,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.009999999776482582,5,8,1,0,[12,10],0]]},"flippingPageRight":{"field":"flippingPageRight","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"flippingPageLeft":{"field":"flippingPageLeft","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"bookSpine":{"field":"bookSpine","tex":[12,0],"pivot":[0,0,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,-5,0,2,10,0,0,[12,0],0]]}}}}}},"ModelChest":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]}}}}}},"ModelChicken":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,15,-4],"boxes":[[-2,-6,-2,4,6,3,0,[0,0],0]]},"body":{"field":"body","tex":[0,9],"pivot":[0,16,0],"boxes":[[-3,-4,-3,6,8,6,0,[0,9],0]]},"rightLeg":{"field":"rightLeg","tex":[26,0],"pivot":[-2,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"leftLeg":{"field":"leftLeg","tex":[26,0],"pivot":[1,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"rightWing":{"field":"rightWing","tex":[24,13],"pivot":[-4,13,0],"boxes":[[0,0,-3,1,4,6,0,[24,13],0]]},"leftWing":{"field":"leftWing","tex":[24,13],"pivot":[4,13,0],"boxes":[[-1,0,-3,1,4,6,0,[24,13],0]]},"bill":{"field":"bill","tex":[14,0],"pivot":[0,15,-4],"boxes":[[-2,-4,-4,4,2,2,0,[14,0],0]]},"chin":{"field":"chin","tex":[14,4],"pivot":[0,15,-4],"boxes":[[-1,-2,-3,2,2,2,0,[14,4],0]]}}}}}},"ModelCow":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[22,0],"pivot":[0,4,-8],"boxes":[[-4,-4,-6,8,8,6,0,[0,0],0],[-5,-5,-4,1,3,1,0,[22,0],0],[4,-5,-4,1,3,1,0,[22,0],0]]},"body":{"field":"body","tex":[52,0],"pivot":[0,5,2],"boxes":[[-6,-10,-7,12,18,10,0,[18,4],0],[-2,2,-8,4,6,1,0,[52,0],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":6}}}}},"ModelCreeper":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}},"d":[["parts.head.boxes.0.6",0,1],["parts.field_78133_b.boxes.0.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}}},"ModelDragon":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":256,"th":256,"parts":{"head":{"field":"head","boxName":"head","tex":[112,0],"pivot":[0,0,0],"boxes":[[-6,-1,-24,12,5,16,0,[176,44],0],[-8,-8,-10,16,16,16,0,[112,30],0],[-5,-12,-4,2,4,6,0,[0,0],1],[-5,-3,-22,2,2,4,0,[112,0],1],[3,-12,-4,2,4,6,0,[0,0],0],[3,-3,-22,2,2,4,0,[112,0],0]],"children":["jaw"]},"neck":{"field":"neck","boxName":"neck","tex":[48,0],"pivot":[0,0,0],"boxes":[[-5,-5,-5,10,10,10,0,[192,104],0],[-1,-9,-3,2,4,6,0,[48,0],0]]},"jaw":{"field":"jaw","boxName":"jaw","tex":[176,65],"pivot":[0,4,-8],"boxes":[[-6,0,-16,12,4,16,0,[176,65],0]]},"body":{"field":"body","boxName":"body","tex":[220,53],"pivot":[0,4,8],"boxes":[[-12,0,-16,24,24,64,0,[0,0],0],[-1,-6,-10,2,6,12,0,[220,53],0],[-1,-6,10,2,6,12,0,[220,53],0],[-1,-6,30,2,6,12,0,[220,53],0]]},"rearLeg":{"field":"rearLeg","boxName":"rearleg","tex":[0,0],"pivot":[-16,16,42],"boxes":[[-8,-4,-8,16,32,16,0,[0,0],0]],"children":["rearLegTip"]},"frontLeg":{"field":"frontLeg","boxName":"frontleg","tex":[112,104],"pivot":[-12,20,2],"boxes":[[-4,-4,-4,8,24,8,0,[112,104],0]],"children":["frontLegTip"]},"rearLegTip":{"field":"rearLegTip","boxName":"rearlegtip","tex":[196,0],"pivot":[0,32,-4],"boxes":[[-6,-2,0,12,32,12,0,[196,0],0]],"children":["rearFoot"]},"frontLegTip":{"field":"frontLegTip","boxName":"frontlegtip","tex":[226,138],"pivot":[0,20,-1],"boxes":[[-3,-1,-3,6,24,6,0,[226,138],0]],"children":["frontFoot"]},"rearFoot":{"field":"rearFoot","boxName":"rearfoot","tex":[112,0],"pivot":[0,31,4],"boxes":[[-9,0,-20,18,6,24,0,[112,0],0]]},"frontFoot":{"field":"frontFoot","boxName":"frontfoot","tex":[144,104],"pivot":[0,23,0],"boxes":[[-4,0,-12,8,4,16,0,[144,104],0]]},"wing":{"field":"wing","boxName":"wing","tex":[-56,88],"pivot":[-12,5,2],"boxes":[[-56,-4,-4,56,8,8,0,[112,88],0],[-56,0,2,56,0,56,0,[-56,88],0]],"children":["wingTip"]},"wingTip":{"field":"wingTip","boxName":"wingtip","tex":[-56,144],"pivot":[-56,0,0],"boxes":[[-56,-2,-2,56,4,4,0,[112,136],0],[-56,0,2,56,0,56,0,[-56,144],0]]}}}}}},"ModelEnderCrystal":{"super":"ModelBase","ctors":{"(FZ)V":{"base":{"tw":64,"th":32,"parts":{"cube":{"field":"cube","boxName":"cube","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[32,0],0]]},"glass":{"field":"glass","boxName":"glass","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelEnderman":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[0,16],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,16],0]]},"bipedBody":{"field":"bipedBody","tex":[32,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[32,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[56,0],"pivot":[-3,-12,0],"boxes":[[-1,-2,-1,2,30,2,0,[56,0],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[56,0],"pivot":[5,-12,0],"mirror":1,"boxes":[[-1,-2,-1,2,30,2,0,[56,0],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[56,0],"pivot":[-2,-2,0],"boxes":[[-1,0,-1,2,30,2,0,[56,0],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[56,0],"pivot":[2,-2,0],"mirror":1,"boxes":[[-1,0,-1,2,30,2,0,[56,0],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[32,0],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"part1":{"tex":[16,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"part2":{"tex":[40,16],"pivot":[-5,-12,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part3":{"tex":[40,16],"pivot":[5,-12,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part4":{"tex":[0,16],"pivot":[-1.899999976158142,-2,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[1.899999976158142,-2,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}}}},"ModelGhast":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,0],"pivot":[0,8,0],"boxes":[[-8,-8,-8,16,16,16,0,[0,0],0]]},"tentacles[0]":{"arrayField":"tentacles","index":0,"length":9,"tex":[0,0],"pivot":[-3.75,15,-5],"boxes":[[-1,0,-1,2,8,2,0,[0,0],0]]},"tentacles[1]":{"arrayField":"tentacles","index":1,"length":9,"tex":[0,0],"pivot":[1.25,15,-5],"boxes":[[-1,0,-1,2,13,2,0,[0,0],0]]},"tentacles[2]":{"arrayField":"tentacles","index":2,"length":9,"tex":[0,0],"pivot":[6.25,15,-5],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[3]":{"arrayField":"tentacles","index":3,"length":9,"tex":[0,0],"pivot":[-6.25,15,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[4]":{"arrayField":"tentacles","index":4,"length":9,"tex":[0,0],"pivot":[-1.25,15,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[5]":{"arrayField":"tentacles","index":5,"length":9,"tex":[0,0],"pivot":[3.75,15,0],"boxes":[[-1,0,-1,2,10,2,0,[0,0],0]]},"tentacles[6]":{"arrayField":"tentacles","index":6,"length":9,"tex":[0,0],"pivot":[-3.75,15,5],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]},"tentacles[7]":{"arrayField":"tentacles","index":7,"length":9,"tex":[0,0],"pivot":[1.25,15,5],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[8]":{"arrayField":"tentacles","index":8,"length":9,"tex":[0,0],"pivot":[6.25,15,5],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]}}}}}},"ModelIronGolem":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1]]},"(FF)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,0,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,0,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,18,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,18,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1],["parts.ironGolemHead.pivot.1",1,1],["parts.ironGolemBody.pivot.1",1,1],["parts.ironGolemLeftLeg.pivot.1",1,1],["parts.ironGolemRightLeg.pivot.1",1,1]]}}},"ModelLargeChest":{"super":"ModelChest","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[128,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,30,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[128,64],"pivot":[1,6,1],"boxes":[[0,0,0,30,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[128,64],"pivot":[16,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part0":{"tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"part1":{"tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part2":{"tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]}}}}}},"ModelMagmaCube":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"field_78109_a[0]":{"arrayField":"field_78109_a","index":0,"length":8,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,1,8,0,[0,0],0]]},"field_78109_a[1]":{"arrayField":"field_78109_a","index":1,"length":8,"tex":[0,1],"pivot":[0,0,0],"boxes":[[-4,17,-4,8,1,8,0,[0,1],0]]},"field_78109_a[2]":{"arrayField":"field_78109_a","index":2,"length":8,"tex":[24,10],"pivot":[0,0,0],"boxes":[[-4,18,-4,8,1,8,0,[24,10],0]]},"field_78109_a[3]":{"arrayField":"field_78109_a","index":3,"length":8,"tex":[24,19],"pivot":[0,0,0],"boxes":[[-4,19,-4,8,1,8,0,[24,19],0]]},"field_78109_a[4]":{"arrayField":"field_78109_a","index":4,"length":8,"tex":[0,4],"pivot":[0,0,0],"boxes":[[-4,20,-4,8,1,8,0,[0,4],0]]},"field_78109_a[5]":{"arrayField":"field_78109_a","index":5,"length":8,"tex":[0,5],"pivot":[0,0,0],"boxes":[[-4,21,-4,8,1,8,0,[0,5],0]]},"field_78109_a[6]":{"arrayField":"field_78109_a","index":6,"length":8,"tex":[0,6],"pivot":[0,0,0],"boxes":[[-4,22,-4,8,1,8,0,[0,6],0]]},"field_78109_a[7]":{"arrayField":"field_78109_a","index":7,"length":8,"tex":[0,7],"pivot":[0,0,0],"boxes":[[-4,23,-4,8,1,8,0,[0,7],0]]},"field_78108_b":{"field":"field_78108_b","tex":[0,16],"pivot":[0,0,0],"boxes":[[-2,18,-2,4,4,4,0,[0,16],0]]}}}}}},"ModelMinecart":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"sideModels[0]":{"arrayField":"sideModels","index":0,"length":7,"tex":[0,10],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-10,-8,-1,20,16,2,0,[0,10],0]]},"sideModels[1]":{"arrayField":"sideModels","index":1,"length":7,"tex":[0,0],"pivot":[-9,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[2]":{"arrayField":"sideModels","index":2,"length":7,"tex":[0,0],"pivot":[9,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[3]":{"arrayField":"sideModels","index":3,"length":7,"tex":[0,0],"pivot":[0,4,-7],"rot":[0,3.1415927410125732,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[4]":{"arrayField":"sideModels","index":4,"length":7,"tex":[0,0],"pivot":[0,4,7],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[5]":{"arrayField":"sideModels","index":5,"length":7,"tex":[44,10],"pivot":[0,4,0],"rot":[-1.5707963705062866,0,0],"boxes":[[-9,-7,-1,18,14,1,0,[44,10],0]]}}}}}},"ModelOcelot":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ocelotBackLeftLeg":{"field":"ocelotBackLeftLeg","tex":[8,13],"pivot":[1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotBackRightLeg":{"field":"ocelotBackRightLeg","tex":[8,13],"pivot":[-1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotFrontLeftLeg":{"field":"ocelotFrontLeftLeg","tex":[40,0],"pivot":[1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotFrontRightLeg":{"field":"ocelotFrontRightLeg","tex":[40,0],"pivot":[-1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotTail":{"field":"ocelotTail","tex":[0,15],"pivot":[0,15,8],"rot":[0.8999999761581421,0,0],"boxes":[[-0.5,0,0,1,8,1,0,[0,15],0]]},"ocelotTail2":{"field":"ocelotTail2","tex":[4,15],"pivot":[0,20,14],"boxes":[[-0.5,0,0,1,8,1,0,[4,15],0]]},"ocelotHead":{"field":"ocelotHead","boxName":"head","tex":[6,10],"pivot":[0,15,-9],"boxes":[[-2.5,-2,-3,5,4,5,0,[0,0],0],[-1.5,0,-4,3,2,2,0,[0,24],0],[-2,-3,0,1,1,2,0,[0,10],0],[1,-3,0,1,1,2,0,[6,10],0]]},"ocelotBody":{"field":"ocelotBody","tex":[20,0],"pivot":[0,12,-10],"boxes":[[-2,3,-8,4,16,6,0,[20,0],0]]}},"extra":{"field_78163_i":1}}}}},"ModelPig":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}},"d":[["parts.head.boxes.0.6",0,1],["parts.head.boxes.1.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}}},"ModelQuadruped":{"super":"ModelBase","ctors":{"(IF)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,18,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,17,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}},"d":[["parts.head.pivot.1",0,-1],["parts.body.pivot.1",0,-1],["parts.leg1.pivot.1",0,-1],["parts.leg1.boxes.0.4",0,1],["parts.leg2.pivot.1",0,-1],["parts.leg2.boxes.0.4",0,1],["parts.leg3.pivot.1",0,-1],["parts.leg3.boxes.0.4",0,1],["parts.leg4.pivot.1",0,-1],["parts.leg4.boxes.0.4",0,1],["parts.head.boxes.0.6",1,1],["parts.body.boxes.0.6",1,1],["parts.leg1.boxes.0.6",1,1],["parts.leg2.boxes.0.6",1,1],["parts.leg3.boxes.0.6",1,1],["parts.leg4.boxes.0.6",1,1]]}}},"ModelSheep1":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-4,6,6,6,0.6000000238418579,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"boxes":[[-4,-10,-7,8,16,6,1.75,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"part2":{"tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part4":{"tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}}},"ModelSheep2":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-6,6,6,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"boxes":[[-4,-10,-7,8,16,6,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}}},"ModelSign":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"signBoard":{"field":"signBoard","tex":[0,0],"pivot":[0,0,0],"boxes":[[-12,-14,-1,24,12,2,0,[0,0],0]]},"signStick":{"field":"signStick","tex":[0,14],"pivot":[0,0,0],"boxes":[[-1,-2,-1,2,14,2,0,[0,14],0]]}}}}}},"ModelSilverfish":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"silverfishBodyParts[0]":{"arrayField":"silverfishBodyParts","index":0,"length":7,"tex":[0,0],"pivot":[0,22,-3.5],"boxes":[[-1.5,0,-1,3,2,2,0,[0,0],0]]},"silverfishBodyParts[1]":{"arrayField":"silverfishBodyParts","index":1,"length":7,"tex":[0,4],"pivot":[0,21,-1.5],"boxes":[[-2,0,-1,4,3,2,0,[0,4],0]]},"silverfishBodyParts[2]":{"arrayField":"silverfishBodyParts","index":2,"length":7,"tex":[0,9],"pivot":[0,20,1],"boxes":[[-3,0,-1.5,6,4,3,0,[0,9],0]]},"silverfishBodyParts[3]":{"arrayField":"silverfishBodyParts","index":3,"length":7,"tex":[0,16],"pivot":[0,21,4],"boxes":[[-1.5,0,-1.5,3,3,3,0,[0,16],0]]},"silverfishBodyParts[4]":{"arrayField":"silverfishBodyParts","index":4,"length":7,"tex":[0,22],"pivot":[0,22,7],"boxes":[[-1,0,-1.5,2,2,3,0,[0,22],0]]},"silverfishBodyParts[5]":{"arrayField":"silverfishBodyParts","index":5,"length":7,"tex":[11,0],"pivot":[0,23,9.5],"boxes":[[-1,0,-1,2,1,2,0,[11,0],0]]},"silverfishBodyParts[6]":{"arrayField":"silverfishBodyParts","index":6,"length":7,"tex":[13,4],"pivot":[0,23,11.5],"boxes":[[-0.5,0,-1,1,1,2,0,[13,4],0]]},"silverfishWings[0]":{"arrayField":"silverfishWings","index":0,"length":3,"tex":[20,0],"pivot":[0,16,1],"boxes":[[-5,0,-1.5,10,8,3,0,[20,0],0]]},"silverfishWings[1]":{"arrayField":"silverfishWings","index":1,"length":3,"tex":[20,11],"pivot":[0,20,7],"boxes":[[-3,0,-1.5,6,4,3,0,[20,11],0]]},"silverfishWings[2]":{"arrayField":"silverfishWings","index":2,"length":3,"tex":[20,18],"pivot":[0,19,-1.5],"boxes":[[-3,0,-1.5,6,5,2,0,[20,18],0]]}}}}}},"ModelSkeleton":{"super":"ModelZombie","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.part0.boxes.0.6",0,1],["parts.part1.boxes.0.6",0,1],["parts.part2.boxes.0.6",0,1],["parts.part3.boxes.0.6",0,1]]}}},"ModelSkeletonHead":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,35],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,35],0]]}}}},"(IIII)V":{"base":{"tw":0,"th":0,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}},"d":[["parts.skeletonHead.tex.0",0,1],["parts.skeletonHead.boxes.0.7.0",0,1],["parts.skeletonHead.tex.1",1,1],["parts.skeletonHead.boxes.0.7.1",1,1],["tw",2,1],["parts.skeletonHead.ts.0",2,1],["th",3,1],["parts.skeletonHead.ts.1",3,1]]}}},"ModelSlime":{"super":"ModelBase","ctors":{"(I)V":{"base":{"tw":64,"th":32,"parts":{"slimeBodies":{"field":"slimeBodies","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelSnowMan":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,16],"ts":[64,64],"pivot":[0,13,0],"boxes":[[-5,-10,-5,10,10,10,-0.5,[0,16],0]]},"bottomBody":{"field":"bottomBody","tex":[0,36],"ts":[64,64],"pivot":[0,24,0],"boxes":[[-6,-12,-6,12,12,12,-0.5,[0,36],0]]},"head":{"field":"head","tex":[0,0],"ts":[64,64],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,0],0]]},"rightHand":{"field":"rightHand","tex":[32,0],"ts":[64,64],"pivot":[0,6,0],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]},"leftHand":{"field":"leftHand","tex":[32,0],"ts":[64,64],"pivot":[0,6,0],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]}}}}}},"ModelSpider":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"spiderHead":{"field":"spiderHead","tex":[32,4],"pivot":[0,15,-3],"boxes":[[-4,-4,-8,8,8,8,0,[32,4],0]]},"spiderNeck":{"field":"spiderNeck","tex":[0,0],"pivot":[0,15,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]]},"spiderBody":{"field":"spiderBody","tex":[0,12],"pivot":[0,15,9],"boxes":[[-5,-4,-6,10,8,12,0,[0,12],0]]},"spiderLeg1":{"field":"spiderLeg1","tex":[18,0],"pivot":[-4,15,2],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg2":{"field":"spiderLeg2","tex":[18,0],"pivot":[4,15,2],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg3":{"field":"spiderLeg3","tex":[18,0],"pivot":[-4,15,1],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg4":{"field":"spiderLeg4","tex":[18,0],"pivot":[4,15,1],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg5":{"field":"spiderLeg5","tex":[18,0],"pivot":[-4,15,0],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg6":{"field":"spiderLeg6","tex":[18,0],"pivot":[4,15,0],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg7":{"field":"spiderLeg7","tex":[18,0],"pivot":[-4,15,-1],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg8":{"field":"spiderLeg8","tex":[18,0],"pivot":[4,15,-1],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]}}}}}},"ModelSquid":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"squidBody":{"field":"squidBody","tex":[0,0],"pivot":[0,8,0],"boxes":[[-6,-8,-6,12,16,12,0,[0,0],0]]},"squidTentacles[0]":{"arrayField":"squidTentacles","index":0,"length":8,"tex":[48,0],"pivot":[5,15,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[1]":{"arrayField":"squidTentacles","index":1,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,3.535533905029297],"rot":[0,0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[2]":{"arrayField":"squidTentacles","index":2,"length":8,"tex":[48,0],"pivot":[3.0616169991140216e-16,15,5],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[3]":{"arrayField":"squidTentacles","index":3,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,3.535533905029297],"rot":[0,-0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[4]":{"arrayField":"squidTentacles","index":4,"length":8,"tex":[48,0],"pivot":[-5,15,6.123233998228043e-16],"rot":[0,-1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[5]":{"arrayField":"squidTentacles","index":5,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,-3.535533905029297],"rot":[0,-2.356194496154785,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[6]":{"arrayField":"squidTentacles","index":6,"length":8,"tex":[48,0],"pivot":[-9.184850467946473e-16,15,-5],"rot":[0,-3.1415927410125732,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[7]":{"arrayField":"squidTentacles","index":7,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,-3.535533905029297],"rot":[0,-3.9269907474517822,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]}}}}}},"ModelVillager":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,64],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,64],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[0,0],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[0,0],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1],["parts.villagerHead.pivot.1",1,1],["parts.villagerBody.pivot.1",1,1],["parts.villagerArms.pivot.1",1,1],["parts.rightVillagerLeg.pivot.1",1,1],["parts.leftVillagerLeg.pivot.1",1,1],["parts.field_82898_f.pivot.1",1,1],["parts.villagerHead.ts.0",2,1],["parts.villagerBody.ts.0",2,1],["parts.villagerArms.ts.0",2,1],["parts.rightVillagerLeg.ts.0",2,1],["parts.leftVillagerLeg.ts.0",2,1],["parts.field_82898_f.ts.0",2,1],["parts.villagerHead.ts.1",3,1],["parts.villagerBody.ts.1",3,1],["parts.villagerArms.ts.1",3,1],["parts.rightVillagerLeg.ts.1",3,1],["parts.leftVillagerLeg.ts.1",3,1],["parts.field_82898_f.ts.1",3,1]]}}},"ModelWitch":{"super":"ModelVillager","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"field_82901_h":{"field":"field_82901_h","tex":[0,0],"ts":[64,128],"pivot":[0,-2,0],"boxes":[[0,3,-6.75,1,1,1,-0.25,[0,0],0]]},"witchHat":{"field":"witchHat","tex":[0,64],"ts":[64,128],"pivot":[-5,-10.03125,-5],"boxes":[[0,0,0,10,2,10,0,[0,64],0]],"children":["part0"]},"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f","witchHat"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,128],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,128],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]],"children":["field_82901_h"]},"part0":{"tex":[0,76],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.05235987901687622,0,0.02617993950843811],"boxes":[[0,0,0,7,4,7,0,[0,76],0]],"children":["part1"]},"part1":{"tex":[0,87],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.10471975803375244,0,0.05235987901687622],"boxes":[[0,0,0,4,4,4,0,[0,87],0]],"children":["part2"]},"part2":{"tex":[0,95],"ts":[64,128],"pivot":[1.75,-2,2],"rot":[-0.20943951606750488,0,0.10471975803375244],"boxes":[[0,0,0,1,2,1,0.25,[0,95],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]}}},"ModelWither":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"field_82905_a[0]":{"arrayField":"field_82905_a","index":0,"length":3,"tex":[0,16],"pivot":[0,0,0],"boxes":[[-10,3.9000000953674316,-0.5,20,3,3,0,[0,16],0]]},"field_82905_a[1]":{"arrayField":"field_82905_a","index":1,"length":3,"tex":[24,22],"pivot":[-2,6.900000095367432,-0.5],"boxes":[[0,0,0,3,10,3,0,[0,22],0],[-4,1.5,0.5,11,2,2,0,[24,22],0],[-4,4,0.5,11,2,2,0,[24,22],0],[-4,6.5,0.5,11,2,2,0,[24,22],0]]},"field_82905_a[2]":{"arrayField":"field_82905_a","index":2,"length":3,"tex":[12,22],"pivot":[0,0,0],"boxes":[[0,0,0,3,6,3,0,[12,22],0]]},"field_82904_b[0]":{"arrayField":"field_82904_b","index":0,"length":3,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]},"field_82904_b[1]":{"arrayField":"field_82904_b","index":1,"length":3,"tex":[32,0],"pivot":[-8,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]},"field_82904_b[2]":{"arrayField":"field_82904_b","index":2,"length":3,"tex":[32,0],"pivot":[10,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]}}}}}},"ModelWolf":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"wolfHeadMain":{"field":"wolfHeadMain","tex":[0,10],"pivot":[-1,13.5,-7],"boxes":[[-3,-3,-2,6,6,4,0,[0,0],0],[-3,-5,0,2,2,1,0,[16,14],0],[1,-5,0,2,2,1,0,[16,14],0],[-1.5,0,-5,3,3,4,0,[0,10],0]]},"wolfBody":{"field":"wolfBody","tex":[18,14],"pivot":[0,14,2],"boxes":[[-4,-2,-3,6,9,6,0,[18,14],0]]},"wolfLeg1":{"field":"wolfLeg1","tex":[0,18],"pivot":[-2.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg2":{"field":"wolfLeg2","tex":[0,18],"pivot":[0.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg3":{"field":"wolfLeg3","tex":[0,18],"pivot":[-2.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg4":{"field":"wolfLeg4","tex":[0,18],"pivot":[0.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfTail":{"field":"wolfTail","tex":[9,18],"pivot":[-1,12,8],"boxes":[[-1,0,-1,2,8,2,0,[9,18],0]]},"wolfMane":{"field":"wolfMane","tex":[21,0],"pivot":[-1,14,2],"boxes":[[-4,-3,-3,8,6,7,0,[21,0],0]]}}}}}},"ModelZombie":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedHead.pivot.1",1,1],["parts.bipedHeadwear.pivot.1",1,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["parts.bipedRightLeg.pivot.1",1,1],["parts.bipedLeftLeg.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]},"(FZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["th",1,-32],["parts.bipedHead.ts.1",1,-32],["parts.bipedHeadwear.ts.1",1,-32],["parts.bipedBody.ts.1",1,-32],["parts.bipedRightArm.ts.1",1,-32],["parts.bipedLeftArm.ts.1",1,-32],["parts.bipedRightLeg.ts.1",1,-32],["parts.bipedLeftLeg.ts.1",1,-32],["parts.bipedEars.ts.1",1,-32],["parts.bipedCloak.ts.1",1,-32]]}}},"ModelZombieVillager":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}},"(FFZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}}}}};
+JVM.vanillaModels = {"ModelBat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"batHead":{"field":"batHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]],"children":["part0","part1"]},"batBody":{"field":"batBody","tex":[0,34],"pivot":[0,0,0],"boxes":[[-3,4,-3,6,12,6,0,[0,16],0],[-5,16,0,10,6,1,0,[0,34],0]],"children":["batRightWing","batLeftWing"]},"batRightWing":{"field":"batRightWing","tex":[42,0],"pivot":[0,0,0],"boxes":[[-12,1,1.5,10,16,1,0,[42,0],0]],"children":["batOuterRightWing"]},"batLeftWing":{"field":"batLeftWing","tex":[42,0],"pivot":[0,0,0],"mirror":1,"boxes":[[2,1,1.5,10,16,1,0,[42,0],1]],"children":["batOuterLeftWing"]},"batOuterRightWing":{"field":"batOuterRightWing","tex":[24,16],"pivot":[-12,1,1.5],"boxes":[[-8,1,0,8,12,1,0,[24,16],0]]},"batOuterLeftWing":{"field":"batOuterLeftWing","tex":[24,16],"pivot":[12,1,1.5],"mirror":1,"boxes":[[0,1,0,8,12,1,0,[24,16],1]]},"part0":{"tex":[24,0],"pivot":[0,0,0],"boxes":[[-4,-6,-2,3,4,1,0,[24,0],0]]},"part1":{"tex":[24,0],"pivot":[0,0,0],"mirror":1,"boxes":[[1,-6,-2,3,4,1,0,[24,0],1]]}}}}},"drawn":["batHead","batBody"]},"ModelBiped":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[0,0,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[0,0,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[0,0,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[0,0,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[0,0,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[0,0,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]}},"drawn":["bipedHead","bipedHeadwear","bipedBody","bipedRightArm","bipedLeftArm","bipedRightLeg","bipedLeftLeg"]},"ModelBlaze":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"blazeSticks[0]":{"arrayField":"blazeSticks","index":0,"length":12,"tex":[0,16],"pivot":[9,-1,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[1]":{"arrayField":"blazeSticks","index":1,"length":12,"tex":[0,16],"pivot":[1.1021821408568715e-15,-1.1224087476730347,9],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[2]":{"arrayField":"blazeSticks","index":2,"length":12,"tex":[0,16],"pivot":[-9,-1.4596672058105469,1.1021821408568715e-15],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[3]":{"arrayField":"blazeSticks","index":3,"length":12,"tex":[0,16],"pivot":[0,-1.929208517074585,-9],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[4]":{"arrayField":"blazeSticks","index":4,"length":12,"tex":[0,16],"pivot":[4.949747562408447,1.5839191675186157,4.949747562408447],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[5]":{"arrayField":"blazeSticks","index":5,"length":12,"tex":[0,16],"pivot":[-4.949747562408447,1.1989107131958008,4.949747562408447],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[6]":{"arrayField":"blazeSticks","index":6,"length":12,"tex":[0,16],"pivot":[-4.949747562408447,1.0100092887878418,-4.949747562408447],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[7]":{"arrayField":"blazeSticks","index":7,"length":12,"tex":[0,16],"pivot":[4.949747562408447,1.0635323524475098,-4.949747562408447],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[8]":{"arrayField":"blazeSticks","index":8,"length":12,"tex":[0,16],"pivot":[4.455076217651367,11.960163116455078,2.269866943359375],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[9]":{"arrayField":"blazeSticks","index":9,"length":12,"tex":[0,16],"pivot":[-2.269866943359375,11.8930082321167,4.455076217651367],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[10]":{"arrayField":"blazeSticks","index":10,"length":12,"tex":[0,16],"pivot":[-4.455076217651367,11.346710205078125,-2.269866943359375],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[11]":{"arrayField":"blazeSticks","index":11,"length":12,"tex":[0,16],"pivot":[2.269866943359375,10.614307403564453,-4.455076217651367],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeHead":{"field":"blazeHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}},"drawn":["blazeSticks[0]","blazeSticks[1]","blazeSticks[2]","blazeSticks[3]","blazeSticks[4]","blazeSticks[5]","blazeSticks[6]","blazeSticks[7]","blazeSticks[8]","blazeSticks[9]","blazeSticks[10]","blazeSticks[11]","blazeHead"]},"ModelBoat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"boatSides[0]":{"arrayField":"boatSides","index":0,"length":5,"tex":[0,8],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-12,-8,-3,24,16,4,0,[0,8],0]]},"boatSides[1]":{"arrayField":"boatSides","index":1,"length":5,"tex":[0,0],"pivot":[-11,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[2]":{"arrayField":"boatSides","index":2,"length":5,"tex":[0,0],"pivot":[11,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[3]":{"arrayField":"boatSides","index":3,"length":5,"tex":[0,0],"pivot":[0,4,-9],"rot":[0,3.1415927410125732,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[4]":{"arrayField":"boatSides","index":4,"length":5,"tex":[0,0],"pivot":[0,4,9],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]}}}}},"drawn":["boatSides[0]","boatSides[1]","boatSides[2]","boatSides[3]","boatSides[4]"]},"ModelBook":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"coverRight":{"field":"coverRight","tex":[0,0],"pivot":[0,0,-1],"rot":[0,3.1415927410125732,0],"boxes":[[-6,-5,0,6,10,0,0,[0,0],0]]},"coverLeft":{"field":"coverLeft","tex":[16,0],"pivot":[0,0,1],"boxes":[[0,-5,0,6,10,0,0,[16,0],0]]},"pagesRight":{"field":"pagesRight","tex":[0,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.9900000095367432,5,8,1,0,[0,10],0]]},"pagesLeft":{"field":"pagesLeft","tex":[12,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.009999999776482582,5,8,1,0,[12,10],0]]},"flippingPageRight":{"field":"flippingPageRight","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"flippingPageLeft":{"field":"flippingPageLeft","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"bookSpine":{"field":"bookSpine","tex":[12,0],"pivot":[0,0,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,-5,0,2,10,0,0,[12,0],0]]}}}}},"drawn":["coverRight","coverLeft","bookSpine","pagesRight","pagesLeft","flippingPageRight","flippingPageLeft"]},"ModelChest":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]}}}}}},"ModelChicken":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,15,-4],"boxes":[[-2,-6,-2,4,6,3,0,[0,0],0]]},"body":{"field":"body","tex":[0,9],"pivot":[0,16,0],"rot":[1.5707963705062866,0,0],"boxes":[[-3,-4,-3,6,8,6,0,[0,9],0]]},"rightLeg":{"field":"rightLeg","tex":[26,0],"pivot":[-2,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"leftLeg":{"field":"leftLeg","tex":[26,0],"pivot":[1,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"rightWing":{"field":"rightWing","tex":[24,13],"pivot":[-4,13,0],"boxes":[[0,0,-3,1,4,6,0,[24,13],0]]},"leftWing":{"field":"leftWing","tex":[24,13],"pivot":[4,13,0],"boxes":[[-1,0,-3,1,4,6,0,[24,13],0]]},"bill":{"field":"bill","tex":[14,0],"pivot":[0,15,-4],"boxes":[[-2,-4,-4,4,2,2,0,[14,0],0]]},"chin":{"field":"chin","tex":[14,4],"pivot":[0,15,-4],"boxes":[[-1,-2,-3,2,2,2,0,[14,4],0]]}}}}},"drawn":["head","bill","chin","body","rightLeg","leftLeg","rightWing","leftWing"]},"ModelCow":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[22,0],"pivot":[0,4,-8],"boxes":[[-4,-4,-6,8,8,6,0,[0,0],0],[-5,-5,-4,1,3,1,0,[22,0],0],[4,-5,-4,1,3,1,0,[22,0],0]]},"body":{"field":"body","tex":[52,0],"pivot":[0,5,2],"rot":[1.5707963705062866,0,0],"boxes":[[-6,-10,-7,12,18,10,0,[18,4],0],[-2,2,-8,4,6,1,0,[52,0],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":6}}}},"drawn":["leg1","leg2","leg3","leg4","head","body"]},"ModelCreeper":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}},"d":[["parts.head.boxes.0.6",0,1],["parts.field_78133_b.boxes.0.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}},"drawn":["head","body","leg1","leg2","leg3","leg4"]},"ModelDragon":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":256,"th":256,"parts":{"head":{"field":"head","boxName":"head","tex":[112,0],"pivot":[0,0,0],"boxes":[[-6,-1,-24,12,5,16,0,[176,44],0],[-8,-8,-10,16,16,16,0,[112,30],0],[-5,-12,-4,2,4,6,0,[0,0],1],[-5,-3,-22,2,2,4,0,[112,0],1],[3,-12,-4,2,4,6,0,[0,0],0],[3,-3,-22,2,2,4,0,[112,0],0]],"children":["jaw"]},"neck":{"field":"neck","boxName":"neck","tex":[48,0],"pivot":[0,0,0],"boxes":[[-5,-5,-5,10,10,10,0,[192,104],0],[-1,-9,-3,2,4,6,0,[48,0],0]]},"jaw":{"field":"jaw","boxName":"jaw","tex":[176,65],"pivot":[0,4,-8],"boxes":[[-6,0,-16,12,4,16,0,[176,65],0]]},"body":{"field":"body","boxName":"body","tex":[220,53],"pivot":[0,4,8],"boxes":[[-12,0,-16,24,24,64,0,[0,0],0],[-1,-6,-10,2,6,12,0,[220,53],0],[-1,-6,10,2,6,12,0,[220,53],0],[-1,-6,30,2,6,12,0,[220,53],0]]},"rearLeg":{"field":"rearLeg","boxName":"rearleg","tex":[0,0],"pivot":[-16,16,42],"boxes":[[-8,-4,-8,16,32,16,0,[0,0],0]],"children":["rearLegTip"]},"frontLeg":{"field":"frontLeg","boxName":"frontleg","tex":[112,104],"pivot":[-12,20,2],"boxes":[[-4,-4,-4,8,24,8,0,[112,104],0]],"children":["frontLegTip"]},"rearLegTip":{"field":"rearLegTip","boxName":"rearlegtip","tex":[196,0],"pivot":[0,32,-4],"boxes":[[-6,-2,0,12,32,12,0,[196,0],0]],"children":["rearFoot"]},"frontLegTip":{"field":"frontLegTip","boxName":"frontlegtip","tex":[226,138],"pivot":[0,20,-1],"boxes":[[-3,-1,-3,6,24,6,0,[226,138],0]],"children":["frontFoot"]},"rearFoot":{"field":"rearFoot","boxName":"rearfoot","tex":[112,0],"pivot":[0,31,4],"boxes":[[-9,0,-20,18,6,24,0,[112,0],0]]},"frontFoot":{"field":"frontFoot","boxName":"frontfoot","tex":[144,104],"pivot":[0,23,0],"boxes":[[-4,0,-12,8,4,16,0,[144,104],0]]},"wing":{"field":"wing","boxName":"wing","tex":[-56,88],"pivot":[-12,5,2],"boxes":[[-56,-4,-4,56,8,8,0,[112,88],0],[-56,0,2,56,0,56,0,[-56,88],0]],"children":["wingTip"]},"wingTip":{"field":"wingTip","boxName":"wingtip","tex":[-56,144],"pivot":[-56,0,0],"boxes":[[-56,-2,-2,56,4,4,0,[112,136],0],[-56,0,2,56,0,56,0,[-56,144],0]]}},"extra":{"partialTicks":1}}}}},"ModelEnderCrystal":{"super":"ModelBase","ctors":{"(FZ)V":{"base":{"tw":64,"th":32,"parts":{"cube":{"field":"cube","boxName":"cube","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[32,0],0]]},"glass":{"field":"glass","boxName":"glass","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}},"drawn":["glass","cube"]},"ModelEnderman":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,-13,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[0,16],"pivot":[0,-13,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,16],0]]},"bipedBody":{"field":"bipedBody","tex":[32,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[32,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[56,0],"pivot":[-5,-12,0],"rot":[0,0,0.10000000149011612],"boxes":[[-1,-2,-1,2,30,2,0,[56,0],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[56,0],"pivot":[5,-12,0],"rot":[0,0,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-1,2,30,2,0,[56,0],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[56,0],"pivot":[-2,-5,0],"boxes":[[-1,0,-1,2,30,2,0,[56,0],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[56,0],"pivot":[2,-5,0],"mirror":1,"boxes":[[-1,0,-1,2,30,2,0,[56,0],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[32,0],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"part1":{"tex":[16,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"part2":{"tex":[40,16],"pivot":[-5,-12,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part3":{"tex":[40,16],"pivot":[5,-12,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part4":{"tex":[0,16],"pivot":[-1.899999976158142,-2,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[1.899999976158142,-2,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}}},"drawn":["bipedHead","bipedHeadwear","bipedBody","bipedRightArm","bipedLeftArm","bipedRightLeg","bipedLeftLeg"]},"ModelGhast":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,0],"pivot":[0,8,0],"boxes":[[-8,-8,-8,16,16,16,0,[0,0],0]]},"tentacles[0]":{"arrayField":"tentacles","index":0,"length":9,"tex":[0,0],"pivot":[-3.75,15,-5],"rot":[0.4000000059604645,0,0],"boxes":[[-1,0,-1,2,8,2,0,[0,0],0]]},"tentacles[1]":{"arrayField":"tentacles","index":1,"length":9,"tex":[0,0],"pivot":[1.25,15,-5],"rot":[0.5682902932167053,0,0],"boxes":[[-1,0,-1,2,13,2,0,[0,0],0]]},"tentacles[2]":{"arrayField":"tentacles","index":2,"length":9,"tex":[0,0],"pivot":[6.25,15,-5],"rot":[0.5818655490875244,0,0],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[3]":{"arrayField":"tentacles","index":3,"length":9,"tex":[0,0],"pivot":[-6.25,15,0],"rot":[0.4282265603542328,0,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[4]":{"arrayField":"tentacles","index":4,"length":9,"tex":[0,0],"pivot":[-1.25,15,0],"rot":[0.24864594638347626,0,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[5]":{"arrayField":"tentacles","index":5,"length":9,"tex":[0,0],"pivot":[3.75,15,0],"rot":[0.208210289478302,0,0],"boxes":[[-1,0,-1,2,10,2,0,[0,0],0]]},"tentacles[6]":{"arrayField":"tentacles","index":6,"length":9,"tex":[0,0],"pivot":[-3.75,15,5],"rot":[0.34411191940307617,0,0],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]},"tentacles[7]":{"arrayField":"tentacles","index":7,"length":9,"tex":[0,0],"pivot":[1.25,15,5],"rot":[0.5313879251480103,0,0],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[8]":{"arrayField":"tentacles","index":8,"length":9,"tex":[0,0],"pivot":[6.25,15,5],"rot":[0.597871720790863,0,0],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]}}}}},"drawn":["body","tentacles[0]","tentacles[1]","tentacles[2]","tentacles[3]","tentacles[4]","tentacles[5]","tentacles[6]","tentacles[7]","tentacles[8]"]},"ModelIronGolem":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1]]},"(FF)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,0,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,0,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,18,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,18,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1],["parts.ironGolemHead.pivot.1",1,1],["parts.ironGolemBody.pivot.1",1,1],["parts.ironGolemLeftLeg.pivot.1",1,1],["parts.ironGolemRightLeg.pivot.1",1,1]]}},"drawn":["ironGolemHead","ironGolemBody","ironGolemRightArm","ironGolemLeftArm","ironGolemLeftLeg","ironGolemRightLeg"]},"ModelLargeChest":{"super":"ModelChest","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[128,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,30,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[128,64],"pivot":[1,6,1],"boxes":[[0,0,0,30,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[128,64],"pivot":[16,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part0":{"tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"part1":{"tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part2":{"tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]}}}}}},"ModelMagmaCube":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"field_78109_a[0]":{"arrayField":"field_78109_a","index":0,"length":8,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,1,8,0,[0,0],0]]},"field_78109_a[1]":{"arrayField":"field_78109_a","index":1,"length":8,"tex":[0,1],"pivot":[0,0,0],"boxes":[[-4,17,-4,8,1,8,0,[0,1],0]]},"field_78109_a[2]":{"arrayField":"field_78109_a","index":2,"length":8,"tex":[24,10],"pivot":[0,0,0],"boxes":[[-4,18,-4,8,1,8,0,[24,10],0]]},"field_78109_a[3]":{"arrayField":"field_78109_a","index":3,"length":8,"tex":[24,19],"pivot":[0,0,0],"boxes":[[-4,19,-4,8,1,8,0,[24,19],0]]},"field_78109_a[4]":{"arrayField":"field_78109_a","index":4,"length":8,"tex":[0,4],"pivot":[0,0,0],"boxes":[[-4,20,-4,8,1,8,0,[0,4],0]]},"field_78109_a[5]":{"arrayField":"field_78109_a","index":5,"length":8,"tex":[0,5],"pivot":[0,0,0],"boxes":[[-4,21,-4,8,1,8,0,[0,5],0]]},"field_78109_a[6]":{"arrayField":"field_78109_a","index":6,"length":8,"tex":[0,6],"pivot":[0,0,0],"boxes":[[-4,22,-4,8,1,8,0,[0,6],0]]},"field_78109_a[7]":{"arrayField":"field_78109_a","index":7,"length":8,"tex":[0,7],"pivot":[0,0,0],"boxes":[[-4,23,-4,8,1,8,0,[0,7],0]]},"field_78108_b":{"field":"field_78108_b","tex":[0,16],"pivot":[0,0,0],"boxes":[[-2,18,-2,4,4,4,0,[0,16],0]]}}}}},"drawn":["field_78109_a[0]","field_78109_a[1]","field_78109_a[2]","field_78109_a[3]","field_78109_a[4]","field_78109_a[5]","field_78109_a[6]","field_78109_a[7]","field_78108_b"]},"ModelMinecart":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"sideModels[0]":{"arrayField":"sideModels","index":0,"length":7,"tex":[0,10],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-10,-8,-1,20,16,2,0,[0,10],0]]},"sideModels[1]":{"arrayField":"sideModels","index":1,"length":7,"tex":[0,0],"pivot":[-9,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[2]":{"arrayField":"sideModels","index":2,"length":7,"tex":[0,0],"pivot":[9,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[3]":{"arrayField":"sideModels","index":3,"length":7,"tex":[0,0],"pivot":[0,4,-7],"rot":[0,3.1415927410125732,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[4]":{"arrayField":"sideModels","index":4,"length":7,"tex":[0,0],"pivot":[0,4,7],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[5]":{"arrayField":"sideModels","index":5,"length":7,"tex":[44,10],"pivot":[0,4,0],"rot":[-1.5707963705062866,0,0],"boxes":[[-9,-7,-1,18,14,1,0,[44,10],0]]}}}}},"drawn":["sideModels[0]","sideModels[1]","sideModels[2]","sideModels[3]","sideModels[4]","sideModels[5]"]},"ModelOcelot":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ocelotBackLeftLeg":{"field":"ocelotBackLeftLeg","tex":[8,13],"pivot":[1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotBackRightLeg":{"field":"ocelotBackRightLeg","tex":[8,13],"pivot":[-1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotFrontLeftLeg":{"field":"ocelotFrontLeftLeg","tex":[40,0],"pivot":[1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotFrontRightLeg":{"field":"ocelotFrontRightLeg","tex":[40,0],"pivot":[-1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotTail":{"field":"ocelotTail","tex":[0,15],"pivot":[0,15,8],"rot":[0.8999999761581421,0,0],"boxes":[[-0.5,0,0,1,8,1,0,[0,15],0]]},"ocelotTail2":{"field":"ocelotTail2","tex":[4,15],"pivot":[0,20,14],"rot":[1.72787606716156,0,0],"boxes":[[-0.5,0,0,1,8,1,0,[4,15],0]]},"ocelotHead":{"field":"ocelotHead","boxName":"head","tex":[6,10],"pivot":[0,15,-9],"boxes":[[-2.5,-2,-3,5,4,5,0,[0,0],0],[-1.5,0,-4,3,2,2,0,[0,24],0],[-2,-3,0,1,1,2,0,[0,10],0],[1,-3,0,1,1,2,0,[6,10],0]]},"ocelotBody":{"field":"ocelotBody","tex":[20,0],"pivot":[0,12,-10],"rot":[1.5707963705062866,0,0],"boxes":[[-2,3,-8,4,16,6,0,[20,0],0]]}},"extra":{"field_78163_i":1}}}},"drawn":["ocelotHead","ocelotBody","ocelotTail","ocelotTail2","ocelotBackLeftLeg","ocelotBackRightLeg","ocelotFrontLeftLeg","ocelotFrontRightLeg"]},"ModelPig":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"rot":[1.5707963705062866,0,0],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"rot":[1.5707963705062866,0,0],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}},"d":[["parts.head.boxes.0.6",0,1],["parts.head.boxes.1.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}},"drawn":["head","body","leg1","leg2","leg3","leg4"]},"ModelQuadruped":{"super":"ModelBase","ctors":{"(IF)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,18,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,17,2],"rot":[1.5707963705062866,0,0],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}},"d":[["parts.head.pivot.1",0,-1],["parts.body.pivot.1",0,-1],["parts.leg1.pivot.1",0,-1],["parts.leg1.boxes.0.4",0,1],["parts.leg2.pivot.1",0,-1],["parts.leg2.boxes.0.4",0,1],["parts.leg3.pivot.1",0,-1],["parts.leg3.boxes.0.4",0,1],["parts.leg4.pivot.1",0,-1],["parts.leg4.boxes.0.4",0,1],["parts.head.boxes.0.6",1,1],["parts.body.boxes.0.6",1,1],["parts.leg1.boxes.0.6",1,1],["parts.leg2.boxes.0.6",1,1],["parts.leg3.boxes.0.6",1,1],["parts.leg4.boxes.0.6",1,1]]}},"drawn":["head","body","leg1","leg2","leg3","leg4"]},"ModelSheep1":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-4,6,6,6,0.6000000238418579,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"rot":[1.5707963705062866,0,0],"boxes":[[-4,-10,-7,8,16,6,1.75,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"part2":{"tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part4":{"tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}},"drawn":["head","body","leg1","leg2","leg3","leg4"]},"ModelSheep2":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-6,6,6,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"rot":[1.5707963705062866,0,0],"boxes":[[-4,-10,-7,8,16,6,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}},"drawn":["leg1","leg2","leg3","leg4","head","body"]},"ModelSign":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"signBoard":{"field":"signBoard","tex":[0,0],"pivot":[0,0,0],"boxes":[[-12,-14,-1,24,12,2,0,[0,0],0]]},"signStick":{"field":"signStick","tex":[0,14],"pivot":[0,0,0],"boxes":[[-1,-2,-1,2,14,2,0,[0,14],0]]}}}}}},"ModelSilverfish":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"silverfishBodyParts[0]":{"arrayField":"silverfishBodyParts","index":0,"length":7,"tex":[0,0],"pivot":[0,22,-3.5],"rot":[0,0.471238911151886,0],"boxes":[[-1.5,0,-1,3,2,2,0,[0,0],0]]},"silverfishBodyParts[1]":{"arrayField":"silverfishBodyParts","index":1,"length":7,"tex":[0,4],"pivot":[0.28523990511894226,21,-1.5],"rot":[0,0.27992069721221924,0],"boxes":[[-2,0,-1,4,3,2,0,[0,4],0]]},"silverfishBodyParts[2]":{"arrayField":"silverfishBodyParts","index":2,"length":7,"tex":[0,9],"pivot":[0,20,1],"rot":[0,0.09233397245407104,0],"boxes":[[-3,0,-1.5,6,4,3,0,[0,9],0]]},"silverfishBodyParts[3]":{"arrayField":"silverfishBodyParts","index":3,"length":7,"tex":[0,16],"pivot":[0.6205772757530212,21,4],"rot":[0,0.04916318878531456,0],"boxes":[[-1.5,0,-1.5,3,3,3,0,[0,16],0]]},"silverfishBodyParts[4]":{"arrayField":"silverfishBodyParts","index":4,"length":7,"tex":[0,22],"pivot":[1.1951626539230347,22,7],"rot":[0,-0.14558644592761993,0],"boxes":[[-1,0,-1.5,2,2,3,0,[0,22],0]]},"silverfishBodyParts[5]":{"arrayField":"silverfishBodyParts","index":5,"length":7,"tex":[11,0],"pivot":[1.3328649997711182,23,9.5],"rot":[0,-0.44428831338882446,0],"boxes":[[-1,0,-1,2,1,2,0,[11,0],0]]},"silverfishBodyParts[6]":{"arrayField":"silverfishBodyParts","index":6,"length":7,"tex":[13,4],"pivot":[0.7766903042793274,23,11.5],"rot":[0,-0.7469534277915955,0],"boxes":[[-0.5,0,-1,1,1,2,0,[13,4],0]]},"silverfishWings[0]":{"arrayField":"silverfishWings","index":0,"length":3,"tex":[20,0],"pivot":[0,16,1],"rot":[0,0.09233397245407104,0],"boxes":[[-5,0,-1.5,10,8,3,0,[20,0],0]]},"silverfishWings[1]":{"arrayField":"silverfishWings","index":1,"length":3,"tex":[20,11],"pivot":[1.1951626539230347,20,7],"rot":[0,-0.14558644592761993,0],"boxes":[[-3,0,-1.5,6,4,3,0,[20,11],0]]},"silverfishWings[2]":{"arrayField":"silverfishWings","index":2,"length":3,"tex":[20,18],"pivot":[0.28523990511894226,19,-1.5],"rot":[0,0.27992069721221924,0],"boxes":[[-3,0,-1.5,6,5,2,0,[20,18],0]]}}}}},"drawn":["silverfishBodyParts[0]","silverfishBodyParts[1]","silverfishBodyParts[2]","silverfishBodyParts[3]","silverfishBodyParts[4]","silverfishBodyParts[5]","silverfishBodyParts[6]","silverfishWings[0]","silverfishWings[1]","silverfishWings[2]"]},"ModelSkeleton":{"super":"ModelZombie","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0.10000000149011612],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0.10000000149011612],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0.10000000149011612],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0.10000000149011612],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.part0.boxes.0.6",0,1],["parts.part1.boxes.0.6",0,1],["parts.part2.boxes.0.6",0,1],["parts.part3.boxes.0.6",0,1]]}},"drawn":["bipedHead","bipedHeadwear","bipedBody","bipedRightArm","bipedLeftArm","bipedRightLeg","bipedLeftLeg"]},"ModelSkeletonHead":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,35],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,35],0]]}}}},"(IIII)V":{"base":{"tw":0,"th":0,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}},"d":[["parts.skeletonHead.tex.0",0,1],["parts.skeletonHead.boxes.0.7.0",0,1],["parts.skeletonHead.tex.1",1,1],["parts.skeletonHead.boxes.0.7.1",1,1],["tw",2,1],["parts.skeletonHead.ts.0",2,1],["th",3,1],["parts.skeletonHead.ts.1",3,1]]}},"drawn":["skeletonHead"]},"ModelSlime":{"super":"ModelBase","ctors":{"(I)V":{"base":{"tw":64,"th":32,"parts":{"slimeBodies":{"field":"slimeBodies","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,8,8,0,[0,0],0]]}}}}},"drawn":["slimeBodies"]},"ModelSnowMan":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,16],"ts":[64,64],"pivot":[0,13,0],"boxes":[[-5,-10,-5,10,10,10,-0.5,[0,16],0]]},"bottomBody":{"field":"bottomBody","tex":[0,36],"ts":[64,64],"pivot":[0,24,0],"boxes":[[-6,-12,-6,12,12,12,-0.5,[0,36],0]]},"head":{"field":"head","tex":[0,0],"ts":[64,64],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,0],0]]},"rightHand":{"field":"rightHand","tex":[32,0],"ts":[64,64],"pivot":[5,6,0],"rot":[0,0,1],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]},"leftHand":{"field":"leftHand","tex":[32,0],"ts":[64,64],"pivot":[-5,6,0],"rot":[0,3.1415927410125732,-1],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]}}}}},"drawn":["head","rightHand","leftHand","body","bottomBody"]},"ModelSpider":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"spiderHead":{"field":"spiderHead","tex":[32,4],"pivot":[0,15,-3],"boxes":[[-4,-4,-8,8,8,8,0,[32,4],0]]},"spiderNeck":{"field":"spiderNeck","tex":[0,0],"pivot":[0,15,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]]},"spiderBody":{"field":"spiderBody","tex":[0,12],"pivot":[0,15,9],"boxes":[[-5,-4,-6,10,8,12,0,[0,12],0]]},"spiderLeg1":{"field":"spiderLeg1","tex":[18,0],"pivot":[-4,15,2],"rot":[0,0.7853981852531433,-0.7853981852531433],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg2":{"field":"spiderLeg2","tex":[18,0],"pivot":[4,15,2],"rot":[0,-0.7853981852531433,0.7853981852531433],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg3":{"field":"spiderLeg3","tex":[18,0],"pivot":[-4,15,1],"rot":[0,0.39269909262657166,-0.5811946392059326],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg4":{"field":"spiderLeg4","tex":[18,0],"pivot":[4,15,1],"rot":[0,-0.39269909262657166,0.5811946392059326],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg5":{"field":"spiderLeg5","tex":[18,0],"pivot":[-4,15,0],"rot":[0,-0.39269909262657166,-0.5811946392059326],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg6":{"field":"spiderLeg6","tex":[18,0],"pivot":[4,15,0],"rot":[0,0.39269909262657166,0.5811946392059326],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg7":{"field":"spiderLeg7","tex":[18,0],"pivot":[-4,15,-1],"rot":[0,-0.7853981852531433,-0.7853981852531433],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg8":{"field":"spiderLeg8","tex":[18,0],"pivot":[4,15,-1],"rot":[0,0.7853981852531433,0.7853981852531433],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]}}}}},"drawn":["spiderHead","spiderNeck","spiderBody","spiderLeg1","spiderLeg2","spiderLeg3","spiderLeg4","spiderLeg5","spiderLeg6","spiderLeg7","spiderLeg8"]},"ModelSquid":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"squidBody":{"field":"squidBody","tex":[0,0],"pivot":[0,8,0],"boxes":[[-6,-8,-6,12,16,12,0,[0,0],0]]},"squidTentacles[0]":{"arrayField":"squidTentacles","index":0,"length":8,"tex":[48,0],"pivot":[5,15,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[1]":{"arrayField":"squidTentacles","index":1,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,3.535533905029297],"rot":[0,0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[2]":{"arrayField":"squidTentacles","index":2,"length":8,"tex":[48,0],"pivot":[3.0616169991140216e-16,15,5],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[3]":{"arrayField":"squidTentacles","index":3,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,3.535533905029297],"rot":[0,-0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[4]":{"arrayField":"squidTentacles","index":4,"length":8,"tex":[48,0],"pivot":[-5,15,6.123233998228043e-16],"rot":[0,-1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[5]":{"arrayField":"squidTentacles","index":5,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,-3.535533905029297],"rot":[0,-2.356194496154785,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[6]":{"arrayField":"squidTentacles","index":6,"length":8,"tex":[48,0],"pivot":[-9.184850467946473e-16,15,-5],"rot":[0,-3.1415927410125732,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[7]":{"arrayField":"squidTentacles","index":7,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,-3.535533905029297],"rot":[0,-3.9269907474517822,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]}}}}},"drawn":["squidBody","squidTentacles[0]","squidTentacles[1]","squidTentacles[2]","squidTentacles[3]","squidTentacles[4]","squidTentacles[5]","squidTentacles[6]","squidTentacles[7]"]},"ModelVillager":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,64],"pivot":[0,3,-1],"rot":[-0.75,0,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,64],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[0,0],"pivot":[0,3,-1],"rot":[-0.75,0,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[0,0],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1],["parts.villagerHead.pivot.1",1,1],["parts.villagerBody.pivot.1",1,1],["parts.rightVillagerLeg.pivot.1",1,1],["parts.leftVillagerLeg.pivot.1",1,1],["parts.field_82898_f.pivot.1",1,1],["parts.villagerHead.ts.0",2,1],["parts.villagerBody.ts.0",2,1],["parts.villagerArms.ts.0",2,1],["parts.rightVillagerLeg.ts.0",2,1],["parts.leftVillagerLeg.ts.0",2,1],["parts.field_82898_f.ts.0",2,1],["parts.villagerHead.ts.1",3,1],["parts.villagerBody.ts.1",3,1],["parts.villagerArms.ts.1",3,1],["parts.rightVillagerLeg.ts.1",3,1],["parts.leftVillagerLeg.ts.1",3,1],["parts.field_82898_f.ts.1",3,1]]}},"drawn":["villagerHead","villagerBody","villagerArms","rightVillagerLeg","leftVillagerLeg"]},"ModelWitch":{"super":"ModelVillager","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"field_82901_h":{"field":"field_82901_h","tex":[0,0],"ts":[64,128],"pivot":[0,-2,0],"boxes":[[0,3,-6.75,1,1,1,-0.25,[0,0],0]]},"witchHat":{"field":"witchHat","tex":[0,64],"ts":[64,128],"pivot":[-5,-10.03125,-5],"boxes":[[0,0,0,10,2,10,0,[0,64],0]],"children":["part0"]},"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f","witchHat"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,128],"pivot":[0,3,-1],"rot":[-0.75,0,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,128],"pivot":[0,-2,0],"rot":[0,0,0.04363323375582695],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]],"children":["field_82901_h"]},"part0":{"tex":[0,76],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.05235987901687622,0,0.02617993950843811],"boxes":[[0,0,0,7,4,7,0,[0,76],0]],"children":["part1"]},"part1":{"tex":[0,87],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.10471975803375244,0,0.05235987901687622],"boxes":[[0,0,0,4,4,4,0,[0,87],0]],"children":["part2"]},"part2":{"tex":[0,95],"ts":[64,128],"pivot":[1.75,-2,2],"rot":[-0.20943951606750488,0,0.10471975803375244],"boxes":[[0,0,0,1,2,1,0.25,[0,95],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]}},"drawn":["villagerHead","villagerBody","villagerArms","rightVillagerLeg","leftVillagerLeg"]},"ModelWither":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"field_82905_a[0]":{"arrayField":"field_82905_a","index":0,"length":3,"tex":[0,16],"pivot":[0,0,0],"boxes":[[-10,3.9000000953674316,-0.5,20,3,3,0,[0,16],0]]},"field_82905_a[1]":{"arrayField":"field_82905_a","index":1,"length":3,"tex":[24,22],"pivot":[-2,6.900000095367432,-0.5],"rot":[0.36128315329551697,0,0],"boxes":[[0,0,0,3,10,3,0,[0,22],0],[-4,1.5,0.5,11,2,2,0,[24,22],0],[-4,4,0.5,11,2,2,0,[24,22],0],[-4,6.5,0.5,11,2,2,0,[24,22],0]]},"field_82905_a[2]":{"arrayField":"field_82905_a","index":2,"length":3,"tex":[12,22],"pivot":[-2,16.254549026489258,3.034461498260498],"rot":[1.146681308746338,0,0],"boxes":[[0,0,0,3,6,3,0,[12,22],0]]},"field_82904_b[0]":{"arrayField":"field_82904_b","index":0,"length":3,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]},"field_82904_b[1]":{"arrayField":"field_82904_b","index":1,"length":3,"tex":[32,0],"pivot":[-8,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]},"field_82904_b[2]":{"arrayField":"field_82904_b","index":2,"length":3,"tex":[32,0],"pivot":[10,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]}}}}},"drawn":["field_82905_a[0]","field_82905_a[1]","field_82905_a[2]","field_82904_b[0]","field_82904_b[1]","field_82904_b[2]"]},"ModelWolf":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"wolfHeadMain":{"field":"wolfHeadMain","tex":[0,10],"pivot":[-1,13.5,-7],"boxes":[[-3,-3,-2,6,6,4,0,[0,0],0],[-3,-5,0,2,2,1,0,[16,14],0],[1,-5,0,2,2,1,0,[16,14],0],[-1.5,0,-5,3,3,4,0,[0,10],0]]},"wolfBody":{"field":"wolfBody","tex":[18,14],"pivot":[0,14,2],"rot":[1.5707963705062866,0,0],"boxes":[[-4,-2,-3,6,9,6,0,[18,14],0]]},"wolfLeg1":{"field":"wolfLeg1","tex":[0,18],"pivot":[-2.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg2":{"field":"wolfLeg2","tex":[0,18],"pivot":[0.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg3":{"field":"wolfLeg3","tex":[0,18],"pivot":[-2.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg4":{"field":"wolfLeg4","tex":[0,18],"pivot":[0.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfTail":{"field":"wolfTail","tex":[9,18],"pivot":[-1,12,8],"boxes":[[-1,0,-1,2,8,2,0,[9,18],0]]},"wolfMane":{"field":"wolfMane","tex":[21,0],"pivot":[-1,14,-3],"rot":[1.5707963705062866,0,0],"boxes":[[-4,-3,-3,8,6,7,0,[21,0],0]]}}}}},"drawn":["wolfHeadMain","wolfBody","wolfMane","wolfLeg1","wolfLeg2","wolfLeg3","wolfLeg4","wolfTail"]},"ModelZombie":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]},"(FZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["th",1,-32],["parts.bipedHead.ts.1",1,-32],["parts.bipedHeadwear.ts.1",1,-32],["parts.bipedBody.ts.1",1,-32],["parts.bipedRightArm.ts.1",1,-32],["parts.bipedLeftArm.ts.1",1,-32],["parts.bipedRightLeg.ts.1",1,-32],["parts.bipedLeftLeg.ts.1",1,-32],["parts.bipedEars.ts.1",1,-32],["parts.bipedCloak.ts.1",1,-32]]}},"drawn":["bipedHead","bipedHeadwear","bipedBody","bipedRightArm","bipedLeftArm","bipedRightLeg","bipedLeftLeg"]},"ModelZombieVillager":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}},"(FFZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"rot":[-1.5707963705062866,-0.10000000149011612,0.10000000149011612],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"rot":[-1.5707963705062866,0.10000000149011612,-0.10000000149011612],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0.10000000149011612],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0.10000000149011612],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}}},"drawn":["bipedHeadwear","bipedBody","bipedRightArm","bipedLeftArm","bipedRightLeg","bipedLeftLeg","bipedHead"]}};
 
 (function () {
 'use strict';
@@ -5024,6 +5047,8 @@ function cfgGet(vm, self, category, key, dflt, comment, type, isList) {
 			cat.props[key] = prop = np;
 		}
 		prop[':comment'] = comment;
+		if (prop.$default === undefined) prop.$default = isList ? dflt : dflt;
+		prop.$cat = category;
 		return prop;
 	}
 	if (dflt == null) return null;
@@ -5031,6 +5056,8 @@ function cfgGet(vm, self, category, key, dflt, comment, type, isList) {
 	if (!isList) propSet(prop, dflt);
 	cat.props[key] = prop;
 	prop[':comment'] = comment;
+	prop.$default = dflt;
+	prop.$cat = category;
 	return prop;
 }
 function cfgLoad(vm, self) {
@@ -5122,8 +5149,23 @@ function cfgSave(vm, self) {
 	if (dir) fs.mkdirs(dir);
 	fs.write(cfg.path, new TextEncoder().encode(out.join('')));
 }
+function cfgTrack(vm, self) { var f = forge(vm); (f.configs || (f.configs = [])).push({ mod: vm.currentMod, cfg: self }); }
+JVM.forgeConfigs = function (vm, modId) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	return (f && f.configs || []).filter(function (c) { return c.mod === modId; }).map(function (c) {
+		var st = cfgState(c.cfg);
+		return { path: st.path, cats: Object.keys(st.cats).sort().map(function (q) {
+			var cat = st.cats[q];
+			return { name: q, comment: cat.comment, props: Object.keys(cat.props).sort().map(function (k) {
+				var p = cat.props[k];
+				return { key: k, type: p.$type, list: p.$list, value: p.$list ? propList(p) : propString(p), def: p.$default, comment: p[':comment'], id: !!p.$isId };
+			}) };
+		}) };
+	});
+};
 function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
+	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
 	var v = javaInt(propString(prop));
 	if (v !== -1) { f.markers[v] = true; return prop; }
@@ -5136,6 +5178,7 @@ function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
 }
 function cfgItemId(vm, self, category, key, dflt, comment) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
+	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
 	var v = javaInt(propString(prop)), shift = dflt + 256;
 	if (v !== -1) { f.markers[v + 256] = true; return prop; }
@@ -5151,8 +5194,8 @@ function installConfig(vm, def) {
 	var C = FORGE + 'common/Configuration', P = FORGE + 'common/Property';
 	var m = {
 		'<init>()V': function () {},
-		'<init>(Ljava/io/File;)V': function (vm, self, a) { cfgState(self).path = a[0] ? a[0].$path : null; JVM.run(vm, function () { cfgLoad(vm, self); }); },
-		'<init>(Ljava/io/File;Z)V': function (vm, self, a) { var c = cfgState(self); c.path = a[0] ? a[0].$path : null; c.caseSensitive = !!a[1]; JVM.run(vm, function () { cfgLoad(vm, self); }); },
+		'<init>(Ljava/io/File;)V': function (vm, self, a) { cfgState(self).path = a[0] ? a[0].$path : null; cfgTrack(vm, self); JVM.run(vm, function () { cfgLoad(vm, self); }); },
+		'<init>(Ljava/io/File;Z)V': function (vm, self, a) { var c = cfgState(self); c.path = a[0] ? a[0].$path : null; c.caseSensitive = !!a[1]; cfgTrack(vm, self); JVM.run(vm, function () { cfgLoad(vm, self); }); },
 		'load()V': function (vm, self) { try { cfgLoad(vm, self); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; vm.throwNew('java/lang/RuntimeException', e.message); } },
 		'save()V': function (vm, self) { cfgSave(vm, self); },
 		'hasChanged()Z': function (vm, self) { var c = cfgState(self); return Object.keys(c.cats).some(function (k) { return Object.keys(c.cats[k].props).some(function (p) { return c.cats[k].props[p].$changed; }); }) ? 1 : 0; },
@@ -6356,6 +6399,883 @@ function installServer(vm) {
 }
 
 JVM.installServer = installServer;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function mobs(vm) { var r = reg(vm); return r.mobs || (r.mobs = { entities: [], spawns: [], renderers: [], mappings: [] }); }
+function F(o, n) { return o ? o[':' + n] : undefined; }
+
+var VANILLA = {
+	EntityCreeper: ['ModelCreeper', 'mob/creeper.png'], EntityZombie: ['ModelZombie', 'mob/zombie.png'], EntitySkeleton: ['ModelSkeleton', 'mob/skeleton.png'],
+	EntitySpider: ['ModelSpider', 'mob/spider.png'], EntityCaveSpider: ['ModelSpider', 'mob/cavespider.png'], EntityPig: ['ModelPig', 'mob/pig.png'],
+	EntityCow: ['ModelCow', 'mob/cow.png'], EntityMooshroom: ['ModelCow', 'mob/redcow.png'], EntitySheep: ['ModelSheep2', 'mob/sheep.png'],
+	EntityChicken: ['ModelChicken', 'mob/chicken.png'], EntityWolf: ['ModelWolf', 'mob/wolf.png'], EntityOcelot: ['ModelOcelot', 'mob/ozelot.png'],
+	EntityVillager: ['ModelVillager', 'mob/villager/villager.png'], EntitySilverfish: ['ModelSilverfish', 'mob/silverfish.png'],
+	EntityBlaze: ['ModelBlaze', 'mob/fire.png'], EntityEnderman: ['ModelEnderman', 'mob/enderman.png'], EntityIronGolem: ['ModelIronGolem', 'mob/villager_golem.png'],
+	EntitySnowman: ['ModelSnowMan', 'mob/snowman.png'], EntitySquid: ['ModelSquid', 'mob/squid.png'], EntityGhast: ['ModelGhast', 'mob/ghast.png'],
+	EntityBat: ['ModelBat', 'mob/bat.png'], EntityWitch: ['ModelWitch', 'mob/villager/witch.png'], EntitySlime: ['ModelSlime', 'mob/slime.png'],
+	EntityMagmaCube: ['ModelMagmaCube', 'mob/lava.png'], EntityPigZombie: ['ModelZombie', 'mob/pigzombie.png'],
+};
+var STATS = {
+	EntityCreeper: [0.6, 1.8, 20, 0.25, null, 'mob.creeper.say', 'mob.creeper.death'], EntityZombie: [0.6, 1.8, 20, 0.23, 'mob.zombie.say', 'mob.zombie.hurt', 'mob.zombie.death'],
+	EntitySkeleton: [0.6, 1.8, 20, 0.25, 'mob.skeleton.say', 'mob.skeleton.hurt', 'mob.skeleton.death'], EntitySpider: [1.4, 0.9, 16, 0.8, 'mob.spider.say', 'mob.spider.say', 'mob.spider.death'],
+	EntityCaveSpider: [0.7, 0.5, 12, 0.8, 'mob.spider.say', 'mob.spider.say', 'mob.spider.death'], EntityPig: [0.9, 0.9, 10, 0.25, 'mob.pig.say', 'mob.pig.say', 'mob.pig.death'],
+	EntityCow: [0.9, 1.3, 10, 0.2, 'mob.cow.say', 'mob.cow.hurt', 'mob.cow.hurt'], EntityMooshroom: [0.9, 1.3, 10, 0.2, 'mob.cow.say', 'mob.cow.hurt', 'mob.cow.hurt'],
+	EntitySheep: [0.9, 1.3, 8, 0.23, 'mob.sheep.say', 'mob.sheep.say', 'mob.sheep.say'], EntityChicken: [0.3, 0.7, 4, 0.25, 'mob.chicken.say', 'mob.chicken.hurt', 'mob.chicken.hurt'],
+	EntityWolf: [0.6, 0.8, 8, 0.3, 'mob.wolf.bark', 'mob.wolf.hurt', 'mob.wolf.death'], EntityOcelot: [0.6, 0.8, 10, 0.3, null, 'mob.cat.hitt', 'mob.cat.hitt'],
+	EntityVillager: [0.6, 1.8, 20, 0.5, 'mob.villager.default', 'mob.villager.defaulthurt', 'mob.villager.defaultdeath'], EntitySilverfish: [0.3, 0.7, 8, 0.6, 'mob.silverfish.say', 'mob.silverfish.hit', 'mob.silverfish.kill'],
+	EntityBlaze: [0.6, 1.8, 20, 0.25, 'mob.blaze.breathe', 'mob.blaze.hit', 'mob.blaze.death'], EntityEnderman: [0.6, 2.9, 40, 0.2, 'mob.endermen.idle', 'mob.endermen.hit', 'mob.endermen.death'],
+	EntityIronGolem: [1.4, 2.9, 100, 0.25, null, 'mob.irongolem.hit', 'mob.irongolem.death'], EntitySnowman: [0.4, 1.8, 4, 0.25, null, null, null],
+	EntitySquid: [0.95, 0.95, 10, 0.25, null, null, null], EntityGhast: [4, 4, 10, 0.25, 'mob.ghast.moan', 'mob.ghast.scream', 'mob.ghast.death'],
+	EntityBat: [0.5, 0.9, 6, 0.25, 'mob.bat.idle', 'mob.bat.hurt', 'mob.bat.death'], EntityWitch: [0.6, 1.8, 26, 0.25, null, null, null],
+	EntitySlime: [2.04, 2.04, 16, 0.25, null, 'mob.slime.big', 'mob.slime.big'], EntityMagmaCube: [2.04, 2.04, 16, 0.25, null, 'mob.slime.big', 'mob.slime.big'],
+	EntityPigZombie: [0.6, 1.8, 20, 0.5, 'mob.zombiepig.zpig', 'mob.zombiepig.zpighurt', 'mob.zombiepig.zpigdeath'],
+};
+var RENDER_MODEL = {
+	RenderCreeper: 'ModelCreeper', RenderZombie: 'ModelZombie', RenderSkeleton: 'ModelSkeleton', RenderSpider: 'ModelSpider', RenderPig: 'ModelPig',
+	RenderCow: 'ModelCow', RenderMooshroom: 'ModelCow', RenderSheep: 'ModelSheep2', RenderChicken: 'ModelChicken', RenderWolf: 'ModelWolf',
+	RenderOcelot: 'ModelOcelot', RenderVillager: 'ModelVillager', RenderSilverfish: 'ModelSilverfish', RenderBlaze: 'ModelBlaze',
+	RenderEnderman: 'ModelEnderman', RenderIronGolem: 'ModelIronGolem', RenderSnowMan: 'ModelSnowMan', RenderSquid: 'ModelSquid',
+	RenderGhast: 'ModelGhast', RenderBat: 'ModelBat', RenderWitch: 'ModelWitch', RenderSlime: 'ModelSlime', RenderMagmaCube: 'ModelMagmaCube',
+};
+function vanillaModel(vm, name) {
+	var c = vm.loadClass(SRC + name);
+	var o = vm.newObject(c);
+	var m = c.findDeclared('<init>()V') || c.findDeclared('<init>(F)V') || c.findDeclared('<init>(I)V');
+	if (m) vm.invoke(m, o, m.sig.args.length ? [m.desc === '(I)V' ? 16 : 0] : []);
+	return o;
+}
+function chainNames(c) { var out = []; for (var k = c; k; k = k.superClass) out.push(k.name.substring(k.name.lastIndexOf('/') + 1)); return out; }
+
+function installMobs(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var addTo = function (n, methods, statics, extra) {
+		var s = vm.natives[SRC + n];
+		s.methods = Object.assign({}, s.methods || {}, methods || {});
+		if (statics) s.staticMethods = Object.assign({}, s.staticMethods || {}, statics);
+		if (extra) Object.assign(s, extra);
+	};
+	var isPlayer = function (o) { return !!(o && o.$info); };
+	var op = function (vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; };
+
+	addTo('Entity', {
+		'setSize(FF)V': function (vm, self, a) { self[':width'] = a[0]; self[':height'] = a[1]; self.$sized = true; },
+		'getTexture()Ljava/lang/String;': function (vm, self) { return self[':texture'] || null; },
+		'isImmuneToFire()Z': function (vm, self) { return self[':isImmuneToFire'] ? 1 : 0; },
+		'getEntityName()Ljava/lang/String;': function (vm, self) { var e = mobs(vm).entities.filter(function (x) { return x.cls && vm.classOf(self).isSubclassOf(x.cls); })[0]; return e ? e.name : 'generic'; },
+		'getEntityId()I': function (vm, self) { return self[':entityId'] | 0; },
+		'setFire(I)V': function () {},
+		'extinguish()V': function () {},
+		'isBurning()Z': function () { return 0; },
+		'isInWater()Z': function () { return 0; },
+		'isWet()Z': function () { return 0; },
+		'isEntityAlive()Z': function () { return 1; },
+		'getBrightness(F)F': function () { return 1; },
+		'getEyeHeight()F': function (vm, self) { return (self[':height'] || 1.8) * 0.85; },
+		'setRotation(FF)V': function (vm, self, a) { self[':rotationYaw'] = a[0]; self[':rotationPitch'] = a[1]; },
+	});
+	var newOf = function (vm, cn) { return vm.newObject(vm.loadClass(cn)); };
+	var initLiving = function (vm, self, world) {
+		if (self.$livingInit) return;
+		self.$livingInit = true;
+		if (world) self[':worldObj'] = world;
+		self[':texture'] = '/mob/char.png';
+		self[':moveSpeed'] = 0.7;
+		self[':width'] = 0.6; self[':height'] = 1.8;
+		self[':experienceValue'] = 0;
+		var rnd = newOf(vm, 'java/util/Random'); vm.callVirtual(rnd, '<init>', '()V', []);
+		self[':rand'] = rnd;
+		self[':tasks'] = newOf(vm, SRC + 'EntityAITasks');
+		self[':targetTasks'] = newOf(vm, SRC + 'EntityAITasks');
+		self[':tasks'].$list = []; self[':targetTasks'].$list = [];
+		self[':navigator'] = newOf(vm, SRC + 'PathNavigate');
+		self[':moveHelper'] = newOf(vm, SRC + 'EntityMoveHelper');
+		self[':lookHelper'] = newOf(vm, SRC + 'EntityLookHelper');
+		self[':jumpHelper'] = newOf(vm, SRC + 'EntityJumpHelper');
+		self[':senses'] = newOf(vm, SRC + 'EntitySenses');
+	};
+	var player = function (fn, other) { return function (vm, self, a) { return isPlayer(self) ? fn(vm, self, a) : other(vm, self, a); }; };
+	addTo('EntityLiving', {
+		'heal(I)V': player(function (vm, self, a) { op(vm, 'heal', a[0]); }, function (vm, self, a) { self[':health'] = (self[':health'] | 0) + a[0]; }),
+		'getHealth()I': player(function (vm) { var i = op(vm, 'player'); return i ? i.health : 20; }, function (vm, self) { return self[':health'] != null ? self[':health'] : vm.callVirtual(self, 'getMaxHealth', '()I', []); }),
+		'setEntityHealth(I)V': player(function (vm, self, a) { op(vm, 'sethealth', a[0]); }, function (vm, self, a) { self[':health'] = a[0]; }),
+		'<init>(Lnet/minecraft/src/World;)V': function (vm, self, a) { initLiving(vm, self, a[0]); },
+		'getMaxHealth()I': function () { return 20; },
+		'getNavigator()Lnet/minecraft/src/PathNavigate;': function (vm, self) { return self[':navigator'] || (self[':navigator'] = newOf(vm, SRC + 'PathNavigate')); },
+		'getMoveHelper()Lnet/minecraft/src/EntityMoveHelper;': function (vm, self) { return self[':moveHelper'] || newOf(vm, SRC + 'EntityMoveHelper'); },
+		'getLookHelper()Lnet/minecraft/src/EntityLookHelper;': function (vm, self) { return self[':lookHelper'] || newOf(vm, SRC + 'EntityLookHelper'); },
+		'getJumpHelper()Lnet/minecraft/src/EntityJumpHelper;': function (vm, self) { return self[':jumpHelper'] || newOf(vm, SRC + 'EntityJumpHelper'); },
+		'getEntitySenses()Lnet/minecraft/src/EntitySenses;': function (vm, self) { return self[':senses'] || newOf(vm, SRC + 'EntitySenses'); },
+		'getAIMoveSpeed()F': function (vm, self) { return self[':landMovementFactor'] || self[':moveSpeed'] || 0.7; },
+		'setAIMoveSpeed(F)V': function (vm, self, a) { self[':landMovementFactor'] = a[0]; },
+		'isAIEnabled()Z': function () { return 0; },
+		'getLivingSound()Ljava/lang/String;': function () { return null; },
+		'getHurtSound()Ljava/lang/String;': function () { return 'damage.hit'; },
+		'getDeathSound()Ljava/lang/String;': function () { return 'damage.hit'; },
+		'getDropItemId()I': function () { return 0; },
+		'getSoundVolume()F': function () { return 1; },
+		'getTalkInterval()I': function () { return 80; },
+		'canDespawn()Z': function () { return 1; },
+		'getCreatureAttribute()Lnet/minecraft/src/EnumCreatureAttribute;': function () { return null; },
+		'setCurrentItemOrArmor(ILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { (self.$equip || (self.$equip = []))[a[0]] = a[1]; },
+		'getCurrentItemOrArmor(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return self.$equip && self.$equip[a[0]] || null; },
+		'getHeldItem()Lnet/minecraft/src/ItemStack;': player(function (vm) { return JVM.mc152.heldStack(vm); }, function (vm, self) { return self.$equip && self.$equip[0] || null; }),
+	}, null, { anyInit: function (vm, self, args) { var w = args.filter(function (x) { return x && x.cls && vm.isInstance(x, vm.loadClass(SRC + 'World')); })[0]; initLiving(vm, self, w); } });
+	var taskSpec = { methods: {
+		'addTask(ILnet/minecraft/src/EntityAIBase;)V': function (vm, self, a) { (self.$list || (self.$list = [])).push(a[1]); },
+		'removeTask(Lnet/minecraft/src/EntityAIBase;)V': function (vm, self, a) { if (self.$list) self.$list = self.$list.filter(function (t) { return t !== a[1] && t !== a[0]; }); },
+		'onUpdateTasks()V': function () {},
+	} };
+	def('EntityAITasks', taskSpec);
+	def('EnumCreatureType', { super: 'java/lang/Enum', statics: { monster: null, creature: null, ambient: null, waterCreature: null }, clinit: function (vm, c) {
+		c.$values = ['monster', 'creature', 'ambient', 'waterCreature'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
+	} });
+	vm.natives[SRC + 'EnumCreatureType'].staticMethods = { 'values()[Lnet/minecraft/src/EnumCreatureType;': function (vm) { var c = vm.loadClass(SRC + 'EnumCreatureType'); vm.initClass(c); return JVM.javaArray(vm, 'L' + SRC + 'EnumCreatureType;', c.$values.slice()); } };
+	var BIOMES = 'ocean Ocean,plains Plains,desert Desert,extremeHills Extreme Hills,forest Forest,taiga Taiga,swampland Swampland,river River,hell Hell,sky Sky,frozenOcean FrozenOcean,frozenRiver FrozenRiver,icePlains Ice Plains,iceMountains Ice Mountains,mushroomIsland MushroomIsland,mushroomIslandShore MushroomIslandShore,beach Beach,desertHills DesertHills,forestHills ForestHills,taigaHills TaigaHills,extremeHillsEdge Extreme Hills Edge,jungle Jungle,jungleHills JungleHills';
+	var bstat = { biomeList: null };
+	BIOMES.split(',').forEach(function (kv) { bstat[kv.split(' ')[0]] = null; });
+	def('BiomeGenBase', { fields: { biomeName: 'Ljava/lang/String;', biomeID: 'I' }, statics: bstat, clinit: function (vm, c) {
+		var list = vm.newArray('L' + SRC + 'BiomeGenBase;', 256);
+		BIOMES.split(',').forEach(function (kv, i) {
+			var p = kv.indexOf(' '), o = vm.newObject(c);
+			o[':biomeName'] = kv.substring(p + 1); o[':biomeID'] = i;
+			c.statics[kv.substring(0, p)] = o; list.a[i] = o;
+		});
+		c.statics.biomeList = list;
+	}, methods: {
+		'<init>(I)V': function (vm, self, a) { self[':biomeID'] = a[0]; self[':biomeName'] = 'Biome ' + a[0]; },
+		'setBiomeName(Ljava/lang/String;)Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) { self[':biomeName'] = a[0]; return self; },
+		'getSpawnableList(Lnet/minecraft/src/EnumCreatureType;)Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getEnableSnow()Z': function () { return 0; },
+		'canSpawnLightningBolt()Z': function () { return 1; },
+		'getFloatTemperature()F': function () { return 0.5; },
+		'getFloatRainfall()F': function () { return 0.5; },
+	} });
+	JVM.biomeAt = function (vm, x, z) {
+		var n = op(vm, 'biome', x, z);
+		var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c);
+		var list = c.statics.biomeList.a;
+		for (var i = 0; i < list.length; i++) if (list[i] && list[i][':biomeName'].toLowerCase().replace(/ /g, '_') === n) return list[i];
+		return c.statics.plains;
+	};
+
+	var M = function (vm) { return mobs(vm); };
+	var cls = function (a) { return a && a.$cls || null; };
+	addTo('ModLoader', null, {
+		'registerEntityID(Ljava/lang/Class;Ljava/lang/String;I)V': function (vm, n, a) { M(vm).entities.push({ cls: cls(a[0]), name: a[1], id: a[2], mod: vm.currentMod }); },
+		'registerEntityID(Ljava/lang/Class;Ljava/lang/String;III)V': function (vm, n, a) { M(vm).entities.push({ cls: cls(a[0]), name: a[1], id: a[2], egg: [a[3], a[4]], mod: vm.currentMod }); },
+		'addSpawn(Ljava/lang/Class;IIILnet/minecraft/src/EnumCreatureType;)V': function (vm, n, a) { M(vm).spawns.push({ cls: cls(a[0]), weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: null }); },
+		'addSpawn(Ljava/lang/Class;IIILnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': function (vm, n, a) { M(vm).spawns.push({ cls: cls(a[0]), weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: a[5] ? Array.prototype.slice.call(a[5].a) : null }); },
+		'addSpawn(Ljava/lang/String;IIILnet/minecraft/src/EnumCreatureType;)V': function (vm, n, a) { M(vm).spawns.push({ name: a[0], weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: null }); },
+		'addSpawn(Ljava/lang/String;IIILnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': function (vm, n, a) { M(vm).spawns.push({ name: a[0], weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: a[5] ? Array.prototype.slice.call(a[5].a) : null }); },
+	});
+	def('EntityList', { staticMethods: {
+		'addMapping(Ljava/lang/Class;Ljava/lang/String;I)V': function (vm, n, a) { M(vm).entities.push({ cls: cls(a[0]), name: a[1], id: a[2], mod: vm.currentMod }); },
+		'addMapping(Ljava/lang/Class;Ljava/lang/String;III)V': function (vm, n, a) { M(vm).entities.push({ cls: cls(a[0]), name: a[1], id: a[2], egg: [a[3], a[4]], mod: vm.currentMod }); },
+		'getEntityString(Lnet/minecraft/src/Entity;)Ljava/lang/String;': function (vm, n, a) { var e = M(vm).entities.filter(function (x) { return x.cls === vm.classOf(a[0]); })[0]; return e ? e.name : null; },
+		'createEntityByName(Ljava/lang/String;Lnet/minecraft/src/World;)Lnet/minecraft/src/Entity;': function () { return null; },
+	} });
+
+	var RL = { methods: {
+		'<init>(Lnet/minecraft/src/ModelBase;F)V': function (vm, self, a) { self[':mainModel'] = a[0]; self[':shadowSize'] = a[1]; },
+		'setRenderPassModel(Lnet/minecraft/src/ModelBase;)V': function (vm, self, a) { self[':renderPassModel'] = a[0]; },
+		'setRenderManager(Lnet/minecraft/src/RenderManager;)V': function () {},
+		'loadTexture(Ljava/lang/String;)V': function () {},
+		'doRender(Lnet/minecraft/src/Entity;DDDFF)V': function () {},
+	}, anyInit: function (vm, self, args) {
+		var m = args.filter(function (x) { return x && x.cls && vm.isInstance(x, vm.loadClass(SRC + 'ModelBase')); })[0];
+		if (m) self[':mainModel'] = m;
+	} };
+	def('Render', { methods: { '<init>()V': function () {}, 'doRender(Lnet/minecraft/src/Entity;DDDFF)V': function () {}, 'loadTexture(Ljava/lang/String;)V': function () {} }, anyInit: function () {} });
+	def('RenderLiving', Object.assign({ super: SRC + 'Render' }, RL));
+	def('RenderBiped', { super: SRC + 'RenderLiving', methods: {
+		'<init>(Lnet/minecraft/src/ModelBiped;F)V': function (vm, self, a) { self[':mainModel'] = a[0]; self[':modelBipedMain'] = a[0]; self[':shadowSize'] = a[1]; },
+		'<init>(Lnet/minecraft/src/ModelBiped;FF)V': function (vm, self, a) { self[':mainModel'] = a[0]; self[':modelBipedMain'] = a[0]; self[':shadowSize'] = a[1]; },
+	} });
+	Object.keys(RENDER_MODEL).forEach(function (rn) {
+		def(rn, { super: SRC + 'RenderLiving', methods: {}, anyInit: function (vm, self, args) {
+			var m = args.filter(function (x) { return x && x.cls && vm.isInstance(x, vm.loadClass(SRC + 'ModelBase')); })[0];
+			self[':mainModel'] = m || vanillaModel(vm, RENDER_MODEL[rn]);
+		} });
+	});
+	var VANILLA_NAME = { EntityChicken: 'chicken', EntityCow: 'cow', EntityPig: 'pig', EntitySheep: 'sheep', EntityWolf: 'wolf', EntitySquid: 'squid',
+		EntityZombie: 'zombie', EntityCreeper: 'creeper', EntitySkeleton: 'skeleton', EntitySpider: 'spider', EntityPigZombie: 'zombie_pigman',
+		EntitySlime: 'slime', EntityGhast: 'ghast', EntityMooshroom: 'mooshroom', EntityOcelot: 'ocelot', EntityVillager: 'villager',
+		EntitySnowman: 'snow_golem', EntityIronGolem: 'iron_golem', EntityBat: 'bat', EntityEnderman: 'enderman', EntityCaveSpider: 'cave_spider',
+		EntitySilverfish: 'silverfish', EntityMagmaCube: 'magma_cube', EntityBlaze: 'blaze', EntityWitch: 'witch' };
+	var wspec = vm.natives[SRC + 'World'];
+	var prevSpawn = wspec.methods['spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z'];
+	wspec.methods = Object.assign({}, wspec.methods, {
+		'spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) {
+			var e = a[0];
+			if (e && !e.$stack && vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving'))) {
+				var keys = mobs(vm).keys, name = null;
+				for (var c = e.cls; c && !name; c = c.superClass) name = (keys && keys.get(c)) || (c.native || c.absent ? VANILLA_NAME[c.name.split('/').pop()] : null) || null;
+				if (name) { var id = op(vm, 'spawnmob', name, e[':posX'], e[':posY'], e[':posZ']); if (id) { e[':entityId'] = id; return 1; } return 0; }
+			}
+			return prevSpawn ? prevSpawn(vm, self, a) : 0;
+		},
+	});
+	vm.natives[SRC + 'ModLoader'].staticMethods['registerEntityID?'] = null;
+	delete vm.natives[SRC + 'ModLoader'].staticMethods['registerEntityID?'];
+}
+
+function jemOf(vm, model, entity) {
+	var d = JVM.modelData(vm, model);
+	if (!d || !d.parts.length) return null;
+	var names = {};
+	var fieldOf = new Map();
+	Object.keys(model).forEach(function (k) {
+		if (k[0] !== ':') return;
+		var v = model[k];
+		if (v && v.cls && v.cls.name === SRC + 'ModelRenderer' && !fieldOf.has(v)) fieldOf.set(v, k.substring(1));
+		else if (v && v.a && v.cls && v.cls.name === '[L' + SRC + 'ModelRenderer;') Array.prototype.forEach.call(v.a, function (x, i) { if (x && !fieldOf.has(x)) fieldOf.set(x, k.substring(1) + i); });
+	});
+	var all = [];
+	(function collect(l) { var arr = l ? Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a) : []; arr.forEach(function (r) { all.push(r); }); })(model[':boxList']);
+	var nameFor = function (r, i) {
+		var n = fieldOf.get(r) || r[':boxName'] || ('part' + i);
+		n = String(n).replace(/^biped/, '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+		var k = n, j = 2;
+		while (names[k]) k = n + '_' + j++;
+		names[k] = true;
+		return k;
+	};
+	var R = 180 / Math.PI;
+	var childSet = new Set();
+	all.forEach(function (r) { var l = r[':childModels']; if (l) Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a).forEach(function (c) { childSet.add(c); }); });
+	var bb = function (x, y, z) { return [-x, 24 - y, z]; };
+	var jem = function (r, i, parentAbs, parentO) {
+		var rel = [r[':rotationPointX'] + (r[':offsetX'] || 0) * 16, r[':rotationPointY'] + (r[':offsetY'] || 0) * 16, r[':rotationPointZ'] + (r[':offsetZ'] || 0) * 16];
+		var abs = [parentAbs[0] + rel[0], parentAbs[1] + rel[1], parentAbs[2] + rel[2]];
+		var o = bb(abs[0], abs[1], abs[2]);
+		var out = { id: nameFor(r, i), translate: [parentO[0] - o[0], parentO[1] - o[1], parentO[2] - o[2]],
+			rotate: [r[':rotateAngleX'] * R, -r[':rotateAngleY'] * R, -r[':rotateAngleZ'] * R], boxes: [] };
+		if (r[':showModel'] && !r[':isHidden']) r.$boxes.forEach(function (b) {
+			var jx = abs[0] + b.x, jy = abs[1] + b.y, jz = abs[2] + b.z;
+			var bx = -(jx + b.w), by = 24 - (jy + b.h), bz = jz;
+			out.boxes.push({ coordinates: [bx - parentO[0], by - parentO[1], bz - parentO[2], b.w, b.h, b.d], textureOffset: [b.u, b.v], sizeAdd: b.inflate || 0 });
+		});
+		if (r[':mirror'] || r.$boxes.some(function (b) { return b.mirror; })) out.mirrorTexture = 'u';
+		var kids = r[':childModels'] ? Array.prototype.slice.call(vm.callVirtual(r[':childModels'], 'toArray', '()[Ljava/lang/Object;', []).a) : [];
+		if (kids.length) out.submodels = kids.map(function (k, j) { return jem(k, i + '_' + j, abs, o); });
+		return out;
+	};
+	var root = [0, 0, 0], rootO = [0, 0, 0];
+	var drawn = JVM.drawnParts ? JVM.drawnParts(vm, model, entity) : null;
+	var tops = all.filter(function (r) { return !childSet.has(r) && (!drawn || drawn.indexOf(r) >= 0); });
+	return { textureSize: [model[':textureWidth'] || 64, model[':textureHeight'] || 32], models: tops.map(function (r, i) { return jem(r, i, root, rootO); }) };
+}
+JVM.collectMobs = function (vm, modId, ref, safe) {
+	var mb = mobs(vm), f = vm.mcReg && vm.mcReg.forge;
+	var out = { mobs: {}, files: {}, skipped: [] };
+	var ents = mb.entities.slice();
+	if (f) f.entities.forEach(function (e) {
+		var a = e.args;
+		ents.push({ cls: a[0] && a[0].$cls, name: a[1], id: a[2], egg: e.kind === 'global' && a.length >= 5 ? [a[3], a[4]] : null, mod: e.mod });
+	});
+	var spawns = mb.spawns.slice();
+	if (f) f.spawns.forEach(function (s) { var a = s.args; spawns.push({ cls: a[0] && a[0].$cls, name: typeof a[0] === 'string' ? a[0] : null, weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: a[5] ? Array.prototype.slice.call(a[5].a) : null }); });
+	var renderers = new Map();
+	if (f) f.renderers.forEach(function (r) { if (r.cls) renderers.set(r.cls, r.render); });
+	reg(vm).mods.forEach(function (m) {
+		if ((m.$mod || m.cls.source) !== modId && m.cls.source !== modId) return;
+		safe(function () {
+			var map = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(map, '<init>', '()V', []);
+			vm.callVirtual(m, 'addRenderer', '(Ljava/util/Map;)V', [map]);
+			var ks = vm.callVirtual(vm.callVirtual(map, 'keySet', '()Ljava/util/Set;', []), 'toArray', '()[Ljava/lang/Object;', []).a;
+			Array.prototype.forEach.call(ks, function (k) { renderers.set(k.$cls, vm.callVirtual(map, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', [k])); });
+		});
+	});
+	var living = vm.loadClass(SRC + 'EntityLiving');
+	ents.forEach(function (e) {
+		if (!e.cls || (e.mod || '') !== modId) return;
+		if (!e.cls.isSubclassStrict(living) || e.cls === living) { out.skipped.push(e.name); return; }
+		var key = String(e.name || e.cls.name.split('/').pop()).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+		var world = JVM.mc152.worldObj(vm);
+		var ent = safe(function () {
+			var o = vm.newObject(e.cls);
+			var k = e.cls.findDeclared('<init>(Lnet/minecraft/src/World;)V');
+			if (k) vm.invoke(k, o, [world]);
+			else JVM.run(vm, function () { vm.callVirtual(o, '<init>', '(Lnet/minecraft/src/World;)V', [world]); });
+			return o;
+		}, null);
+		if (!ent) { out.skipped.push(e.name + ' (its constructor failed)'); return; }
+		var chain = chainNames(e.cls);
+		var vanilla = null;
+		for (var i = 0; i < chain.length && !vanilla; i++) vanilla = VANILLA[chain[i]] || null;
+		var has = function (n) { return chain.indexOf(n) >= 0; };
+		var stats = null;
+		for (var si = 0; si < chain.length && !stats; si++) stats = STATS[chain[si]] || null;
+		var own = function (key) { var m = e.cls.findMethod(key); return !!(m && !m.cls.native); };
+		if (stats && !ent.$sized) { ent[':width'] = ent[':width'] === 0.6 && ent[':height'] === 1.8 ? stats[0] : ent[':width']; ent[':height'] = ent[':height'] === 1.8 && ent[':width'] === stats[0] ? stats[1] : ent[':height']; }
+		if (stats && ent[':moveSpeed'] === 0.7) ent[':moveSpeed'] = stats[3];
+		var tasks = [].concat(ent[':tasks'] && ent[':tasks'].$list || [], ent[':targetTasks'] && ent[':targetTasks'].$list || []).map(function (t) { return t && t.cls ? t.cls.name.split('/').pop() : ''; });
+		var spawn = spawns.filter(function (s) { return s.cls === e.cls || (s.name && s.name === e.name); });
+		var stype = spawn[0] && spawn[0].type;
+		var behaviour = has('EntityFlying') || has('EntityGhast') || has('EntityBat') || has('EntityBlaze') ? 'flying'
+			: has('EntityWaterMob') || has('EntitySquid') || stype === 'waterCreature' ? 'swimming'
+			: has('EntityTameable') || has('EntityIronGolem') || has('EntityPigZombie') || has('EntityWolf') ? 'neutral'
+			: has('EntityMob') || stype === 'monster' || tasks.indexOf('EntityAIAttackOnCollide') >= 0 || tasks.indexOf('EntityAIArrowAttack') >= 0 ? 'hostile' : 'passive';
+		var str = function (fn) { var v = safe(function () { return vm.callVirtual(ent, fn, '()Ljava/lang/String;', []); }, null); return typeof v === 'string' && v ? v : null; };
+		var json = {
+			name: (reg(vm).lang['entity.' + e.name + '.name']) || e.name,
+			behaviour: behaviour,
+			health: !own('getMaxHealth()I') && stats ? stats[2] : safe(function () { return vm.callVirtual(ent, 'getMaxHealth', '()I', []); }, 20),
+			speed: Math.max(0.05, Math.min(1, +ent[':moveSpeed'] || 0.25)),
+			size: [+ent[':width'] || 0.6, +ent[':height'] || 1.8],
+			xp: ent[':experienceValue'] || (behaviour === 'hostile' ? 5 : 1),
+		};
+		if (behaviour === 'hostile' || behaviour === 'neutral') {
+			var dmg = e.cls.findMethod('getAttackStrength(Lnet/minecraft/src/Entity;)I') ? safe(function () { return vm.callVirtual(ent, 'getAttackStrength', '(Lnet/minecraft/src/Entity;)I', [null]); }, 2) : (ent[':attackStrength'] || 2);
+			json.damage = dmg;
+		}
+		if (ent[':isImmuneToFire']) json.fire_immune = true;
+		if (has('EntityZombie') || has('EntitySkeleton')) json.burns_in_daylight = true;
+		var snd = {
+			ambient: own('getLivingSound()Ljava/lang/String;') || !stats ? str('getLivingSound') : stats[4],
+			hurt: own('getHurtSound()Ljava/lang/String;') || !stats ? str('getHurtSound') : stats[5],
+			death: own('getDeathSound()Ljava/lang/String;') || !stats ? str('getDeathSound') : stats[6] };
+		Object.keys(snd).forEach(function (k) { if (!snd[k]) delete snd[k]; });
+		if (Object.keys(snd).length) json.sounds = snd;
+		var drop = safe(function () { return vm.callVirtual(ent, 'getDropItemId', '()I', []); }, 0);
+		if (drop > 0) { var dr = ref(drop, 0); if (dr) json.drops = [{ item: dr, count: [0, 2] }]; }
+		if (e.egg) json.egg = e.egg.map(function (c) { return '#' + ('00000' + ((c >>> 0) & 0xffffff).toString(16)).slice(-6); });
+		else json.egg = false;
+		json.spawn = spawn.map(function (s) {
+			var r = { weight: s.weight || 10, group: [Math.max(1, s.min | 0), Math.max(1, s.max | 0)] };
+			if (s.biomes && s.biomes.length) r.biomes = s.biomes.filter(Boolean).map(function (b) { return String(b[':biomeName'] || '').toLowerCase().replace(/ /g, '_'); });
+			if (s.type === 'monster') r.light = [0, 7];
+			return r;
+		});
+		var render = renderers.get(e.cls);
+		for (var k2 = e.cls; !render && k2; k2 = k2.superClass) render = renderers.get(k2);
+		var model = render && render[':mainModel'];
+		if (!model && vanilla) model = safe(function () { return vanillaModel(vm, vanilla[0]); }, null);
+		if (model && JVM.pose) JVM.pose(vm, model, ent);
+		var jem = model ? safe(function () { return jemOf(vm, model, ent); }, null) : null;
+		if (!jem) { out.skipped.push(e.name + ' (no model)'); return; }
+		out.files['models/entity/' + key + '.jem'] = JSON.stringify(jem);
+		json.model = 'models/entity/' + key + '.jem';
+		var tex = safe(function () { return vm.callVirtual(ent, 'getTexture', '()Ljava/lang/String;', []); }, null) || ent[':texture'];
+		if ((!tex || tex === '/mob/char.png') && vanilla) tex = '/' + vanilla[1];
+		var tp = String(tex || '').replace(/^[/]+/, '');
+		if (vm.resources[tp]) { out.files['textures/entity/' + key + '.png'] = vm.resources[tp]; json.texture = 'textures/entity/' + key + '.png'; }
+		else if (/^mob[/]/.test(tp)) json.texture = 'minecraft:' + tp;
+		else { out.skipped.push(e.name + ' (no texture ' + tex + ')'); return; }
+		out.mobs[key] = json;
+		(mb.keys || (mb.keys = new Map())).set(e.cls, modId + ':' + key);
+	});
+	return out;
+};
+
+JVM.installMobs = installMobs;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var LWJGL = { 1: 'Escape', 12: 'Minus', 13: 'Equal', 14: 'Backspace', 15: 'Tab', 26: 'BracketLeft', 27: 'BracketRight', 28: 'Enter', 29: 'ControlLeft',
+	39: 'Semicolon', 40: 'Quote', 41: 'Backquote', 42: 'ShiftLeft', 43: 'Backslash', 51: 'Comma', 52: 'Period', 53: 'Slash', 54: 'ShiftRight',
+	55: 'NumpadMultiply', 56: 'AltLeft', 57: 'Space', 58: 'CapsLock', 69: 'NumLock', 70: 'ScrollLock', 71: 'Numpad7', 72: 'Numpad8', 73: 'Numpad9',
+	74: 'NumpadSubtract', 75: 'Numpad4', 76: 'Numpad5', 77: 'Numpad6', 78: 'NumpadAdd', 79: 'Numpad1', 80: 'Numpad2', 81: 'Numpad3', 82: 'Numpad0',
+	83: 'NumpadDecimal', 87: 'F11', 88: 'F12', 156: 'NumpadEnter', 157: 'ControlRight', 181: 'NumpadDivide', 184: 'AltRight', 199: 'Home', 200: 'ArrowUp',
+	201: 'PageUp', 203: 'ArrowLeft', 205: 'ArrowRight', 207: 'End', 208: 'ArrowDown', 209: 'PageDown', 210: 'Insert', 211: 'Delete' };
+(function () {
+	for (var i = 2; i <= 11; i++) LWJGL[i] = 'Digit' + (i === 11 ? 0 : i - 1);
+	'QWERTYUIOP'.split('').forEach(function (c, i) { LWJGL[16 + i] = 'Key' + c; });
+	'ASDFGHJKL'.split('').forEach(function (c, i) { LWJGL[30 + i] = 'Key' + c; });
+	'ZXCVBNM'.split('').forEach(function (c, i) { LWJGL[44 + i] = 'Key' + c; });
+	for (var f = 1; f <= 10; f++) LWJGL[58 + f] = 'F' + f;
+})();
+var CODE_TO_LWJGL = {};
+Object.keys(LWJGL).forEach(function (k) { CODE_TO_LWJGL[LWJGL[k]] = +k; });
+JVM.lwjglKey = function (n) { return LWJGL[n] || ''; };
+JVM.keyToLwjgl = function (code) { return CODE_TO_LWJGL[code] || 0; };
+
+function reg(vm) { return JVM.mc152.reg(vm); }
+function keysOf(vm) { var r = reg(vm); return r.keys || (r.keys = []); }
+function pretty(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function installSettings(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	def('KeyBinding', { fields: { keyDescription: 'Ljava/lang/String;', keyCode: 'I', pressed: 'Z' }, statics: { keybindArray: null, hash: null }, methods: {
+		'<init>(Ljava/lang/String;I)V': function (vm, self, a) { self[':keyDescription'] = a[0]; self[':keyCode'] = a[1]; self[':pressed'] = 0; },
+		'isPressed()Z': function (vm, self) { var p = self.$presses | 0; if (p) self.$presses = p - 1; return p ? 1 : 0; },
+		'unpressKey()V': function (vm, self) { self[':pressed'] = 0; self.$presses = 0; },
+	}, staticMethods: {
+		'unPressAllKeys()V': function () {}, 'resetKeyBindingArrayAndHash()V': function () {},
+		'setKeyBindState(IZ)V': function () {}, 'onTick(I)V': function () {},
+	} });
+	var ml = vm.natives[SRC + 'ModLoader'];
+	ml.staticMethods['registerKey(Lnet/minecraft/src/BaseMod;Lnet/minecraft/src/KeyBinding;Z)V'] = function (vm, n, a) {
+		if (a[1]) keysOf(vm).push({ mod: vm.currentMod, kind: 'ml', owner: a[0], kb: a[1], repeat: !!a[2] });
+	};
+	var fr = vm.natives['cpw/mods/fml/client/registry/KeyBindingRegistry'];
+	if (fr) fr.staticMethods['registerKeyBinding(Lcpw/mods/fml/client/registry/KeyBindingRegistry$KeyHandler;)V'] = function (vm, n, a) {
+		var h = a[0], kbs = h && vm.callVirtual(h, 'getKeyBindings', '()[Lnet/minecraft/src/KeyBinding;', []);
+		if (kbs) Array.prototype.forEach.call(kbs.a, function (kb) { if (kb) keysOf(vm).push({ mod: vm.currentMod, kind: 'forge', owner: h, kb: kb }); });
+	};
+}
+
+function propsParse(text) {
+	var out = {};
+	String(text || '').split(/\r?\n/).forEach(function (l) {
+		if (/^\s*[#!]/.test(l)) return;
+		var i = l.search(/[=:]/);
+		if (i > 0) out[l.substring(0, i).trim()] = l.substring(i + 1).trim();
+	});
+	return out;
+}
+JVM.mlProps = function (vm, cls) {
+	var r = reg(vm), list = r.mlprops || (r.mlprops = []);
+	if (!cls.cf) return;
+	var file = 'config/' + cls.name.split('/').pop() + '.cfg';
+	var fields = Object.keys(cls.fields).filter(function (fn) { var f = cls.fields[fn]; return f.static && JVM.annotation(vm, f.annotations, SRC + 'MLProp'); });
+	if (!fields.length) return;
+	vm.initClass(cls);
+	var have = vm.fs && vm.fs.read(file);
+	var saved = have ? propsParse(new TextDecoder().decode(have)) : {};
+	var lines = ['#' + cls.name.split('/').pop() + ' Config', '#' + new Date().toString()];
+	fields.forEach(function (fn) {
+		var f = cls.fields[fn], a = JVM.annotation(vm, f.annotations, SRC + 'MLProp');
+		var g = function (k, d) { var e = a.values[k]; return e && e.v !== undefined ? e.v : d; };
+		var name = g('name', '') || fn, info = g('info', ''), min = g('min', -Infinity), max = g('max', Infinity);
+		var dflt = cls.statics[fn];
+		var v = dflt;
+		if (saved[name] !== undefined) {
+			var s = saved[name];
+			if (f.desc === 'Z') v = /^true$/i.test(s) ? 1 : 0;
+			else if (/^[IJSB]$/.test(f.desc)) { var n = parseInt(s, 10); if (isFinite(n) && n >= min && n <= max) v = f.desc === 'J' ? BigInt(n) : n; }
+			else if (/^[FD]$/.test(f.desc)) { var d = parseFloat(s); if (isFinite(d) && d >= min && d <= max) v = d; }
+			else if (f.desc === 'Ljava/lang/String;') v = s;
+			cls.statics[fn] = v;
+		}
+		if (info) lines.push('#' + info);
+		lines.push(name + '=' + (f.desc === 'Z' ? (v ? 'true' : 'false') : String(v)));
+		list.push({ mod: vm.currentMod, file: file, name: name, info: info, min: min, max: max, desc: f.desc,
+			value: f.desc === 'Z' ? !!v : /^[IJSBFD]$/.test(f.desc) ? Number(v) : String(v), def: f.desc === 'Z' ? !!dflt : /^[IJSBFD]$/.test(f.desc) ? Number(dflt) : String(dflt) });
+	});
+	if (vm.fs) { vm.fs.mkdirs('config'); vm.fs.write(file, new TextEncoder().encode(lines.join('\n') + '\n')); }
+};
+
+JVM.javaSettings = function (vm, modId) {
+	var out = [];
+	var cfgs = JVM.forgeConfigs ? JVM.forgeConfigs(vm, modId) : [];
+	cfgs.forEach(function (c) {
+		c.cats.forEach(function (cat) {
+			if (/^(block|item|blocks|items|ids?)$/i.test(cat.name)) return;
+			var group = (cfgs.length > 1 ? c.path.split('/').pop().replace(/[.]cfg$/i, '') + ': ' : '') + cat.name.split('.').map(pretty).join(' > ');
+			cat.props.forEach(function (p) {
+				if (p.id || p.list) return;
+				if (p.type === 'I' && /(^|[\s_.])(id|blockid|itemid)$/i.test(p.key)) return;
+				var d = { id: 'cfg|' + c.path + '|' + cat.name + '|' + p.key, name: String(p.key).slice(0, 48), description: String(p.comment || '').slice(0, 200), group: group };
+				if (p.type === 'B') { d.type = 'toggle'; d.default = /^true$/i.test(p.def != null ? p.def : p.value); }
+				else if (p.type === 'I') { d.type = 'number'; d.min = -2147483648; d.max = 2147483647; d.step = 1; d.default = parseInt(p.def != null ? p.def : p.value, 10) || 0; }
+				else if (p.type === 'D') { d.type = 'number'; d.min = -1e300; d.max = 1e300; d.step = 0; d.default = parseFloat(p.def != null ? p.def : p.value) || 0; }
+				else { d.type = 'text'; d.default = String(p.def != null ? p.def : p.value); }
+				d.current = p.type === 'B' ? /^true$/i.test(p.value) : p.type === 'I' ? parseInt(p.value, 10) || 0 : p.type === 'D' ? parseFloat(p.value) || 0 : String(p.value);
+				out.push(d);
+			});
+		});
+	});
+	(reg(vm).mlprops || []).filter(function (p) { return p.mod === modId; }).forEach(function (p) {
+		var d = { id: 'ml|' + p.file + '|' + p.name, name: String(p.name).slice(0, 48), description: String(p.info || '').slice(0, 200), group: 'Options' };
+		if (p.desc === 'Z') d.type = 'toggle';
+		else if (/^[IJSB]$/.test(p.desc)) { d.type = isFinite(p.min) && isFinite(p.max) && p.max - p.min <= 1000 ? 'slider' : 'number'; d.min = isFinite(p.min) ? p.min : -2147483648; d.max = isFinite(p.max) ? p.max : 2147483647; d.step = 1; }
+		else if (/^[FD]$/.test(p.desc)) { d.type = 'number'; d.min = isFinite(p.min) ? p.min : -1e300; d.max = isFinite(p.max) ? p.max : 1e300; d.step = 0; }
+		else d.type = 'text';
+		d.default = p.def; d.current = p.value;
+		out.push(d);
+	});
+	keysOf(vm).filter(function (k) { return k.mod === modId; }).forEach(function (k) {
+		var desc = String(k.kb[':keyDescription'] || 'key');
+		var label = reg(vm).lang[desc] || desc.replace(/^key[.]/, '');
+		out.push({ id: 'key|' + desc, type: 'key', name: pretty(label).slice(0, 48), description: '', group: 'Controls', default: JVM.lwjglKey(k.kb[':keyCode'] | 0) });
+	});
+	return out;
+};
+
+function cfgPatch(text, cat, key, value) {
+	var lines = String(text).split('\n'), stack = [], done = false;
+	var unq = function (s) { s = s.trim(); return s[0] === '"' && s[s.length - 1] === '"' ? s.slice(1, -1) : s; };
+	for (var i = 0; i < lines.length && !done; i++) {
+		var l = lines[i].replace(/\r$/, ''), t = l.trim();
+		if (!t || t[0] === '#') continue;
+		var open = /^(.*)\{\s*$/.exec(t);
+		if (open && t.indexOf('=') < 0) { stack.push(unq(open[1])); continue; }
+		if (t === '}') { stack.pop(); continue; }
+		var m = /^([SIBD]):("?)(.*?)\2=(.*)$/.exec(t);
+		if (m && m[3] === key && stack.join('.').toLowerCase() === String(cat).toLowerCase()) {
+			lines[i] = l.substring(0, l.indexOf(t)) + m[1] + ':' + m[2] + m[3] + m[2] + '=' + value + (/\r$/.test(lines[i]) ? '\r' : '');
+			done = true;
+		}
+	}
+	return done ? lines.join('\n') : null;
+}
+JVM.applyJavaSettings = function (fs, values) {
+	var dec = new TextDecoder(), enc = new TextEncoder(), files = {};
+	var get = function (path) { if (files[path] === undefined) { var b = fs.read(path); files[path] = b ? dec.decode(b) : null; } return files[path]; };
+	Object.keys(values || {}).forEach(function (id) {
+		var v = values[id], p = id.split('|');
+		if (p[0] === 'cfg' && p.length >= 4) {
+			var t = get(p[1]);
+			if (t == null) return;
+			var nt = cfgPatch(t, p[2], p.slice(3).join('|'), typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v));
+			if (nt != null) files[p[1]] = nt;
+		} else if (p[0] === 'ml' && p.length >= 3) {
+			var t2 = get(p[1]);
+			if (t2 == null) return;
+			var name = p.slice(2).join('|'), re = new RegExp('^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=.*$', 'm');
+			var val = typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v);
+			files[p[1]] = re.test(t2) ? t2.replace(re, name + '=' + val) : t2 + name + '=' + val + '\n';
+		}
+	});
+	Object.keys(files).forEach(function (path) { if (files[path] != null) fs.write(path, enc.encode(files[path])); });
+};
+
+JVM.javaKey = function (vm, modId, settingId, down) {
+	var desc = String(settingId).replace(/^key[|]/, '');
+	keysOf(vm).filter(function (k) { return k.mod === modId && String(k.kb[':keyDescription']) === desc; }).forEach(function (k) {
+		vm.currentMod = modId;
+		k.kb[':pressed'] = down ? 1 : 0;
+		if (down) k.kb.$presses = (k.kb.$presses | 0) + 1;
+		JVM.run(vm, function () {
+			if (k.kind === 'ml') { if (down) vm.callVirtual(k.owner, 'keyboardEvent', '(Lnet/minecraft/src/KeyBinding;)V', [k.kb]); }
+			else {
+				var tt = vm.loadClass('cpw/mods/fml/common/TickType'); vm.initClass(tt);
+				var set = vm.callStatic('java/util/EnumSet', 'of', '(Ljava/lang/Enum;)Ljava/util/EnumSet;', [tt.statics.CLIENT]);
+				if (down) vm.callVirtual(k.owner, 'keyDown', '(Ljava/util/EnumSet;Lnet/minecraft/src/KeyBinding;ZZ)V', [set, k.kb, 1, 0]);
+				else vm.callVirtual(k.owner, 'keyUp', '(Ljava/util/EnumSet;Lnet/minecraft/src/KeyBinding;Z)V', [set, k.kb, 1]);
+			}
+		});
+	});
+};
+JVM.javaKeysOf = function (vm) { return keysOf(vm).map(function (k) { return { mod: k.mod, id: 'key|' + k.kb[':keyDescription'] }; }); };
+
+JVM.installSettings = installSettings;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function tiles(vm) { var r = reg(vm); return r.tiles || (r.tiles = { classes: {}, names: new Map(), at: new Map(), ticking: [], dirty: false }); }
+function K(x, y, z) { return (x | 0) + ',' + (y | 0) + ',' + (z | 0); }
+function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+
+var TAG = { 1: 'NBTTagByte', 2: 'NBTTagShort', 3: 'NBTTagInt', 4: 'NBTTagLong', 5: 'NBTTagFloat', 6: 'NBTTagDouble', 7: 'NBTTagByteArray', 8: 'NBTTagString', 9: 'NBTTagList', 10: 'NBTTagCompound', 11: 'NBTTagIntArray' };
+function tag(vm, t, v, name) {
+	var o = vm.newObject(vm.loadClass(SRC + TAG[t]));
+	o.$t = t; o.$v = v; o.$name = name || '';
+	if (t === 10 && !v) o.$v = new Map();
+	if (t === 9 && !v) { o.$v = []; o.$lt = 0; }
+	setDataField(o);
+	return o;
+}
+function setDataField(o) { if (o.$t !== 9 && o.$t !== 10) o[':data'] = o.$v; }
+function compound(vm, name) { return tag(vm, 10, null, name); }
+function cget(o, k) { return o && o.$v && o.$v.get(k); }
+function cset(vm, o, k, t, v) { var x = tag(vm, t, v, k); o.$v.set(k, x); return x; }
+JVM.nbtToJson = function (o) {
+	if (!o) return null;
+	switch (o.$t) {
+	case 10: { var m = {}; o.$v.forEach(function (v, k) { m[k] = JVM.nbtToJson(v); }); return { t: 10, v: m }; }
+	case 9: return { t: 9, lt: o.$lt | 0, v: o.$v.map(JVM.nbtToJson) };
+	case 4: return { t: 4, v: String(o.$v) };
+	case 7: case 11: return { t: o.$t, v: Array.prototype.slice.call(o.$v.a) };
+	default: return { t: o.$t, v: o.$v };
+	}
+};
+JVM.nbtFromJson = function (vm, j, name) {
+	if (!j) return null;
+	switch (j.t) {
+	case 10: { var o = compound(vm, name); Object.keys(j.v).forEach(function (k) { o.$v.set(k, JVM.nbtFromJson(vm, j.v[k], k)); }); return o; }
+	case 9: { var l = tag(vm, 9, j.v.map(function (x) { return JVM.nbtFromJson(vm, x, ''); }), name); l.$lt = j.lt; return l; }
+	case 4: return tag(vm, 4, BigInt(j.v), name);
+	case 7: { var b = vm.newArray('B', j.v.length); j.v.forEach(function (x, i) { b.a[i] = x; }); return tag(vm, 7, b, name); }
+	case 11: { var a = vm.newArray('I', j.v.length); j.v.forEach(function (x, i) { a.a[i] = x; }); return tag(vm, 11, a, name); }
+	default: return tag(vm, j.t, j.v, name);
+	}
+};
+
+function installTiles(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var C = 'Lnet/minecraft/src/NBTTagCompound;', B = 'Lnet/minecraft/src/NBTBase;';
+	def('NBTBase', { methods: {
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name || ''; },
+		'setName(Ljava/lang/String;)Lnet/minecraft/src/NBTBase;': function (vm, self, a) { self.$name = a[0]; return self; },
+		'getId()B': function (vm, self) { return self.$t; },
+		'copy()Lnet/minecraft/src/NBTBase;': function (vm, self) { return JVM.nbtFromJson(vm, JVM.nbtToJson(self), self.$name); },
+		'toString()Ljava/lang/String;': function (vm, self) { return JSON.stringify(JVM.nbtToJson(self)); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && JSON.stringify(JVM.nbtToJson(a[0])) === JSON.stringify(JVM.nbtToJson(self)) ? 1 : 0; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(JSON.stringify(JVM.nbtToJson(self))); },
+	} });
+	var prim = { 1: 'B', 2: 'S', 3: 'I', 4: 'J', 5: 'F', 6: 'D', 7: '[B', 8: 'Ljava/lang/String;', 11: '[I' };
+	Object.keys(prim).forEach(function (t) {
+		t = +t;
+		var m = {};
+		m['<init>(Ljava/lang/String;)V'] = function (vm, self, a) { self.$t = t; self.$name = a[0]; self.$v = t === 4 ? 0n : t === 8 ? '' : t === 7 || t === 11 ? vm.newArray(t === 7 ? 'B' : 'I', 0) : 0; setDataField(self); };
+		m['<init>(Ljava/lang/String;' + prim[t] + ')V'] = function (vm, self, a) { self.$t = t; self.$name = a[0]; self.$v = a[1]; setDataField(self); };
+		def(TAG[t], { super: SRC + 'NBTBase', fields: { data: prim[t] }, methods: m });
+	});
+	var getter = function (t, dflt) { return function (vm, self, a) { var x = cget(self, a[0]); if (!x) return typeof dflt === 'function' ? dflt(vm) : dflt; if (x.$t !== 9 && x.$t !== 10) x.$v = x[':data']; return x.$v; }; };
+	var setter = function (t, conv) { return function (vm, self, a) { cset(vm, self, a[0], t, conv ? conv(a[1]) : a[1]); }; };
+	def('NBTTagCompound', { super: SRC + 'NBTBase', methods: {
+		'<init>()V': function (vm, self) { self.$t = 10; self.$v = new Map(); self.$name = ''; },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$t = 10; self.$v = new Map(); self.$name = a[0]; },
+		'setTag(Ljava/lang/String;Lnet/minecraft/src/NBTBase;)V': function (vm, self, a) { if (a[1]) { a[1].$name = a[0]; self.$v.set(a[0], a[1]); } },
+		'setByte(Ljava/lang/String;B)V': setter(1), 'setShort(Ljava/lang/String;S)V': setter(2), 'setInteger(Ljava/lang/String;I)V': setter(3),
+		'setLong(Ljava/lang/String;J)V': setter(4), 'setFloat(Ljava/lang/String;F)V': setter(5), 'setDouble(Ljava/lang/String;D)V': setter(6),
+		'setString(Ljava/lang/String;Ljava/lang/String;)V': setter(8), 'setByteArray(Ljava/lang/String;[B)V': setter(7), 'setIntArray(Ljava/lang/String;[I)V': setter(11),
+		'setBoolean(Ljava/lang/String;Z)V': setter(1, function (v) { return v ? 1 : 0; }),
+		'setCompoundTag(Ljava/lang/String;Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) { if (a[1]) { a[1].$name = a[0]; self.$v.set(a[0], a[1]); } },
+		'getTag(Ljava/lang/String;)Lnet/minecraft/src/NBTBase;': function (vm, self, a) { return cget(self, a[0]) || null; },
+		'hasKey(Ljava/lang/String;)Z': function (vm, self, a) { return self.$v.has(a[0]) ? 1 : 0; },
+		'removeTag(Ljava/lang/String;)V': function (vm, self, a) { self.$v.delete(a[0]); },
+		'getByte(Ljava/lang/String;)B': getter(1, 0), 'getShort(Ljava/lang/String;)S': getter(2, 0), 'getInteger(Ljava/lang/String;)I': getter(3, 0),
+		'getLong(Ljava/lang/String;)J': getter(4, 0n), 'getFloat(Ljava/lang/String;)F': getter(5, 0), 'getDouble(Ljava/lang/String;)D': getter(6, 0),
+		'getString(Ljava/lang/String;)Ljava/lang/String;': getter(8, ''),
+		'getByteArray(Ljava/lang/String;)[B': getter(7, function (vm) { return vm.newArray('B', 0); }),
+		'getIntArray(Ljava/lang/String;)[I': getter(11, function (vm) { return vm.newArray('I', 0); }),
+		'getBoolean(Ljava/lang/String;)Z': function (vm, self, a) { var x = cget(self, a[0]); return x && (x[':data'] !== undefined ? x[':data'] : x.$v) ? 1 : 0; },
+		'getCompoundTag(Ljava/lang/String;)Lnet/minecraft/src/NBTTagCompound;': function (vm, self, a) { var x = cget(self, a[0]); return x && x.$t === 10 ? x : compound(vm, a[0]); },
+		'getTagList(Ljava/lang/String;)Lnet/minecraft/src/NBTTagList;': function (vm, self, a) { var x = cget(self, a[0]); return x && x.$t === 9 ? x : tag(vm, 9, null, a[0]); },
+		'getTags()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, Array.from(self.$v.values())); },
+		'hasNoTags()Z': function (vm, self) { return self.$v.size ? 0 : 1; },
+		'copy()Lnet/minecraft/src/NBTBase;': function (vm, self) { return JVM.nbtFromJson(vm, JVM.nbtToJson(self), self.$name); },
+	} });
+	def('NBTTagList', { super: SRC + 'NBTBase', methods: {
+		'<init>()V': function (vm, self) { self.$t = 9; self.$v = []; self.$lt = 0; self.$name = ''; },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$t = 9; self.$v = []; self.$lt = 0; self.$name = a[0]; },
+		'appendTag(Lnet/minecraft/src/NBTBase;)V': function (vm, self, a) { if (a[0]) { self.$lt = a[0].$t; self.$v.push(a[0]); } },
+		'tagAt(I)Lnet/minecraft/src/NBTBase;': function (vm, self, a) { return self.$v[a[0]] || null; },
+		'removeTag(I)Lnet/minecraft/src/NBTBase;': function (vm, self, a) { return self.$v.splice(a[0], 1)[0] || null; },
+		'tagCount()I': function (vm, self) { return self.$v.length; },
+	} });
+	def('CompressedStreamTools', { staticMethods: {} });
+
+	var IS = vm.natives[SRC + 'ItemStack'];
+	IS.methods = Object.assign({}, IS.methods, {
+		'writeToNBT(Lnet/minecraft/src/NBTTagCompound;)Lnet/minecraft/src/NBTTagCompound;': function (vm, self, a) {
+			var c = a[0];
+			cset(vm, c, 'id', 2, self[':itemID']); cset(vm, c, 'Count', 1, self[':stackSize']); cset(vm, c, 'Damage', 2, self[':itemDamage']);
+			if (self[':stackTagCompound']) { self[':stackTagCompound'].$name = 'tag'; c.$v.set('tag', self[':stackTagCompound']); }
+			return c;
+		},
+		'readFromNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) {
+			var c = a[0], g = function (k) { var x = cget(c, k); return x ? x[':data'] : 0; };
+			self[':itemID'] = g('id'); self[':stackSize'] = g('Count'); self[':itemDamage'] = Math.max(0, g('Damage'));
+			var t = cget(c, 'tag'); if (t) self[':stackTagCompound'] = t;
+		},
+		'hasTagCompound()Z': function (vm, self) { return self[':stackTagCompound'] ? 1 : 0; },
+		'getTagCompound()Lnet/minecraft/src/NBTTagCompound;': function (vm, self) { return self[':stackTagCompound'] || null; },
+		'setTagCompound(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) { self[':stackTagCompound'] = a[0]; },
+		'getEnchantmentTagList()Lnet/minecraft/src/NBTTagList;': function (vm, self) { var t = self[':stackTagCompound']; var l = t && cget(t, 'ench'); return l || null; },
+		'isItemEnchanted()Z': function (vm, self) { var t = self[':stackTagCompound']; return t && cget(t, 'ench') ? 1 : 0; },
+	});
+	IS.staticMethods = Object.assign({}, IS.staticMethods || {}, {
+		'loadItemStackFromNBT(Lnet/minecraft/src/NBTTagCompound;)Lnet/minecraft/src/ItemStack;': function (vm, n, a) {
+			var s = JVM.mc152.newStack(vm, 0, 0, 0);
+			vm.callVirtual(s, 'readFromNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [a[0]]);
+			return s[':itemID'] ? s : null;
+		},
+	});
+
+	var W = 'Lnet/minecraft/src/World;';
+	def('TileEntity', { fields: { worldObj: W, xCoord: 'I', yCoord: 'I', zCoord: 'I', tileEntityInvalid: 'Z', blockMetadata: 'I', blockType: 'Lnet/minecraft/src/Block;' }, methods: {
+		'<init>()V': function (vm, self) { self[':blockMetadata'] = -1; },
+		'readFromNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) { var g = function (k) { var x = cget(a[0], k); return x ? x[':data'] : 0; }; self[':xCoord'] = g('x'); self[':yCoord'] = g('y'); self[':zCoord'] = g('z'); },
+		'writeToNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) {
+			var name = tiles(vm).names.get(self.cls) || self.cls.name.split('/').pop();
+			for (var c = self.cls; c && !tiles(vm).names.get(c); c = c.superClass) {}
+			if (c) name = tiles(vm).names.get(c);
+			cset(vm, a[0], 'id', 8, name); cset(vm, a[0], 'x', 3, self[':xCoord']); cset(vm, a[0], 'y', 3, self[':yCoord']); cset(vm, a[0], 'z', 3, self[':zCoord']);
+		},
+		'updateEntity()V': function () {},
+		'getWorldObj()Lnet/minecraft/src/World;': function (vm, self) { return self[':worldObj']; },
+		'setWorldObj(Lnet/minecraft/src/World;)V': function (vm, self, a) { self[':worldObj'] = a[0]; },
+		'hasWorldObj()Z': function (vm, self) { return self[':worldObj'] ? 1 : 0; },
+		'getBlockMetadata()I': function (vm, self) { var t = op(vm, 'tile', self[':xCoord'], self[':yCoord'], self[':zCoord']); return t ? t.data : 0; },
+		'getBlockType()Lnet/minecraft/src/Block;': function (vm, self) { var t = op(vm, 'tile', self[':xCoord'], self[':yCoord'], self[':zCoord']); var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc); return t ? bc.statics.blocksList.a[t.id] || null : null; },
+		'onInventoryChanged()V': function (vm) { tiles(vm).dirty = true; },
+		'isInvalid()Z': function (vm, self) { return self[':tileEntityInvalid'] ? 1 : 0; },
+		'invalidate()V': function (vm, self) { self[':tileEntityInvalid'] = 1; },
+		'validate()V': function (vm, self) { self[':tileEntityInvalid'] = 0; },
+		'updateContainingBlockInfo()V': function () {},
+		'getDistanceFrom(DDD)D': function (vm, self, a) { var dx = self[':xCoord'] + 0.5 - a[0], dy = self[':yCoord'] + 0.5 - a[1], dz = self[':zCoord'] + 0.5 - a[2]; return dx * dx + dy * dy + dz * dz; },
+		'getDescriptionPacket()Lnet/minecraft/src/Packet;': function () { return null; },
+		'receiveClientEvent(II)Z': function () { return 0; },
+		'canUpdate()Z': function () { return 1; },
+		'shouldRefresh(IIIIILnet/minecraft/src/World;III)Z': function () { return 1; },
+	}, staticMethods: {
+		'addMapping(Ljava/lang/Class;Ljava/lang/String;)V': function (vm, n, a) { regTile(vm, a[0] && a[0].$cls, a[1]); },
+		'createAndLoadEntity(Lnet/minecraft/src/NBTTagCompound;)Lnet/minecraft/src/TileEntity;': function (vm, n, a) { return loadTile(vm, a[0]); },
+	} });
+	def('ITileEntityProvider', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def('BlockContainer', { super: SRC + 'Block', interfaces: [SRC + 'ITileEntityProvider'], methods: {
+		'<init>(ILnet/minecraft/src/Material;)V': function (vm, self, a) { vm.invoke(vm.loadClass(SRC + 'Block').methods['<init>(ILnet/minecraft/src/Material;)V'], self, a); self[':isBlockContainer'] = 1; },
+		'onBlockAdded(Lnet/minecraft/src/World;III)V': function () {},
+		'breakBlock(Lnet/minecraft/src/World;IIIII)V': function (vm, self, a) { removeTile(vm, a[1], a[2], a[3]); },
+		'onBlockEventReceived(Lnet/minecraft/src/World;IIIII)Z': function () { return 0; },
+	} });
+	vm.natives[SRC + 'BlockContainer'].anyInit = function (vm, self, args, desc) { vm.natives[SRC + 'Block'].anyInit(vm, self, args, desc); self[':isBlockContainer'] = 1; };
+	var BS = vm.natives[SRC + 'Block'];
+	BS.methods = Object.assign({}, BS.methods, {
+		'hasTileEntity(I)Z': function (vm, self) { return vm.isInstance(self, vm.loadClass(SRC + 'ITileEntityProvider')) ? 1 : 0; },
+		'createTileEntity(Lnet/minecraft/src/World;I)Lnet/minecraft/src/TileEntity;': function (vm, self, a) { return vm.isInstance(self, vm.loadClass(SRC + 'ITileEntityProvider')) ? vm.callVirtual(self, 'createNewTileEntity', '(Lnet/minecraft/src/World;)Lnet/minecraft/src/TileEntity;', [a[0]]) : null; },
+	});
+	var ML = vm.natives[SRC + 'ModLoader'].staticMethods;
+	ML['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;)V'] = function (vm, n, a) { regTile(vm, a[0] && a[0].$cls, a[1]); };
+	ML['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'] = function (vm, n, a) { regTile(vm, a[0] && a[0].$cls, a[1]); };
+	[['cpw/mods/fml/common/registry/GameRegistry', 'registerTileEntity(Ljava/lang/Class;Ljava/lang/String;)V'],
+	 ['cpw/mods/fml/common/registry/GameRegistry', 'registerTileEntityWithAlternatives(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/String;)V'],
+	 ['cpw/mods/fml/client/registry/ClientRegistry', 'registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V']].forEach(function (p) {
+		var sp = vm.natives[p[0]];
+		if (!sp) return;
+		var prev = sp.staticMethods[p[1]];
+		sp.staticMethods[p[1]] = function (vm, n, a) { if (prev) prev(vm, n, a); regTile(vm, a[0] && a[0].$cls, a[1]); };
+	});
+	var WS = vm.natives[SRC + 'World'];
+	WS.methods = Object.assign({}, WS.methods, {
+		'getBlockTileEntity(III)Lnet/minecraft/src/TileEntity;': function (vm, self, a) { return tileAt(vm, a[0], a[1], a[2], true); },
+		'setBlockTileEntity(IIILnet/minecraft/src/TileEntity;)V': function (vm, self, a) { putTile(vm, a[0], a[1], a[2], a[3]); },
+		'removeBlockTileEntity(III)V': function (vm, self, a) { removeTile(vm, a[0], a[1], a[2]); },
+		'markTileEntityChanged(IIILnet/minecraft/src/TileEntity;)V': function (vm) { tiles(vm).dirty = true; },
+		'updateTileEntityChunkAndDoNothing(IIILnet/minecraft/src/TileEntity;)V': function (vm) { tiles(vm).dirty = true; },
+		'addBlockEvent(IIIIII)V': function (vm, self, a) {
+			var b = JVM.mc152.blockOf ? JVM.mc152.blockOf(vm, a[3]) : null;
+			if (b) JVM.run(vm, function () { vm.callVirtual(b, 'onBlockEventReceived', '(Lnet/minecraft/src/World;IIIII)Z', [self, a[0], a[1], a[2], a[4], a[5]]); });
+		},
+	});
+}
+
+function regTile(vm, cls, name) { if (!cls || !name) return; var t = tiles(vm); t.classes[name] = cls; t.names.set(cls, name); }
+JVM.registerTile = regTile;
+function blockAt(vm, x, y, z) {
+	var t = op(vm, 'tile', x, y, z);
+	if (!t || !t.id) return null;
+	var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc);
+	var b = bc.statics.blocksList.a[t.id];
+	return b && b.$mod ? { b: b, meta: t.data } : null;
+}
+function makeTile(vm, b, meta, world) {
+	var te = null;
+	JVM.run(vm, function () {
+		if (vm.callVirtual(b, 'hasTileEntity', '(I)Z', [meta])) te = vm.callVirtual(b, 'createTileEntity', '(Lnet/minecraft/src/World;I)Lnet/minecraft/src/TileEntity;', [world, meta]);
+	});
+	return te;
+}
+function putTile(vm, x, y, z, te) {
+	var t = tiles(vm);
+	if (!te) return;
+	te[':worldObj'] = JVM.mc152.worldObj(vm);
+	te[':xCoord'] = x | 0; te[':yCoord'] = y | 0; te[':zCoord'] = z | 0;
+	te[':tileEntityInvalid'] = 0;
+	te.$mod = te.cls.source || vm.currentMod;
+	t.at.set(K(x, y, z), te);
+	var u = te.cls.findMethod('updateEntity()V');
+	if (u && !u.cls.native && t.ticking.indexOf(te) < 0) t.ticking.push(te);
+	t.dirty = true;
+}
+function tileAt(vm, x, y, z, create) {
+	var t = tiles(vm), te = t.at.get(K(x, y, z));
+	if (te || !create || !vm.game || vm.game.mode !== 'run') return te || null;
+	var bm = blockAt(vm, x, y, z);
+	if (!bm) return null;
+	te = makeTile(vm, bm.b, bm.meta, JVM.mc152.worldObj(vm));
+	if (te) putTile(vm, x, y, z, te);
+	return te || null;
+}
+function removeTile(vm, x, y, z) {
+	var t = tiles(vm), k = K(x, y, z), te = t.at.get(k);
+	if (!te) return;
+	te[':tileEntityInvalid'] = 1;
+	t.at.delete(k);
+	var i = t.ticking.indexOf(te);
+	if (i >= 0) t.ticking.splice(i, 1);
+	t.dirty = true;
+}
+function loadTile(vm, c) {
+	var idTag = cget(c, 'id'), name = idTag && idTag[':data'];
+	var cls = name && tiles(vm).classes[name];
+	if (!cls) return null;
+	var te = vm.newObject(cls), k = cls.findDeclared('<init>()V');
+	if (k) vm.invoke(k, te, []);
+	vm.callVirtual(te, 'readFromNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [c]);
+	return te;
+}
+
+JVM.tilePlaced = function (vm, x, y, z) {
+	if (tiles(vm).at.get(K(x, y, z))) return;
+	var bm = blockAt(vm, x, y, z);
+	if (!bm) return;
+	var te = makeTile(vm, bm.b, bm.meta, JVM.mc152.worldObj(vm));
+	if (te) putTile(vm, x, y, z, te);
+};
+JVM.tileBroken = function (vm, x, y, z) { removeTile(vm, x, y, z); };
+JVM.tilesWantTick = function (vm) { var r = vm.mcReg; return !!(r && r.tiles && (r.tiles.ticking.length || Object.keys(r.tiles.classes).length)); };
+JVM.tileTick = function (vm) {
+	var t = vm.mcReg && vm.mcReg.tiles;
+	if (!t || !t.ticking.length) return;
+	t.ticking.slice().forEach(function (te) {
+		if (te[':tileEntityInvalid']) return;
+		vm.currentMod = te.$mod || vm.currentMod;
+		JVM.run(vm, function () { vm.callVirtual(te, 'updateEntity', '()V', []); });
+	});
+	t.dirty = true;
+};
+JVM.tileSave = function (vm) {
+	var t = vm.mcReg && vm.mcReg.tiles;
+	if (!t || !vm.fs) return;
+	var byMod = {};
+	t.at.forEach(function (te) {
+		var mod = te.$mod || '';
+		JVM.run(vm, function () {
+			var c = compound(vm, '');
+			vm.callVirtual(te, 'writeToNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [c]);
+			(byMod[mod] || (byMod[mod] = [])).push(JVM.nbtToJson(c));
+		});
+	});
+	var prev = vm.currentMod;
+	Object.keys(t.mods || {}).concat(Object.keys(byMod)).forEach(function (mod) {
+		vm.currentMod = mod;
+		vm.fs.write('world/tileentities.json', new TextEncoder().encode(JSON.stringify({ format: 1, tiles: byMod[mod] || [] })));
+	});
+	vm.currentMod = prev;
+	t.dirty = false;
+};
+JVM.tileLoad = function (vm, mods) {
+	var t = tiles(vm);
+	t.at = new Map(); t.ticking = []; t.mods = {};
+	if (!vm.fs) return;
+	var prev = vm.currentMod;
+	mods.forEach(function (mod) {
+		t.mods[mod] = true;
+		vm.currentMod = mod;
+		var b = vm.fs.read('world/tileentities.json');
+		if (!b) return;
+		var j;
+		try { j = JSON.parse(new TextDecoder().decode(b)); } catch (e) { vm.log('warn', mod + ': saved tile entities could not be read'); return; }
+		(j.tiles || []).forEach(function (tj) {
+			JVM.run(vm, function () {
+				var c = JVM.nbtFromJson(vm, tj, '');
+				var te = loadTile(vm, c);
+				if (te) putTile(vm, te[':xCoord'], te[':yCoord'], te[':zCoord'], te);
+			});
+		});
+	});
+	vm.currentMod = prev;
+	t.dirty = false;
+};
+
+JVM.installTiles = installTiles;
 })();
 
 (function () {
