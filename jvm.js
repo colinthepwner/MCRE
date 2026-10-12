@@ -7375,6 +7375,7 @@ JVM.javaSettings = function (vm, modId) {
 		d.default = p.def; d.current = p.value;
 		out.push(d);
 	});
+	if (JVM.stationSettings) out = out.concat(JVM.stationSettings(vm, modId));
 	keysOf(vm).filter(function (k) { return k.mod === modId; }).forEach(function (k) {
 		var desc = String(k.kb[':keyDescription'] || 'key');
 		var label = reg(vm).lang[desc] || desc.replace(/^key[.]/, '');
@@ -8438,7 +8439,7 @@ var LIBS = [
 	[/^kotlin[/]|^kotlinx[/]/, 'Fabric Language Kotlin'],
 	[/^net[/]lomeli[/]lomlib[/]/, 'LomLib'],
 	[/^paulevs[/]bhcreative[/]/, 'BH Creative'],
-	[/^net[/]glasslauncher[/]mods[/]api[/]gcapi|^net[/]glasslauncher[/]mods[/]gcapi/, 'Glass Config API'],
+	[/^net[/]glasslauncher[/]mods[/]api[/]gcapi|^net[/]glasslauncher[/]mods[/]gcapi/, null],
 	[/^net[/]glasslauncher[/]mods[/]alwaysmoreitems|^net[/]glasslauncher[/]hmifabric/, null],
 	[/^com[/]terraformersmc[/]modmenu|^io[/]github[/]prospector[/]modmenu/, null],
 	[/^org[/]spongepowered[/]asm[/]/, null],
@@ -8719,6 +8720,16 @@ function mapName(vm, c) { return (vm.mapClass && vm.mapClass(c)) || c; }
 function installStation(vm) {
 	var def = function (n, s) { vm.defineNative(n, s); };
 	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+	if (JVM.mc152.onWorld !== JVM.mc152.$stOnWorld) {
+		var prevOnWorld = JVM.mc152.onWorld;
+		JVM.mc152.onWorld = function (vm, w) {
+			if (prevOnWorld) prevOnWorld(vm, w);
+			var pv = w[':provider'];
+			w[':worldProvider'] = pv;
+			if (pv) pv[':worldType'] = pv[':dimensionId'];
+		};
+		JVM.mc152.$stOnWorld = JVM.mc152.onWorld;
+	}
 	vm.autoBlockId = function (vm) {
 		var bc = vm.loadClass(SRC + 'Block'), list = bc.statics.blocksList.a, s = st(vm);
 		while (s.nextBlock < list.length && list[s.nextBlock]) s.nextBlock++;
@@ -8910,6 +8921,8 @@ function installStation(vm) {
 		mb.spawns.push({ cls: a[0] && a[0].$cls, weight: a[1], min: 1, max: 4, type: type, biomes: [self], mod: vm.currentMod });
 	}; };
 	if (MB) MB.methods = Object.assign({}, MB.methods, {
+		'addFeature(Lnet/minecraft/src/WorldGenerator;)V': function (vm, self, a) { (self.$stFeatures = self.$stFeatures || []).push(a[0]); },
+		'getFeatures()Ljava/util/List;': function (vm, self) { return JVM.newList(vm, (self.$stFeatures || []).slice()); },
 		'addPassiveEntity(Ljava/lang/Class;I)V': spawnAdd('creature'),
 		'addHostileEntity(Ljava/lang/Class;I)V': spawnAdd('monster'),
 		'addWaterEntity(Ljava/lang/Class;I)V': spawnAdd('waterCreature'),
@@ -9074,6 +9087,25 @@ function installStation(vm) {
 	};
 	forward(B, BETA.block);
 	forward(It, BETA.item);
+	var BC = ST + 'client/color/block/', IC = ST + 'client/color/item/';
+	def(BC + 'BlockColorProvider', { access: I, abstractMethods: { 'getColor(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)I': true } });
+	def(IC + 'ItemColorProvider', { access: I, abstractMethods: { 'getColor(Lnet/minecraft/src/ItemStack;I)I': true } });
+	var tintTo = function (prop) { return function (vm, self, a) { Array.prototype.forEach.call(a[1] ? a[1].a : [], function (o) { if (o) o[prop] = a[0]; }); }; };
+	def(BC + 'BlockColors', { methods: {
+		'registerColorProvider(Lnet/modificationstation/stationapi/api/client/color/block/BlockColorProvider;[Lnet/minecraft/src/Block;)V': tintTo('$stTint'),
+	} });
+	def(IC + 'ItemColors', { methods: {
+		'register(Lnet/modificationstation/stationapi/api/client/color/item/ItemColorProvider;[Lnet/modificationstation/stationapi/api/item/ItemConvertible;)V': tintTo('$stItemTint'),
+		'register(Lnet/modificationstation/stationapi/api/client/color/item/ItemColorProvider;[Lnet/minecraft/src/Item;)V': tintTo('$stItemTint'),
+		'register(Lnet/modificationstation/stationapi/api/client/color/item/ItemColorProvider;[Lnet/minecraft/src/Block;)V': tintTo('$stItemTint'),
+	} });
+	def(ST + 'item/ItemConvertible', { access: I });
+	ev('client/event/color/block/BlockColorsRegisterEvent', null, { fields: { blockColors: 'L' + BC + 'BlockColors;' } });
+	ev('client/event/color/item/ItemColorsRegisterEvent', null, { fields: { itemColors: 'L' + IC + 'ItemColors;', blockColors: 'L' + BC + 'BlockColors;' } });
+	var DY = vm.natives[SRC + 'ItemDye'] || (vm.defineNative(SRC + 'ItemDye', { super: SRC + 'Item' }), vm.natives[SRC + 'ItemDye']);
+	DY.statics = Object.assign({}, DY.statics || {}, { dyeColors: null });
+	var dyClinit = DY.clinit;
+	DY.clinit = function (vm, c) { if (dyClinit) dyClinit(vm, c); c.statics.dyeColors = JVM.javaArray(vm, 'I', [0x1e1b1b, 0xb3312c, 0x3b511a, 0x51301a, 0x253192, 0x7b2fbe, 0x287697, 0xababab, 0x434343, 0xd88198, 0x41cd34, 0xdecf2a, 0x6689d3, 0xc354cd, 0xeb8844, 0xf0f0f0]); };
 	A.statics = Object.assign({}, A.statics || {}, { maxDamageArray: null, damageReduceAmountArray: null });
 	var aClinit = A.clinit;
 	A.clinit = function (vm, c) {
@@ -9125,6 +9157,64 @@ function installStation(vm) {
 		});
 		def(name, { super: sup, methods: methods, access: T[name][2] ? JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT : JVM.ACC_PUBLIC });
 	});
+	var WG = SRC + 'WorldGenerator', GEN = 'generate(Lnet/minecraft/src/World;Ljava/util/Random;III)Z', FT = ST + 'worldgen/feature/';
+	var nextInt = function (vm, r, n) { return vm.callVirtual(r, 'nextInt', '(I)I', [n]); };
+	var genOf = function (vm, f, w, r, x, y, z) { return f ? vm.callVirtual(f, 'generate', '(Lnet/minecraft/src/World;Ljava/util/Random;III)Z', [w, r, x, y, z]) : 0; };
+	var scatterGen = function (vm, self, a) {
+		var w = a[0], r = a[1], res = 0;
+		for (var i = 0; i < self.$it; i++) {
+			var px = a[2] + nextInt(vm, r, 16), pz = a[4] + nextInt(vm, r, 16);
+			var py = vm.callVirtual(self, 'getHeight', '(Lnet/minecraft/src/World;Ljava/util/Random;III)I', [w, r, px, a[3], pz]);
+			res = genOf(vm, self.$f, w, r, px, py, pz) | res;
+		}
+		return res ? 1 : 0;
+	};
+	var HGT = 'getHeight(Lnet/minecraft/src/World;Ljava/util/Random;III)I';
+	var mGen = {}; mGen[GEN] = scatterGen;
+	def(FT + 'ScatterFeature', { super: WG, access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;I)V': function (vm, self, a) { self.$f = a[0]; self.$it = a[1]; self[':feature'] = a[0]; self[':iterations'] = a[1]; },
+	}, mGen) });
+	var hs = {}; hs[HGT] = function (vm, self, a) { return vm.callVirtual(a[0], 'getHeightValue', '(II)I', [a[2], a[4]]); };
+	def(FT + 'HeightScatterFeature', { super: FT + 'ScatterFeature', methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;I)V': function (vm, self, a) { self.$f = a[0]; self.$it = a[1]; },
+	}, hs) });
+	var vs = {}; vs[HGT] = function (vm, self, a) { return self.$min + nextInt(vm, a[1], self.$delta); };
+	var volInit = function (vm, self, f, it, min, max) { self.$f = f; self.$it = it; self.$min = min; self.$delta = max - min + 1; self[':minHeight'] = min; self[':deltaHeight'] = self.$delta; };
+	def(FT + 'VolumetricScatterFeature', { super: FT + 'ScatterFeature', methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;III)V': function (vm, self, a) { volInit(vm, self, a[0], a[1], a[2], a[3]); },
+		'<init>(Lnet/minecraft/src/WorldGenerator;II)V': function (vm, self, a) { volInit(vm, self, a[0], a[1], 0, a[2]); },
+	}, vs) });
+	var bw = {}; bw[HGT] = function (vm, self, a) { return nextInt(vm, a[1], self.$min + nextInt(vm, a[1], self.$delta)); };
+	def(FT + 'BottomWeightedScatter', { super: FT + 'VolumetricScatterFeature', methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;III)V': function (vm, self, a) { volInit(vm, self, a[0], a[1], a[2], a[3]); },
+	}, bw) });
+	var lv = {};
+	lv[GEN] = function (vm, self, a) {
+		var w = a[0], r = a[1], res = 0;
+		for (var index = 0 >> 4; index < (128 >> 4); index++) for (var i = 0; i < self.$it; i++) {
+			var px = a[2] + nextInt(vm, r, 16), pz = a[4] + nextInt(vm, r, 16);
+			var py = vm.callVirtual(self, 'getHeight', '(Lnet/minecraft/src/World;Ljava/util/Random;III)I', [w, r, px, index << 4, pz]);
+			if (py === -2147483648) continue;
+			res = genOf(vm, self.$f, w, r, px, py, pz) | res;
+		}
+		return res ? 1 : 0;
+	};
+	lv[HGT] = function (vm, self, a) {
+		var w = a[0], x = a[2], y = a[3], z = a[4];
+		var bl = vm.loadClass(SRC + 'Block').statics.blocksList.a;
+		var op = function (yy) { var b = bl[vm.callVirtual(w, 'getBlockId', '(III)I', [x, yy, z])]; return b && vm.callVirtual(b, 'isOpaqueCube', '()Z', []) ? 1 : 0; };
+		var opaque = op(y);
+		for (var i = 1; i < 16; i++) { var o2 = op(--y); if (o2 && !opaque) return y + 1; }
+		return -2147483648;
+	};
+	def(FT + 'LeveledScatterFeature', { super: FT + 'ScatterFeature', methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;I)V': function (vm, self, a) { self.$f = a[0]; self.$it = a[1]; },
+	}, lv) });
+	var wf = {}; wf[GEN] = function (vm, self, a) { if (nextInt(vm, a[1], self.$w) > 0) return 0; return genOf(vm, self.$f, a[0], a[1], a[2], a[3], a[4]); };
+	def(FT + 'WeightedFeature', { super: WG, methods: Object.assign({
+		'<init>(Lnet/minecraft/src/WorldGenerator;I)V': function (vm, self, a) { self.$f = a[0]; self.$w = a[1]; },
+	}, wf) });
+
 	var OLD = {};
 	OLD[ST + 'registry/Identifier'] = ID;
 	OLD[ST + 'registry/ModID'] = NS;
@@ -9275,11 +9365,104 @@ function entrypointObject(vm, v) {
 	return o;
 }
 
+var GC3 = 'net/glasslauncher/mods/gcapi3/api/', GC2 = 'net/glasslauncher/mods/api/gcapi/api/';
+function gcAnn(vm, list, names) { for (var i = 0; i < names.length; i++) { var a = JVM.annotation(vm, list, names[i]); if (a) return a; } return null; }
+function annVal(a, k, dflt) { var e = a && a.values && a.values[k]; return e && e.v !== undefined ? e.v : dflt; }
+function gcRoots(vm, modId) {
+	var s = st(vm), out = [];
+	(s.gcClasses && s.gcClasses[modId] || []).forEach(function (cn) {
+		var r = JVM.run(vm, function () {
+			var c = vm.loadClass(cn);
+			if (c.absent) return;
+			vm.initClass(c);
+			Object.keys(c.fields).forEach(function (fn) {
+				var f = c.fields[fn], a = gcAnn(vm, f.annotations, [GC3 + 'ConfigRoot', GC2 + 'GConfig']);
+				if (!a || !f.static || !c.statics[fn]) return;
+				out.push({ cls: cn, field: fn, obj: c.statics[fn], title: annVal(a, 'visibleName', '') || annVal(a, 'value', fn) });
+			});
+		});
+		void r;
+	});
+	return out;
+}
+function gcEntries(vm, obj, path, group, out, depth) {
+	if (!obj || !obj.cls || depth > 6) return out;
+	for (var c = obj.cls; c && !c.native; c = c.superClass) {
+		Object.keys(c.fields).forEach(function (fn) {
+			var f = c.fields[fn];
+			if (f.static || !f.annotations) return;
+			var cat = gcAnn(vm, f.annotations, [GC3 + 'ConfigCategory', GC2 + 'ConfigCategory']);
+			if (cat) { gcEntries(vm, obj[':' + fn], path.concat(fn), (group ? group + ' > ' : '') + (annVal(cat, 'name', '') || pretty(fn)), out, depth + 1); return; }
+			var en = gcAnn(vm, f.annotations, [GC3 + 'ConfigEntry', GC2 + 'ConfigName']);
+			if (!en) return;
+			out.push({ path: path.concat(fn), field: fn, owner: obj, desc: f.desc, ann: en, group: group });
+		});
+	}
+	return out;
+}
+function pretty(n) { return String(n).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, function (x) { return x.toUpperCase(); }); }
+function unbox(v) { return v && v.$box !== undefined ? JVM.unbox(v) : v; }
+function enumConsts(vm, desc) {
+	if (desc[0] !== 'L') return null;
+	var c = vm.loadClass(desc.slice(1, -1));
+	if (!c.superClass || c.superClass.name !== 'java/lang/Enum') return null;
+	vm.initClass(c);
+	if (c.$values) return c.$values;
+	var r = JVM.run(vm, function () { return vm.callStatic(c.name, 'values', '()[' + desc, []); });
+	return r.ok && r.value ? Array.prototype.slice.call(r.value.a) : null;
+}
+JVM.stationSettings = function (vm, modId) {
+	var decls = [];
+	gcRoots(vm, modId).forEach(function (root) {
+		gcEntries(vm, root.obj, [], '', [], 0).forEach(function (e) {
+			var v = e.owner[':' + e.field], name = annVal(e.ann, 'name', '') || annVal(e.ann, 'value', '') || pretty(e.field);
+			var d = { id: 'gc|' + root.cls + '|' + root.field + '|' + e.path.join('.'), name: String(name).slice(0, 48),
+				description: String(annVal(e.ann, 'description', '') || annVal(e.ann, 'comment', '')).slice(0, 200), group: root.title + (e.group ? ': ' + e.group : '') };
+			var lo = annVal(e.ann, 'minValue', null), hi = annVal(e.ann, 'maxValue', null);
+			var ev = enumConsts(vm, e.desc);
+			if (/^(Z|Ljava\/lang\/Boolean;)$/.test(e.desc)) { d.type = 'toggle'; d.default = !!unbox(v); }
+			else if (/^([IJSB]|Ljava\/lang\/(Integer|Long|Short|Byte);)$/.test(e.desc)) {
+				d.type = lo != null && hi != null && Number(hi) - Number(lo) <= 1000 ? 'slider' : 'number';
+				d.min = lo != null ? Number(lo) : -2147483648; d.max = hi != null ? Number(hi) : 2147483647; d.step = 1; d.default = Number(unbox(v) || 0);
+			} else if (/^([FD]|Ljava\/lang\/(Float|Double);)$/.test(e.desc)) {
+				d.type = 'number'; d.min = lo != null ? Number(lo) : -1e300; d.max = hi != null ? Number(hi) : 1e300; d.step = 0; d.default = Number(unbox(v) || 0);
+			} else if (ev) { d.type = 'choice'; d.options = ev.map(function (x) { return x.$name; }); d.default = v && v.$name || d.options[0]; }
+			else if (e.desc === 'Ljava/lang/String;') { d.type = 'text'; d.default = v == null ? '' : String(v); }
+			else return;
+			d.current = d.default;
+			decls.push(d);
+		});
+	});
+	return decls;
+};
+function gcApply(vm, modId, values) {
+	if (!values) return;
+	gcRoots(vm, modId).forEach(function (root) {
+		gcEntries(vm, root.obj, [], '', [], 0).forEach(function (e) {
+			var id = 'gc|' + root.cls + '|' + root.field + '|' + e.path.join('.');
+			if (!(id in values)) return;
+			var v = values[id], d = e.desc, out;
+			if (d === 'Z') out = v ? 1 : 0;
+			else if (d === 'Ljava/lang/Boolean;') out = JVM.box(vm, v ? 1 : 0, 'Z');
+			else if (/^[ISB]$/.test(d)) out = Math.trunc(+v) | 0;
+			else if (d === 'J') out = BigInt(Math.trunc(+v));
+			else if (/^[FD]$/.test(d)) out = d === 'F' ? Math.fround(+v) : +v;
+			else if (d === 'Ljava/lang/Integer;') out = JVM.box(vm, Math.trunc(+v) | 0, 'I');
+			else if (d === 'Ljava/lang/Long;') out = JVM.box(vm, BigInt(Math.trunc(+v)), 'J');
+			else if (d === 'Ljava/lang/Float;') out = JVM.box(vm, Math.fround(+v), 'F');
+			else if (d === 'Ljava/lang/Double;') out = JVM.box(vm, +v, 'D');
+			else if (d === 'Ljava/lang/String;') out = String(v);
+			else { var ev = enumConsts(vm, d); out = ev ? ev.filter(function (x) { return x.$name === String(v); })[0] : undefined; }
+			if (out !== undefined) e.owner[':' + e.field] = out;
+		});
+	});
+}
+
 var EVENT_FEATURES = [
 	[/Biome/, 'new biomes'], [/Dimension/, 'new dimensions'], [/KeyBinding|KeyState/, 'its keys'],
 	[/Tooltip/, 'item tooltips'], [/Colors/, 'tinted blocks and items'], [/Renderer|ModelPredicate|Model/, 'custom-drawn blocks and items'],
 	[/Achievement|Stat/, 'achievements'], [/GuiHandler|Screen/, 'its screens'], [/Effect/, 'status effects'],
-	[/Burnable/, 'blocks catching fire'], [/Packet|Message|Network|Login|Logout|Server/, null], [/Resource|Reload|DataFixer|Option/, null],
+	[/Burnable/, 'blocks catching fire'], [/Packet|Message|Network|Login|Logout|Server|MobHandler|EntityHandler/, null], [/Resource|Reload|DataFixer|Option/, null],
 	[/Player|Item|Block|Crafting|Slot/, 'some of its block and item behaviour'],
 ];
 JVM.babricLoad = function (vm, modId, fj, files, classes) {
@@ -9289,6 +9472,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	vm.currentMod = modId;
 	stationTags(vm, files);
 	var eps = fj.entrypoints || {}, objs = [];
+	(s.gcClasses = s.gcClasses || {})[modId] = (eps.gcapi3 || []).concat(eps.gcapi || []).map(function (v) { return String(typeof v === 'string' ? v : v && v.value || '').split('::')[0].replace(/[.]/g, '/'); }).filter(Boolean);
 	var run = function (what, fn) { var r = JVM.run(vm, fn); if (!r.ok) vm.log('error', id + ': ' + what + ' failed'); return r; };
 	['stationapi:event_bus', 'stationapi:event_bus_client'].forEach(function (k) {
 		(eps[k] || []).forEach(function (v) { run(k + ' ' + (v.value || v), function () { var o = entrypointObject(vm, v); if (o) { setupEntrypoint(vm, o, modId); objs.push(o); } }); });
@@ -9297,6 +9481,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	(eps.client || []).forEach(function (v) { run('onInitializeClient', function () { var o = entrypointObject(vm, v); if (o && o.cls && !o.$cls) vm.callVirtual(o, 'onInitializeClient', '()V', []); }); });
 	var E = function (n) { return ST + n; };
 	var fireNew = function (cls, fields) { var r = JVM.run(vm, function () { return newEvent(vm, cls, fields); }); if (r.ok) fire(vm, r.value, modId); };
+	gcApply(vm, modId, vm.$stSaved && vm.$stSaved[modId]);
 	var regObj = function (key) { var c = vm.loadClass(ST + 'registry/' + key); vm.initClass(c); return c.statics.INSTANCE; };
 	fireNew(E('event/mod/PreInitEvent'));
 	fireNew(E('event/mod/InitEvent'));
@@ -9319,9 +9504,14 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	var rv = vm.loadClass(ST + 'event/recipe/RecipeRegisterEvent$Vanilla'); vm.initClass(rv);
 	rv.$values.forEach(function (v) { fireNew(E('event/recipe/RecipeRegisterEvent'), { recipeId: v.$type }); });
 	fireNew(E('client/event/texture/TextureRegisterEvent'));
+	JVM.run(vm, function () {
+		var bcs = vm.newObject(vm.loadClass(ST + 'client/color/block/BlockColors')), ics = vm.newObject(vm.loadClass(ST + 'client/color/item/ItemColors'));
+		fire(vm, newEvent(vm, E('client/event/color/block/BlockColorsRegisterEvent'), { blockColors: bcs }), modId);
+		fire(vm, newEvent(vm, E('client/event/color/item/ItemColorsRegisterEvent'), { itemColors: ics, blockColors: bcs }), modId);
+	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)Event?;$/;
+	var SENT = /(BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();
@@ -9447,12 +9637,30 @@ function blockModelFaces(files, id) {
 }
 JVM.stationTexture = function (vm, o, side, files) {
 	if (!files) return null;
+	var t = stationTex0(vm, o, side, files);
+	var prov = side >= 0 ? o.$stTint : o.$stItemTint;
+	if (t && t.file && prov) {
+		var col = null;
+		JVM.run(vm, function () {
+			col = side >= 0 ? vm.callVirtual(prov, 'getColor', '(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)I', [JVM.stationState.defaultOf(vm, o), null, null, 0])
+				: vm.callVirtual(prov, 'getColor', '(Lnet/minecraft/src/ItemStack;I)I', [JVM.mc152.newStack(vm, o[':itemID'], 1, 0), 0]);
+		});
+		if (typeof col === 'number' && (col & 0xffffff) !== 0xffffff) {
+			var hex = ('00000' + (col & 0xffffff).toString(16)).slice(-6);
+			t = { mod: null, name: t.name + '_t' + hex, file: t.file, tint: col & 0xffffff };
+		}
+	}
+	return t;
+};
+function stationTex0(vm, o, side, files) {
 	var s = st(vm), isBlock = side >= 0;
 	if (o.$stTex) return texRef(files, o.$stTex);
 	var id = o.$stId;
 	if (isBlock) {
 		if (id) { var f = blockModelFaces(files, id); if (f) return texRef(files, f[FACE[side]]); }
 		var cell = o[':blockIndexInTexture'];
+		var lt = JVM.legacyTexture ? JVM.legacyTexture(vm, o, side) : null;
+		if (lt && lt.cell >= 4096) cell = lt.cell;
 		if (cell >= 4096 && s.sprites[cell]) return texRef(files, s.sprites[cell]);
 		return null;
 	}
@@ -9464,9 +9672,11 @@ JVM.stationTexture = function (vm, o, side, files) {
 		if (bl) { var bf = blockModelFaces(files, id); if (bf) return texRef(files, bf.north || bf.up); }
 	}
 	var ic = o[':iconIndex'];
+	var li = JVM.legacyTexture ? JVM.legacyTexture(vm, o, 0) : null;
+	if (li && li.cell >= 4096) ic = li.cell;
 	if (ic >= 4096 && s.sprites[ic]) return texRef(files, s.sprites[ic]);
 	return null;
-};
+}
 JVM.vanillaCellName = function (sheet, cell) {
 	var d = D();
 	if (/^[/]?terrain[.]png$/i.test(sheet)) return d.terrain[cell] || null;
@@ -9475,15 +9685,26 @@ JVM.vanillaCellName = function (sheet, cell) {
 };
 
 JVM.stationWantsGen = function (vm) {
-	return st(vm).listeners.some(function (l) { return l.type === 'L' + ST + 'event/world/gen/WorldGenEvent$ChunkDecoration;' || l.type === 'L' + ST + 'event/world/gen/WorldGenEvent;'; });
+	var feats = false;
+	JVM.run(vm, function () { var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c); feats = Array.prototype.some.call(c.statics.biomeList.a, function (b) { return b && b.$stFeatures && b.$stFeatures.length; }); });
+	return feats || st(vm).listeners.some(function (l) { return l.type === 'L' + ST + 'event/world/gen/WorldGenEvent$ChunkDecoration;' || l.type === 'L' + ST + 'event/world/gen/WorldGenEvent;'; });
 };
-JVM.stationGenerate = function (vm, world, cx, cz, seed) {
-	var rnd = vm.newObject(vm.loadClass('java/util/Random'));
-	vm.callVirtual(rnd, '<init>', '(J)V', [BigInt.asIntN(64, BigInt(seed) ^ (BigInt(cx) * 341873128712n + BigInt(cz) * 132897987541n))]);
-	var biome = null;
-	JVM.run(vm, function () { var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c); biome = c.statics.plains || null; });
+JVM.stationGenerate = function (vm, world, cx, cz, rnd, dim) {
+	var biome = JVM.biomeAt ? JVM.biomeAt(vm, cx * 16 + 8, cz * 16 + 8) : null;
+	if (!biome) JVM.run(vm, function () { var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c); biome = (dim === -1 ? c.statics.hell : c.statics.plains) || null; });
 	var ev = newEvent(vm, ST + 'event/world/gen/WorldGenEvent$ChunkDecoration', { world: world, worldSource: null, biome: biome, x: cx * 16, z: cz * 16, random: rnd });
 	fire(vm, ev);
+	var x1 = (cx << 4) | 8, z1 = (cz << 4) | 8;
+	var fb = JVM.biomeAt ? JVM.biomeAt(vm, x1 + 8, z1 + 8) : biome;
+	if (!fb || !fb.$stFeatures || !fb.$stFeatures.length) return;
+	JVM.run(vm, function () {
+		var S = BigInt(vm.mcSeed | 0), R = vm.newObject(vm.loadClass('java/util/Random'));
+		vm.callVirtual(R, '<init>', '(J)V', [S]);
+		var dx = ((vm.callVirtual(R, 'nextLong', '()J', []) >> 1n) << 1n) | 1n, dz = ((vm.callVirtual(R, 'nextLong', '()J', []) >> 1n) << 1n) | 1n;
+		vm.callVirtual(R, 'setSeed', '(J)V', [BigInt.asIntN(64, BigInt.asIntN(64, BigInt(cx) * dx + BigInt(cz) * dz) ^ S)]);
+		var y = vm.callVirtual(world, 'getHeightValue', '(II)I', [x1, z1]);
+		fb.$stFeatures.forEach(function (f) { JVM.run(vm, function () { vm.callVirtual(f, 'generate', '(Lnet/minecraft/src/World;Ljava/util/Random;III)Z', [world, R, x1, y, z1]); }); });
+	});
 };
 
 JVM.babricKind = function (fj, files) {
@@ -9771,6 +9992,9 @@ function installStates(vm) {
 	};
 	var W = vm.natives[SRC + 'World'];
 	if (W) W.methods = Object.assign({}, W.methods, {
+		'getBottomY()I': function () { return 0; },
+		'getTopY()I': function () { return 128; },
+		'getHeight()I': function () { return 128; },
 		'getBlockState(III)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return getState(vm, self, a[0], a[1], a[2]); },
 		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
 		'setBlockStateWithNotify(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },

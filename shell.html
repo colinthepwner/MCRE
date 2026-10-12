@@ -1767,6 +1767,7 @@
                         return 0;
                     }
                     case 'destroy': Module._mcJavaGenSet(x, y, z, 0, 0); return 0;
+                    case 'biome': return mp(['biome', x, y].join('\t'));
                     default:
                         if (vm) vm.warnOnce('gen:' + name, 'game action "' + name + '" is not available while the world generates (left unplugged)');
                         return undefined;
@@ -1782,7 +1783,8 @@
             J.genCheck = function () {
                 var r = reg();
                 genRefs = {}; genIds = {};
-                var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm))));
+                var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm)) ||
+                    (window.JVM && window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm))));
                 if (Module._mcJavaGenOn) Module._mcJavaGenOn(on ? 1 : 0);
                 return on;
             };
@@ -1791,7 +1793,8 @@
                 if (!vm || !r) return;
                 var gm = dim === 0 || dim === -1 ? genMods(r) : [];
                 var fg = !!(window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm));
-                if (!gm.length && !fg) return;
+                var sg = !!(window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm));
+                if (!gm.length && !fg && !sg) return;
                 var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim;
                 if (!running) {
                     javaMods = {};
@@ -1815,6 +1818,7 @@
                             });
                         });
                         if (fg) JV.forgeGenerate(vm, cx, cz);
+                        if (sg) JV.stationGenerate(vm, world, cx, cz, rnd, dim);
                     });
                 } finally { vm.game = prev; vm.mcDim = prevDim; }
             };
@@ -2253,6 +2257,7 @@
                         var fjson = null;
                         try { fjson = JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, '')); } catch (e) { fjson = {}; }
                         (vm.$stFiles = vm.$stFiles || {})[modId] = files;
+                        (vm.$stSaved = vm.$stSaved || {})[modId] = Module.mcMods && Module.mcMods.savedSettings ? Module.mcMods.savedSettings(modId) : null;
                         JVM.babricLoad(vm, modId, fjson, files, classes);
                     }
                     entry.forEach(function (cn) {
@@ -2297,6 +2302,19 @@
                             return new Promise(function (res) { cv.toBlob(function (b) { res(b ? b.arrayBuffer() : null); }, 'image/png'); });
                         }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
                     };
+                    var tintPng = function (bytes, rgb) {
+                        return createImageBitmap(new Blob([bytes], { type: 'image/png' })).then(function (img) {
+                            var cv = document.createElement('canvas');
+                            cv.width = img.width; cv.height = img.height;
+                            var x = cv.getContext('2d');
+                            x.drawImage(img, 0, 0);
+                            var d = x.getImageData(0, 0, cv.width, cv.height), p = d.data;
+                            var r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
+                            for (var i = 0; i < p.length; i += 4) { p[i] = p[i] * r / 255; p[i + 1] = p[i + 1] * g / 255; p[i + 2] = p[i + 2] * b / 255; }
+                            x.putImageData(d, 0, 0);
+                            return new Promise(function (res) { cv.toBlob(function (bl) { res(bl ? bl.arrayBuffer() : null); }, 'image/png'); });
+                        }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
+                    };
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
                         if (t.sheet != null) {
@@ -2305,7 +2323,13 @@
                             else problem('', 'no picture ' + t.sheet + ' in the mod');
                             return;
                         }
-                        if (t.file) { var fb = fileOf(t.file); if (fb) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = fb; else problem('', 'no picture ' + t.file + ' in the mod'); return; }
+                        if (t.file) {
+                            var fb = fileOf(t.file);
+                            if (!fb) { problem('', 'no picture ' + t.file + ' in the mod'); return; }
+                            if (t.tint != null) cuts.push(tintPng(fb, t.tint).then(function (png) { add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png || fb; }));
+                            else add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = fb;
+                            return;
+                        }
                         var cands = [];
                         if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kind + '/' + t.name + '.png', 'assets/' + t.mod + '/textures/' + kind + '/' + t.name + '.png');
                         cands.push('textures/' + kind + '/' + t.name + '.png');

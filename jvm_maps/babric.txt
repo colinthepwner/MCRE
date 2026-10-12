@@ -704,6 +704,7 @@ F	net/minecraft/class_49	field_178	field_178	blockType
 F	net/minecraft/class_18	field_198	field_198	loadedEntityList
 F	net/minecraft/class_18	field_200	field_200	playerEntities
 F	net/minecraft/class_18	field_214	field_214	rand
+F	net/minecraft/class_18	field_216	field_216	worldProvider
 F	net/minecraft/class_18	field_218	field_218	chunkProvider
 F	net/minecraft/class_18	field_220	field_220	worldInfo
 F	net/minecraft/class_66	field_228	field_228	tileEntities
@@ -880,6 +881,7 @@ F	net/minecraft/class_186	field_647	field_647	worldObj
 F	net/minecraft/class_186	field_650	field_650	height
 F	net/minecraft/class_187	field_660	field_660	key
 F	net/minecraft/class_189	field_664	field_664	SIN_TABLE
+F	net/minecraft/class_191	field_666	field_666	title
 F	net/minecraft/class_191	field_669	field_669	offsetX
 F	net/minecraft/class_191	field_670	field_670	offsetY
 F	net/minecraft/class_191	field_695	field_695	Skeleton
@@ -936,6 +938,8 @@ F	net/minecraft/class_153	field_894	field_894	spawnableCreatureList
 F	net/minecraft/class_153	field_895	field_895	spawnableWaterCreatureList
 F	net/minecraft/class_153	field_896	field_896	enableSnow
 F	net/minecraft/class_153	field_897	field_897	enableRain
+F	net/minecraft/class_242	field_907	field_907	dyeColors
+F	net/minecraft/class_242	field_908	field_908	dyeColors
 F	net/minecraft/class_245	field_909	field_909	mainModel
 F	net/minecraft/class_245	field_910	field_910	renderPassModel
 F	net/minecraft/class_109	field_932	field_932	count
@@ -1291,6 +1295,7 @@ F	net/minecraft/class_497	field_2021	field_2021	thePlayer
 F	net/minecraft/class_439	field_2032	field_2032	entityId
 F	net/minecraft/class_439	field_2033	field_2033	xPosition
 F	net/minecraft/class_439	field_2034	field_2034	yPosition
+F	net/minecraft/class_439	field_2037	field_2037	title
 F	net/minecraft/class_440	field_2051	field_2051	pitch
 F	net/minecraft/class_67	field_2054	field_2054	instance
 F	net/minecraft/class_67	field_2064	field_2064	color
@@ -1319,6 +1324,7 @@ F	net/minecraft/class_441	field_2158	field_2158	size
 F	net/minecraft/class_50	field_2173	field_2173	worldObj
 F	net/minecraft/class_50	field_2176	field_2176	isHellWorld
 F	net/minecraft/class_50	field_2177	field_2177	hasNoSky
+F	net/minecraft/class_50	field_2179	field_2179	worldType
 F	net/minecraft/class_526	field_2206	field_2206	random
 F	net/minecraft/class_531	field_2214	field_2214	unknown
 F	net/minecraft/class_533	field_2216	field_2216	blockID
