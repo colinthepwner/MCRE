@@ -5704,6 +5704,7 @@ function installMc152(vm) {
 	if (JVM.installLiving16) JVM.installLiving16(vm);
 	if (JVM.installContact) JVM.installContact(vm);
 	if (JVM.installDims) JVM.installDims(vm);
+	if (JVM.installForgeDims) JVM.installForgeDims(vm);
 	if (JVM.installWorldServices) JVM.installWorldServices(vm);
 }
 
@@ -5808,11 +5809,16 @@ function worldObj(vm) {
 		w[':rand'] = rnd;
 		vm.mcWorld = w;
 	}
-	var w2 = vm.mcWorld, dim = vm.mcDim | 0;
-	if (!w2[':provider'] || w2[':provider'][':dimensionId'] !== dim) {
+	var w2 = vm.mcWorld, dim = vm.mcDim | 0, p = w2[':provider'];
+	var dkey = dim !== 0 && dim !== -1 && dim !== 1 && vm.mcDimKeyOf ? vm.mcDimKeyOf(dim) : null;
+	var lp = dkey && JVM.dimProvider ? JVM.dimProvider(vm, dkey) : null;
+	if (lp) {
+		lp.$gameDim = dim;
+		if (p !== lp) { lp[':worldObj'] = w2; w2[':provider'] = lp; }
+	} else if (!p || (p.$gameDim != null ? p.$gameDim : p[':dimensionId']) !== dim) {
 		var pv = vm.newObject(vm.loadClass(SRC + 'WorldProvider'));
 		pv[':dimensionId'] = dim; pv[':isHellWorld'] = dim === -1 ? 1 : 0; pv[':hasNoSky'] = dim === -1 ? 1 : 0;
-		pv[':worldObj'] = w2;
+		pv[':worldObj'] = w2; pv.$gameDim = dim;
 		w2[':provider'] = pv;
 	}
 	if (JVM.mc152.onWorld) JVM.mc152.onWorld(vm, w2);
@@ -5820,7 +5826,7 @@ function worldObj(vm) {
 	return vm.mcWorld;
 }
 function playerObj(vm, info) {
-	var p = vm.mcPlayer || (vm.mcPlayer = vm.newObject(vm.loadClass(SRC + 'EntityClientPlayerMP')));
+	var p = vm.mcPlayer || (vm.mcPlayer = vm.newObject(vm.loadClass(SRC + 'EntityPlayerMP')));
 	var i = info || op(vm, 'player') || {};
 	p[':posX'] = +i.x || 0; p[':posY'] = +i.y || 0; p[':posZ'] = +i.z || 0;
 	p[':rotationYaw'] = +i.yaw || 0; p[':rotationPitch'] = +i.pitch || 0;
@@ -5976,7 +5982,7 @@ function installWorld(vm, def) {
 	} });
 	def('EntityPlayerSP', { super: SRC + 'EntityPlayer', methods: {} });
 	def('EntityClientPlayerMP', { super: SRC + 'EntityPlayerSP', methods: {} });
-	def('EntityPlayerMP', { super: SRC + 'EntityPlayer', methods: {} });
+	def('EntityPlayerMP', { super: SRC + 'EntityClientPlayerMP', methods: {} });
 	def('PlayerCapabilities', { methods: { '<init>()V': function () {} } });
 	def('FoodStats', { methods: {
 		'addStats(IF)V': function (vm, self, a) { op(vm, 'feed', a[0], a[1]); },
@@ -8242,9 +8248,15 @@ function install(vm) {
 		})(),
 		methods: (function () {
 			var m = {};
-			m['addItem(' + WRC + ')V'] = function (vm, self, a) { if (a[0]) self.$items.push(a[0]); };
+			var ctor = function (vm, self, a) {
+				self.$cat = String(a[0]); self.$items = a[1] && a[1].a ? Array.prototype.slice.call(a[1].a).filter(Boolean) : []; self.$min = a[2] != null ? a[2] : 3; self.$max = a[3] != null ? a[3] : 8;
+				var c = chests(vm); if (!c[self.$cat]) c[self.$cat] = self;
+			};
+			m['<init>(Ljava/lang/String;)V'] = ctor;
+			m['<init>(Ljava/lang/String;[' + WRC + 'II)V'] = ctor;
+			m['addItem(' + WRC + ')V'] = function (vm, self, a) { if (a[0]) (self.$items || (self.$items = [])).push(a[0]); };
 			m['removeItem(Lnet/minecraft/src/ItemStack;)V'] = function () {};
-			m['getItems(Ljava/util/Random;)[' + WRC] = function (vm, self) { return JVM.javaArray(vm, WRC, self.$items.slice()); };
+			m['getItems(Ljava/util/Random;)[' + WRC] = function (vm, self) { return JVM.javaArray(vm, WRC, (self.$items || []).slice()); };
 			m['getCount(Ljava/util/Random;)I'] = function (vm, self, a) { return self.$min + ri(a[0], Math.max(1, self.$max - self.$min + 1)); };
 			m['setMin(I)V'] = function (vm, self, a) { self.$min = a[0]; };
 			m['setMax(I)V'] = function (vm, self, a) { self.$max = a[0]; };
@@ -8920,6 +8932,90 @@ function install(vm) {
 		b[':worldGeneratorSwamp'] = newGen('WorldGenSwamp', '()V', []);
 	}
 	vm.$biomeTreeGens = treeGens;
+
+	var M64 = function (v) { return BigInt.asIntN(64, v); };
+	var LA = 6364136223846793005n, LC = 1442695040888963407n;
+	var mix = function (s, add) { return M64(M64(s * M64(s * LA + LC)) + add); };
+	var GLD = 'net/minecraft/src/GenLayer';
+	if (!vm.natives[GLD]) vm.defineNative(GLD, { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, fields: { worldGenSeed: 'J', parent: 'L' + GLD + ';', chunkSeed: 'J', baseSeed: 'J' },
+		abstractMethods: { 'getInts(IIII)[I': true },
+		methods: {
+			'<init>(J)V': function (vm, self, a) {
+				var s = BigInt(a[0]), b = s;
+				b = mix(b, s); b = mix(b, s); b = mix(b, s);
+				self[':baseSeed'] = b; self[':worldGenSeed'] = 0n; self[':chunkSeed'] = 0n;
+			},
+			'initWorldGenSeed(J)V': function (vm, self, a) {
+				var s = BigInt(a[0]);
+				if (self[':parent']) vm.callVirtual(self[':parent'], 'initWorldGenSeed', '(J)V', [s]);
+				var w = s, b = BigInt(self[':baseSeed'] || 0n);
+				w = mix(w, b); w = mix(w, b); w = mix(w, b);
+				self[':worldGenSeed'] = w;
+			},
+			'initChunkSeed(JJ)V': function (vm, self, a) {
+				var x = BigInt(a[0]), z = BigInt(a[1]), c = BigInt(self[':worldGenSeed'] || 0n);
+				c = mix(c, x); c = mix(c, z); c = mix(c, x); c = mix(c, z);
+				self[':chunkSeed'] = c;
+			},
+			'nextInt(I)I': function (vm, self, a) {
+				var c = BigInt(self[':chunkSeed'] || 0n), n = BigInt(a[0]);
+				var i = Number(BigInt.asIntN(32, (c >> 24n) % n));
+				if (i < 0) i += a[0];
+				self[':chunkSeed'] = mix(c, BigInt(self[':worldGenSeed'] || 0n));
+				return i;
+			},
+		} });
+	def('IntCache', { staticMethods: {
+		'getIntCache(I)[I': function (vm, n, a) { return vm.newArray('I', Math.max(0, a[0])); },
+		'resetIntCache()V': function () {},
+		'getCacheSizes()Ljava/lang/String;': function () { return 'cache: 0'; },
+	} });
+	def('LongHashMap', { methods: {
+		'<init>()V': function (vm, self) { self.$m = new Map(); },
+		'getNumHashElements()I': function (vm, self) { return (self.$m || (self.$m = new Map())).size; },
+		'getValueByKey(J)Ljava/lang/Object;': function (vm, self, a) { var v = (self.$m || (self.$m = new Map())).get(String(a[0])); return v === undefined ? null : v; },
+		'containsItem(J)Z': function (vm, self, a) { return (self.$m || (self.$m = new Map())).has(String(a[0])) ? 1 : 0; },
+		'add(JLjava/lang/Object;)V': function (vm, self, a) { (self.$m || (self.$m = new Map())).set(String(a[0]), a[1]); },
+		'remove(J)Ljava/lang/Object;': function (vm, self, a) { var m = self.$m || (self.$m = new Map()), k = String(a[0]), v = m.get(k); m.delete(k); return v === undefined ? null : v; },
+	} });
+	var BGL = 'L' + SRC + 'BiomeGenBase;';
+	var biomeAt = function (x, z) { return JVM.biomeAt ? JVM.biomeAt(vm, x, z) : null; };
+	var fillBiomes = function (arr, x, z, w, h, step) {
+		var n = w * h, out = arr && arr.a && arr.a.length >= n ? arr : vm.newArray(BGL, n);
+		for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) out.a[i + j * w] = biomeAt((x + i) * step, (z + j) * step);
+		return out;
+	};
+	var WCM = vm.natives[SRC + 'WorldChunkManager'];
+	if (!WCM) { def('WorldChunkManager', { methods: { '<init>()V': function () {} } }); WCM = vm.natives[SRC + 'WorldChunkManager']; }
+	var wcmMethods = {};
+	wcmMethods['getBiomeGenAt(II)' + BGL] = function (vm, self, a) { return biomeAt(a[0], a[1]); };
+	wcmMethods['getBiomesForGeneration([' + BGL + 'IIII)[' + BGL] = function (vm, self, a) { return fillBiomes(a[0], a[1], a[2], a[3], a[4], 4); };
+	wcmMethods['loadBlockGeneratorData([' + BGL + 'IIII)[' + BGL] = function (vm, self, a) { return fillBiomes(a[0], a[1], a[2], a[3], a[4], 1); };
+	wcmMethods['getBiomeGenAt([' + BGL + 'IIIIZ)[' + BGL] = function (vm, self, a) { return fillBiomes(a[0], a[1], a[2], a[3], a[4], 1); };
+	var climateArr = function (k) { return function (vm, self, a) {
+		var n = a[3] * a[4], out = a[0] && a[0].a && a[0].a.length >= n ? a[0] : vm.newArray('F', n);
+		for (var j = 0; j < a[4]; j++) for (var i = 0; i < a[3]; i++) { var b = biomeAt(a[1] + i, a[2] + j); out.a[i + j * a[3]] = b ? Math.min(1, +b[':' + k] || 0.5) : 0.5; }
+		return out;
+	}; };
+	wcmMethods['getRainfall([FIIII)[F'] = climateArr('rainfall');
+	wcmMethods['getTemperatures([FIIII)[F'] = climateArr('temperature');
+	wcmMethods['getTemperatureAtHeight(FI)F'] = function (vm, self, a) { return a[0]; };
+	wcmMethods['areBiomesViable(IIILjava/util/List;)Z'] = function () { return 1; };
+	wcmMethods['findBiomePosition(IIILjava/util/List;Ljava/util/Random;)Lnet/minecraft/src/ChunkPosition;'] = function () { return null; };
+	wcmMethods['cleanupCache()V'] = function () {};
+	wcmMethods['getBiomesToSpawnIn()Ljava/util/List;'] = function (vm) { return JVM.newList(vm, []); };
+	Object.keys(wcmMethods).forEach(function (k) { if (!WCM.methods[k]) WCM.methods[k] = wcmMethods[k]; });
+	var WD = vm.natives[SRC + 'World'];
+	if (WD && !WD.$wcmProv) {
+		WD.$wcmProv = true;
+		var gw0 = WD.methods['getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;'];
+		WD.methods['getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;'] = function (vm, self, a) {
+			var p = self[':provider'];
+			if (p && p[':worldChunkMgr']) return p[':worldChunkMgr'];
+			if (gw0) return gw0(vm, self, a);
+			return vm.$wcmDefault || (vm.$wcmDefault = vm.newObject(vm.loadClass(SRC + 'WorldChunkManager')));
+		};
+	}
 
 	var WT = SRC + 'WorldType', BGD = 'Lnet/minecraft/src/BiomeGenBase;';
 	var typeKey = function (wt) { return wt && wt.$key ? wt.$key : 'default'; };
@@ -9807,7 +9903,12 @@ function installServer(vm) {
 		'isRaining()Z': function () { return 0; }, 'isThundering()Z': function () { return 0; },
 		'getGameType()Lnet/minecraft/src/EnumGameType;': function (vm) { var c = vm.loadClass(SRC + 'EnumGameType'); vm.initClass(c); return c.statics[winfo(vm).creative ? 'CREATIVE' : 'SURVIVAL'] || null; },
 		'getSpawnX()I': function () { return 0; }, 'getSpawnY()I': function () { return 64; }, 'getSpawnZ()I': function () { return 0; },
-		'getTerrainType()Lnet/minecraft/src/WorldType;': function () { return null; },
+		'getTerrainType()Lnet/minecraft/src/WorldType;': function (vm) {
+			var key = winfo(vm).type, wts = JVM.mc152.reg(vm).worldTypes || [];
+			for (var i = 0; key && i < wts.length; i++) if (wts[i].$key === key) return wts[i];
+			if (!vm.natives[SRC + 'WorldType']) return null;
+			var c = vm.loadClass(SRC + 'WorldType'); vm.initClass(c); return c.statics.DEFAULT || null;
+		},
 		'getDimension()I': function (vm) { return vm.mcDim | 0; },
 	} });
 	def('ISaveHandler', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
@@ -9875,6 +9976,9 @@ function installServer(vm) {
 		if (inv) inv[':currentItem'] = p.$info && p.$info.slot != null ? p.$info.slot : 0;
 		p[':inventorySlots'] = p[':inventorySlots'] || null;
 		p[':width'] = 0.6; p[':height'] = 1.8; p[':yOffset'] = 1.62;
+		p[':mcServer'] = server(vm);
+		var wp = p[':worldObj'] && p[':worldObj'][':provider'];
+		p[':dimension'] = wp ? wp[':dimensionId'] | 0 : vm.mcDim | 0;
 		var b = p[':boundingBox'] || (p[':boundingBox'] = aabb(vm, [0, 0, 0, 0, 0, 0]));
 		var e = entityBox(p);
 		['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { b[':' + k] = e[i]; });
@@ -9897,7 +10001,7 @@ function installServer(vm) {
 	function configManager(vm) { return vm.mcConfigMgr || (vm.mcConfigMgr = vm.newObject(vm.loadClass(SRC + 'ServerConfigurationManager'))); }
 	vm.defineNative(MS, { methods: {
 		'getConfigurationManager()Lnet/minecraft/src/ServerConfigurationManager;': function (vm) { return configManager(vm); },
-		'worldServerForDimension(I)Lnet/minecraft/src/WorldServer;': function (vm, self, a) { return (vm.mcDim | 0) === a[0] ? JVM.mc152.worldObj(vm) : null; },
+		'worldServerForDimension(I)Lnet/minecraft/src/WorldServer;': function (vm) { return JVM.mc152.worldObj(vm); },
 		'getEntityWorld()Lnet/minecraft/src/World;': function (vm) { return JVM.mc152.worldObj(vm); },
 		'getTickCounter()I': function (vm) { return vm.mcTicks | 0; },
 		'isSinglePlayer()Z': function () { return 1; },
@@ -10112,6 +10216,9 @@ function installMobs(vm) {
 	} });
 	function biomeInit(vm, self, id) {
 		self[':biomeID'] = id; self[':biomeName'] = 'Biome ' + id;
+		var bc = vm.loadClass(SRC + 'BiomeGenBase');
+		if (bc.initState !== 2) vm.initClass(bc);
+		if (bc.statics.biomeList && id >= 0 && id < bc.statics.biomeList.a.length) bc.statics.biomeList.a[id] = self;
 		['spawnableMonsterList', 'spawnableCreatureList', 'spawnableWaterCreatureList', 'spawnableCaveCreatureList'].forEach(function (k) { self[':' + k] = JVM.newList(vm, []); });
 		self[':topBlock'] = 2; self[':fillerBlock'] = 3; self[':minHeight'] = 0.1; self[':maxHeight'] = 0.3; self[':temperature'] = 0.5; self[':rainfall'] = 0.5;
 		self[':waterColorMultiplier'] = 0xffffff; self[':enableRain'] = 1; self[':color'] = 0;
@@ -14820,7 +14927,8 @@ function callNamed(vm, o, names, args) {
 function makeDimension(vm, c) {
 	var o = null;
 	JVM.run(vm, function () {
-		if (c.$intFn) o = vm.callVirtual(c.$intFn, 'apply', '(I)Ljava/lang/Object;', [c.$serial | 0]);
+		if (c.$forgeCls && JVM.forgeDimension) o = JVM.forgeDimension(vm, c);
+		else if (c.$intFn) o = vm.callVirtual(c.$intFn, 'apply', '(I)Ljava/lang/Object;', [c.$serial | 0]);
 		else if (c.$supplier) o = vm.callVirtual(c.$supplier, 'get', '()Ljava/lang/Object;', []);
 	});
 	return o;
@@ -14832,7 +14940,7 @@ JVM.collectDims = function (vm, modId, safe) {
 		if ((c.$mod || '') !== modId) return;
 		var key = c.$stId, path = keyName(key.split(':').pop());
 		var dim = safe(function () { return makeDimension(vm, c); }, null);
-		var j = { name: path.replace(/^the_/, 'the ').replace(/_/g, ' ').replace(/\b\w/g, function (x) { return x.toUpperCase(); }).replace(/^The /, 'the '),
+		var j = { name: c.$title || path.replace(/^the_/, 'the ').replace(/_/g, ' ').replace(/\b\w/g, function (x) { return x.toUpperCase(); }).replace(/^The /, 'the '),
 			terrain: 'script', java_generator: true, arrival_block: 'minecraft:glowstone' };
 		if (dim) {
 			var world = JVM.mc152.worldObj(vm);
@@ -14879,6 +14987,11 @@ function live(vm, contentKey) {
 	var c = null;
 	d.list.forEach(function (x) { if ((x.$mod || '') + ':' + keyName(x.$stId.split(':').pop()) === contentKey) c = x; });
 	if (!c) return null;
+	if (d.creating && d.creating[contentKey]) return null;
+	(d.creating || (d.creating = {}))[contentKey] = true;
+	try { return liveMake(vm, d, c, contentKey); } finally { delete d.creating[contentKey]; }
+}
+function liveMake(vm, d, c, contentKey) {
 	var dim = makeDimension(vm, c);
 	if (!dim) return null;
 	var world = JVM.mc152.worldObj(vm), prov = null;
@@ -14889,18 +15002,23 @@ function live(vm, contentKey) {
 	if (!prov) { vm.warnOnce('dim:noprov:' + contentKey, 'dimension ' + c.$stId + ' has no chunk generator here'); return null; }
 	return (d.live[contentKey] = { container: c, dim: dim, provider: prov, key: contentKey });
 }
+function withDim(vm, l, fn) {
+	var w = JVM.mc152.worldObj(vm), prev = w[':provider'];
+	w[':provider'] = l.dim; l.dim[':worldObj'] = w;
+	try { return fn(); } finally { w[':provider'] = prev; }
+}
 JVM.dimChunk = function (vm, contentKey, cx, cz) {
 	var l = live(vm, contentKey);
 	if (!l) return null;
 	var ch = null;
-	var r = JVM.run(vm, function () { ch = vm.callVirtual(l.provider, 'provideChunk', '(II)Lnet/minecraft/src/Chunk;', [cx, cz]); });
+	var r = withDim(vm, l, function () { return JVM.run(vm, function () { ch = vm.callVirtual(l.provider, 'provideChunk', '(II)Lnet/minecraft/src/Chunk;', [cx, cz]); }); });
 	if (!r.ok || !ch) return null;
 	return chunkOut(ch);
 };
 JVM.dimPopulate = function (vm, contentKey, cx, cz) {
 	var l = live(vm, contentKey);
 	if (!l) return false;
-	JVM.run(vm, function () { vm.callVirtual(l.provider, 'populate', '(Lnet/minecraft/src/IChunkProvider;II)V', [l.provider, cx, cz]); });
+	withDim(vm, l, function () { JVM.run(vm, function () { vm.callVirtual(l.provider, 'populate', '(Lnet/minecraft/src/IChunkProvider;II)V', [l.provider, cx, cz]); }); });
 	return true;
 };
 JVM.stationBlockSet = function (vm, world, x, y, z, id, meta) {
@@ -14918,9 +15036,118 @@ JVM.stationBlockSet = function (vm, world, x, y, z, id, meta) {
 	JVM.station.fire(vm, ev);
 	return !!ev.$canceled;
 };
+JVM.dimsOf = dims;
+JVM.dimProvider = function (vm, contentKey) { var l = live(vm, contentKey); return l ? l.dim : null; };
 JVM.dimsLive = function (vm) { var r = vm && vm.mcReg; if (r && r.dims) r.dims.live = {}; };
 JVM.hasJavaDims = function (vm) { var r = vm && vm.mcReg; return !!(r && r.dims && r.dims.list.length); };
 JVM.installDims = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', FC = 'net/minecraftforge/common/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function forgeDims(vm) { var r = reg(vm); return r.forgeDims || (r.forgeDims = { types: {}, ids: {} }); }
+function keyName(s) { return String(s || 'dimension').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'dimension'; }
+
+function install(vm) {
+	var DM = vm.natives[FC + 'DimensionManager'];
+	if (!DM) return;
+	var newProvider = function (vm, cls, id) {
+		var o = vm.newObject(cls);
+		vm.callVirtual(o, '<init>', '()V', []);
+		o[':dimensionId'] = id;
+		var m = cls.findMethod('setDimension(I)V');
+		if (m) vm.invoke(m, o, [id]);
+		return o;
+	};
+	DM.staticMethods = Object.assign({}, DM.staticMethods, {
+		'registerProviderType(ILjava/lang/Class;Z)Z': function (vm, n, a) {
+			var f = forgeDims(vm), id = a[0];
+			if (id === -1 || id === 0 || id === 1) { vm.warnOnce('forge:dimreplace', 'replacing the game\'s own Nether / End with a mod\'s is not available here - they stay the game\'s'); return 0; }
+			if (f.types[id]) return 0;
+			f.types[id] = { cls: a[1] && a[1].$cls, mod: vm.currentMod };
+			return 1;
+		},
+		'unregisterProviderType(I)[I': function (vm, n, a) { var f = forgeDims(vm); delete f.types[a[0]]; return vm.newArray('I', 0); },
+		'registerDimension(II)V': function (vm, n, a) {
+			var f = forgeDims(vm), dimId = a[0], t = f.types[a[1]];
+			if (dimId === -1 || dimId === 0 || dimId === 1) return;
+			if (!t || !t.cls) { vm.warnOnce('forge:dimtype:' + a[1], 'dimension ' + dimId + ' uses provider type ' + a[1] + ', which isn\'t registered'); return; }
+			var name = 'dimension_' + dimId;
+			JVM.run(vm, function () { var p = newProvider(vm, t.cls, dimId); var s = vm.callVirtual(p, 'getDimensionName', '()Ljava/lang/String;', []); if (s) name = String(s); });
+			var d = JVM.dimsOf(vm), mod = t.mod || vm.currentMod || 'java', key = mod + ':' + keyName(name);
+			var c = { $stId: key, $mod: mod, $forgeCls: t.cls, $dimId: dimId, $title: name };
+			if (!d.byKey[key]) d.list.push(c);
+			d.byKey[key] = c;
+			f.ids[dimId] = c;
+		},
+		'getProviderType(I)I': function (vm, n, a) { var c = forgeDims(vm).ids[a[0]]; return c ? a[0] : 0; },
+		'isDimensionRegistered(I)Z': function (vm, n, a) { return a[0] === 0 || a[0] === -1 || a[0] === 1 || forgeDims(vm).ids[a[0]] ? 1 : 0; },
+		'getIDs()[Ljava/lang/Integer;': function (vm) {
+			var ids = [0, -1, 1].concat(Object.keys(forgeDims(vm).ids).map(Number));
+			return JVM.javaArray(vm, 'Ljava/lang/Integer;', ids.map(function (d) { return JVM.box(vm, d, 'I'); }));
+		},
+		'getStaticDimensionIDs()[Ljava/lang/Integer;': function (vm) {
+			var ids = [0, -1, 1].concat(Object.keys(forgeDims(vm).ids).map(Number));
+			return JVM.javaArray(vm, 'Ljava/lang/Integer;', ids.map(function (d) { return JVM.box(vm, d, 'I'); }));
+		},
+		'getNextFreeDimId()I': function (vm) { var i = 2, f = forgeDims(vm); while (f.ids[i]) i++; return i; },
+		'createProviderFor(I)Lnet/minecraft/src/WorldProvider;': function (vm, n, a) {
+			var c = forgeDims(vm).ids[a[0]];
+			return c ? newProvider(vm, c.$forgeCls, a[0]) : null;
+		},
+		'getWorld(I)Lnet/minecraft/src/WorldServer;': function (vm, n, a) { return vm.game && vm.game.mode !== 'define' ? JVM.mc152.worldObj(vm) : null; },
+	});
+	var tripTo = function (vm, dimId) {
+		var g = vm.game;
+		if (!g || !g.op) return;
+		if (dimId === 0) { g.op('travel', 'overworld'); return; }
+		var c = forgeDims(vm).ids[dimId];
+		if (!c) { vm.warnOnce('forge:trip:' + dimId, 'travel to dimension ' + dimId + ' is not available here'); return; }
+		g.op('travel', c.$stId);
+	};
+	var CM = vm.natives[SRC + 'ServerConfigurationManager'];
+	if (CM) CM.methods = Object.assign({}, CM.methods, {
+		'transferPlayerToDimension(Lnet/minecraft/src/EntityPlayerMP;I)V': function (vm, self, a) { tripTo(vm, a[1]); },
+		'transferPlayerToDimension(Lnet/minecraft/src/EntityPlayerMP;ILnet/minecraft/src/Teleporter;)V': function (vm, self, a) { tripTo(vm, a[1]); },
+	});
+	['Entity', 'EntityPlayer', 'EntityPlayerMP'].forEach(function (n) {
+		var s = vm.natives[SRC + n];
+		if (s) s.methods['travelToDimension(I)V'] = function (vm, self, a) { if (self.$info && self.$info.type === 63 || vm.isInstance(self, vm.loadClass(SRC + 'EntityPlayer'))) tripTo(vm, a[0]); };
+	});
+	if (!vm.natives[SRC + 'Teleporter']) vm.defineNative(SRC + 'Teleporter', { methods: {
+		'<init>(Lnet/minecraft/src/WorldServer;)V': function (vm, self, a) { self[':worldServerInstance'] = a[0]; },
+		'placeInPortal(Lnet/minecraft/src/Entity;DDDF)V': function () {},
+		'placeInExistingPortal(Lnet/minecraft/src/Entity;DDDF)Z': function () { return 1; },
+		'makePortal(Lnet/minecraft/src/Entity;)Z': function () { return 1; },
+		'removeStalePortalLocations(J)V': function () {},
+	} });
+	var WP = vm.natives[SRC + 'WorldProvider'];
+	if (WP) {
+		var gcp = WP.methods['getChunkProvider()Lnet/minecraft/src/IChunkProvider;'];
+		WP.methods['createChunkGenerator()Lnet/minecraft/src/IChunkProvider;'] = function () { return null; };
+		WP.methods['getChunkProvider()Lnet/minecraft/src/IChunkProvider;'] = function (vm, self, a) {
+			var m = self.cls.findMethod('createChunkGenerator()Lnet/minecraft/src/IChunkProvider;');
+			if (m && !m.cls.native) return vm.invoke(m, self, []);
+			return gcp ? gcp(vm, self, a) : null;
+		};
+		WP.methods['setDimension(I)V'] = function (vm, self, a) { self[':dimensionId'] = a[0]; };
+		WP.methods['getSaveFolder()Ljava/lang/String;'] = function (vm, self) { return 'DIM' + self[':dimensionId']; };
+		WP.methods['getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;'] = function (vm, self) { return self[':worldChunkMgr'] || null; };
+	}
+}
+JVM.installForgeDims = install;
+JVM.forgeDimension = function (vm, c) {
+	if (!c || !c.$forgeCls) return null;
+	var o = vm.newObject(c.$forgeCls);
+	vm.callVirtual(o, '<init>', '()V', []);
+	o[':dimensionId'] = c.$dimId;
+	var m = c.$forgeCls.findMethod('setDimension(I)V');
+	if (m) vm.invoke(m, o, [c.$dimId]);
+	return o;
+};
 })();
 
 (function () {

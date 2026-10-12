@@ -1728,6 +1728,7 @@
                     case 'setrot': return mp(['setrot', a[0] | 0, +a[1] || 0, +a[2] || 0].join('\t'));
                     case 'hurt': return mp(['hurt', a[0] | 0, a[1] | 0].join('\t'));
                     case 'fire': return mp(['fire', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'travel': return mp(['travel', clean(String(a[0]))].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
@@ -1862,9 +1863,11 @@
                 chunk: function (key, cx, cz, blocksPtr, dataPtr) {
                     var r = reg();
                     if (!vm || !r || !window.JVM || !window.JVM.dimChunk) return false;
-                    var JV = window.JVM, prev = vm.game, out = null;
+                    var JV = window.JVM, prev = vm.game, out = null, prevDim = vm.mcDim;
                     vm.game = genBridge; vm.steps = 0;
-                    try { out = JV.dimChunk(vm, key, cx, cz); } finally { vm.game = prev; }
+                    var mdk = (Module.mcModDims || {})[key];
+                    if (mdk && mdk.id != null) vm.mcDim = mdk.id;
+                    try { out = JV.dimChunk(vm, key, cx, cz); } finally { vm.game = prev; vm.mcDim = prevDim; }
                     if (!out) return false;
                     var cache = {};
                     for (var i = 0; i < 32768; i++) {
@@ -2336,6 +2339,7 @@
                                 install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
                             });
                             vm.gameTexture = function (kind, n) { return Module.mcMods && Module.mcMods.hasTexture ? Module.mcMods.hasTexture(kind, n) : true; };
+                            vm.mcDimKeyOf = function (d) { return dimKeyOf(d); };
                             vm.$tag = ver.tag || 'mcp152';
                             vm.$legacy = vm.$tag === 'mcp147';
                             vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },

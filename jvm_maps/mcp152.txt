@@ -2663,6 +2663,7 @@ M	acn	a	(II)Z	func_76566_a	canCoordinateBeSpawn
 M	acn	a	(JF)F	func_76563_a	calculateCelestialAngle
 M	acn	a	(Laab;)V	func_76558_a	registerWorld
 M	acn	b	()V	func_76572_b	registerWorldChunkManager
+M	acn	c	()Labt;	func_76555_c	createChunkGenerator
 M	acn	d	()Z	func_76569_d	isSurfaceWorld
 M	acn	e	()Z	func_76567_e	canRespawnHere
 M	acn	f	()F	func_76571_f	getCloudHeight
@@ -3220,6 +3221,7 @@ M	fs	b	()F	func_82500_b	func_82500_b
 M	fs	b	(Laz;Lwm;)Lwm;	func_82487_b	dispenseStack
 M	gu	a	(Lei;)V	func_72384_a	sendPacketToAllPlayers
 M	gu	a	(Lei;I)V	func_72396_a	sendPacketToAllPlayersInDimension
+M	gu	a	(Ljc;I)V	func_72356_a	transferPlayerToDimension
 M	gu	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
 M	gu	e	(Ljava/lang/String;)Z	func_72353_e	areCommandsAllowed
 M	gu	i	()Ljava/util/Set;	func_72376_i	getOps
@@ -3682,6 +3684,7 @@ R	field_77140_h	canBeCreated
 R	field_77141_i	isWorldTypeVersioned
 R	Sky	Sky
 R	Block	Block
+R	field_85192_a	worldServerInstance
 R	field_77187_a	random
 R	field_72818_a	chunkX
 R	field_72816_b	chunkZ
@@ -3761,6 +3764,9 @@ R	field_76313_b	yCoord
 R	field_76314_c	zCoord
 R	field_76306_b	octaves
 R	field_75909_a	parent
+R	field_75907_b	worldGenSeed
+R	field_75908_c	chunkSeed
+R	field_75906_d	baseSeed
 R	field_75851_b	count
 R	field_75839_a	xCoord
 R	field_75837_b	yCoord
@@ -4336,6 +4342,10 @@ R	func_77131_c	getGeneratorVersion
 R	func_77126_d	getCanBeCreated
 R	func_82747_f	getWorldTypeID
 R	valueOf	valueOf
+R	func_85189_a	removeStalePortalLocations
+R	func_85188_a	makePortal
+R	func_77185_a	placeInPortal
+R	func_77184_b	placeInExistingPortal
 R	func_72800_K	getHeight
 R	func_82732_R	getWorldVec3Pool
 R	func_72807_a	getBiomeGenForCoords
@@ -4353,13 +4363,22 @@ R	func_76921_b	getY
 R	func_76920_c	getZ
 R	func_76918_d	getEventID
 R	func_76916_f	getBlockID
+R	func_76838_a	cleanupCache
 R	func_76837_b	getBiomeGenAt
 R	func_76885_a	getBiomeGenAt
 R	func_70006_a	sendChatToPlayer
 R	func_70005_c_	getCommandSenderName
+R	func_76932_a	getBiomesToSpawnIn
+R	func_76939_a	getTemperatureAtHeight
 R	func_76935_a	getBiomeGenAt
+R	func_76940_a	areBiomesViable
+R	func_76941_a	findBiomePosition
+R	func_76936_a	getRainfall
+R	func_76937_a	getBiomesForGeneration
 R	func_76931_a	getBiomeGenAt
+R	func_76938_b	cleanupCache
 R	func_76934_b	getTemperatures
+R	func_76933_b	loadBlockGeneratorData
 R	func_76728_a	decorate
 R	func_76740_a	getRandomWorldGenForTrees
 R	func_76730_b	getRandomWorldGenForGrass
@@ -4397,6 +4416,7 @@ R	func_76556_a	generateLightBrightnessTable
 R	func_76566_a	canCoordinateBeSpawn
 R	func_76563_a	calculateCelestialAngle
 R	func_76572_b	registerWorldChunkManager
+R	func_76555_c	createChunkGenerator
 R	func_76569_d	isSurfaceWorld
 R	func_76567_e	canRespawnHere
 R	func_80007_l	getDimensionName
@@ -4422,7 +4442,12 @@ R	func_76305_a	generateNoiseOctaves
 R	func_76304_a	generateNoiseOctaves
 R	func_76220_a	isSolid
 R	func_76224_d	isLiquid
+R	func_75904_a	getInts
+R	func_76446_a	resetIntCache
+R	func_76445_a	getIntCache
 R	func_75902_a	nextInt
+R	func_75905_a	initWorldGenSeed
+R	func_75903_a	initChunkSeed
 R	func_75829_a	distanceTo
 R	func_76184_a	readFromNBT
 R	func_76187_b	writeToNBT
@@ -4733,8 +4758,12 @@ R	put	put
 R	remove	remove
 R	size	size
 R	func_76041_a	lookup
+R	func_76037_b	containsItem
+R	func_76162_a	getNumHashElements
 R	func_76157_a	hash
+R	func_76164_a	getValueByKey
 R	func_76163_a	add
+R	func_76161_b	containsItem
 R	func_76159_d	remove
 R	func_76146_a	getKey
 R	func_76317_a	clearProfiling
