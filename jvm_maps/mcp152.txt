@@ -1540,6 +1540,15 @@ C	zy	net/minecraft/src/GameRules
 C	zz	net/minecraft/src/GameRuleValue
 F	aab	I	field_72995_K	isRemote
 F	aab	s	field_73012_v	rand
+F	aab	t	field_73011_w	provider
+F	acn	a	field_76579_a	worldObj
+F	acn	e	field_76575_d	isHellWorld
+F	acn	f	field_76576_e	hasNoSky
+F	acn	h	field_76574_g	dimensionId
+F	adj	a	field_76488_a	doBlockNotify
+F	adv	a	field_76542_a	minableBlockId
+F	adv	b	field_76541_b	numberOfBlocks
+F	adv	c	field_94523_c	field_94523_c
 F	aif	A	field_76266_z	pumpkin
 F	aif	B	field_76236_A	dragonEgg
 F	aif	C	field_76237_B	portal
@@ -1770,10 +1779,13 @@ F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
 F	bfj	c	field_71159_c	mc
+F	kx	a	field_76144_a	SIN_TABLE
 F	mp	A	field_70177_z	rotationYaw
 F	mp	B	field_70125_A	rotationPitch
 F	mp	F	field_70122_E	onGround
+F	mp	P	field_70131_O	height
 F	mp	ab	field_70146_Z	rand
+F	mp	ar	field_71093_bK	dimension
 F	mp	d	field_70151_c	fire
 F	mp	q	field_70170_p	worldObj
 F	mp	u	field_70165_t	posX
@@ -2007,8 +2019,11 @@ F	wm	f	field_82843_f	itemFrame
 F	xn	a	field_77885_a	blockID
 F	xr	b	field_77826_b	toolMaterial
 M	aab	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
+M	aab	G	()J	func_72905_C	getSeed
 M	aab	H	()J	func_82737_E	getTotalWorldTime
 M	aab	I	()J	func_72820_D	getWorldTime
+M	aab	Q	()I	func_72800_K	getHeight
+M	aab	R	()I	func_72940_L	getActualHeight
 M	aab	a	(DDDD)Lsq;	func_72977_a	getClosestPlayer
 M	aab	a	(DDDLjava/lang/String;FF)V	func_72908_a	playSoundEffect
 M	aab	a	(III)I	func_72798_a	getBlockId
@@ -2018,23 +2033,37 @@ M	aab	a	(Ljava/lang/String;DDDDDD)V	func_72869_a	spawnParticle
 M	aab	a	(Lmp;D)Lsq;	func_72890_a	getClosestPlayerToEntity
 M	aab	a	(Lmp;DDDFZ)Lzw;	func_72876_a	createExplosion
 M	aab	a	(Lmp;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
+M	aab	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
+M	aab	b	(IIIII)Z	func_72921_c	setBlockMetadata
 M	aab	b	(J)V	func_72877_b	setWorldTime
 M	aab	c	(III)Z	func_72799_c	isAirBlock
 M	aab	c	(IIII)Z	func_94575_c	setBlock
 M	aab	d	(Lmp;)Z	func_72838_d	spawnEntityInWorld
+M	aab	e	(IIIIII)Z	func_72904_c	checkChunksExist
 M	aab	f	(II)I	func_72976_f	getHeightValue
+M	aab	f	(III)Z	func_72899_e	blockExists
 M	aab	f	(IIII)V	func_72898_h	notifyBlocksOfNeighborChange
 M	aab	f	(IIIIII)Z	func_72832_d	setBlock
 M	aab	g	(III)Laif;	func_72803_f	getBlockMaterial
+M	aab	h	(II)I	func_72874_g	getPrecipitationHeight
 M	aab	h	(III)I	func_72805_g	getBlockMetadata
 M	aab	i	(II)I	func_72825_h	getTopSolidOrLiquidBlock
 M	aab	i	(III)Z	func_94571_i	setBlockToAir
 M	aab	j	(III)V	func_72845_h	markBlockForUpdate
 M	aab	v	()Z	func_72935_r	isDaytime
+M	aak	Q	()I	func_72800_K	getHeight
 M	aak	a	(III)I	func_72798_a	getBlockId
 M	aak	c	(III)Z	func_72799_c	isAirBlock
 M	aak	g	(III)Laif;	func_72803_f	getBlockMaterial
 M	aak	h	(III)I	func_72805_g	getBlockMetadata
+M	acn	d	()Z	func_76569_d	isSurfaceWorld
+M	acn	i	()I	func_76557_i	getAverageGroundLevel
+M	acn	l	()Ljava/lang/String;	func_80007_l	getDimensionName
+M	adj	a	(DDD)V	func_76487_a	setScale
+M	adj	a	(Laab;IIII)V	func_76486_a	setBlock
+M	adj	a	(Laab;IIIII)V	func_76485_a	setBlockAndMetadata
+M	adj	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
+M	adv	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
 M	aif	a	()Z	func_76220_a	isSolid
 M	aif	d	()Z	func_76224_d	isLiquid
 M	aif	f	()Laif;	func_76221_f	setRequiresTool
@@ -2054,6 +2083,7 @@ M	apa	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	apa	a	(Laab;)I	func_71859_p_	tickRate
 M	apa	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	apa	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	apa	a	(Laab;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
 M	apa	a	(Laab;IIIII)V	func_71852_a	breakBlock
 M	apa	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	apa	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
@@ -2104,6 +2134,25 @@ M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	jc	b	(I)V	func_70606_j	setEntityHealth
 M	jc	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	kx	a	(D)F	func_76133_a	sqrt_double
+M	kx	a	(DD)D	func_76132_a	abs_max
+M	kx	a	(F)F	func_76126_a	sin
+M	kx	a	(FFF)F	func_76131_a	clamp_float
+M	kx	a	(I)I	func_76130_a	abs_int
+M	kx	a	(II)I	func_76137_a	bucketInt
+M	kx	a	(III)I	func_76125_a	clamp_int
+M	kx	a	(Ljava/util/Random;II)I	func_76136_a	getRandomIntegerInRange
+M	kx	b	(D)I	func_76140_b	truncateDoubleToInt
+M	kx	b	(F)F	func_76134_b	cos
+M	kx	c	(D)I	func_76128_c	floor_double
+M	kx	c	(F)F	func_76129_c	sqrt_float
+M	kx	d	(D)J	func_76124_d	floor_double_long
+M	kx	d	(F)I	func_76141_d	floor_float
+M	kx	e	(F)F	func_76135_e	abs
+M	kx	f	(D)I	func_76143_f	ceiling_double_int
+M	kx	f	(F)I	func_76123_f	ceiling_float_int
+M	kx	g	(D)D	func_76138_g	wrapAngleTo180_double
+M	kx	g	(F)F	func_76142_g	wrapAngleTo180_float
 M	lx	a	()I	func_94211_a	getOriginX
 M	lx	a	(D)F	func_94214_a	getInterpolatedU
 M	lx	b	()I	func_94216_b	getOriginY
@@ -2254,3 +2303,1228 @@ M	xr	a	(Lwm;Lng;Lng;)Z	func_77644_a	hitEntity
 M	xr	c	()I	func_77619_b	getItemEnchantability
 M	xr	c_	(Lwm;)I	func_77626_a	getMaxItemUseDuration
 M	xr	n_	()Z	func_77662_d	isFull3D
+S	aus	java/lang/Thread	
+S	avk	java/applet/Applet	java/applet/AppletStub
+S	awd	java/lang/Error	
+S	avo	java/lang/Object	java/util/concurrent/Callable
+S	avi	java/lang/Object	java/util/concurrent/Callable
+S	awb	java/lang/Object	lc
+S	avg	java/lang/Object	java/util/concurrent/Callable
+S	avq	java/lang/Thread	
+S	avr	java/lang/Object	java/util/concurrent/Callable
+S	auw	java/awt/Canvas	
+S	avh	java/lang/Object	java/util/concurrent/Callable
+S	avn	java/lang/Object	java/util/concurrent/Callable
+S	avm	java/lang/Object	java/util/concurrent/Callable
+S	auv	java/awt/Panel	
+S	awa	java/lang/Enum	
+S	avs	java/lang/Object	java/util/concurrent/Callable
+S	avv	net/minecraft/client/Minecraft	
+S	aux	java/awt/Canvas	
+S	avp	java/awt/event/WindowAdapter	
+S	ave	java/lang/Object	java/util/concurrent/Callable
+S	avl	java/lang/Object	jw
+S	avd	java/lang/Thread	
+S	net/minecraft/client/MinecraftApplet	java/applet/Applet	
+S	avu	java/awt/Canvas	
+S	net/minecraft/client/Minecraft	java/lang/Object	java/lang/Runnable,mc
+S	avt	java/lang/Enum	
+S	avf	java/lang/Object	java/util/concurrent/Callable
+S	bjv	java/lang/Object	kp
+S	bjx	axt	
+S	bjq	bjp	
+S	bjp	java/lang/Object	bjt
+S	bjs	bjp	
+S	bjw	axr	
+S	bjr	bjp	
+S	axm	axr	
+S	awl	axr	
+S	axe	axr	
+S	ayb	axr	
+S	awj	axr	
+S	axo	axt	
+S	awo	axr	
+S	aww	awx	
+S	axd	awg	
+S	axx	awg	
+S	axc	java/lang/Thread	
+S	axz	axr	
+S	axj	axr	
+S	awh	awx	
+S	awq	axr	
+S	awi	axr	
+S	awz	awj	
+S	axu	axr	
+S	awk	axr	
+S	awt	axr	
+S	awu	axr	
+S	aws	awx	
+S	axb	axt	
+S	axq	axr	
+S	axk	axr	
+S	axw	axr	
+S	awg	awx	
+S	axy	awg	
+S	axf	axt	
+S	axv	axt	
+S	axr	awx	
+S	axa	axr	
+S	awr	axr	
+S	axl	axr	
+S	axp	axr	lc
+S	awm	axr	
+S	awp	axr	
+S	awn	axt	
+S	axh	awg	
+S	aya	axt	
+S	azx	java/lang/Object	java/lang/Runnable
+S	ban	axr	
+S	bal	axr	
+S	bai	azy	
+S	bag	axr	
+S	azw	axr	
+S	baj	java/lang/Thread	
+S	azn	bad	
+S	azo	axr	
+S	azq	axr	
+S	bam	azx	
+S	azr	axr	
+S	bac	java/lang/Object	java/util/Comparator
+S	azm	axr	
+S	bae	azx	
+S	azu	axr	
+S	azp	azx	
+S	bab	java/util/TimerTask	
+S	bah	java/lang/Thread	
+S	baf	java/lang/Thread	
+S	azv	awk	
+S	ayc	awx	
+S	ayd	axr	
+S	ayk	axt	
+S	aye	axr	
+S	ayj	java/lang/Object	java/util/Comparator
+S	ayf	ayk	
+S	ayg	java/lang/Object	java/util/Comparator
+S	ayh	axt	
+S	ayi	ayk	
+S	ayv	ayl	
+S	ayl	axr	
+S	azj	ayl	tp
+S	azk	axr	
+S	ayp	ayq	
+S	azg	azb	
+S	ayz	tj	
+S	ayx	java/lang/Object	tp
+S	ayy	azb	
+S	azb	ayl	
+S	ayu	axr	
+S	ayr	axr	
+S	azi	awg	
+S	ayn	ayq	
+S	ays	awg	
+S	ayo	ayq	
+S	aza	ul	
+S	aym	ayl	
+S	azd	ayl	
+S	ayq	awg	
+S	ayw	ayl	
+S	azl	ayl	
+S	ayt	ayl	
+S	azf	ayl	
+S	azh	ayl	
+S	aze	ayl	
+S	bap	awx	
+S	baq	axr	
+S	bdu	java/lang/Object	java/util/concurrent/Callable
+S	bdt	java/lang/Object	java/util/concurrent/Callable
+S	bdl	axr	
+S	bdx	axr	
+S	bdv	bfj	
+S	bdm	awk	
+S	bdk	ej	
+S	bdn	axr	
+S	bds	aab	
+S	bdo	java/lang/Thread	
+S	bdq	java/lang/Object	abt
+S	bdp	axr	
+S	bba	bax	
+S	bbb	bax	
+S	baz	bax	
+S	bay	bax	
+S	baw	java/lang/RuntimeException	
+S	bbg	bbk	
+S	bbe	bbk	
+S	bbi	bbh	
+S	bbf	bbk	
+S	bbj	bbk	
+S	bbh	java/lang/Exception	
+S	bbn	bbl	
+S	bbm	bbl	
+S	bfi	bfh	
+S	bfj	sq	
+S	bfk	sq	
+S	bjg	net/minecraft/server/MinecraftServer	
+S	bjh	java/lang/Object	java/util/concurrent/Callable
+S	bjj	jk	
+S	bjm	java/lang/Thread	
+S	bji	java/lang/Object	java/util/concurrent/Callable
+S	bjo	java/lang/Thread	
+S	bjf	gu	
+S	bjy	paulscode/sound/codecs/CodecJOrbis	
+S	bjz	java/io/InputStream	
+S	bka	java/lang/Object	gy
+S	bkg	java/lang/Object	java/lang/Runnable
+S	bkf	axr	
+S	bkh	java/lang/Thread	
+S	bbv	bch	
+S	bcm	bcd	
+S	bby	bcd	
+S	bcs	bcd	
+S	bcp	bcd	
+S	bch	bcd	
+S	bcz	bcd	
+S	bcu	bcd	
+S	bbp	bcd	
+S	bcn	bda	
+S	bcf	bch	
+S	bci	bch	
+S	bbu	bcd	
+S	bcc	bcd	
+S	bbq	bcd	
+S	bbw	bcd	
+S	bcy	bcd	
+S	bca	bbt	
+S	bce	bcd	
+S	bda	bbz	
+S	bcb	bcd	
+S	bcx	bcv	
+S	bbx	bbz	
+S	bcw	bbz	
+S	bck	bcd	
+S	bcl	bcd	
+S	bbr	bcd	
+S	bbz	bcd	
+S	bcr	bcd	
+S	bbt	bcd	
+S	bbs	bcd	
+S	bcv	bcd	
+S	bcj	bch	
+S	bcq	bcd	
+S	bdb	bcd	
+S	bdc	bcd	
+S	bem	bet	
+S	bef	bet	
+S	bey	bet	
+S	bet	mp	
+S	beg	bet	
+S	bfa	bet	
+S	bfg	bet	
+S	bel	bet	
+S	bes	bet	
+S	bek	bet	
+S	bez	bet	
+S	bec	bet	
+S	bfb	bfg	
+S	beb	bet	
+S	bfd	bet	
+S	bfc	bet	
+S	ben	bet	
+S	bej	bet	
+S	ber	bet	
+S	bed	bet	
+S	bev	bet	
+S	beo	bet	
+S	bfe	bet	
+S	bew	bet	
+S	bex	bet	
+S	beh	bet	
+S	bep	bet	
+S	bee	bet	
+S	beq	bet	
+S	bff	bet	
+S	bfz	java/lang/Object	java/util/concurrent/Callable
+S	bfo	java/lang/Object	java/util/Comparator
+S	bft	java/lang/Object	java/util/concurrent/Callable
+S	bga	java/lang/Object	bfw
+S	bfn	java/lang/Object	java/util/Comparator
+S	bfs	java/lang/Object	java/util/concurrent/Callable
+S	bfv	java/lang/Thread	
+S	bfr	java/lang/Object	java/util/concurrent/Callable
+S	bfy	java/lang/Object	aag
+S	bjb	bje	
+S	biv	bje	
+S	biw	bje	
+S	bix	bje	
+S	biz	bje	
+S	bjc	bje	
+S	biu	bje	
+S	biy	bje	
+S	bja	bje	
+S	bhs	bho	
+S	bgu	bgz	
+S	bht	bho	
+S	bhh	bgz	
+S	bhx	bho	
+S	bhl	bgz	
+S	bgn	bgz	
+S	bho	bgz	
+S	bgr	bho	
+S	bgw	bho	
+S	bid	bho	
+S	bhe	bho	
+S	bgx	bho	
+S	bhi	bgz	
+S	bgo	bho	
+S	bia	bho	
+S	bhq	bho	
+S	bhy	bho	
+S	bhg	bho	
+S	bhc	bgz	
+S	bgt	bho	
+S	bhf	bho	
+S	bhp	bho	
+S	bhj	bgz	
+S	bhv	bho	
+S	bhb	bgz	
+S	bhu	bho	
+S	bhn	bhm	
+S	bgs	bho	
+S	bic	bgz	
+S	bhk	bho	
+S	bhr	bgz	
+S	bgv	bgz	
+S	bgp	bho	
+S	big	bho	
+S	bii	bho	
+S	bha	bgz	
+S	bij	bhg	
+S	bie	bho	
+S	bhd	bgz	
+S	bhw	bhg	
+S	bif	bho	
+S	bhz	bho	
+S	bib	bhm	
+S	bgq	bgz	
+S	bhm	bgz	
+S	bih	bgz	
+S	bin	java/lang/RuntimeException	
+S	bir	java/lang/Object	ly
+S	bil	java/lang/Object	lx
+S	bip	java/lang/Object	java/lang/Comparable
+S	bit	bil	
+S	bis	bil	
+S	bgi	bgk	
+S	bgj	java/lang/Object	bgh
+S	bkl	java/lang/Thread	
+S	bkk	java/lang/Thread	
+S	ast	java/lang/Object	asw
+S	asx	java/lang/Object	asy
+S	atb	java/util/ArrayList	
+S	ata	auj	
+S	atc	java/lang/Object	atl
+S	atd	atk	
+S	atg	java/lang/Object	atj
+S	ath	java/lang/Object	atj
+S	ati	java/lang/Object	atj
+S	atf	java/lang/Object	auo
+S	atn	java/lang/Object	atl
+S	ato	java/lang/Object	atl
+S	atp	java/lang/Object	atl
+S	atq	atr	
+S	atr	java/lang/IllegalArgumentException	
+S	ats	atr	
+S	atw	aum	
+S	atx	aum	
+S	aty	aum	
+S	atz	aum	
+S	aua	aum	
+S	aub	aum	
+S	auc	aum	
+S	aud	java/lang/Enum	
+S	aue	atk	
+S	auf	java/lang/Object	atl
+S	aug	auj	
+S	aui	java/util/HashMap	
+S	auh	java/lang/Object	atl
+S	auj	atk	
+S	auk	atk	java/lang/Comparable
+S	aul	java/lang/Object	atl
+S	aum	java/lang/Object	asy
+S	aun	java/lang/Exception	
+S	aup	java/lang/Object	aur
+S	a	java/lang/Enum	
+S	c	java/lang/Object	java/util/concurrent/Callable
+S	d	java/lang/Object	java/util/concurrent/Callable
+S	e	java/lang/Object	java/util/concurrent/Callable
+S	f	java/lang/Object	java/util/concurrent/Callable
+S	g	java/lang/Object	java/util/concurrent/Callable
+S	h	java/lang/Object	java/util/concurrent/Callable
+S	i	java/lang/Object	java/util/concurrent/Callable
+S	k	java/lang/Object	java/util/Comparator
+S	j	java/lang/Object	java/util/concurrent/Callable
+S	l	java/lang/Object	java/util/concurrent/Callable
+S	n	java/lang/Object	java/util/concurrent/Callable
+S	o	java/lang/Object	java/util/concurrent/Callable
+S	p	java/lang/Object	java/util/concurrent/Callable
+S	t	java/lang/Object	java/lang/Comparable
+S	u	java/lang/RuntimeException	
+S	x	java/lang/Object	z
+S	y	java/lang/Object	aa
+S	z	java/lang/Object	java/lang/Comparable
+S	ad	ai	
+S	ae	x	
+S	af	x	
+S	ag	x	
+S	ah	x	
+S	ai	x	
+S	aj	x	
+S	ak	x	
+S	al	x	
+S	am	x	
+S	an	x	
+S	ap	x	
+S	aq	x	
+S	ar	x	
+S	as	java/lang/RuntimeException	
+S	at	as	
+S	au	as	
+S	av	as	
+S	aw	as	
+S	ax	au	
+S	az	java/lang/Object	bg
+S	ba	java/lang/Object	az
+S	bb	java/lang/Object	bd
+S	bc	bl	
+S	be	java/lang/Object	bd
+S	bf	java/lang/Enum	
+S	bg	java/lang/Object	bh
+S	bh	java/lang/Object	bi
+S	bj	java/lang/Object	bi
+S	bl	java/lang/Object	bk
+S	bq	cf	
+S	br	cf	
+S	bt	java/lang/Object	java/util/concurrent/Callable
+S	bu	java/lang/Object	java/util/concurrent/Callable
+S	bs	cf	
+S	bv	cf	
+S	bw	cf	
+S	bx	cf	
+S	by	cf	
+S	bz	cf	
+S	ca	cf	
+S	cb	cf	
+S	cd	cf	
+S	ce	cf	
+S	ch	java/lang/Object	cg
+S	cj	java/lang/Thread	
+S	ck	java/lang/Thread	
+S	cl	java/lang/Thread	
+S	cm	java/lang/Thread	
+S	ci	java/lang/Object	cg
+S	cn	ei	
+S	co	ei	
+S	cp	ei	
+S	cq	ei	
+S	cr	ei	
+S	cs	ei	
+S	ct	ei	
+S	cu	ei	
+S	cv	ei	
+S	cw	ei	
+S	cx	ei	
+S	cy	ei	
+S	cz	ei	
+S	da	ei	
+S	db	ei	
+S	dc	ei	
+S	dd	ei	
+S	de	ei	
+S	df	ei	
+S	dg	ei	
+S	dh	ei	
+S	di	ei	
+S	dj	ei	
+S	dk	ei	
+S	dl	ei	
+S	dm	ei	
+S	dn	ei	
+S	do	ei	
+S	dp	ei	
+S	dq	ei	
+S	dr	ei	
+S	ds	ei	
+S	dt	ei	
+S	dv	ei	
+S	dw	ei	
+S	dx	ei	
+S	dy	ei	
+S	dz	ei	
+S	eb	ea	
+S	ec	ea	
+S	ed	ea	
+S	ea	ei	
+S	ef	ee	
+S	eg	ee	
+S	eh	ee	
+S	ee	ei	
+S	ek	ei	
+S	el	ei	
+S	em	ei	
+S	en	ei	
+S	ep	ei	
+S	eq	ei	
+S	er	ei	
+S	es	ei	
+S	et	ei	
+S	eu	ei	
+S	ev	ei	
+S	ew	ei	
+S	ex	ei	
+S	ey	ei	
+S	ez	ei	
+S	fa	ei	
+S	fb	ei	
+S	fc	ei	
+S	fd	ei	
+S	fe	ei	
+S	ff	ei	
+S	fg	ei	
+S	fh	ei	
+S	fi	ei	
+S	fj	ei	
+S	fk	ei	
+S	fl	ei	
+S	fm	ei	
+S	fn	ei	
+S	fo	ei	
+S	fp	ei	
+S	fq	ei	
+S	fr	ei	
+S	fs	bb	
+S	fy	fs	
+S	fz	bb	
+S	ga	bb	
+S	gb	bb	
+S	gc	bb	
+S	gd	bb	
+S	ge	fs	
+S	gf	fs	
+S	gg	fs	
+S	gi	fs	
+S	gh	java/lang/Object	bd
+S	gj	bb	
+S	gk	bb	
+S	gl	bb	
+S	gm	bb	
+S	gn	java/lang/Object	lc
+S	gp	java/lang/Thread	
+S	gq	java/lang/Object	java/util/concurrent/Callable
+S	gr	java/lang/Object	java/util/concurrent/Callable
+S	gs	java/lang/Object	java/util/concurrent/Callable
+S	gt	java/lang/Object	java/util/Comparator
+S	gw	arj	
+S	gz	x	
+S	ha	x	
+S	hb	x	
+S	hc	x	
+S	hd	x	
+S	he	x	
+S	hf	x	
+S	hg	x	
+S	hh	x	
+S	hi	x	
+S	hj	x	
+S	hk	x	
+S	hl	x	
+S	hm	x	
+S	hn	x	
+S	ho	x	
+S	hp	x	
+S	hq	x	
+S	hr	x	
+S	hs	y	w
+S	ht	x	
+S	hu	x	
+S	hv	x	
+S	hw	x	
+S	hx	x	
+S	hy	gu	
+S	ia	java/lang/Thread	
+S	ib	java/lang/Thread	
+S	ic	java/lang/Object	java/util/concurrent/Callable
+S	id	java/lang/Object	java/util/concurrent/Callable
+S	hz	net/minecraft/server/MinecraftServer	gv
+S	ie	jk	
+S	if	java/lang/Thread	
+S	iq	iz	
+S	ir	jd	
+S	is	iz	
+S	iu	java/lang/Object	java/util/concurrent/Callable
+S	iv	java/lang/Object	aag
+S	iy	java/lang/Object	abt
+S	jb	java/util/ArrayList	
+S	iz	aab	
+S	jc	sq	tp
+S	jg	java/lang/Thread	
+S	jf	ej	
+S	ji	java/lang/Object	java/util/concurrent/Callable
+S	jj	java/lang/Object	java/util/concurrent/Callable
+S	jh	ej	
+S	jn	java/lang/Object	ab
+S	jo	java/lang/Object	java/lang/Runnable
+S	jp	jo	
+S	jr	jo	
+S	jt	jo	
+S	ju	ka	
+S	jx	ka	
+S	jy	ka	
+S	jz	ka	
+S	kb	java/lang/Object	ke
+S	kc	java/lang/Object	ke
+S	kd	java/lang/Object	ke
+S	kj	java/util/logging/Formatter	
+S	kh	java/lang/Object	ku
+S	ko	java/lang/Object	java/lang/Runnable
+S	kq	java/lang/Object	java/util/Map
+S	lb	java/lang/Object	java/lang/Comparable
+S	lp	lo	
+S	ls	java/lang/Object	lt
+S	lw	java/lang/Object	lx
+S	lz	java/lang/Object	lt
+S	mb	java/util/TimerTask	
+S	md	java/lang/Object	lt
+S	mh	mg	
+S	mi	mh	
+S	mj	mk	
+S	mm	nr	
+S	mq	java/lang/Object	java/util/concurrent/Callable
+S	mr	java/lang/Object	java/util/concurrent/Callable
+S	mt	java/lang/Enum	
+S	mz	java/lang/Object	my
+S	na	java/lang/Object	my
+S	nb	java/lang/Object	my
+S	nc	mp	
+S	nd	ng	
+S	ne	mp	
+S	nf	ne	
+S	nh	java/lang/Object	java/util/concurrent/Callable
+S	ni	java/lang/Object	java/util/concurrent/Callable
+S	nj	java/lang/Object	java/util/concurrent/Callable
+S	nk	java/lang/Object	java/util/concurrent/Callable
+S	nl	java/lang/Object	java/util/concurrent/Callable
+S	nm	java/lang/Object	java/util/concurrent/Callable
+S	ng	mp	
+S	nn	java/lang/Enum	
+S	no	java/lang/Enum	
+S	nq	java/lang/Enum	
+S	np	ne	
+S	nr	ng	
+S	nu	qh	
+S	ob	java/lang/Object	my
+S	oa	om	
+S	oc	om	
+S	od	og	
+S	oe	om	
+S	of	om	
+S	og	om	
+S	oh	om	
+S	oi	om	
+S	oj	om	
+S	ok	om	
+S	ol	om	
+S	op	or	
+S	oq	om	
+S	or	om	
+S	os	or	
+S	ot	om	
+S	ou	om	
+S	ov	om	
+S	ow	om	
+S	ox	om	
+S	oy	om	
+S	oz	om	
+S	pa	om	
+S	pb	om	
+S	pc	og	
+S	pd	om	
+S	pe	om	
+S	pf	om	
+S	pg	om	
+S	ph	om	
+S	pi	om	
+S	pj	om	
+S	pk	om	
+S	pl	om	
+S	pm	om	
+S	pn	om	
+S	po	om	
+S	pp	pw	
+S	pq	pw	
+S	ps	java/lang/Object	java/util/Comparator
+S	pr	pw	
+S	pt	pr	
+S	pu	pw	
+S	pv	pw	
+S	pw	om	
+S	qe	ajo	
+S	qf	ng	mn
+S	qg	qf	
+S	qh	mm	mn
+S	qi	qh	
+S	qj	qh	
+S	qk	nr	mn
+S	ql	qj	
+S	qm	nu	
+S	qn	qh	
+S	qp	tj	
+S	qo	qh	
+S	qq	qk	sd
+S	qr	qt	
+S	qs	qk	
+S	qt	nr	mn
+S	qu	nu	
+S	qx	mp	
+S	qy	mp	
+S	qz	ng	qv,qw
+S	rc	java/lang/Object	my
+S	rb	sb	qv,sd
+S	rd	mp	
+S	re	rd	
+S	rf	mp	
+S	rg	mp	
+S	rh	mp	
+S	ri	mp	
+S	rj	rk	
+S	rk	ri	lt
+S	rl	ri	
+S	rm	rk	aqh
+S	rn	ri	
+S	rp	zs	
+S	ro	ri	
+S	rq	ri	
+S	rr	mp	
+S	rs	sb	
+S	rt	sh	
+S	ru	sb	
+S	rv	sb	
+S	rx	java/lang/Object	my
+S	rw	java/lang/Object	mn
+S	ry	nd	rw
+S	rz	sb	
+S	sa	sg	
+S	sb	nr	rw
+S	sc	sj	
+S	se	sb	
+S	sf	sb	sd
+S	sg	ng	rw
+S	sh	sb	
+S	si	sb	sd
+S	sj	sb	
+S	sk	java/lang/Object	zp
+S	sl	java/lang/Object	mn
+S	sm	mm	sl,zp
+S	sp	java/lang/Object	java/util/concurrent/Callable
+S	so	java/lang/Object	lt
+S	sr	java/lang/Enum	
+S	sq	ng	ab
+S	ss	mp	sy
+S	st	mp	
+S	su	mp	
+S	sv	mp	
+S	sw	mp	
+S	sx	su	
+S	sz	su	
+S	ta	tb	
+S	tb	mp	sy
+S	tc	tb	
+S	td	tb	
+S	te	tb	
+S	tf	tb	
+S	tg	su	
+S	tl	ul	
+S	tk	tj	
+S	tn	ul	
+S	to	ul	
+S	tm	tj	
+S	tq	tj	
+S	tr	java/lang/Object	lt
+S	ts	tj	
+S	tu	lz	
+S	tv	ul	
+S	tt	tj	
+S	tw	tj	
+S	tx	ul	
+S	ty	tj	
+S	ua	ul	
+S	tz	tj	
+S	uc	java/lang/Object	lt
+S	ud	tj	
+S	ue	ul	
+S	uf	lz	
+S	uh	lz	
+S	ui	ul	
+S	ug	tj	
+S	uj	java/lang/Object	lt
+S	uk	ul	
+S	um	tj	
+S	un	wt	
+S	up	bb	
+S	uq	java/lang/Enum	
+S	uo	wk	
+S	ur	xn	
+S	us	wk	
+S	ut	wk	
+S	uu	wk	
+S	uv	wk	
+S	uw	wk	
+S	ux	wf	
+S	uy	wk	
+S	uz	wk	
+S	va	xn	
+S	vb	wk	
+S	vc	xn	
+S	vd	wk	
+S	vf	ve	
+S	vg	ve	
+S	vh	ve	
+S	vi	ve	
+S	vj	ve	
+S	vk	ve	
+S	vl	ve	
+S	vm	ve	
+S	vn	ve	
+S	vo	ve	
+S	vp	ve	
+S	vq	ve	
+S	vr	wk	
+S	vs	wk	
+S	vt	wk	
+S	vu	wk	
+S	vv	vd	
+S	vw	wk	
+S	vx	wk	
+S	vy	wk	
+S	vz	wk	
+S	wa	wk	
+S	wb	wk	
+S	wc	wk	
+S	wd	wk	
+S	we	wk	
+S	wf	wk	
+S	wg	wf	
+S	wh	wk	
+S	wi	vr	
+S	wj	wk	
+S	wl	java/lang/Enum	
+S	wn	xn	
+S	wo	vd	
+S	wp	wk	
+S	wr	bb	
+S	wq	wk	
+S	ws	wk	
+S	wt	xn	
+S	wu	vr	
+S	wv	xn	
+S	ww	wk	
+S	wx	java/lang/Enum	
+S	wy	wk	
+S	wz	wk	
+S	xa	wk	
+S	xc	wf	
+S	xd	wk	
+S	xe	wk	
+S	xf	vr	
+S	xg	wk	
+S	xh	wk	
+S	xi	wk	
+S	xj	ur	
+S	xk	wk	
+S	xm	xn	
+S	xn	wk	
+S	xo	wk	
+S	xp	java/lang/Enum	
+S	xq	vc	
+S	xr	wk	
+S	xs	wk	
+S	xt	wk	
+S	yb	java/lang/Object	ym
+S	ye	java/lang/Object	ym
+S	yh	java/lang/Object	ym
+S	yi	yn	
+S	yl	java/lang/Object	java/util/Comparator
+S	yn	java/lang/Object	ym
+S	yo	java/lang/Object	ym
+S	ys	yz	
+S	yt	yz	
+S	yu	yz	
+S	yv	yz	
+S	yw	yz	
+S	yx	yz	
+S	yy	yz	
+S	za	java/lang/Enum	
+S	ze	java/lang/Object	zd
+S	zf	java/lang/Object	zd
+S	zg	lo	
+S	zh	yz	
+S	zi	yz	
+S	zj	yz	
+S	zk	yz	
+S	zl	yz	
+S	zm	yz	
+S	zn	yz	
+S	zo	yz	
+S	zr	java/util/ArrayList	
+S	zt	lo	
+S	aac	java/lang/Object	java/util/concurrent/Callable
+S	aad	java/lang/Object	java/util/concurrent/Callable
+S	aae	java/lang/Object	java/util/concurrent/Callable
+S	aab	java/lang/Object	aak
+S	aaf	java/lang/Exception	
+S	aaj	java/lang/Enum	
+S	aam	java/lang/Enum	
+S	aap	t	
+S	aaq	java/lang/Object	aak
+S	aar	java/lang/Object	java/lang/Comparable
+S	aau	aav	
+S	aaw	lo	
+S	abb	aav	
+S	abc	aav	
+S	abd	aba	
+S	abe	aav	
+S	abf	aav	
+S	abg	aav	
+S	abh	aav	
+S	abi	aav	
+S	abj	aav	
+S	abk	aav	
+S	abm	aav	
+S	abn	aav	
+S	abo	aav	
+S	abp	aav	
+S	abq	aaz	
+S	abr	adj	
+S	abv	abw	
+S	ach	java/io/ByteArrayOutputStream	
+S	acj	java/lang/Object	acb,akw
+S	aco	acn	
+S	acp	acn	
+S	acq	acn	
+S	acr	acw	
+S	act	java/lang/Object	abt
+S	acu	java/lang/Object	abt
+S	acv	acw	
+S	acx	acw	
+S	acy	java/lang/Object	abt
+S	acz	java/lang/Object	abt
+S	adb	adj	
+S	adc	adj	
+S	add	adj	
+S	ade	adj	
+S	adg	adj	
+S	adh	adj	
+S	adi	adj	
+S	adk	adj	
+S	adl	adj	
+S	adm	adj	
+S	adn	adj	
+S	ado	adj	
+S	adq	adj	
+S	adr	adj	
+S	ads	adj	
+S	adt	adj	
+S	adu	adj	
+S	adv	adj	
+S	adw	adj	
+S	adx	adj	
+S	ady	adj	
+S	adz	adj	
+S	aea	adj	
+S	aeb	adj	
+S	aec	adj	
+S	aed	adj	
+S	aee	adj	
+S	aef	adj	
+S	aeg	adj	
+S	ael	ags	
+S	aen	agw	
+S	aeo	agw	
+S	aep	agw	
+S	aeq	agw	
+S	aer	agy	
+S	aet	agy	
+S	aes	ags	
+S	aev	afh	
+S	aew	afh	
+S	aex	afh	
+S	aey	afh	
+S	aez	afh	
+S	afa	afh	
+S	afb	afh	
+S	afc	afh	
+S	afd	afh	
+S	afe	afh	
+S	aff	afh	
+S	afg	afh	
+S	afh	agw	
+S	afj	afh	
+S	afk	afh	
+S	afl	aev	
+S	afn	agy	
+S	afm	ags	
+S	afq	aft	
+S	afs	agx	
+S	afr	aft	
+S	aft	agw	
+S	afu	aft	
+S	afw	agy	
+S	afv	ags	
+S	afy	agg	
+S	afz	agg	
+S	agb	agq	
+S	agc	agq	
+S	agd	agq	
+S	age	agq	
+S	agf	agq	
+S	agh	agq	
+S	agi	agq	
+S	agj	age	
+S	agk	agq	
+S	agl	agx	
+S	agm	agq	
+S	agn	agm	
+S	ago	agq	
+S	agp	agq	
+S	agr	java/lang/Enum	
+S	agq	agw	
+S	agt	java/lang/Object	java/util/concurrent/Callable
+S	agu	java/lang/Object	java/util/concurrent/Callable
+S	agv	java/lang/Object	java/util/concurrent/Callable
+S	ags	acw	
+S	aha	agy	
+S	agz	ags	
+S	ahc	ahp	
+S	ahd	ahp	
+S	ahe	ahp	
+S	ahf	ahp	
+S	ahh	ahp	
+S	ahi	ahp	
+S	ahj	ahp	
+S	ahk	ahp	
+S	ahl	ahp	
+S	ahm	ahr	
+S	ahn	ahq	
+S	aho	ahp	
+S	ahp	agw	
+S	ahq	ahp	
+S	ahr	ahp	
+S	ahv	aib	
+S	ahw	aib	
+S	aic	aif	
+S	aid	aif	
+S	aie	aif	
+S	aig	aif	
+S	aii	aif	
+S	aij	ait	
+S	aik	ait	
+S	ail	ait	
+S	aim	ait	
+S	aiq	ait	
+S	ais	ait	
+S	aiu	ait	
+S	aiv	ait	
+S	aiw	ait	
+S	aix	ait	
+S	aiy	ait	
+S	aiz	ait	
+S	ajb	ait	
+S	aje	ait	
+S	ajf	ait	
+S	ajl	ajo	
+S	ajp	ajt	
+S	ajr	java/lang/Object	java/io/FilenameFilter
+S	ajq	aju	
+S	ajs	ajv	
+S	ajt	java/lang/Object	akf,akt
+S	aju	java/lang/Object	aki
+S	ajw	java/lang/Object	java/util/concurrent/Callable
+S	ajx	java/lang/Object	java/util/concurrent/Callable
+S	ajy	java/lang/Object	java/util/concurrent/Callable
+S	ajz	java/lang/Object	java/util/concurrent/Callable
+S	aka	java/lang/Object	java/util/concurrent/Callable
+S	akb	java/lang/Object	java/util/concurrent/Callable
+S	akc	java/lang/Object	java/util/concurrent/Callable
+S	akd	java/lang/Object	java/util/concurrent/Callable
+S	ake	java/lang/Object	java/util/concurrent/Callable
+S	akg	java/lang/Exception	
+S	akj	java/lang/Object	java/lang/Comparable
+S	aks	java/lang/Object	akf
+S	akv	java/lang/Object	java/lang/Runnable
+S	aky	amt	
+S	akz	apa	amh
+S	ala	apa	
+S	alb	apa	
+S	ald	akz	
+S	ale	alz	
+S	alf	apa	
+S	alg	akz	
+S	alh	apa	
+S	ali	apa	
+S	alj	apa	
+S	alk	apa	
+S	all	alu	
+S	alm	apa	
+S	aln	akz	
+S	alo	apa	
+S	alp	apa	
+S	alq	alz	
+S	alr	akz	
+S	als	aly	amh
+S	alu	alh	
+S	alv	akz	
+S	alw	alh	
+S	alx	alb	
+S	aly	alz	
+S	alz	apa	
+S	ama	apa	
+S	amb	akz	
+S	amc	apa	
+S	amd	amb	
+S	ame	apa	
+S	amf	akz	
+S	amg	akz	
+S	ami	apa	
+S	amj	alz	
+S	amk	apa	
+S	aml	apa	
+S	amm	apa	
+S	amn	akz	
+S	amo	ams	
+S	amp	apa	
+S	amq	amt	
+S	amr	apa	
+S	ams	apa	
+S	amt	apa	
+S	amu	apa	
+S	amv	apa	
+S	amw	akz	
+S	amx	apa	
+S	amy	ams	
+S	amz	apa	
+S	ana	api	
+S	anc	apa	
+S	and	apa	
+S	ane	apa	
+S	anf	ane	
+S	ang	ane	
+S	anh	apa	
+S	ani	apa	
+S	anj	apa	
+S	ank	akz	
+S	anl	alh	
+S	anm	akz	
+S	ann	apa	
+S	ano	alh	
+S	anp	aph	
+S	anr	aov	
+S	ans	apa	
+S	ant	ams	
+S	anu	alu	
+S	anv	anj	
+S	anw	alb	
+S	any	java/lang/Enum	
+S	anx	ala	
+S	anz	alz	
+S	aoa	apa	
+S	aob	alb	
+S	aod	aqp	
+S	aoc	akz	
+S	aoe	apa	
+S	aof	apa	
+S	aog	apa	
+S	aoh	apa	
+S	aoi	aly	
+S	aoj	apa	
+S	aok	alh	
+S	aol	akz	
+S	aom	akz	
+S	aon	apa	
+S	aoo	apa	
+S	aop	apa	
+S	aoq	apa	
+S	aor	alh	
+S	aos	ali	
+S	aot	apa	
+S	aou	amr	
+S	aov	apa	
+S	aow	alh	
+S	aox	akz	
+S	aoy	apa	
+S	aoz	apa	
+S	apb	ape	
+S	apc	ape	
+S	apd	ape	
+S	apf	apa	
+S	apg	apa	
+S	aph	apa	
+S	api	apa	
+S	apj	apa	
+S	apk	apa	
+S	apl	apa	
+S	apm	apa	
+S	apn	apa	
+S	apo	apa	
+S	app	alh	
+S	apq	apa	
+S	apr	ala	
+S	aps	ali	
+S	apt	amr	
+S	apu	apa	
+S	apv	apa	
+S	apw	aqp	lt
+S	apx	aqp	md
+S	apy	aqp	lt
+S	apz	aqp	ab
+S	aqa	aqp	
+S	aqb	aqp	
+S	aqc	aqp	lt
+S	aqd	aqc	
+S	aqe	aqp	
+S	aqf	aqp	
+S	aqg	aqp	md
+S	aqh	java/lang/Object	lt
+S	aqi	aqp	aqh
+S	aqk	zs	
+S	aqj	aqp	
+S	aql	aqp	
+S	aqm	aqp	
+S	aqn	aqp	
+S	aqo	aqp	
+S	aqq	java/lang/Object	java/util/concurrent/Callable
+S	aqr	java/lang/Object	java/util/concurrent/Callable
+S	aqs	java/lang/Object	java/util/concurrent/Callable
+S	aqt	apa	
+S	aqu	apa	
+S	aqv	akz	
+S	aqw	aqp	
+S	aqy	java/lang/ThreadLocal	
+S	arb	java/lang/Enum	
+S	arh	java/lang/Object	java/util/Comparator
+S	ark	ajo	
+S	arl	java/lang/Object	arn
+S	arm	arl	
+S	arp	java/lang/Object	aro
+S	arq	ars	
+S	arr	arp	
+S	ars	arr	
+S	asa	asd	
+S	asd	java/lang/RuntimeException	
+S	asf	java/lang/Object	arv
+S	asg	java/io/FilterInputStream	
+S	ash	java/io/FilterOutputStream	
+S	asi	java/lang/Object	arv
+S	asj	java/lang/Object	ary
+S	ask	java/lang/Object	ary
+S	asn	java/security/BasicPermission	
+S	asq	java/lang/Object	java/security/PrivilegedAction
+S	asp	java/security/Provider	asl
+S	asr	java/lang/Object	asm

@@ -1579,13 +1579,13 @@
             function reg() { return vm && vm.mcReg; }
             function blockRef(id) {
                 var r = reg(), b = r && r.blocks[id];
-                return b ? 'mod:' + b.$mod + ':b' + id : 'id:' + id;
+                return b && !b.$override ? 'mod:' + b.$mod + ':b' + id : 'id:' + id;
             }
             function itemRef(id) {
                 var r = reg();
                 if (id < 4096) return blockRef(id);
                 var it = r && r.items[id];
-                return it ? 'mod:' + it.$mod + ':i' + id : 'id:' + id;
+                return it && !it.$override ? 'mod:' + it.$mod + ':i' + id : 'id:' + id;
             }
             function refToJava(ref) {
                 var m = /^mod:([^:]+):([bi])(\d+)$/.exec(ref || '');
@@ -1594,6 +1594,8 @@
                 return m ? +m[1] : 0;
             }
             function player() { return mp('player'); }
+            var tiles = null;
+            function forget(x, y, z) { if (tiles) delete tiles[(x | 0) + ',' + (y | 0) + ',' + (z | 0)]; }
             var bridge = {
                 mode: 'run',
                 blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
@@ -1601,10 +1603,21 @@
                 op: function (name) {
                     var a = Array.prototype.slice.call(arguments, 1);
                     switch (name) {
-                    case 'tile': { var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t')); return t ? { id: refToJava(t[0]), data: t[1] | 0 } : { id: 0, data: 0 }; }
-                    case 'settile': return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? blockRef(a[3]) : 'id:0', a[4] | 0].join('\t'));
-                    case 'setdata': return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
-                    case 'destroy': return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
+                    case 'tile': {
+                        var tk = (a[0] | 0) + ',' + (a[1] | 0) + ',' + (a[2] | 0), hit = tiles && tiles[tk];
+                        if (hit) return { id: hit.id, data: hit.data };
+                        var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                        var tv = t ? { id: refToJava(t[0]), data: t[1] | 0 } : { id: 0, data: 0 };
+                        if (tiles) tiles[tk] = { id: tv.id, data: tv.data };
+                        return tv;
+                    }
+                    case 'settile': {
+                        forget(a[0], a[1], a[2]);
+                        var sref = a[3] ? blockRef(a[3]) : 'id:0';
+                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : a[4] | 0].join('\t'));
+                    }
+                    case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
                     case 'player': {
                         var p = player();
                         if (!p) return null;
@@ -1617,7 +1630,7 @@
                     case 'msg': return mp('msg\t' + clean(a[0]));
                     case 'sound': return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
                     case 'particle': return mp(['particle', clean(a[0]), +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
-                    case 'explode': return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
+                    case 'explode': if (tiles) tiles = {}; return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
                     case 'time': return mp('time');
                     case 'settime': return mp('settime\t' + (a[0] | 0));
                     case 'setpos': { var sp = player(); return sp ? mp(['setpos', sp.id, +a[0], +a[1], +a[2]].join('\t')) : null; }
@@ -1656,6 +1669,93 @@
                 running = true;
                 return r.tickMods.length ? ['subscribe\tgametick'] : [];
             };
+            var genRefs = {}, genIds = {};
+            function genJava(raw) {
+                var v = genRefs[raw];
+                if (!v) {
+                    var p = UTF8ToString(Module._mcJavaRefOf(raw & 255, raw >> 8)).split('\t');
+                    v = genRefs[raw] = { id: refToJava(p[0]), data: p[1] | 0, mod: /^mod:/.test(p[0]) };
+                }
+                return v;
+            }
+            function genGame(jid) {
+                var v = genIds[jid];
+                if (v === undefined) {
+                    var ref = blockRef(jid);
+                    if (/^id:/.test(ref)) v = { id: jid, aux: 0, mod: false };
+                    else { var n = Module.ccall('mcJavaResolve', 'number', ['string'], [ref]); v = n < 0 ? null : { id: n & 255, aux: n >> 8, mod: true }; }
+                    genIds[jid] = v;
+                }
+                return v;
+            }
+            var genBridge = {
+                mode: 'gen',
+                blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava,
+                op: function (name, x, y, z, b, d) {
+                    x |= 0; y |= 0; z |= 0;
+                    switch (name) {
+                    case 'tile': { var t = genJava(Module._mcJavaGenTile(x, y, z)); return { id: t.id, data: t.data }; }
+                    case 'settile': {
+                        if (!b) { Module._mcJavaGenSet(x, y, z, 0, 0); return 0; }
+                        var gg = genGame(b | 0);
+                        if (gg) Module._mcJavaGenSet(x, y, z, gg.id, gg.mod ? gg.aux : d | 0);
+                        return 0;
+                    }
+                    case 'setdata': {
+                        var raw = Module._mcJavaGenTile(x, y, z);
+                        if (!genJava(raw).mod) Module._mcJavaGenSet(x, y, z, raw & 255, b | 0);
+                        return 0;
+                    }
+                    case 'destroy': Module._mcJavaGenSet(x, y, z, 0, 0); return 0;
+                    default:
+                        if (vm) vm.warnOnce('gen:' + name, 'game action "' + name + '" is not available while the world generates (left unplugged)');
+                        return undefined;
+                    }
+                },
+            };
+            function genMods(r) {
+                var own = function (o, key) { var m = o.cls.findMethod(key); return !!(m && m.cls.name !== 'net/minecraft/src/BaseMod'); };
+                return r.mods.filter(function (m) {
+                    return own(m, 'generateSurface(Lnet/minecraft/src/World;Ljava/util/Random;II)V') || own(m, 'generateNether(Lnet/minecraft/src/World;Ljava/util/Random;II)V');
+                });
+            }
+            J.genCheck = function () {
+                var r = reg();
+                genRefs = {}; genIds = {};
+                var on = !!(vm && r && genMods(r).length);
+                if (Module._mcJavaGenOn) Module._mcJavaGenOn(on ? 1 : 0);
+                return on;
+            };
+            J.populate = function (cx, cz, dim, seed) {
+                var r = reg();
+                if (!vm || !r || (dim !== 0 && dim !== -1)) return;
+                var gm = genMods(r);
+                if (!gm.length) return;
+                var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim;
+                if (!running) {
+                    javaMods = {};
+                    Object.keys(r.blocks).forEach(function (k) { javaMods[r.blocks[k].$mod] = true; });
+                    Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
+                }
+                vm.game = genBridge; vm.mcSeed = seed | 0; vm.mcDim = dim; vm.steps = 0;
+                try {
+                    JV.run(vm, function () {
+                        var world = JV.mc152.worldObj(vm);
+                        var S = BigInt(seed | 0), rnd = vm.newObject(vm.loadClass('java/util/Random'));
+                        vm.callVirtual(rnd, '<init>', '(J)V', [S]);
+                        var l1 = vm.callVirtual(rnd, 'nextLong', '()J', []) / 2n * 2n + 1n;
+                        var l2 = vm.callVirtual(rnd, 'nextLong', '()J', []) / 2n * 2n + 1n;
+                        vm.callVirtual(rnd, 'setSeed', '(J)V', [BigInt.asIntN(64, BigInt.asIntN(64, BigInt(cx) * l1 + BigInt(cz) * l2) ^ S)]);
+                        gm.forEach(function (m) {
+                            vm.currentMod = m.cls.source || vm.currentMod;
+                            JV.run(vm, function () {
+                                if (dim === 0) vm.callVirtual(m, 'generateSurface', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, rnd, cx * 16, cz * 16]);
+                                else vm.callVirtual(m, 'generateNether', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, rnd, cx * 16, cz * 16]);
+                            });
+                        });
+                    });
+                } finally { vm.game = prev; vm.mcDim = prevDim; }
+            };
             J.worldStop = function () {
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
@@ -1678,6 +1778,10 @@
             }
             J.handle = function (e) {
                 if (!running || !WANTS[e.t]) return;
+                tiles = {};
+                try { handle(e); } finally { tiles = null; }
+            };
+            function handle(e) {
                 var JV = window.JVM, M = JV.mc152, r = reg();
                 vm.steps = 0;
                 var world = M.worldObj(vm);
@@ -1712,7 +1816,7 @@
                     else if (!out) bridge.op('setslot', slot, 0, 0, 0);
                 }
             };
-            J.begin = function () { vm = null; };
+            J.begin = function () { vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
             J.define = function (modId, files, problem) {
                 return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
                     var JVM = r[0], map = r[1];
@@ -1750,6 +1854,7 @@
                             vm.callVirtual(o, 'load', '()V', []);
                         });
                     });
+                    J.genCheck();
                     var c = JVM.collectContent(vm, modId);
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
@@ -1933,6 +2038,7 @@
                             files['manifest.json'] = new TextEncoder().encode(JSON.stringify({
                                 id: String(src.id || src.modid || base).toLowerCase().replace(/[^a-z0-9_.-]/g, '_'),
                                 name: src.name || base, version: src.version || '', description: src.description || '',
+                                devices: 'any',
                                 author: (Array.isArray(auth) ? auth : [auth]).map(function (a) { return typeof a === 'string' ? a : (a && a.name) || ''; }).join(', '),
                             }));
                         }
