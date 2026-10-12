@@ -1697,7 +1697,12 @@
                     case 'effect': return mp(['effect', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
                     case 'rmeffect': return mp(['rmeffect', a[0] | 0, a[1] | 0].join('\t'));
                     case 'clreffect': return mp(['clreffect', a[0] | 0].join('\t'));
-                    case 'particle': return mp(['particle', clean(a[0]), +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
+                    case 'particle': {
+                        var pname = clean(a[0]);
+                        var pm = /^javafx[|]i[|](-?\d+):(\d+)([|].*)$/.exec(pname);
+                        if (pm) pname = 'javafx|i|' + itemRef(+pm[1], +pm[2]) + pm[3];
+                        return mp(['particle', pname, +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
+                    }
                     case 'explode': if (tiles) tiles = {}; return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
                     case 'time': return mp('time');
                     case 'settime': return mp('settime\t' + (a[0] | 0));
@@ -1730,6 +1735,8 @@
                     case 'fire': return mp(['fire', a[0] | 0, a[1] | 0].join('\t'));
                     case 'travel': return mp(['travel', clean(String(a[0]))].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
+                    case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
+                    case 'remove': return mp(['remove', a[0] | 0].join('\t'));
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
@@ -1751,8 +1758,9 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1 };
             J.running = function () { return running; };
+            J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
                 if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
                 var e; try { e = JSON.parse(json); } catch (x) { return 0; }
@@ -1973,6 +1981,7 @@
                         r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
+                    if (JV.shotTick) JV.shotTick(vm);
                     if (JV.guiTick) JV.guiTick(vm);
                     if (JV.tileTick) {
                         JV.tileTick(vm);
@@ -1990,6 +1999,7 @@
                     return;
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
+                if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
@@ -2290,7 +2300,8 @@
                     vs = vs.filter(Boolean).sort(function (a, b) { return a.rank - b.rank; });
                     var tag = vs.length ? vs[0].tag : null;
                     J.wantTag = tag;
-                    return { tag: tag, losers: vs.filter(function (v) { return v.tag !== tag; }).map(function (v) { return v.id; }), versionOf: function (t) { return window.JVM && window.JVM.versionOfTag ? window.JVM.versionOfTag[t] : t; } };
+                    var tags = {}; vs.forEach(function (v) { tags[v.id] = v.tag; });
+                    return { tag: tag, tags: tags, losers: [], versionOf: function (t) { return window.JVM && window.JVM.versionOfTag ? window.JVM.versionOfTag[t] : t; } };
                 });
             };
             var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164'];
@@ -2327,14 +2338,16 @@
                 var JVM = null;
                 return loadJvm().then(function (j) { JVM = j; return JVM.expandNestedJars ? JVM.expandNestedJars(files) : files; })
                     .then(function () { return versionTag(JVM, files); }).then(function (ver) {
-                    var want = J.wantTag || (vm && vm.$tag);
+                    var mtag = ver.tag || 'mcp152';
+                    var want = null;
                     if (ver.tag && want && want !== ver.tag) {
                         var why = 'made for Minecraft ' + JVM.versionOfTag[ver.tag] + ', but the newest Java mods on are for ' + JVM.versionOfTag[want] + ' - one version\'s Java mods run at a time';
                         J.reports[modId] = JVM.javaReport(vm, modId, { loader: '', version: JVM.versionOfTag[ver.tag], cant: why });
                         problem('', "Can't run: " + why);
                         return (J.pre[modId] = { skip: true });
                     }
-                    return loadMap(ver.tag || 'mcp152').then(function (map) {
+                    return loadMap('babric').then(function (bmap) { return loadMap(mtag).then(function (map) { return { map: map, bmap: bmap }; }); }).then(function (mm) {
+                        var map = mm.map, bmap = mm.bmap;
                         if (!vm) {
                             vm = JVM.create({
                                 log: function (level, text) {
@@ -2342,7 +2355,7 @@
                                     if (level === 'error') problem('', String(text).split('\n')[0]);
                                     (level === 'out' ? console.log : console.warn)('[java ' + (vm && vm.currentMod || '') + '] ' + text);
                                 },
-                                install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
+                                install: function (v) { v.$tag = mtag; if (map) JVM.loadMap(v, map, mtag); if (bmap && mtag !== 'babric') JVM.loadMap(v, bmap, 'babric'); JVM.installMc152(v); },
                             });
                             vm.gameTexture = function (kind, n) { return Module.mcMods && Module.mcMods.hasTexture ? Module.mcMods.hasTexture(kind, n) : true; };
                             vm.mcDimKeyOf = function (d) { return dimKeyOf(d); };
@@ -2351,6 +2364,8 @@
                             vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
                                         itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
                         }
+                        if (map && !(vm.$maps && vm.$maps[mtag])) JVM.loadMap(vm, map, mtag);
+                        (vm.$modTag || (vm.$modTag = {}))[modId] = mtag;
                         if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
                         JVM.onGuiOpen = function () { jgOpen(); };
                         JVM.onGuiClose = function () { jgClose(true); };
@@ -2379,8 +2394,8 @@
                     vm.currentMod = modId;
                     if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
                     var kind = JVM.javaKind ? JVM.javaKind(vm, classes, files) : { loader: '', version: '', cant: '' };
-                    if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[vm.$tag] || '1.5.2';
-                    if (ver.guessed && ver.said && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[vm.$tag]; }
+                    if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag] || '1.5.2';
+                    if (ver.guessed && ver.said && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag]; }
                     Object.keys(files).forEach(function (k) {
                         if (!/(^|[/])lang[/]en_us[.]lang$/i.test(k)) return;
                         var lr = JVM.mc152.reg(vm).lang;
@@ -2460,6 +2475,10 @@
                             return new Promise(function (res) { cv.toBlob(function (bl) { res(bl ? bl.arrayBuffer() : null); }, 'image/png'); });
                         }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
                     };
+                    Object.keys(files).forEach(function (f) {
+                        var pm = /(?:^|[/])textures[/]particles?[/](.+)[.]png$/i.exec(f);
+                        if (pm && !/[/]/.test(pm[1])) add['textures/items/fx_' + pm[1].toLowerCase().replace(/[^a-z0-9_]+/g, '_') + '.png'] = files[f];
+                    });
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
                         if (t.sheet != null) {
@@ -2541,8 +2560,14 @@
                 try { return JSON.parse(new TextDecoder().decode(FS.readFile(STATE))); } catch (e) { return { order: [], enabled: {} }; }
             }
             function writeState() {
-                var s = { order: mods.map(function (x) { return x.id; }), enabled: {}, support: supportSeen || readState().support || {}, onAt: {} };
-                mods.forEach(function (x) { s.enabled[x.id] = !!x.enabled; if (x.onAt) s.onAt[x.id] = x.onAt; });
+                var s = { order: mods.map(function (x) { return x.id; }), enabled: {}, support: supportSeen || readState().support || {}, onAt: {}, versionOff: {} };
+                s.javaDeps = {};
+                mods.forEach(function (x) {
+                    s.enabled[x.id] = !!x.enabled; if (x.onAt) s.onAt[x.id] = x.onAt; if (x.versionOff) s.versionOff[x.id] = x.versionOff;
+                    var jd = Module.mcJava && Module.mcJava.depsOf ? Module.mcJava.depsOf(x.id).concat(Module.mcJava.depsOf(cid(x))) : [];
+                    if (jd.length) x.javaDeps = jd.filter(function (d, i, a) { return a.indexOf(d) === i; });
+                    if (x.javaDeps && x.javaDeps.length) s.javaDeps[x.id] = x.javaDeps;
+                });
                 try { FS.mkdirTree(LIB); FS.writeFile(STATE, JSON.stringify(s)); } catch (e) { console.warn('[mods] state', e); }
                 if (Module._syncSaves) Module._syncSaves();
             }
@@ -3012,6 +3037,8 @@
                     Object.keys(found).forEach(function (id) {
                         if (st.enabled && id in st.enabled) found[id].enabled = !!st.enabled[id];
                         if (st.onAt && st.onAt[id]) found[id].onAt = st.onAt[id];
+                        if (st.versionOff && st.versionOff[id]) found[id].versionOff = st.versionOff[id];
+                        if (st.javaDeps && st.javaDeps[id]) found[id].javaDeps = st.javaDeps[id];
                     });
                     var order = (st.order || []).filter(function (id) { return found[id]; });
                     Object.keys(found).sort().forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
@@ -3121,15 +3148,20 @@
                     var list = Object.keys(javaFiles).map(function (id) { return { id: id, files: javaFiles[id].files, rank: rankOf(javaFiles[id].x) }; });
                     return Module.mcJava.pickTag(list);
                 }).then(function (pick) {
+                    if (pick && pick.tag && !session) {
+                        var back = [];
+                        mods.forEach(function (x) { if (!x.enabled && !x.err && x.versionOff) { x.enabled = true; delete x.versionOff; back.push(x.m && x.m.name || x.id); } });
+                        if (back.length) { writeState(); setTimeout(function () { reapply(true); }, 0); applyNote = 'Turned back on ' + back.join(', ') + ' - mods for different Minecraft versions now run together.'; }
+                    }
                     if (!pick || !pick.losers.length || session) return;
                     var top = Object.keys(javaFiles).map(function (id) { return javaFiles[id].x; }).sort(function (a, b) { return rankOf(a) - rankOf(b); })[0];
                     if (!top) return;
                     var names = [];
-                    pick.losers.forEach(function (id) { var lx = javaFiles[id] && javaFiles[id].x; if (lx && lx.enabled) { lx.enabled = false; names.push(lx.m && lx.m.name || id); delete javaFiles[id]; } });
+                    pick.losers.forEach(function (id) { var lx = javaFiles[id] && javaFiles[id].x; if (lx && lx.enabled) { lx.enabled = false; lx.versionOff = pick.tags && pick.tags[id]; names.push(lx.m && lx.m.name || id); delete javaFiles[id]; } });
                     on = on.filter(function (x) { return x.enabled; });
                     if (names.length) {
                         writeState();
-                        applyNote = ('Turned off ' + names.join(', ') + ' - Java mods for one Minecraft version run at a time, and ' + (top.m && top.m.name || 'the new mod') + ' is for ' + pick.versionOf(pick.tag) + '. Turn them back on in Mods to switch back.');
+                        applyNote = ('Turned off ' + names.join(', ') + ' - Java mods for one Minecraft version run at a time, and ' + (top.m && top.m.name || 'the new mod') + ' is for ' + pick.versionOf(pick.tag) + '. Turning one of them back on switches back (with the others).');
                     }
                 });
                 var javaPre = !Module.mcJava ? Promise.resolve() : javaPick.then(function () {
@@ -4717,6 +4749,13 @@
                 Object.keys(lootLines).forEach(function (n) { lines.push(lootLines[n]); });
                 lootKeys = {};
                 Object.keys(lootLines).forEach(function (n) { lootKeys[n] = 1; });
+                Object.keys(newTex.items).forEach(function (k) {
+                    var p = k.indexOf(':');
+                    if (/^fx_/.test(k.slice(p + 1))) cellOf('items', k.slice(0, p), k.slice(p + 1));
+                });
+                ['items', 'blocks'].forEach(function (kind) {
+                    Object.keys(given[kind]).forEach(function (k) { lines.push(['texcell', kind === 'blocks' ? 'b' : 'i', k, given[kind][k]].join('\t')); });
+                });
                 var needCells = Math.max(next.blocks, next.items), rows = 32;
                 while (rows * 16 < needCells) rows *= 2;
                 lines.unshift('rows\t' + rows);
@@ -4759,8 +4798,37 @@
             }
 
             var applyNote = '';
+            function depIdsOf(x) {
+                var out = [];
+                ((x.m && x.m.deps) || []).forEach(function (d) { if (d && d.id && !d.optional) out.push(d.id); });
+                if (Module.mcJava && Module.mcJava.depsOf) out = out.concat(Module.mcJava.depsOf(cid(x)), x.id !== cid(x) ? Module.mcJava.depsOf(x.id) : []);
+                out = out.concat(x.javaDeps || []);
+                return out.filter(function (d, i, a) { return d && a.indexOf(d) === i && !LIB_BUILTIN.test(d); });
+            }
+            function syncLibs() {
+                var users = {}, changed = false;
+                mods.forEach(function (x) {
+                    if (x.err) return;
+                    depIdsOf(x).forEach(function (d) {
+                        var L = byContentId(d) || (LIB_KNOWN[d] && byContentId(LIB_KNOWN[d].slug));
+                        if (L && L !== x) (users[L.id] = users[L.id] || []).push(x);
+                    });
+                });
+                mods.forEach(function (x) { x.libUsers = users[x.id] || null; });
+                for (var pass = 0; pass < 6; pass++) {
+                    var any = false;
+                    mods.forEach(function (L) {
+                        if (!L.libUsers || L.err) return;
+                        var on = L.libUsers.some(function (y) { return y.enabled; });
+                        if (L.enabled !== on) { L.enabled = on; if (on) L.onAt = L.onAt || Date.now(); any = changed = true; }
+                    });
+                    if (!any) break;
+                }
+                return changed;
+            }
             function reapply(tell, ask) {
                 if (busy) { again = true; return Promise.resolve(); }
+                if (syncLibs()) writeState();
                 var keep = status;
                 busy = true; bump('Applying mods...');
                 return applyAll(ask).then(function (unknown) {
@@ -4772,6 +4840,7 @@
                     if (tell && Module._mcModsApplied) Module._mcModsApplied();
                     applied++;
                     setTimeout(autoLibs, 0);
+                    if (syncLibs()) { writeState(); setTimeout(function () { reapply(true); }, 0); }
                     if (again) { again = false; return reapply(tell); }
                 }).catch(function (e) {
                     busy = false;
@@ -4819,7 +4888,8 @@
                         .concat((problems[cid(x)] || []).map(function (p) { return (p.file ? p.file + ': ' : '') + p.text; }));
                     return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
                         .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
-                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '', supportOf(x, probs)]).join('\t');
+                        .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, x.m.devices || '', supportOf(x, probs),
+                            clean(x.libUsers ? x.libUsers.map(function (y) { return y.m && y.m.name || y.id; }).join(', ') : '')]).join('\t');
                 }).join('\n');
             };
             function modsOn() {
@@ -4925,6 +4995,32 @@
                         }, function () { return null; });
                     });
                 }, Promise.resolve(null)).then(function (pick) {
+                    if (pick || k) return pick;
+                    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); };
+                    var want = norm(key), t0 = tries[0];
+                    var facets = [['categories:' + t0.loaders[0]]].concat(t0.gv ? [['versions:' + t0.gv]] : []);
+                    var q1 = String(key).replace(/[-_.]+/g, ' ').trim();
+                    var q2 = q1.replace(/(api|lib|library|core|config|utils?|loader|compat)$/i, ' $1').trim();
+                    var queries = [key, q1, q2].filter(function (q, i, a) { return q && a.indexOf(q) === i; });
+                    var search = function (i) {
+                        if (i >= queries.length) return Promise.resolve(null);
+                        return fetch('https://api.modrinth.com/v2/search?limit=10&query=' + encodeURIComponent(queries[i]) + '&facets=' + encodeURIComponent(JSON.stringify(facets)))
+                            .then(function (r) { return r.ok ? r.json() : null; }).then(function (res) {
+                                var h = res && (res.hits || []).filter(function (h) { return norm(h.slug) === want || norm(h.title) === want; })[0];
+                                return h ? { hits: [h] } : search(i + 1);
+                            }, function () { return search(i + 1); });
+                    };
+                    return search(0).then(function (res) {
+                            var hit = res && (res.hits || []).filter(function (h) { return norm(h.slug) === want || norm(h.title) === want; })[0];
+                            if (!hit) return null;
+                            var url = 'https://api.modrinth.com/v2/project/' + encodeURIComponent(hit.slug) + '/version?loaders=' + encodeURIComponent(JSON.stringify(t0.loaders)) + (t0.gv ? '&game_versions=' + encodeURIComponent(JSON.stringify([t0.gv])) : '');
+                            return fetch(url).then(function (r) { return r.ok ? r.json() : []; }).then(function (vs) {
+                                var v = Array.isArray(vs) && vs[0];
+                                var f = v && v.files && (v.files.filter(function (x) { return x.primary; })[0] || v.files[0]);
+                                return f && f.url ? { url: f.url, name: f.filename || hit.slug + '.jar', title: v.name || hit.title } : null;
+                            });
+                        }, function () { return null; });
+                }).then(function (pick) {
                     if (!pick) return null;
                     return fetch(pick.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (ab) {
                         return ab ? new File([ab], pick.name) : null;
@@ -4939,14 +5035,18 @@
                     var id = cid(x), rep = Module.mcJava.reportOf ? Module.mcJava.reportOf(id) : null;
                     if (rep && rep.status === 'cant') return;
                     var ver = rep && rep.version || '';
-                    var add = function (k) { if (k && LIB_KNOWN[k]) k = LIB_KNOWN[k].slug; if (!k || libTried[k] || LIB_BUILTIN.test(k) || byContentId(k)) return; if (!want[k]) want[k] = { by: x.m.name, ver: ver }; };
-                    (Module.mcJava.depsOf ? Module.mcJava.depsOf(id) : []).forEach(add);
-                    (rep && rep.needs || []).forEach(add);
+                    var add = function (k, guess) { if (k && LIB_KNOWN[k]) k = LIB_KNOWN[k].slug; if (!k || libTried[k] || LIB_BUILTIN.test(k) || byContentId(k)) return; if (!want[k]) want[k] = { by: x.m.name, ver: ver, guess: !!guess, mod: id }; };
+                    if (Module.mcJava.depsOf) Module.mcJava.depsOf(id).concat(x.id !== id ? Module.mcJava.depsOf(x.id) : []).forEach(add);
+                    (rep && rep.needs || []).forEach(function (k) { add(k, true); });
                 });
                 var keys = Object.keys(want);
                 if (!keys.length) return;
                 keys.reduce(function (pr, k) {
                     return pr.then(function () {
+                        if (want[k].guess) {
+                            var rep2 = Module.mcJava.reportOf ? Module.mcJava.reportOf(want[k].mod) : null;
+                            if (rep2 && (rep2.needs || []).indexOf(k) < 0) return;
+                        }
                         libTried[k] = true;
                         var nice = LIB_KNOWN[k] && LIB_KNOWN[k].name || k;
                         bump('Getting ' + nice + ' (needed by ' + want[k].by + ')...');
@@ -4961,7 +5061,13 @@
             api.toggle = function (id) {
                 var i = find(id);
                 if (i < 0 || mods[i].err) return;
+                if (mods[i].libUsers) {
+                    var un = mods[i].libUsers.map(function (y) { return y.m && y.m.name || y.id; }).join(', ');
+                    bump((mods[i].m.name || mods[i].id) + ' is a library - it\'s on while ' + un + (mods[i].libUsers.length > 1 ? ' are' : ' is') + ' on');
+                    return;
+                }
                 mods[i].enabled = !mods[i].enabled;
+                delete mods[i].versionOff;
                 if (mods[i].enabled) { mods.forEach(function (x) { x.justAdded = false; }); mods[i].justAdded = true; mods[i].onAt = Date.now(); }
                 var turned = [];
                 (function need(x, seen) {
@@ -5215,9 +5321,10 @@
                             }, Promise.resolve()).then(function () { return true; });
                         }
                         files = normalise(files);
+                        var derived = !files['manifest.json'];
                         var m = manifestOf(files, file.name);
                         var i = find(m.id);
-                        if (i >= 0 && (mods[i].bundled || mods[i].m.name !== m.name || mods[i].m.author !== m.author)) {
+                        if (i >= 0 && (mods[i].bundled || (!derived && (mods[i].m.name !== m.name || mods[i].m.author !== m.author)))) {
                             var base = m.id.slice(0, 44), n = 2, same = -1;
                             mods.forEach(function (x, k) {
                                 if (!x.bundled && x.id.indexOf(base + '-') === 0 && /^\d+$/.test(x.id.slice(base.length + 1))
