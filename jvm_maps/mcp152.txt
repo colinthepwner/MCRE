@@ -1587,6 +1587,10 @@ F	aav	w	field_76782_w	jungle
 F	aav	x	field_76792_x	jungleHills
 F	aav	y	field_76791_y	biomeName
 F	aav	z	field_76790_z	color
+F	aaz	A	field_76802_A	flowersPerChunk
+F	aaz	B	field_76803_B	grassPerChunk
+F	aaz	e	field_76812_e	biome
+F	aaz	z	field_76832_z	treesPerChunk
 F	acj	d	field_75825_d	chunkSaveLocation
 F	acn	a	field_76579_a	worldObj
 F	acn	e	field_76575_d	isHellWorld
@@ -1628,9 +1632,12 @@ F	aif	w	field_76259_v	snow
 F	aif	x	field_76258_w	craftedSnow
 F	aif	y	field_76268_x	cactus
 F	aif	z	field_76267_y	clay
+F	aih	c	field_76280_c	grassColor
 F	ajo	a	field_76189_a	dirty
 F	ajo	h	field_76190_i	mapName
 F	ajv	l	field_76105_j	dimension
+F	amb	a	field_82527_a	dispenseBehaviorRegistry
+F	amb	b	field_72284_a	random
 F	apa	A	field_71978_w	cobblestone
 F	apa	B	field_71988_x	planks
 F	apa	C	field_71987_y	sapling
@@ -1828,6 +1835,7 @@ F	apa	z	field_71979_v	dirt
 F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
+F	aqc	a	field_94050_c	customName
 F	aqp	k	field_70331_k	worldObj
 F	aqp	l	field_70329_l	xCoord
 F	aqp	m	field_70330_m	yCoord
@@ -1902,6 +1910,9 @@ F	ayl	c	field_74195_c	ySize
 F	ayl	d	field_74193_d	inventorySlots
 F	ayl	e	field_74198_m	guiLeft
 F	ayl	o	field_74197_n	guiTop
+F	ba	a	field_82627_a	worldObj
+F	ba	b	field_82625_b	xPos
+F	ba	c	field_82626_c	yPos
 F	bbp	a	field_82895_a	batHead
 F	bbp	b	field_82893_b	batBody
 F	bbp	c	field_82894_c	batRightWing
@@ -2063,6 +2074,12 @@ F	bdi	s	field_78813_p	textureOffsetY
 F	bdi	v	field_78810_s	baseModel
 F	bdj	a	field_78783_a	textureOffsetX
 F	bdj	b	field_78782_b	textureOffsetY
+F	bf	a	DOWN	DOWN
+F	bf	b	UP	UP
+F	bf	c	NORTH	NORTH
+F	bf	d	SOUTH	SOUTH
+F	bf	e	EAST	EAST
+F	bf	f	WEST	WEST
 F	bfj	c	field_71159_c	mc
 F	bge	f	field_78365_j	options
 F	bgx	f	field_77077_b	rnd
@@ -2072,6 +2089,9 @@ F	bhi	f	field_77023_b	zLevel
 F	bhi	i	field_77025_h	random
 F	bho	i	field_77045_g	mainModel
 F	bho	j	field_77046_h	renderPassModel
+F	bj	a	field_82630_a	x
+F	bj	b	field_82628_b	y
+F	bj	c	field_82629_c	z
 F	bp	a	field_74817_a	instance
 F	bp	f	field_74814_e	isUnicode
 F	br	a	field_74756_a	data
@@ -2087,6 +2107,51 @@ F	gu	e	field_72400_f	mcServer
 F	gu	h	field_72414_i	ops
 F	iz	a	field_73061_a	mcServer
 F	jc	b	field_71133_b	mcServer
+F	ju	a	field_75993_a	displayColumn
+F	ju	b	field_75991_b	displayRow
+F	ju	c	field_75992_c	parentAchievement
+F	ju	d	field_75990_d	theItemStack
+F	ju	k	field_75996_k	achievementDescription
+F	ju	m	field_75995_m	isSpecial
+F	jv	A	field_76001_A	potion
+F	jv	B	field_76002_B	theEnd
+F	jv	C	field_76003_C	theEnd2
+F	jv	D	field_75998_D	enchantments
+F	jv	E	field_75999_E	overkill
+F	jv	F	field_76000_F	bookcase
+F	jv	a	field_76010_a	minDisplayColumn
+F	jv	b	field_76008_b	minDisplayRow
+F	jv	c	field_76009_c	maxDisplayColumn
+F	jv	d	field_76006_d	maxDisplayRow
+F	jv	e	field_76007_e	achievementList
+F	jv	f	field_76004_f	openInventory
+F	jv	g	field_76005_g	mineWood
+F	jv	h	field_76017_h	buildWorkBench
+F	jv	i	field_76018_i	buildPickaxe
+F	jv	j	field_76015_j	buildFurnace
+F	jv	k	field_76016_k	acquireIron
+F	jv	l	field_76013_l	buildHoe
+F	jv	m	field_76014_m	makeBread
+F	jv	n	field_76011_n	bakeCake
+F	jv	o	field_76012_o	buildBetterPickaxe
+F	jv	p	field_76026_p	cookFish
+F	jv	q	field_76025_q	onARail
+F	jv	r	field_76024_r	buildSword
+F	jv	s	field_76023_s	killEnemy
+F	jv	t	field_76022_t	killCow
+F	jv	u	field_76021_u	flyPig
+F	jv	v	field_76020_v	snipeSkeleton
+F	jv	w	field_76019_w	diamonds
+F	jv	x	field_76029_x	portal
+F	jv	y	field_76028_y	ghast
+F	jv	z	field_76027_z	blazeRod
+F	ka	a	field_75978_a	statName
+F	ka	b	field_75976_b	type
+F	ka	e	field_75975_e	statId
+F	ka	f	field_75972_f	isIndependent
+F	ka	g	field_75973_g	statGuid
+F	kf	b	field_75940_b	allStats
+F	kf	c	field_75941_c	generalStats
 F	kx	a	field_76144_a	SIN_TABLE
 F	mp	A	field_70177_z	rotationYaw
 F	mp	B	field_70125_A	rotationPitch
@@ -2480,6 +2545,8 @@ M	aav	c	()Z	func_76746_c	getEnableSnow
 M	aav	d	()Z	func_76738_d	canSpawnLightningBolt
 M	aav	i	()F	func_76727_i	getFloatRainfall
 M	aav	j	()F	func_76743_j	getFloatTemperature
+M	aav	k	()I	func_76737_k	getBiomeGrassColor
+M	aav	l	()I	func_76726_l	getBiomeFoliageColor
 M	aav	m	()Laav;	func_76745_m	setDisableRain
 M	acn	d	()Z	func_76569_d	isSurfaceWorld
 M	acn	i	()I	func_76557_i	getAverageGroundLevel
@@ -2531,6 +2598,18 @@ M	aku	a	(Ljava/lang/String;Lajo;)V	func_75745_a	setData
 M	akz	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	akz	a	(Laab;IIIII)V	func_71852_a	breakBlock
 M	akz	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived
+M	amb	a	(II)Llx;	func_71858_a	getIcon
+M	amb	a	(Laab;)I	func_71859_p_	tickRate
+M	amb	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	amb	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	amb	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	amb	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	amb	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	amb	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	amb	a	(Laz;)Lbi;	func_82525_a	getIPositionFromBlockSource
+M	amb	a	(Lly;)V	func_94332_a	registerIcons
+M	amb	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	amb	j_	(I)Lbf;	func_100009_j_	getFacing
 M	amh	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
 M	apa	A	()Ljava/lang/String;	func_71931_t	getLocalizedName
 M	apa	C	()Z	func_71876_u	getEnableStats
@@ -2589,6 +2668,22 @@ M	ape	a	()Ljava/lang/String;	func_72676_a	getBreakSound
 M	ape	c	()F	func_72677_b	getVolume
 M	ape	d	()F	func_72678_c	getPitch
 M	ape	e	()Ljava/lang/String;	func_72675_d	getStepSound
+M	aqc	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	aqc	a	(II)Lwm;	func_70298_a	decrStackSize
+M	aqc	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	aqc	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aqc	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	aqc	a	(Lwm;)I	func_70360_a	addItem
+M	aqc	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	aqc	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	aqc	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	aqc	b	(Lbs;)V	func_70310_b	writeToNBT
+M	aqc	c	()Z	func_94042_c	isInvNameLocalized
+M	aqc	d	()I	func_70297_j_	getInventoryStackLimit
+M	aqc	f	()V	func_70295_k_	openChest
+M	aqc	g	()V	func_70305_f	closeChest
+M	aqc	j	()I	func_70361_i	getRandomStackFromInventory
+M	aqc	j_	()I	func_70302_i_	getSizeInventory
 M	aqp	a	(DDD)D	func_70318_a	getDistanceFrom
 M	aqp	a	(Lbs;)V	func_70307_a	readFromNBT
 M	aqp	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
@@ -2725,6 +2820,28 @@ M	ayl	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
 M	ayl	b	(III)V	func_73879_b	mouseMovedOrUp
 M	ayl	c	()V	func_73876_c	updateScreen
 M	ayl	f	()Z	func_73868_f	doesGuiPauseGame
+M	az	a	()D	func_82615_a	getX
+M	az	b	()D	func_82617_b	getY
+M	az	c	()D	func_82616_c	getZ
+M	az	d	()I	func_82623_d	getXInt
+M	az	e	()I	func_82622_e	getYInt
+M	az	f	()I	func_82621_f	getZInt
+M	az	h	()I	func_82620_h	getBlockMetadata
+M	az	j	()Laqp;	func_82619_j	getBlockTileEntity
+M	ba	a	()D	func_82615_a	getX
+M	ba	b	()D	func_82617_b	getY
+M	ba	c	()D	func_82616_c	getZ
+M	ba	d	()I	func_82623_d	getXInt
+M	ba	e	()I	func_82622_e	getYInt
+M	ba	f	()I	func_82621_f	getZInt
+M	ba	h	()I	func_82620_h	getBlockMetadata
+M	ba	j	()Laqp;	func_82619_j	getBlockTileEntity
+M	ba	k	()Laab;	func_82618_k	getWorld
+M	bb	a	(Laab;Lwm;ILbf;Lbi;)V	func_82486_a	doDispense
+M	bb	a	(Laz;)V	func_82485_a	playDispenseSound
+M	bb	a	(Laz;Lbf;)V	func_82489_a	spawnDispenseParticles
+M	bb	a	(Laz;Lwm;)Lwm;	func_82482_a	dispense
+M	bb	b	(Laz;Lwm;)Lwm;	func_82487_b	dispenseStack
 M	bbp	a	(Lmp;FFFFFF)V	func_78088_a	render
 M	bbq	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
 M	bbq	a	(Lmp;FFFFFF)V	func_78088_a	render
@@ -2784,6 +2901,7 @@ M	bcy	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
 M	bcz	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
 M	bcz	a	(Lmp;FFFFFF)V	func_78088_a	render
 M	bcz	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bd	a	(Laz;Lwm;)Lwm;	func_82482_a	dispense
 M	bda	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
 M	bdb	a	(Lmp;FFFFFF)V	func_78088_a	render
 M	bdb	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
@@ -2802,6 +2920,11 @@ M	bdi	c	(F)V	func_78794_c	postRender
 M	bdv	a	(Lka;I)V	func_71064_a	addStat
 M	bdv	h	()V	func_71053_j	closeScreen
 M	bdv	j	(I)V	func_70691_i	heal
+M	bf	a	(I)Lbf;	func_82600_a	getFront
+M	bf	c	()I	func_82601_c	getFrontOffsetX
+M	bf	d	()I	func_96559_d	getFrontOffsetY
+M	bf	e	()I	func_82599_e	getFrontOffsetZ
+M	bf	values	()[Lbf;	values	values
 M	bfj	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	bfj	a	(Lka;I)V	func_71064_a	addStat
 M	bfj	a	(Llt;)V	func_71007_a	displayGUIChest
@@ -2822,6 +2945,7 @@ M	bgx	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bgz	a	(Lbgy;)V	func_76976_a	setRenderManager
 M	bgz	a	(Ljava/lang/String;)V	func_76985_a	loadTexture
 M	bgz	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bh	k	()Laab;	func_82618_k	getWorld
 M	bhg	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bhi	a	(Lawv;Lbge;Lwm;II)V	func_77015_a	renderItemIntoGUI
 M	bhi	a	(Lawv;Lbge;Lwm;IILjava/lang/String;)V	func_94148_a	renderItemOverlayIntoGUI
@@ -2835,11 +2959,19 @@ M	bhp	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bhq	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bhs	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bhv	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bi	a	()D	func_82615_a	getX
+M	bi	b	()D	func_82617_b	getY
+M	bi	c	()D	func_82616_c	getZ
 M	bia	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bid	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bie	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bif	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bij	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bj	a	()D	func_82615_a	getX
+M	bj	b	()D	func_82617_b	getY
+M	bj	c	()D	func_82616_c	getZ
+M	bk	a	(Ljava/lang/Object;Ljava/lang/Object;)V	func_82595_a	putObject
+M	bl	a	(Ljava/lang/Object;Ljava/lang/Object;)V	func_82595_a	putObject
 M	bo	a	(Ljava/lang/String;)Ljava/lang/String;	func_74838_a	translateToLocal
 M	bo	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74837_a	translateToLocalFormatted
 M	bp	a	()Lbp;	func_74808_a	getInstance
@@ -2945,6 +3077,11 @@ M	cf	e	()Ljava/lang/String;	func_74740_e	getName
 M	cf	equals	(Ljava/lang/Object;)Z	equals	equals
 M	cf	hashCode	()I	hashCode	hashCode
 M	cf	p	(Ljava/lang/String;)Lcf;	func_74738_o	setName
+M	fs	a	()F	func_82498_a	func_82498_a
+M	fs	a	(Laab;Lbi;)Lsy;	func_82499_a	getProjectileEntity
+M	fs	a	(Laz;)V	func_82485_a	playDispenseSound
+M	fs	b	()F	func_82500_b	func_82500_b
+M	fs	b	(Laz;Lwm;)Lwm;	func_82487_b	dispenseStack
 M	gu	a	(Lei;)V	func_72384_a	sendPacketToAllPlayers
 M	gu	a	(Lei;I)V	func_72396_a	sendPacketToAllPlayersInDimension
 M	gu	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
@@ -2967,6 +3104,23 @@ M	jc	b	(I)V	func_70606_j	setEntityHealth
 M	jc	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	jc	e	()F	func_70047_e	getEyeHeight
 M	jc	h	()V	func_71053_j	closeScreen
+M	ju	a	()Lju;	func_75986_a	setIndependent
+M	ju	a	(Ljw;)Lju;	func_75988_a	setStatStringFormatter
+M	ju	b	()Lju;	func_75987_b	setSpecial
+M	ju	c	()Lju;	func_75985_c	registerAchievement
+M	ju	d	()Z	func_75967_d	isAchievement
+M	ju	e	()Ljava/lang/String;	func_75989_e	getDescription
+M	ju	f	()Z	func_75984_f	getSpecial
+M	ju	g	()Lka;	func_75971_g	registerStat
+M	ju	h	()Lka;	func_75966_h	initIndependentStat
+M	jv	a	()V	func_75997_a	init
+M	jx	g	()Lka;	func_75971_g	registerStat
+M	ka	d	()Z	func_75967_d	isAchievement
+M	ka	g	()Lka;	func_75971_g	registerStat
+M	ka	h	()Lka;	func_75966_h	initIndependentStat
+M	ka	i	()Ljava/lang/String;	func_75970_i	getName
+M	ka	toString	()Ljava/lang/String;	toString	toString
+M	kf	a	(I)Lka;	func_75923_a	getOneShotStat
 M	kx	a	(D)F	func_76133_a	sqrt_double
 M	kx	a	(DD)D	func_76132_a	abs_max
 M	kx	a	(F)F	func_76126_a	sin

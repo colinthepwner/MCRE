@@ -5108,6 +5108,7 @@ function installMc152(vm) {
 	if (JVM.installStation) JVM.installStation(vm);
 	if (JVM.installStates) JVM.installStates(vm);
 	if (JVM.installDispense) JVM.installDispense(vm);
+	if (JVM.installModBiomes) JVM.installModBiomes(vm);
 }
 
 var SIN_TABLE = null;
@@ -5603,6 +5604,7 @@ JVM.collectContent = function (vm, modId) {
 		out.mobs = cm.mobs; out.mobFiles = cm.files; out.mobsSkipped = cm.skipped;
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
+	if (JVM.collectBiomes) out.biomes = JVM.collectBiomes(vm, modId, ref, safe);
 	return out;
 };
 
@@ -7814,13 +7816,14 @@ function installMobs(vm) {
 		self[':topBlock'] = 2; self[':fillerBlock'] = 3; self[':minHeight'] = 0.1; self[':maxHeight'] = 0.3; self[':temperature'] = 0.5; self[':rainfall'] = 0.5;
 		self[':waterColorMultiplier'] = 0xffffff; self[':enableRain'] = 1; self[':color'] = 0;
 		self[':theBiomeDecorator'] = vm.newObject(vm.loadClass(SRC + 'BiomeDecorator'));
-		vm.warnOnce('biome:' + id, 'a new biome (' + id + ') is not generated here');
 	}
 	vm.natives[SRC + 'BiomeGenBase'].anyInit = function (vm, self, args) { biomeInit(vm, self, typeof args[0] === 'number' ? args[0] : 0); };
 	vm.natives[SRC + 'BiomeGenBase'].fields = { biomeName: 'Ljava/lang/String;', biomeID: 'I', topBlock: 'B', fillerBlock: 'B', minHeight: 'F', maxHeight: 'F', temperature: 'F', rainfall: 'F',
 		spawnableMonsterList: 'Ljava/util/List;', spawnableCreatureList: 'Ljava/util/List;', spawnableWaterCreatureList: 'Ljava/util/List;', spawnableCaveCreatureList: 'Ljava/util/List;', theBiomeDecorator: 'L' + SRC + 'BiomeDecorator;' };
 	JVM.biomeAt = function (vm, x, z) {
 		var n = op(vm, 'biome', x, z);
+		var mk = JVM.mc152.reg(vm).biomeKeys;
+		if (mk && n && mk[n]) return mk[n];
 		var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c);
 		var list = c.statics.biomeList.a;
 		for (var i = 0; i < list.length; i++) if (list[i] && list[i][':biomeName'].toLowerCase().replace(/ /g, '_') === n) return list[i];
@@ -8031,7 +8034,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		else json.egg = false;
 		json.spawn = spawn.map(function (s) {
 			var r = { weight: s.weight || 10, group: [Math.max(1, s.min | 0), Math.max(1, s.max | 0)] };
-			if (s.biomes && s.biomes.length) r.biomes = s.biomes.filter(Boolean).map(function (b) { return String(b[':biomeName'] || '').toLowerCase().replace(/ /g, '_'); });
+			if (s.biomes && s.biomes.length) r.biomes = s.biomes.filter(Boolean).map(function (b) { return b.$biomeKey || String(b[':biomeName'] || '').toLowerCase().replace(/ /g, '_'); });
 			if (s.type === 'monster') r.light = [0, 7];
 			return r;
 		});
@@ -10881,6 +10884,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	fireNew(E('event/registry/ItemRegistryEvent'), { registry: regObj('ItemRegistry') });
 	fireNew(E('event/entity/EntityRegisterEvent'));
 	fireNew(E('event/block/entity/BlockEntityRegisterEvent'));
+	fireNew(E('event/world/biome/BiomeRegisterEvent'));
 	JVM.run(vm, function () {
 		var map = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(map, '<init>', '()V', []);
 		fire(vm, newEvent(vm, E('client/event/render/entity/EntityRendererRegisterEvent'), { renderers: map }), modId);
@@ -10890,6 +10894,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 		var bc = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(bc);
 		Array.prototype.forEach.call(bc.statics.biomeList.a, function (b) { if (b) fire(vm, newEvent(vm, E('event/worldgen/biome/BiomeModificationEvent'), { world: JVM.mc152.worldObj(vm), biome: b }), modId); });
 	});
+	fireNew(E('event/worldgen/biome/BiomeProviderRegisterEvent'));
 	fireNew(E('event/registry/AfterBlockAndItemRegisterEvent'));
 	JVM.run(vm, function () { fire(vm, newEvent(vm, E('event/achievement/AchievementRegisterEvent'), { achievements: JVM.newList(vm, []) }), modId); });
 	fireNew(E('event/registry/StatRegistryEvent'), { registry: regObj('StatRegistry') });
@@ -10909,7 +10914,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
+	var SENT = /(BiomeRegister|BiomeProviderRegister|StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();
@@ -11460,6 +11465,234 @@ function installStates(vm) {
 
 JVM.stationState = { defaultOf: defaultOf, managerOf: managerOf, stateOfMeta: stateOfMeta, metaOf: metaOf, valueName: valueName };
 JVM.installStates = installStates;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', ST = 'net/modificationstation/stationapi/api/', EV = 'net/mine_diver/unsafeevents/Event';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function placed(vm) { var r = reg(vm); return r.modBiomes || (r.modBiomes = []); }
+function keyName(s) { return String(s || 'biome').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'biome'; }
+var LAND = ['plains', 'forest', 'taiga', 'desert', 'swampland', 'extreme_hills', 'jungle', 'ice_plains', 'forest_hills', 'taiga_hills', 'desert_hills', 'jungle_hills',
+	'rainforest', 'seasonal_forest', 'savanna', 'shrubland', 'tundra', 'ice_desert'];
+
+function place(vm, b, hosts, weight) {
+	if (!b) return;
+	var list = placed(vm);
+	for (var i = 0; i < list.length; i++) if (list[i].b === b) return;
+	var mod = vm.currentMod || b.$mod || 'java';
+	b.$biomeKey = mod + ':' + keyName(b[':biomeName']);
+	list.push({ b: b, mod: mod, hosts: hosts, weight: Math.max(1, Math.round(weight)) });
+	var r = reg(vm);
+	(r.biomeKeys || (r.biomeKeys = {}))[b.$biomeKey] = b;
+}
+function providerBiomes(p) { return p ? (p.$biomes || []).slice() : []; }
+
+function install(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	var BG = SRC + 'BiomeGenBase';
+	var spec = vm.natives[BG];
+	if (!spec) return;
+
+	var addBiome = function (vm, n, a) { place(vm, a[0], ['*land'], 10); };
+	var ml = vm.natives[SRC + 'ModLoader'];
+	if (ml) ml.staticMethods['addBiome(Lnet/minecraft/src/BiomeGenBase;)V'] = addBiome;
+	var gr = vm.natives['cpw/mods/fml/common/registry/GameRegistry'];
+	if (gr) gr.staticMethods = Object.assign({}, gr.staticMethods, {
+		'addBiome(Lnet/minecraft/src/BiomeGenBase;)V': addBiome,
+		'removeBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm) { vm.warnOnce('feature:removing biomes', 'GameRegistry.removeBiome: the game\'s own biomes stay'); },
+	});
+
+	if (!JVM.station) return;
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+	def(ST + 'event/world/biome/BiomeRegisterEvent', { super: EV });
+	def(ST + 'event/worldgen/biome/BiomeProviderRegisterEvent', { super: EV });
+	def(ST + 'util/math/ColorHelper$Argb', { staticMethods: {
+		'getArgb(IIII)I': function (vm, n, a) { return ((a[0] & 255) << 24 | (a[1] & 255) << 16 | (a[2] & 255) << 8 | (a[3] & 255)) | 0; },
+		'getRed(I)I': function (vm, n, a) { return (a[0] >> 16) & 255; }, 'getGreen(I)I': function (vm, n, a) { return (a[0] >> 8) & 255; },
+		'getBlue(I)I': function (vm, n, a) { return a[0] & 255; }, 'getAlpha(I)I': function (vm, n, a) { return (a[0] >>> 24) & 255; },
+	} });
+
+	var colorOf = function (vm, v) {
+		if (typeof v === 'number') return v & 0xffffff;
+		if (!v) return null;
+		var r = JVM.run(vm, function () { return vm.callVirtual(v, 'getColor', '(Lnet/minecraft/src/WorldChunkManager;II)I', [null, 0, 0]); });
+		return r.ok && typeof r.value === 'number' ? r.value & 0xffffff : null;
+	};
+	def(ST + 'worldgen/biome/BiomeColorProvider', { access: I });
+
+	var SR = ST + 'worldgen/surface/';
+	def(SR + 'SurfaceRule', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT });
+	def(SR + 'StateSurfaceRule', { super: SR + 'SurfaceRule' });
+	var stateRef = function (vm, x) {
+		if (!x) return null;
+		if (x.$block) return { id: x.$block[':blockID'] | 0, data: x.$idx | 0 };
+		if (x[':blockID'] !== undefined) return { id: x[':blockID'] | 0, data: 0, any: true };
+		return null;
+	};
+	var builder = function (vm, rule) { var b = vm.newObject(vm.loadClass(SR + 'SurfaceBuilder')); b.$r = rule; return b; };
+	var SB = 'Lnet/modificationstation/stationapi/api/worldgen/surface/SurfaceBuilder;';
+	var setR = function (fn) { return function (vm, self, a) { fn(self.$r, a); return self; }; };
+	def(SR + 'SurfaceBuilder', { methods: (function () {
+		var m = {};
+		m['replace(Lnet/minecraft/src/Block;)' + SB] = setR(function (r, a) { r.replace = stateRef(vm, a[0]); });
+		m['replace(Lnet/modificationstation/stationapi/api/block/BlockState;)' + SB] = setR(function (r, a) { r.replace = stateRef(vm, a[0]); });
+		m['replace(Lnet/modificationstation/stationapi/api/tag/TagKey;)' + SB] = setR(function (r) { r.tag = true; });
+		m['ground(I)' + SB] = setR(function (r, a) { r.ground = a[0] | 0; });
+		m['ground(II)' + SB] = setR(function (r, a) { r.ground = Math.round(((a[0] | 0) + (a[1] | 0)) / 2); });
+		m['ceiling(I)' + SB] = setR(function (r, a) { r.ceiling = a[0] | 0; });
+		m['ceiling(II)' + SB] = setR(function (r, a) { r.ceiling = Math.round(((a[0] | 0) + (a[1] | 0)) / 2); });
+		m['range(II)' + SB] = setR(function (r, a) { r.minY = a[0] | 0; r.maxY = a[1] | 0; });
+		m['slope(F)' + SB] = setR(function () {}); m['slope(FZ)' + SB] = setR(function () {}); m['slope(FZZ)' + SB] = setR(function () {});
+		m['condition(Lnet/modificationstation/stationapi/api/worldgen/surface/condition/SurfaceCondition;I)' + SB] = setR(function () {});
+		m['build()Lnet/modificationstation/stationapi/api/worldgen/surface/SurfaceRule;'] = function (vm, self) { var o = vm.newObject(vm.loadClass(SR + 'StateSurfaceRule')); o.$rule = self.$r; return o; };
+		return m;
+	})(), staticMethods: {
+	} });
+	var sbStatics = vm.natives[SR + 'SurfaceBuilder'].staticMethods = {};
+	sbStatics['start(Lnet/minecraft/src/Block;)' + SB] = function (vm, n, a) { return builder(vm, { block: stateRef(vm, a[0]) }); };
+	sbStatics['start(Lnet/modificationstation/stationapi/api/block/BlockState;)' + SB] = function (vm, n, a) { return builder(vm, { block: stateRef(vm, a[0]) }); };
+	sbStatics['start(Lnet/modificationstation/stationapi/api/worldgen/surface/SurfaceRule;)' + SB] = function (vm, n, a) { return builder(vm, Object.assign({}, a[0] && a[0].$rule || {})); };
+
+	var BB = ST + 'worldgen/biome/BiomeBuilder', BBD = 'Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeBuilder;';
+	var TB = ST + 'worldgen/biome/TemplateBiome';
+	def(TB, { super: BG, methods: { '<init>(Ljava/lang/String;)V': function (vm, self, a) { newBiome(vm, self, a[0]); } } });
+	var nextId = function (vm) { var r = reg(vm); r.nextBiomeId = Math.max(r.nextBiomeId || 40, 40) + 1; return r.nextBiomeId; };
+	function newBiome(vm, o, name) {
+		var id = nextId(vm);
+		spec.anyInit(vm, o, [id]);
+		o[':biomeName'] = String(name || 'Biome'); o.$mod = vm.currentMod;
+		var c = vm.loadClass(BG); vm.initClass(c);
+		if (id < c.statics.biomeList.a.length) c.statics.biomeList.a[id] = o;
+		return o;
+	}
+	var B = function (fn) { return function (vm, self, a) { fn(self.$b, a); return self; }; };
+	def(BB, { methods: (function () {
+		var m = {};
+		m['surfaceRule(Lnet/modificationstation/stationapi/api/worldgen/surface/SurfaceRule;)' + BBD] = B(function (b, a) { if (a[0] && a[0].$rule) b.rules.push(a[0].$rule); });
+		m['noDimensionFeatures()' + BBD] = B(function () {});
+		m['feature(Lnet/minecraft/src/WorldGenerator;)' + BBD] = B(function (b, a) { if (a[0]) b.features.push(a[0]); });
+		m['overworldLakes()' + BBD] = B(function () {}); m['overworldOres()' + BBD] = B(function () {});
+		m['precipitation(Z)' + BBD] = B(function (b, a) { b.rain = !!a[0]; });
+		m['snow(Z)' + BBD] = B(function (b, a) { b.snow = !!a[0]; });
+		['hostile', 'passive', 'water'].forEach(function (k) { m[k + 'Entity(Ljava/lang/Class;I)' + BBD] = B(function (b, a) { b.spawns.push({ kind: k, cls: a[0], rarity: a[1] }); }); });
+		['grassColor', 'leavesColor', 'grassAndLeavesColor', 'fogColor'].forEach(function (k) {
+			var set = function (b, v) { if (k !== 'leavesColor' && k !== 'fogColor') b.grass = v; if (k === 'leavesColor' || k === 'grassAndLeavesColor') b.leaves = v; };
+			m[k + '(I)' + BBD] = B(function (b, a) { set(b, a[0]); });
+			m[k + '(Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeColorProvider;)' + BBD] = B(function (b, a) { set(b, a[0]); });
+		});
+		m['height(II)' + BBD] = B(function () {});
+		m['build()Lnet/minecraft/src/BiomeGenBase;'] = function (vm, self) {
+			var b = self.$b, o = vm.newObject(vm.loadClass(TB));
+			newBiome(vm, o, b.name);
+			o.$stRules = b.rules.slice(); o.$stFeatures = b.features.slice();
+			o.$grass = colorOf(vm, b.grass); o.$leaves = colorOf(vm, b.leaves);
+			o[':enableRain'] = b.rain ? 1 : 0; o[':enableSnow'] = b.snow ? 1 : 0;
+			b.spawns.forEach(function (s) {
+				JVM.run(vm, function () { vm.callVirtual(o, 'add' + s.kind.charAt(0).toUpperCase() + s.kind.slice(1) + 'Entity', '(Ljava/lang/Class;I)V', [s.cls, s.rarity]); });
+			});
+			return o;
+		};
+		return m;
+	})(), staticMethods: {
+	} });
+	vm.natives[BB].staticMethods = {};
+	vm.natives[BB].staticMethods['start(Ljava/lang/String;)' + BBD] = function (vm, n, a) {
+		var o = vm.newObject(vm.loadClass(BB));
+		o.$b = { name: a[0], rules: [], features: [], spawns: [], rain: true, snow: false, grass: null, leaves: null };
+		return o;
+	};
+
+	var P = ST + 'worldgen/biome/';
+	def(P + 'BiomeProvider', { access: I });
+	var add = function (vm, self, a) { (self.$biomes = self.$biomes || []).push(a[0]); };
+	def(P + 'ClimateBiomeProvider', { interfaces: [P + 'BiomeProvider'], methods: {
+		'<init>()V': function (vm, self) { self.$biomes = []; },
+		'addBiome(Lnet/minecraft/src/BiomeGenBase;FFFF)V': function (vm, self, a) { add(vm, self, a); if (a[0]) a[0].$climate = [a[1], a[2], a[3], a[4]]; },
+		'getBiomes()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, providerBiomes(self)); },
+	} });
+	def(P + 'VoronoiBiomeProvider', { interfaces: [P + 'BiomeProvider'], methods: {
+		'<init>()V': function (vm, self) { self.$biomes = []; }, '<init>(D)V': function (vm, self) { self.$biomes = []; }, '<init>(DD)V': function (vm, self) { self.$biomes = []; },
+		'addBiome(Lnet/minecraft/src/BiomeGenBase;)V': add,
+		'getBiomes()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, providerBiomes(self)); },
+		'setSeed(J)V': function () {},
+	} });
+	def(P + 'SingleBiomeProvider', { interfaces: [P + 'BiomeProvider'], methods: {
+		'<init>(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, self, a) { self.$biomes = [a[0]]; },
+		'getBiomes()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, providerBiomes(self)); },
+	} });
+	def(P + 'BiomeRegionsProvider', { interfaces: [P + 'BiomeProvider'], methods: {
+		'<init>(Ljava/util/List;)V': function (vm, self, a) { self.$biomes = []; JVM.iterate(vm, a[0]).forEach(function (p) { self.$biomes = self.$biomes.concat(providerBiomes(p)); }); },
+		'getBiomes()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, providerBiomes(self)); },
+	} });
+	var provider = function (hosts) { return function (vm, n, a) {
+		if (hosts === LAND) hosts = ['*land'];
+		var bs = providerBiomes(a[1]);
+		bs.forEach(function (b) {
+			if (b && b.$climate) { b[':temperature'] = (b.$climate[0] + b.$climate[1]) / 2; b[':rainfall'] = (b.$climate[2] + b.$climate[3]) / 2; place(vm, b, hosts[0] === '*land' ? [] : hosts, 100); }
+			else place(vm, b, hosts, 100 / Math.max(1, bs.length));
+		});
+	}; };
+	def(ST + 'worldgen/BiomeAPI', { staticMethods: {
+		'addOverworldBiome(Lnet/minecraft/src/BiomeGenBase;FFFF)V': function (vm, n, a) {
+			if (!a[0]) return;
+			a[0][':temperature'] = (a[1] + a[2]) / 2; a[0][':rainfall'] = (a[3] + a[4]) / 2;
+			place(vm, a[0], [], 100);
+		},
+		'addOverworldBiomeProvider(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeProvider;)V': provider(LAND),
+		'addNetherBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, n, a) { place(vm, a[0], ['hell'], 100); },
+		'addNetherBiomeProvider(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeProvider;)V': provider(['hell']),
+		'getOverworldBiomeProvider(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeProvider;': function () { return null; },
+		'getNetherBiomeProvider(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/worldgen/biome/BiomeProvider;': function () { return null; },
+	} });
+}
+JVM.installModBiomes = install;
+
+JVM.collectBiomes = function (vm, modId, ref, safe) {
+	var out = {};
+	placed(vm).forEach(function (p) {
+		if (p.mod !== modId) return;
+		var b = p.b, j = { name: String(b[':biomeName'] || 'Biome'), weight: p.weight };
+		j.hosts = p.hosts.length ? p.hosts.slice() : 'climate';
+		var dep = +b[':minHeight'], sca = +b[':maxHeight'];
+		if (isFinite(dep) && isFinite(sca) && (Math.abs(dep - 0.1) > 1e-3 || Math.abs(sca - 0.3) > 1e-3)) j.terrain = { depth: dep, scale: sca };
+		j.temperature = Math.max(0, Math.min(2, +b[':temperature'] || 0.5));
+		j.rainfall = Math.max(0, Math.min(1, +b[':rainfall'] || 0.5));
+		var top = b[':topBlock'] & 255, fill = b[':fillerBlock'] & 255;
+		if (top && top !== 2) j.top = ref(top, 0);
+		if (fill && fill !== 3) j.filler = ref(fill, 0);
+		if (b[':enableSnow']) j.snow = true;
+		if (b[':enableRain'] === 0) j.rain = false;
+		var own = function (sig) { for (var c = b.cls; c && !c.native; c = c.superClass) if (c.findDeclared(sig)) return true; return false; };
+		var g = b.$grass != null ? b.$grass : own('getBiomeGrassColor()I') ? safe(function () { return vm.callVirtual(b, 'getBiomeGrassColor', '()I', []); }, null) : null;
+		var f = b.$leaves != null ? b.$leaves : own('getBiomeFoliageColor()I') ? safe(function () { return vm.callVirtual(b, 'getBiomeFoliageColor', '()I', []); }, null) : null;
+		var hex = function (v) { return '#' + ('00000' + ((v >>> 0) & 0xffffff).toString(16)).slice(-6); };
+		if (typeof g === 'number') j.grass_color = hex(g);
+		if (typeof f === 'number') j.foliage_color = hex(f);
+		var d = b[':theBiomeDecorator'];
+		if (d) {
+			var t = d[':treesPerChunk'];
+			if (typeof t === 'number') { if (t < 0) j.trees = 'none'; else j.trees_per_chunk = t; }
+			if (typeof d[':flowersPerChunk'] === 'number') j.flowers_per_chunk = Math.max(0, d[':flowersPerChunk']);
+			if (typeof d[':grassPerChunk'] === 'number') j.grass_per_chunk = Math.max(0, d[':grassPerChunk']);
+		}
+		if (b.$stRules && b.$stRules.length) {
+			j.surface_rules = b.$stRules.filter(function (r) { return r.block && !r.tag; }).map(function (r) {
+				var o = { block: ref(r.block.id, r.block.data) };
+				if (r.replace) o.replace = ref(r.replace.id, r.replace.any ? 0 : r.replace.data);
+				if (r.ground) o.ground = r.ground;
+				if (r.ceiling) o.ceiling = r.ceiling;
+				if (r.minY) o.min_y = r.minY;
+				if (r.maxY) o.max_y = r.maxY;
+				return o;
+			});
+		}
+		if (p.hosts.length === 1 && p.hosts[0] === 'hell') { j.trees = 'none'; j.dimension = 'nether'; }
+		out[b.$biomeKey.split(':').slice(1).join(':')] = j;
+	});
+	return out;
+};
 })();
 
 (function () {

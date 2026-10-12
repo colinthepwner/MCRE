@@ -1442,10 +1442,13 @@ F	agi	w	field_76259_v	snow
 F	agi	x	field_76258_w	craftedSnow
 F	agi	y	field_76268_x	cactus
 F	agi	z	field_76267_y	clay
+F	agk	c	field_76280_c	grassColor
 F	ahq	a	field_76189_a	dirty
 F	ahq	h	field_76190_i	mapName
 F	ahv	a	field_75772_a	logger
 F	ahx	l	field_76105_j	dimension
+F	ajw	a	field_82527_a	dispenseBehaviorRegistry
+F	ajw	b	field_72284_a	random
 F	amq	A	field_71988_x	planks
 F	amq	B	field_71987_y	sapling
 F	amq	C	field_71986_z	bedrock
@@ -1829,6 +1832,9 @@ F	axy	m	field_78223_m	partialTicks
 F	axz	a	field_78230_a	cube
 F	axz	b	field_78228_b	glass
 F	axz	c	field_78229_c	base
+F	ay	a	field_82627_a	worldObj
+F	ay	b	field_82625_b	xPos
+F	ay	c	field_82626_c	yPos
 F	aya	a	field_78252_a	posX1
 F	aya	b	field_78250_b	posY1
 F	aya	c	field_78251_c	posZ1
@@ -1864,6 +1870,15 @@ F	bce	f	field_77023_b	zLevel
 F	bce	i	field_77025_h	random
 F	bcj	i	field_77045_g	mainModel
 F	bcj	j	field_77046_h	renderPassModel
+F	bd	a	DOWN	DOWN
+F	bd	b	UP	UP
+F	bd	c	NORTH	NORTH
+F	bd	d	SOUTH	SOUTH
+F	bd	e	EAST	EAST
+F	bd	f	WEST	WEST
+F	bh	a	field_82630_a	x
+F	bh	b	field_82628_b	y
+F	bh	c	field_82629_c	z
 F	bn	a	field_74817_a	instance
 F	bn	e	field_74814_e	isUnicode
 F	bp	a	field_74756_a	data
@@ -1880,6 +1895,51 @@ F	gm	f	field_72400_f	mcServer
 F	gm	i	field_72414_i	ops
 F	in	a	field_73061_a	mcServer
 F	iq	b	field_71133_b	mcServer
+F	jg	a	field_75993_a	displayColumn
+F	jg	b	field_75991_b	displayRow
+F	jg	c	field_75992_c	parentAchievement
+F	jg	d	field_75990_d	theItemStack
+F	jg	k	field_75996_k	achievementDescription
+F	jg	m	field_75995_m	isSpecial
+F	jh	A	field_76001_A	potion
+F	jh	B	field_76002_B	theEnd
+F	jh	C	field_76003_C	theEnd2
+F	jh	D	field_75998_D	enchantments
+F	jh	E	field_75999_E	overkill
+F	jh	F	field_76000_F	bookcase
+F	jh	a	field_76010_a	minDisplayColumn
+F	jh	b	field_76008_b	minDisplayRow
+F	jh	c	field_76009_c	maxDisplayColumn
+F	jh	d	field_76006_d	maxDisplayRow
+F	jh	e	field_76007_e	achievementList
+F	jh	f	field_76004_f	openInventory
+F	jh	g	field_76005_g	mineWood
+F	jh	h	field_76017_h	buildWorkBench
+F	jh	i	field_76018_i	buildPickaxe
+F	jh	j	field_76015_j	buildFurnace
+F	jh	k	field_76016_k	acquireIron
+F	jh	l	field_76013_l	buildHoe
+F	jh	m	field_76014_m	makeBread
+F	jh	n	field_76011_n	bakeCake
+F	jh	o	field_76012_o	buildBetterPickaxe
+F	jh	p	field_76026_p	cookFish
+F	jh	q	field_76025_q	onARail
+F	jh	r	field_76024_r	buildSword
+F	jh	s	field_76023_s	killEnemy
+F	jh	t	field_76022_t	killCow
+F	jh	u	field_76021_u	flyPig
+F	jh	v	field_76020_v	snipeSkeleton
+F	jh	w	field_76019_w	diamonds
+F	jh	x	field_76029_x	portal
+F	jh	y	field_76028_y	ghast
+F	jh	z	field_76027_z	blazeRod
+F	jl	a	field_75978_a	statName
+F	jl	b	field_75976_b	type
+F	jl	e	field_75975_e	statId
+F	jl	f	field_75972_f	isIndependent
+F	jl	g	field_75973_g	statGuid
+F	jq	b	field_75940_b	allStats
+F	jq	c	field_75941_c	generalStats
 F	ke	a	field_76144_a	SIN_TABLE
 F	lq	A	field_70125_A	rotationPitch
 F	lq	B	field_70126_B	prevRotationYaw
@@ -2225,6 +2285,10 @@ F	yy	w	field_76782_w	jungle
 F	yy	x	field_76792_x	jungleHills
 F	yy	y	field_76791_y	biomeName
 F	yy	z	field_76790_z	color
+F	zc	A	field_76802_A	flowersPerChunk
+F	zc	B	field_76803_B	grassPerChunk
+F	zc	e	field_76812_e	biome
+F	zc	z	field_76832_z	treesPerChunk
 M	aaq	d	()Z	func_76569_d	isSurfaceWorld
 M	aaq	i	()I	func_76557_i	getAverageGroundLevel
 M	aaq	l	()Ljava/lang/String;	func_80007_l	getDimensionName
@@ -2272,6 +2336,17 @@ M	aiv	a	()V	func_75744_a	saveAllData
 M	aiv	a	(Ljava/lang/Class;Ljava/lang/String;)Lahq;	func_75742_a	loadData
 M	aiv	a	(Ljava/lang/String;)I	func_75743_a	getUniqueDataId
 M	aiv	a	(Ljava/lang/String;Lahq;)V	func_75745_a	setData
+M	ajw	a	(I)I	func_71851_a	getBlockTextureFromSide
+M	ajw	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	ajw	a	(Lyc;)Lany;	func_72274_a	createNewTileEntity
+M	ajw	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
+M	ajw	a	(Lyc;IIIII)V	func_71852_a	breakBlock
+M	ajw	a	(Lyc;IIILmd;)V	func_71860_a	onBlockPlacedBy
+M	ajw	a	(Lyc;IIILqx;IFFF)Z	func_71903_a	onBlockActivated
+M	ajw	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ajw	d	(Lym;IIII)I	func_71895_b	getBlockTexture
+M	ajw	g	(Lyc;III)V	func_71861_g	onBlockAdded
+M	ajw	r_	()I	func_71859_p_	tickRate
 M	akb	a	(Lyc;)Lany;	func_72274_a	createNewTileEntity
 M	akb	a	(Lyc;IIIII)V	func_71852_a	breakBlock
 M	akb	g	(Lyc;III)V	func_71861_g	onBlockAdded
@@ -2331,6 +2406,20 @@ M	amu	a	()Ljava/lang/String;	func_72676_a	getBreakSound
 M	amu	c	()F	func_72677_b	getVolume
 M	amu	d	()F	func_72678_c	getPitch
 M	amu	e	()Ljava/lang/String;	func_72675_d	getStepSound
+M	ano	a	(I)Lur;	func_70301_a	getStackInSlot
+M	ano	a	(II)Lur;	func_70298_a	decrStackSize
+M	ano	a	(ILur;)V	func_70299_a	setInventorySlotContents
+M	ano	a	(Lbq;)V	func_70307_a	readFromNBT
+M	ano	a	(Lur;)I	func_70360_a	addItem
+M	ano	a_	(I)Lur;	func_70304_b	getStackInSlotOnClosing
+M	ano	a_	(Lqx;)Z	func_70300_a	isUseableByPlayer
+M	ano	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	ano	b	(Lbq;)V	func_70310_b	writeToNBT
+M	ano	c	()I	func_70297_j_	getInventoryStackLimit
+M	ano	f	()V	func_70305_f	closeChest
+M	ano	i	()I	func_70361_i	getRandomStackFromInventory
+M	ano	k_	()I	func_70302_i_	getSizeInventory
+M	ano	l_	()V	func_70295_k_	openChest
 M	any	a	(DDD)D	func_70318_a	getDistanceFrom
 M	any	a	(Lbq;)V	func_70307_a	readFromNBT
 M	any	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
@@ -2479,6 +2568,12 @@ M	aww	a	(Llq;FFFFFF)V	func_78088_a	render
 M	awy	a	(Llq;FFFFFF)V	func_78088_a	render
 M	awy	a	(Lmd;FFF)V	func_78086_a	setLivingAnimations
 M	awz	a	(Llq;FFFFFF)V	func_78088_a	render
+M	ax	a	()D	func_82615_a	getX
+M	ax	b	()D	func_82617_b	getY
+M	ax	c	()D	func_82616_c	getZ
+M	ax	d	()I	func_82623_d	getXInt
+M	ax	e	()I	func_82622_e	getYInt
+M	ax	f	()I	func_82621_f	getZInt
 M	axa	a	(FFFFFFLlq;)V	func_78087_a	setRotationAngles
 M	axa	a	(Ljava/lang/String;)Layg;	func_78084_a	getTextureOffset
 M	axa	a	(Ljava/lang/String;II)V	func_78085_a	setTextureOffset
@@ -2523,6 +2618,13 @@ M	axx	a	(FFFFFFLlq;)V	func_78087_a	setRotationAngles
 M	axy	a	(Llq;FFFFFF)V	func_78088_a	render
 M	axy	a	(Lmd;FFF)V	func_78086_a	setLivingAnimations
 M	axz	a	(Llq;FFFFFF)V	func_78088_a	render
+M	ay	a	()D	func_82615_a	getX
+M	ay	b	()D	func_82617_b	getY
+M	ay	c	()D	func_82616_c	getZ
+M	ay	d	()I	func_82623_d	getXInt
+M	ay	e	()I	func_82622_e	getYInt
+M	ay	f	()I	func_82621_f	getZInt
+M	ay	k	()Lyc;	func_82618_k	getWorld
 M	aya	a	(Lbaz;F)V	func_78245_a	render
 M	ayf	a	(F)V	func_78785_a	render
 M	ayf	a	(FFF)V	func_78793_a	setRotationPoint
@@ -2537,6 +2639,10 @@ M	ayf	c	(F)V	func_78794_c	postRender
 M	ays	a	(Ljl;I)V	func_71064_a	addStat
 M	ays	i	()V	func_71053_j	closeScreen
 M	ays	i	(I)V	func_70691_i	heal
+M	az	a	(Lax;)V	func_82485_a	playDispenseSound
+M	az	a	(Lax;Lbd;)V	func_82489_a	spawnDispenseParticles
+M	az	a	(Lax;Lur;)Lur;	func_82482_a	dispense
+M	az	b	(Lax;Lur;)Lur;	func_82487_b	dispenseStack
 M	bag	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	bag	a	(Ljl;I)V	func_71064_a	addStat
 M	bag	a	(Lla;)V	func_71007_a	displayGUIChest
@@ -2544,6 +2650,7 @@ M	bag	ah	()Z	func_70093_af	isSneaking
 M	bag	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	bag	bD	()Lur;	func_70694_bm	getHeldItem
 M	bag	i	()V	func_71053_j	closeScreen
+M	bb	a	(Lax;Lur;)Lur;	func_82482_a	dispense
 M	bba	a	(Ljava/lang/String;Ljava/lang/String;)I	func_78350_a	getTextureForDownloadableImage
 M	bba	b	(I)V	func_78342_b	bindTexture
 M	bba	b	(Ljava/lang/String;)I	func_78341_b	getTexture
@@ -2571,7 +2678,20 @@ M	bcv	a	(Llq;DDDFF)V	func_76986_a	doRender
 M	bcx	a	(Llq;DDDFF)V	func_76986_a	doRender
 M	bcy	a	(Llq;DDDFF)V	func_76986_a	doRender
 M	bcz	a	(Llq;DDDFF)V	func_76986_a	doRender
+M	bd	a	(I)Lbd;	func_82600_a	getFront
+M	bd	c	()I	func_82601_c	getFrontOffsetX
+M	bd	e	()I	func_82599_e	getFrontOffsetZ
+M	bd	values	()[Lbd;	values	values
 M	bdd	a	(Llq;DDDFF)V	func_76986_a	doRender
+M	bf	k	()Lyc;	func_82618_k	getWorld
+M	bg	a	()D	func_82615_a	getX
+M	bg	b	()D	func_82617_b	getY
+M	bg	c	()D	func_82616_c	getZ
+M	bh	a	()D	func_82615_a	getX
+M	bh	b	()D	func_82617_b	getY
+M	bh	c	()D	func_82616_c	getZ
+M	bi	a	(Ljava/lang/Object;Ljava/lang/Object;)V	func_82595_a	putObject
+M	bj	a	(Ljava/lang/Object;Ljava/lang/Object;)V	func_82595_a	putObject
 M	bm	a	(Ljava/lang/String;)Ljava/lang/String;	func_74838_a	translateToLocal
 M	bm	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74837_a	translateToLocalFormatted
 M	bn	a	()Lbn;	func_74808_a	getInstance
@@ -2676,6 +2796,11 @@ M	cd	e	()Ljava/lang/String;	func_74740_e	getName
 M	cd	equals	(Ljava/lang/Object;)Z	equals	equals
 M	cd	hashCode	()I	hashCode	hashCode
 M	cd	p	(Ljava/lang/String;)Lcd;	func_74738_o	setName
+M	fl	a	()F	func_82498_a	func_82498_a
+M	fl	a	(Lax;)V	func_82485_a	playDispenseSound
+M	fl	a	(Lyc;Lbg;)Lrf;	func_82499_a	getProjectileEntity
+M	fl	b	()F	func_82500_b	func_82500_b
+M	fl	b	(Lax;Lur;)Lur;	func_82487_b	dispenseStack
 M	gm	a	(Lef;)V	func_72384_a	sendPacketToAllPlayers
 M	gm	a	(Lef;I)V	func_72396_a	sendPacketToAllPlayersInDimension
 M	gm	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
@@ -2698,6 +2823,23 @@ M	iq	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	iq	e	()F	func_70047_e	getEyeHeight
 M	iq	h	()Z	func_71003_h	isPVPEnabled
 M	iq	i	()V	func_71053_j	closeScreen
+M	jg	a	()Ljg;	func_75986_a	setIndependent
+M	jg	a	(Lji;)Ljg;	func_75988_a	setStatStringFormatter
+M	jg	b	()Ljg;	func_75987_b	setSpecial
+M	jg	c	()Ljg;	func_75985_c	registerAchievement
+M	jg	d	()Z	func_75967_d	isAchievement
+M	jg	e	()Ljava/lang/String;	func_75989_e	getDescription
+M	jg	f	()Z	func_75984_f	getSpecial
+M	jg	g	()Ljl;	func_75971_g	registerStat
+M	jg	h	()Ljl;	func_75966_h	initIndependentStat
+M	jh	a	()V	func_75997_a	init
+M	jj	g	()Ljl;	func_75971_g	registerStat
+M	jl	d	()Z	func_75967_d	isAchievement
+M	jl	g	()Ljl;	func_75971_g	registerStat
+M	jl	h	()Ljl;	func_75966_h	initIndependentStat
+M	jl	i	()Ljava/lang/String;	func_75970_i	getName
+M	jl	toString	()Ljava/lang/String;	toString	toString
+M	jq	a	(I)Ljl;	func_75923_a	getOneShotStat
 M	ke	a	(D)F	func_76133_a	sqrt_double
 M	ke	a	(DD)D	func_76132_a	abs_max
 M	ke	a	(F)F	func_76126_a	sin
@@ -3112,6 +3254,8 @@ M	yy	c	()Z	func_76746_c	getEnableSnow
 M	yy	d	()Z	func_76738_d	canSpawnLightningBolt
 M	yy	i	()F	func_76727_i	getFloatRainfall
 M	yy	j	()F	func_76743_j	getFloatTemperature
+M	yy	k	()I	func_76737_k	getBiomeGrassColor
+M	yy	l	()I	func_76726_l	getBiomeFoliageColor
 M	yy	m	()Lyy;	func_76745_m	setDisableRain
 S	arn	java/lang/Thread	
 S	asf	java/applet/Applet	java/applet/AppletStub

@@ -2342,6 +2342,7 @@
                     Object.keys(c.items).forEach(function (k) { put('items/' + k + '.json', c.items[k]); });
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
+                    Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
                     var cuts = [];
                     var fileOf = function (path) {
@@ -3960,8 +3961,24 @@
                 biomeFiles.forEach(function (b) {
                     var j = b.j, num = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
                     var hosts = [];
-                    (j.hosts === undefined ? [] : Array.isArray(j.hosts) ? j.hosts : [j.hosts]).forEach(function (h) {
+                    var hostList = j.hosts === undefined ? [] : Array.isArray(j.hosts) ? j.hosts : [j.hosts];
+                    var nether = String(j.dimension || '').toLowerCase() === 'nether';
+                    if (nether && !hostList.length) hostList = ['hell'];
+                    var byClimate = hostList.length === 1 && String(hostList[0]).toLowerCase() === 'climate';
+                    if (byClimate) hostList = [];
+                    else if (!hostList.length) hostList = ['*land'];
+                    var TERRAIN = { flat: [0.1, 0.02], plains: [0.1, 0.3], hills: [0.3, 0.7], mountains: [0.3, 1.5], plateau: [1.2, 0.1],
+                        swamp: [-0.2, 0.1], ocean: [-1, 0.4], deep_ocean: [-1.8, 0.4] };
+                    var tr = j.terrain !== undefined ? j.terrain : j.height, terrain = '-';
+                    if (tr !== undefined) {
+                        var tv = typeof tr === 'string' ? TERRAIN[tr.toLowerCase()] : Array.isArray(tr) ? tr : tr && typeof tr === 'object' ? [tr.depth, tr.scale] : null;
+                        if (!tv || !isFinite(+tv[0]) || !isFinite(+tv[1])) bad(b.mod, b.file, '"terrain" is one of ' + Object.keys(TERRAIN).join(', ') + ', or {"depth", "scale"}');
+                        else terrain = Math.max(-2, Math.min(3, +tv[0])) + ',' + Math.max(0, Math.min(3, +tv[1]));
+                    }
+                    hostList.forEach(function (h) {
                         var n = String(h).toLowerCase().replace(/^minecraft:/, '').replace(/[\s-]+/g, '_');
+                        if (n === 'nether' || n === 'the_nether' || n === 'nether_wastes') n = 'hell';
+                        if (n === '*land' || n === 'land' || n === 'any') n = '*land';
                         [n, BIOME_ALIAS[n], LEGACY_TO_MODERN[n], LEGACY_TO_MODERN[BIOME_ALIAS[n]]].forEach(function (x) { if (x && hosts.indexOf(x) < 0) hosts.push(x); });
                     });
                     var top = j.top === undefined ? '' : ref(j.top, b.mod, b.file), filler = j.filler === undefined ? '' : ref(j.filler, b.mod, b.file);
@@ -3970,11 +3987,19 @@
                     var trees = j.trees === undefined ? 'oak' : String(j.trees).toLowerCase();
                     if (TREES.indexOf(trees) < 0) { bad(b.mod, b.file, '"trees" is one of ' + TREES.join(', ')); trees = 'oak'; }
                     var key = b.mod + ':' + b.name;
+                    var rules = [];
+                    (Array.isArray(j.surface_rules) ? j.surface_rules : []).forEach(function (r) {
+                        if (!r || r.block === undefined) { bad(b.mod, b.file, 'a surface rule needs a "block"'); return; }
+                        var rb = ref(r.block, b.mod, b.file), rr = r.replace === undefined ? '*' : ref(r.replace, b.mod, b.file);
+                        if (!rb || !rr) return;
+                        var n = function (v) { v = Math.round(Number(v)); return isFinite(v) ? Math.max(0, Math.min(128, v)) : 0; };
+                        rules.push([rb, rr, n(r.ground), n(r.ceiling), n(r.min_y), n(r.max_y)].join(','));
+                    });
                     lines.push(['biome', key, clean(j.name || pretty(b.name)), hosts.join(';') || '-', Math.round(num(j.weight, 10, 0, 1000)),
                                 num(j.temperature, 0.7, -1, 2), num(j.rainfall, 0.5, 0, 1), top || '-', filler || '-',
                                 hexColor(j.grass_color, b.mod, b.file, 'grass_color'), hexColor(j.foliage_color, b.mod, b.file, 'foliage_color'),
                                 trees, num(j.trees_per_chunk, trees === 'none' ? 0 : 3, 0, 64), Math.round(num(j.flowers_per_chunk, 2, 0, 64)),
-                                Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1].join('\t'));
+                                Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1, rules.join(';') || '-', terrain].join('\t'));
                 });
                 var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
                 function ore(o, blockRef, mod, file) {

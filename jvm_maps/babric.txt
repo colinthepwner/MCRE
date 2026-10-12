@@ -1467,6 +1467,7 @@ F	net/minecraft/class_104	field_2682	field_2682	yaw
 F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
 F	net/minecraft/class_71	field_2734	field_2734	slots
 F	net/minecraft/class_71	field_2735	field_2735	windowId
+F	net/minecraft/class_259	field_2739	field_2739	grassColor
 F	net/minecraft/class_56	field_2757	field_2757	Sky
 F	net/minecraft/class_56	field_2758	field_2758	Block
 F	net/minecraft/class_635	field_2763	field_2763	options
