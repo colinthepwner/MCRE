@@ -1597,17 +1597,17 @@
             function reg() { return vm && vm.mcReg; }
             function blockRef(id) {
                 var r = reg(), b = r && r.blocks[id];
-                return b && !b.$override ? 'mod:' + b.$mod + ':b' + id : 'id:' + id;
+                return b && !b.$override ? 'mod:' + b.$mod + ':' + window.JVM.contentName(vm, id) : 'id:' + id;
             }
             function itemRef(id) {
                 var r = reg();
                 if (id < 4096) return blockRef(id);
                 var it = r && r.items[id];
-                return it && !it.$override ? 'mod:' + it.$mod + ':i' + id : 'id:' + id;
+                return it && !it.$override ? 'mod:' + it.$mod + ':' + window.JVM.contentName(vm, id) : 'id:' + id;
             }
             function refToJava(ref) {
-                var m = /^mod:([^:]+):([bi])(\d+)$/.exec(ref || '');
-                if (m) return javaMods[m[1]] ? +m[3] : 4095;
+                var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
+                if (m) { var jid = javaMods[m[1]] ? window.JVM.contentId(vm, m[1], m[2]) : null; return jid != null ? jid : 4095; }
                 m = /^id:(\d+)/.exec(ref || '');
                 return m ? +m[1] : 0;
             }
@@ -2162,6 +2162,10 @@
             var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164'];
             function versionTag(JVM, files) {
                 var said = null;
+                if (files['fabric.mod.json']) {
+                    var fk = JVM.javaKind({ sources: {}, nameMap: null }, [], files);
+                    if (fk.loader === 'Babric') return Promise.resolve({ tag: 'babric', said: 'Beta 1.7.3' });
+                }
                 try {
                     var mi = files['mcmod.info'] && JSON.parse(new TextDecoder().decode(files['mcmod.info']).replace(/^\uFEFF/, ''));
                     if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
@@ -2245,6 +2249,12 @@
                     }
                     var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
                     var errorsBefore = errorCount;
+                    if (kind.loader === 'Babric' && JVM.babricLoad) {
+                        var fjson = null;
+                        try { fjson = JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, '')); } catch (e) { fjson = {}; }
+                        (vm.$stFiles = vm.$stFiles || {})[modId] = files;
+                        JVM.babricLoad(vm, modId, fjson, files, classes);
+                    }
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
                             if (JVM.mlProps) JVM.mlProps(vm, vm.loadClass(cn));
@@ -2263,7 +2273,8 @@
                     var c = JVM.collectContent(vm, modId);
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes,
-                        errors: errorCount - errorsBefore, extraMissing: c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [] });
+                        errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
+                            .concat(kind.mixins ? ["changes to the game's own code (" + kind.mixins + (kind.mixins === 1 ? ' mixin)' : ' mixins)')] : []) });
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
@@ -2294,6 +2305,7 @@
                             else problem('', 'no picture ' + t.sheet + ' in the mod');
                             return;
                         }
+                        if (t.file) { var fb = fileOf(t.file); if (fb) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = fb; else problem('', 'no picture ' + t.file + ' in the mod'); return; }
                         var cands = [];
                         if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kind + '/' + t.name + '.png', 'assets/' + t.mod + '/textures/' + kind + '/' + t.name + '.png');
                         cands.push('textures/' + kind + '/' + t.name + '.png');
@@ -4768,7 +4780,7 @@
                 box.innerHTML =
                     '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Add a mod</h2>' +
                     '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Choose a mod file (.zip), or drop it here. ' +
-                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and Java mods for Minecraft 1.5.2 (ModLoader and Forge, .jar or .zip) work too - each one shows how well it runs here.</p>' +
+                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and Java mods for Minecraft 1.4.7 to 1.6.4 (ModLoader and Forge) and Beta 1.7.3 (Babric) - .jar or .zip - work too - each one shows how well it runs here.</p>' +
                     '<button data-browse style="display:block;width:100%;padding:12px;margin-bottom:14px;background:#4a8a4a;color:#fff;' +
                     'border:none;cursor:pointer;font-size:14px;font-family:monospace">Browse mods</button>' +
                     '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +

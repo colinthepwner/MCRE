@@ -1882,10 +1882,14 @@ F	aws	d	field_73811_d	width
 F	aws	e	field_73812_e	height
 F	aws	f	field_73809_f	text
 F	aws	l	field_73818_l	isFocused
+F	aws	s	field_73823_s	visible
 F	awv	a	field_78288_b	FONT_HEIGHT
 F	awv	g	field_78298_i	renderEngine
 F	awv	h	field_78295_j	posX
 F	awv	i	field_78296_k	posY
+F	awv	l	field_78291_n	red
+F	awv	m	field_78292_o	blue
+F	awv	n	field_78306_p	green
 F	awx	j	field_73735_i	zLevel
 F	axr	g	field_73882_e	mc
 F	axr	h	field_73880_f	width
@@ -2094,6 +2098,7 @@ F	mp	P	field_70131_O	height
 F	mp	X	field_70139_V	ySize
 F	mp	ab	field_70146_Z	rand
 F	mp	ag	field_70178_ae	isImmuneToFire
+F	mp	ah	field_70180_af	dataWatcher
 F	mp	ar	field_71093_bK	dimension
 F	mp	d	field_70151_c	fire
 F	mp	k	field_70157_k	entityId
@@ -2111,6 +2116,7 @@ F	mw	a	field_75613_a	spawnedID
 F	mw	b	field_75611_b	primaryColor
 F	mw	c	field_75612_c	secondaryColor
 F	net/minecraft/client/Minecraft	K	field_71425_J	running
+F	net/minecraft/client/Minecraft	L	field_71426_K	debug
 F	net/minecraft/client/Minecraft	V	field_71428_T	timer
 F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
 F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
@@ -2139,6 +2145,7 @@ F	nn	a	monster	monster
 F	nn	b	creature	creature
 F	nn	c	ambient	ambient
 F	nn	d	waterCreature	waterCreature
+F	rh	a	field_70292_b	age
 F	rh	d	field_70291_e	health
 F	s	a	field_71588_a	oppositeSide
 F	s	b	field_71586_b	offsetsXForSide
@@ -2171,6 +2178,7 @@ F	ul	h	field_75223_e	xDisplayPosition
 F	ul	i	field_75221_f	yDisplayPosition
 F	uo	b	field_77881_a	armorType
 F	uo	c	field_77879_b	damageReduceAmount
+F	uo	cu	field_77882_bY	maxDamageArray
 F	uo	cx	field_77878_bZ	material
 F	uo	d	field_77880_c	renderIndex
 F	uq	a	CLOTH	CLOTH
@@ -3026,6 +3034,7 @@ M	mp	f	(DDD)D	func_70011_f	getDistance
 M	mp	f	(Lbs;)V	func_70020_e	readFromNBT
 M	mp	hashCode	()I	hashCode	hashCode
 M	mp	toString	()Ljava/lang/String;	toString	toString
+M	mp	u	()Lns;	func_70096_w	getDataWatcher
 M	mp	w	()V	func_70106_y	setDead
 M	mv	a	(Ljava/lang/Class;Ljava/lang/String;I)V	func_75618_a	addMapping
 M	mv	a	(Ljava/lang/Class;Ljava/lang/String;III)V	func_75614_a	addMapping
@@ -3146,6 +3155,7 @@ M	sq	q	(I)Lwm;	func_82169_q	getCurrentArmor
 M	sq	w	()V	func_70106_y	setDead
 M	sq	w	(I)V	func_71023_q	addExperience
 M	t	b	(III)V	func_71571_b	set
+M	t	compareTo	(Ljava/lang/Object;)I	compareTo	compareTo
 M	t	e	(III)F	func_71569_e	getDistanceSquared
 M	t	equals	(Ljava/lang/Object;)Z	equals	equals
 M	t	hashCode	()I	hashCode	hashCode

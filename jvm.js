@@ -154,6 +154,8 @@ function VM(opts) {
 	JVM.installLang(this);
 	JVM.installUtil(this);
 	JVM.installIo(this);
+	if (JVM.installAwt) JVM.installAwt(this);
+	if (JVM.installLibs) JVM.installLibs(this);
 	JVM.installReflect(this);
 	if (opts.install) opts.install(this);
 }
@@ -3623,6 +3625,348 @@ JVM.installIo = installIo;
 (function () {
 'use strict';
 
+var C = 'java/awt/Color', LC = 'Ljava/awt/Color;';
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+function argb(a, r, g, b) { return ((a & 255) << 24) | ((r & 255) << 16) | ((g & 255) << 8) | (b & 255); }
+function f2i(f) { return Math.trunc(Math.fround(f) * 255 + 0.5); }
+function hsbToRgb(h, s, v) {
+	var r = 0, g = 0, b = 0;
+	if (s === 0) { r = g = b = Math.trunc(v * 255 + 0.5); }
+	else {
+		var hh = (h - Math.floor(h)) * 6, f = hh - Math.floor(hh);
+		var p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
+		switch (Math.trunc(hh)) {
+		case 0: r = v; g = t; b = p; break;
+		case 1: r = q; g = v; b = p; break;
+		case 2: r = p; g = v; b = t; break;
+		case 3: r = p; g = q; b = v; break;
+		case 4: r = t; g = p; b = v; break;
+		case 5: r = v; g = p; b = q; break;
+		}
+		r = Math.trunc(r * 255 + 0.5); g = Math.trunc(g * 255 + 0.5); b = Math.trunc(b * 255 + 0.5);
+	}
+	return 0xff000000 | (r << 16) | (g << 8) | b;
+}
+function rgbToHsb(r, g, b) {
+	var cmax = Math.max(r, g, b), cmin = Math.min(r, g, b), h, s, v = Math.fround(cmax / 255);
+	s = cmax !== 0 ? Math.fround((cmax - cmin) / cmax) : 0;
+	if (s === 0) h = 0;
+	else {
+		var rc = (cmax - r) / (cmax - cmin), gc = (cmax - g) / (cmax - cmin), bc = (cmax - b) / (cmax - cmin);
+		h = r === cmax ? bc - gc : g === cmax ? 2 + rc - bc : 4 + gc - rc;
+		h = h / 6; if (h < 0) h = h + 1;
+	}
+	return [Math.fround(h), s, v];
+}
+
+function installAwt(vm) {
+	var make = function (vm, v) { var o = vm.newObject(vm.loadClass(C)); o.$v = v | 0; return o; };
+	var NAMED = { white: 0xffffff, lightGray: 0xc0c0c0, gray: 0x808080, darkGray: 0x404040, black: 0, red: 0xff0000, pink: 0xffafaf,
+		orange: 0xffc800, yellow: 0xffff00, green: 0x00ff00, magenta: 0xff00ff, cyan: 0x00ffff, blue: 0x0000ff };
+	var statics = {};
+	Object.keys(NAMED).forEach(function (k) { statics[k] = null; statics[k.replace(/([A-Z])/g, '_$1').toUpperCase()] = null; });
+	var ch = function (sh) { return function (vm, self) { return (self.$v >>> sh) & 255; }; };
+	vm.defineNative(C, { statics: statics, clinit: function (vm, c) {
+		Object.keys(NAMED).forEach(function (k) { c.statics[k] = c.statics[k.replace(/([A-Z])/g, '_$1').toUpperCase()] = make(vm, 0xff000000 | NAMED[k]); });
+	}, methods: {
+		'<init>(I)V': function (vm, self, a) { self.$v = 0xff000000 | a[0]; },
+		'<init>(IZ)V': function (vm, self, a) { self.$v = a[1] ? a[0] | 0 : 0xff000000 | a[0]; },
+		'<init>(III)V': function (vm, self, a) { self.$v = argb(255, a[0], a[1], a[2]); },
+		'<init>(IIII)V': function (vm, self, a) { self.$v = argb(a[3], a[0], a[1], a[2]); },
+		'<init>(FFF)V': function (vm, self, a) { self.$v = argb(255, f2i(a[0]), f2i(a[1]), f2i(a[2])); },
+		'<init>(FFFF)V': function (vm, self, a) { self.$v = argb(f2i(a[3]), f2i(a[0]), f2i(a[1]), f2i(a[2])); },
+		'getRGB()I': function (vm, self) { return self.$v | 0; },
+		'getRed()I': ch(16), 'getGreen()I': ch(8), 'getBlue()I': ch(0), 'getAlpha()I': ch(24),
+		'brighter()Ljava/awt/Color;': function (vm, self) {
+			var r = (self.$v >>> 16) & 255, g = (self.$v >>> 8) & 255, b = self.$v & 255, al = (self.$v >>> 24) & 255, i = 3;
+			if (r === 0 && g === 0 && b === 0) return make(vm, argb(al, i, i, i));
+			if (r > 0 && r < i) r = i; if (g > 0 && g < i) g = i; if (b > 0 && b < i) b = i;
+			return make(vm, argb(al, Math.min(Math.trunc(r / 0.7), 255), Math.min(Math.trunc(g / 0.7), 255), Math.min(Math.trunc(b / 0.7), 255)));
+		},
+		'darker()Ljava/awt/Color;': function (vm, self) {
+			return make(vm, argb((self.$v >>> 24) & 255, Math.max(Math.trunc(((self.$v >>> 16) & 255) * 0.7), 0), Math.max(Math.trunc(((self.$v >>> 8) & 255) * 0.7), 0), Math.max(Math.trunc((self.$v & 255) * 0.7), 0)));
+		},
+		'getRGBComponents([F)[F': function (vm, self, a) {
+			var out = a[0] || vm.newArray('F', 4);
+			[16, 8, 0, 24].forEach(function (sh, i) { out.a[i] = Math.fround(((self.$v >>> sh) & 255) / 255); });
+			return out;
+		},
+		'hashCode()I': function (vm, self) { return self.$v | 0; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].cls === self.cls && a[0].$v === self.$v ? 1 : 0; },
+		'toString()Ljava/lang/String;': function (vm, self) { return 'java.awt.Color[r=' + ((self.$v >>> 16) & 255) + ',g=' + ((self.$v >>> 8) & 255) + ',b=' + (self.$v & 255) + ']'; },
+	}, staticMethods: {
+		'HSBtoRGB(FFF)I': function (vm, n, a) { return hsbToRgb(a[0], a[1], a[2]) | 0; },
+		'RGBtoHSB(III[F)[F': function (vm, n, a) { var h = rgbToHsb(clamp(a[0]), clamp(a[1]), clamp(a[2])), out = a[3] || vm.newArray('F', 3); out.a[0] = h[0]; out.a[1] = h[1]; out.a[2] = h[2]; return out; },
+		'getHSBColor(FFF)Ljava/awt/Color;': function (vm, n, a) { return make(vm, hsbToRgb(a[0], a[1], a[2])); },
+		'decode(Ljava/lang/String;)Ljava/awt/Color;': function (vm, n, a) { var s = String(a[0]).trim(), v = /^(#|0x)/i.test(s) ? parseInt(s.replace(/^(#|0x)/i, ''), 16) : /^0\d/.test(s) ? parseInt(s, 8) : parseInt(s, 10); return make(vm, 0xff000000 | v); },
+	} });
+}
+
+JVM.installAwt = installAwt;
+})();
+
+(function () {
+'use strict';
+
+var OBJ = 'Ljava/lang/Object;', STR = 'Ljava/lang/String;';
+var G = 'com/google/gson/', GU = 'com/google/common/';
+
+function installLibs(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+
+	def(GU + 'base/Supplier', { access: I, interfaces: ['java/util/function/Supplier'], abstractMethods: { 'get()Ljava/lang/Object;': true } });
+	def('mcre/Memoized', { interfaces: [GU + 'base/Supplier', 'java/util/function/Supplier'], methods: {
+		'get()Ljava/lang/Object;': function (vm, self) {
+			if (!self.$done) { self.$v = vm.callVirtual(self.$src, 'get', '()Ljava/lang/Object;', []); self.$done = true; }
+			return self.$v;
+		},
+	} });
+	var memo = function (vm, n, a) { var o = vm.newObject(vm.loadClass('mcre/Memoized')); o.$src = a[0]; return o; };
+	def(GU + 'base/Suppliers', { staticMethods: {
+		'memoize(Lcom/google/common/base/Supplier;)Lcom/google/common/base/Supplier;': memo,
+		'memoize(Ljava/util/function/Supplier;)Lcom/google/common/base/Supplier;': memo,
+		'ofInstance(Ljava/lang/Object;)Lcom/google/common/base/Supplier;': function (vm, n, a) { var o = vm.newObject(vm.loadClass('mcre/Memoized')); o.$v = a[0]; o.$done = true; return o; },
+	} });
+	var check = function (cls, msgAt) { return function (vm, n, a) { if (!a[0]) vm.throwNew(cls, msgAt != null && a[msgAt] != null ? String(a[msgAt]) : null); }; };
+	def(GU + 'base/Preconditions', { staticMethods: {
+		'checkArgument(Z)V': check('java/lang/IllegalArgumentException'), 'checkArgument(ZLjava/lang/Object;)V': check('java/lang/IllegalArgumentException', 1),
+		'checkState(Z)V': check('java/lang/IllegalStateException'), 'checkState(ZLjava/lang/Object;)V': check('java/lang/IllegalStateException', 1),
+		'checkNotNull(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { if (a[0] == null) vm.throwNew('java/lang/NullPointerException', null); return a[0]; },
+		'checkNotNull(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { if (a[0] == null) vm.throwNew('java/lang/NullPointerException', a[1] == null ? null : String(a[1])); return a[0]; },
+	} });
+	var list = function (vm, items) { return JVM.newList(vm, items); };
+	var map = function (vm, pairs) { var m = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(m, '<init>', '()V', []); pairs.forEach(function (p) { vm.callVirtual(m, 'put', '(' + OBJ + OBJ + ')' + OBJ, p); }); return m; };
+	var toArr = function (vm, c) { var r = []; if (c instanceof JVM.JArray) return Array.prototype.slice.call(c.a); JVM.iterate(vm, c, function (x) { r.push(x); }); return r; };
+	var listStatics = {};
+	for (var n = 0; n <= 6; n++) listStatics['of(' + new Array(n + 1).join(OBJ) + ')Lcom/google/common/collect/ImmutableList;'] = function (vm, nm, a) { return list(vm, a.slice()); };
+	listStatics['of([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableList;'] = function (vm, nm, a) { return list(vm, toArr(vm, a[0])); };
+	listStatics['copyOf(Ljava/util/Collection;)Lcom/google/common/collect/ImmutableList;'] = function (vm, nm, a) { return list(vm, toArr(vm, a[0])); };
+	listStatics['copyOf(Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableList;'] = function (vm, nm, a) { return list(vm, toArr(vm, a[0])); };
+	listStatics['copyOf([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableList;'] = function (vm, nm, a) { return list(vm, toArr(vm, a[0])); };
+	listStatics['builder()Lcom/google/common/collect/ImmutableList$Builder;'] = function (vm) { var b = vm.newObject(vm.loadClass(GU + 'collect/ImmutableList$Builder')); b.$items = []; return b; };
+	def(GU + 'collect/ImmutableList', { super: 'java/util/ArrayList', staticMethods: listStatics });
+	def(GU + 'collect/ImmutableList$Builder', { methods: {
+		'add(Ljava/lang/Object;)Lcom/google/common/collect/ImmutableList$Builder;': function (vm, self, a) { self.$items.push(a[0]); return self; },
+		'add([Ljava/lang/Object;)Lcom/google/common/collect/ImmutableList$Builder;': function (vm, self, a) { self.$items = self.$items.concat(toArr(vm, a[0])); return self; },
+		'addAll(Ljava/lang/Iterable;)Lcom/google/common/collect/ImmutableList$Builder;': function (vm, self, a) { self.$items = self.$items.concat(toArr(vm, a[0])); return self; },
+		'build()Lcom/google/common/collect/ImmutableList;': function (vm, self) { return list(vm, self.$items.slice()); },
+	} });
+	var mapStatics = {};
+	for (var k = 0; k <= 5; k++) mapStatics['of(' + new Array(2 * k + 1).join(OBJ) + ')Lcom/google/common/collect/ImmutableMap;'] = function (vm, nm, a) { var p = []; for (var i = 0; i + 1 < a.length; i += 2) p.push([a[i], a[i + 1]]); return map(vm, p); };
+	mapStatics['copyOf(Ljava/util/Map;)Lcom/google/common/collect/ImmutableMap;'] = function (vm, nm, a) { var m = map(vm, []); vm.callVirtual(m, 'putAll', '(Ljava/util/Map;)V', [a[0]]); return m; };
+	mapStatics['builder()Lcom/google/common/collect/ImmutableMap$Builder;'] = function (vm) { var b = vm.newObject(vm.loadClass(GU + 'collect/ImmutableMap$Builder')); b.$pairs = []; return b; };
+	def(GU + 'collect/ImmutableMap', { super: 'java/util/LinkedHashMap', staticMethods: mapStatics });
+	def(GU + 'collect/ImmutableMap$Builder', { methods: {
+		'<init>()V': function (vm, self) { self.$pairs = []; },
+		'put(Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/common/collect/ImmutableMap$Builder;': function (vm, self, a) { (self.$pairs = self.$pairs || []).push([a[0], a[1]]); return self; },
+		'putAll(Ljava/util/Map;)Lcom/google/common/collect/ImmutableMap$Builder;': function (vm, self, a) {
+			var es = vm.callVirtual(a[0], 'entrySet', '()Ljava/util/Set;', []);
+			JVM.iterate(vm, es, function (e) { (self.$pairs = self.$pairs || []).push([vm.callVirtual(e, 'getKey', '()' + OBJ, []), vm.callVirtual(e, 'getValue', '()' + OBJ, [])]); });
+			return self;
+		},
+		'build()Lcom/google/common/collect/ImmutableMap;': function (vm, self) { return map(vm, self.$pairs || []); },
+		'buildOrThrow()Lcom/google/common/collect/ImmutableMap;': function (vm, self) { return map(vm, self.$pairs || []); },
+	} });
+	def(GU + 'collect/Lists', { staticMethods: {
+		'newArrayList()Ljava/util/ArrayList;': function (vm) { return list(vm, []); },
+		'newArrayList([Ljava/lang/Object;)Ljava/util/ArrayList;': function (vm, n, a) { return list(vm, toArr(vm, a[0])); },
+		'newArrayList(Ljava/lang/Iterable;)Ljava/util/ArrayList;': function (vm, n, a) { return list(vm, toArr(vm, a[0])); },
+		'newLinkedList()Ljava/util/LinkedList;': function (vm) { var o = vm.newObject(vm.loadClass('java/util/LinkedList')); vm.callVirtual(o, '<init>', '()V', []); return o; },
+	} });
+	var newOf = function (cn) { return function (vm) { var o = vm.newObject(vm.loadClass(cn)); vm.callVirtual(o, '<init>', '()V', []); return o; }; };
+	def(GU + 'collect/Maps', { staticMethods: {
+		'newHashMap()Ljava/util/HashMap;': newOf('java/util/HashMap'), 'newLinkedHashMap()Ljava/util/LinkedHashMap;': newOf('java/util/LinkedHashMap'),
+		'newTreeMap()Ljava/util/TreeMap;': newOf('java/util/TreeMap'), 'newIdentityHashMap()Ljava/util/IdentityHashMap;': newOf('java/util/IdentityHashMap'),
+		'newEnumMap(Ljava/lang/Class;)Ljava/util/EnumMap;': newOf('java/util/HashMap'),
+	} });
+	def(GU + 'collect/Sets', { staticMethods: {
+		'newHashSet()Ljava/util/HashSet;': newOf('java/util/HashSet'), 'newLinkedHashSet()Ljava/util/LinkedHashSet;': newOf('java/util/LinkedHashSet'),
+		'newHashSet([Ljava/lang/Object;)Ljava/util/HashSet;': function (vm, n, a) { var o = newOf('java/util/HashSet')(vm); toArr(vm, a[0]).forEach(function (x) { vm.callVirtual(o, 'add', '(' + OBJ + ')Z', [x]); }); return o; },
+	} });
+
+	var el = function (vm, j) {
+		var cn = j === null || j === undefined ? 'JsonNull' : Array.isArray(j) ? 'JsonArray' : typeof j === 'object' ? 'JsonObject' : 'JsonPrimitive';
+		var o = vm.newObject(vm.loadClass(G + cn)); o.$j = j === undefined ? null : j; return o;
+	};
+	var jsOf = function (vm, x) {
+		if (x == null) return null;
+		if (typeof x !== 'object') return x;
+		if (x.$j !== undefined && x.cls && x.cls.name.indexOf(G) === 0) return x.$j;
+		if (x.$box !== undefined) { var u = JVM.unbox(x); return typeof u === 'bigint' ? Number(u) : x.cls.name === 'java/lang/Boolean' ? !!u : x.cls.name === 'java/lang/Character' ? String.fromCharCode(u) : u; }
+		return toJs(vm, x, 0);
+	};
+	var prim = function (fn) { return function (vm, self) { return fn(self.$j); }; };
+	var elMethods = {
+		'isJsonObject()Z': function (vm, self) { return self.$j !== null && typeof self.$j === 'object' && !Array.isArray(self.$j) ? 1 : 0; },
+		'isJsonArray()Z': function (vm, self) { return Array.isArray(self.$j) ? 1 : 0; },
+		'isJsonPrimitive()Z': function (vm, self) { return self.$j !== null && typeof self.$j !== 'object' ? 1 : 0; },
+		'isJsonNull()Z': function (vm, self) { return self.$j === null ? 1 : 0; },
+		'getAsJsonObject()Lcom/google/gson/JsonObject;': function (vm, self) { return el(vm, self.$j); },
+		'getAsJsonArray()Lcom/google/gson/JsonArray;': function (vm, self) { return el(vm, self.$j); },
+		'getAsJsonPrimitive()Lcom/google/gson/JsonPrimitive;': function (vm, self) { return el(vm, self.$j); },
+		'getAsString()Ljava/lang/String;': prim(function (j) { return j == null ? null : String(j); }),
+		'getAsInt()I': prim(function (j) { return Math.trunc(+j) | 0; }), 'getAsLong()J': prim(function (j) { return BigInt(Math.trunc(+j)); }),
+		'getAsFloat()F': prim(function (j) { return Math.fround(+j); }), 'getAsDouble()D': prim(function (j) { return +j; }),
+		'getAsBoolean()Z': prim(function (j) { return j === true || j === 'true' ? 1 : 0; }),
+		'getAsShort()S': prim(function (j) { return (+j << 16) >> 16; }), 'getAsByte()B': prim(function (j) { return (+j << 24) >> 24; }),
+		'getAsNumber()Ljava/lang/Number;': prim(function (j) { return JVM.box(vm, +j, Number.isInteger(+j) ? 'I' : 'D'); }),
+		'toString()Ljava/lang/String;': function (vm, self) { return JSON.stringify(self.$j); },
+		'deepCopy()Lcom/google/gson/JsonElement;': function (vm, self) { return el(vm, JSON.parse(JSON.stringify(self.$j))); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$j !== undefined && JSON.stringify(a[0].$j) === JSON.stringify(self.$j) ? 1 : 0; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(JSON.stringify(self.$j)); },
+	};
+	def(G + 'JsonElement', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: elMethods });
+	def(G + 'JsonNull', { super: G + 'JsonElement', statics: { INSTANCE: null }, clinit: function (vm, c) { c.statics.INSTANCE = el(vm, null); } });
+	def(G + 'JsonPrimitive', { super: G + 'JsonElement', methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$j = a[0]; },
+		'<init>(Ljava/lang/Number;)V': function (vm, self, a) { self.$j = jsOf(vm, a[0]); },
+		'<init>(Ljava/lang/Boolean;)V': function (vm, self, a) { self.$j = jsOf(vm, a[0]); },
+		'<init>(Ljava/lang/Character;)V': function (vm, self, a) { self.$j = jsOf(vm, a[0]); },
+		'isString()Z': function (vm, self) { return typeof self.$j === 'string' ? 1 : 0; },
+		'isNumber()Z': function (vm, self) { return typeof self.$j === 'number' ? 1 : 0; },
+		'isBoolean()Z': function (vm, self) { return typeof self.$j === 'boolean' ? 1 : 0; },
+	} });
+	var objOf = function (self) { if (!self.$j || typeof self.$j !== 'object') self.$j = {}; return self.$j; };
+	def(G + 'JsonObject', { super: G + 'JsonElement', methods: {
+		'<init>()V': function (vm, self) { self.$j = {}; },
+		'add(Ljava/lang/String;Lcom/google/gson/JsonElement;)V': function (vm, self, a) { objOf(self)[a[0]] = a[1] ? a[1].$j : null; },
+		'addProperty(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { objOf(self)[a[0]] = a[1]; },
+		'addProperty(Ljava/lang/String;Ljava/lang/Number;)V': function (vm, self, a) { objOf(self)[a[0]] = jsOf(vm, a[1]); },
+		'addProperty(Ljava/lang/String;Ljava/lang/Boolean;)V': function (vm, self, a) { objOf(self)[a[0]] = jsOf(vm, a[1]); },
+		'addProperty(Ljava/lang/String;Ljava/lang/Character;)V': function (vm, self, a) { objOf(self)[a[0]] = jsOf(vm, a[1]); },
+		'remove(Ljava/lang/String;)Lcom/google/gson/JsonElement;': function (vm, self, a) { var o = objOf(self), v = o[a[0]]; delete o[a[0]]; return v === undefined ? null : el(vm, v); },
+		'has(Ljava/lang/String;)Z': function (vm, self, a) { return Object.prototype.hasOwnProperty.call(objOf(self), a[0]) ? 1 : 0; },
+		'get(Ljava/lang/String;)Lcom/google/gson/JsonElement;': function (vm, self, a) { var v = objOf(self)[a[0]]; return v === undefined ? null : el(vm, v); },
+		'getAsJsonObject(Ljava/lang/String;)Lcom/google/gson/JsonObject;': function (vm, self, a) { var v = objOf(self)[a[0]]; return v == null ? null : el(vm, v); },
+		'getAsJsonArray(Ljava/lang/String;)Lcom/google/gson/JsonArray;': function (vm, self, a) { var v = objOf(self)[a[0]]; return v == null ? null : el(vm, v); },
+		'getAsJsonPrimitive(Ljava/lang/String;)Lcom/google/gson/JsonPrimitive;': function (vm, self, a) { var v = objOf(self)[a[0]]; return v == null ? null : el(vm, v); },
+		'keySet()Ljava/util/Set;': function (vm, self) { var s = vm.newObject(vm.loadClass('java/util/LinkedHashSet')); vm.callVirtual(s, '<init>', '()V', []); Object.keys(objOf(self)).forEach(function (k) { vm.callVirtual(s, 'add', '(' + OBJ + ')Z', [k]); }); return s; },
+		'entrySet()Ljava/util/Set;': function (vm, self) { var m = map(vm, Object.keys(objOf(self)).map(function (k) { return [k, el(vm, self.$j[k])]; })); return vm.callVirtual(m, 'entrySet', '()Ljava/util/Set;', []); },
+		'size()I': function (vm, self) { return Object.keys(objOf(self)).length; },
+	} });
+	var arrOf = function (self) { if (!Array.isArray(self.$j)) self.$j = []; return self.$j; };
+	def(G + 'JsonArray', { super: G + 'JsonElement', interfaces: ['java/lang/Iterable'], methods: {
+		'<init>()V': function (vm, self) { self.$j = []; },
+		'add(Lcom/google/gson/JsonElement;)V': function (vm, self, a) { arrOf(self).push(a[0] ? a[0].$j : null); },
+		'add(Ljava/lang/String;)V': function (vm, self, a) { arrOf(self).push(a[0]); },
+		'add(Ljava/lang/Number;)V': function (vm, self, a) { arrOf(self).push(jsOf(vm, a[0])); },
+		'add(Ljava/lang/Boolean;)V': function (vm, self, a) { arrOf(self).push(jsOf(vm, a[0])); },
+		'get(I)Lcom/google/gson/JsonElement;': function (vm, self, a) { return el(vm, arrOf(self)[a[0]]); },
+		'size()I': function (vm, self) { return arrOf(self).length; },
+		'iterator()Ljava/util/Iterator;': function (vm, self) { return vm.callVirtual(list(vm, arrOf(self).map(function (x) { return el(vm, x); })), 'iterator', '()Ljava/util/Iterator;', []); },
+	} });
+	var parse = function (vm, t) {
+		try { return el(vm, JSON.parse(String(t))); }
+		catch (e) {
+			try { return el(vm, JSON.parse(String(t).replace(/[/][/][^\n]*|[/][*][\s\S]*?[*][/]/g, '').replace(/,\s*([}\]])/g, '$1'))); }
+			catch (e2) { vm.throwNew(G + 'JsonSyntaxException', String(e2.message)); }
+		}
+	};
+	def(G + 'JsonParseException', { super: 'java/lang/RuntimeException' });
+	def(G + 'JsonSyntaxException', { super: G + 'JsonParseException' });
+	def(G + 'JsonParser', { methods: {
+		'parse(Ljava/lang/String;)Lcom/google/gson/JsonElement;': function (vm, self, a) { return parse(vm, a[0]); },
+		'parse(Ljava/io/Reader;)Lcom/google/gson/JsonElement;': function (vm, self, a) { return parse(vm, JVM.readAllText(vm, a[0])); },
+	}, staticMethods: {
+		'parseString(Ljava/lang/String;)Lcom/google/gson/JsonElement;': function (vm, n, a) { return parse(vm, a[0]); },
+		'parseReader(Ljava/io/Reader;)Lcom/google/gson/JsonElement;': function (vm, n, a) { return parse(vm, JVM.readAllText(vm, a[0])); },
+	} });
+	var self_ = function (vm, self) { return self; };
+	def(G + 'GsonBuilder', { methods: {
+		'<init>()V': function () {},
+		'setPrettyPrinting()Lcom/google/gson/GsonBuilder;': function (vm, self) { self.$pretty = true; return self; },
+		'disableHtmlEscaping()Lcom/google/gson/GsonBuilder;': self_, 'serializeNulls()Lcom/google/gson/GsonBuilder;': self_,
+		'setLenient()Lcom/google/gson/GsonBuilder;': self_, 'excludeFieldsWithoutExposeAnnotation()Lcom/google/gson/GsonBuilder;': self_,
+		'registerTypeAdapter(Ljava/lang/reflect/Type;Ljava/lang/Object;)Lcom/google/gson/GsonBuilder;': function (vm, self) { vm.warnOnce('gson:adapter', 'Gson type adapters are not available here'); return self; },
+		'create()Lcom/google/gson/Gson;': function (vm, self) { var g = vm.newObject(vm.loadClass(G + 'Gson')); g.$pretty = !!self.$pretty; return g; },
+	} });
+	var dump = function (g, j) { return g.$pretty ? JSON.stringify(j, null, 2) : JSON.stringify(j); };
+	var clsArg = function (c) { return c && c.$cls ? c.$cls : null; };
+	def(G + 'Gson', { methods: {
+		'<init>()V': function () {},
+		'toJson(Lcom/google/gson/JsonElement;)Ljava/lang/String;': function (vm, self, a) { return dump(self, a[0] ? a[0].$j : null); },
+		'toJson(Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { return dump(self, jsOf(vm, a[0])); },
+		'toJson(Ljava/lang/Object;Ljava/lang/Appendable;)V': function (vm, self, a) { JVM.writeAllText(vm, a[1], dump(self, jsOf(vm, a[0]))); },
+		'toJson(Lcom/google/gson/JsonElement;Ljava/lang/Appendable;)V': function (vm, self, a) { JVM.writeAllText(vm, a[1], dump(self, a[0] ? a[0].$j : null)); },
+		'toJsonTree(Ljava/lang/Object;)Lcom/google/gson/JsonElement;': function (vm, self, a) { return el(vm, jsOf(vm, a[0])); },
+		'fromJson(Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;': function (vm, self, a) { return fromJs(vm, parse(vm, a[0]).$j, clsArg(a[1])); },
+		'fromJson(Ljava/io/Reader;Ljava/lang/Class;)Ljava/lang/Object;': function (vm, self, a) { return fromJs(vm, parse(vm, JVM.readAllText(vm, a[0])).$j, clsArg(a[1])); },
+		'fromJson(Lcom/google/gson/JsonElement;Ljava/lang/Class;)Ljava/lang/Object;': function (vm, self, a) { return fromJs(vm, a[0] ? a[0].$j : null, clsArg(a[1])); },
+	} });
+}
+
+function toJs(vm, o, depth) {
+	if (o == null || depth > 20) return null;
+	if (typeof o !== 'object') return o;
+	if (o.$box !== undefined) { var u = JVM.unbox(o); return typeof u === 'bigint' ? Number(u) : o.cls.name === 'java/lang/Boolean' ? !!u : u; }
+	if (o instanceof JVM.JArray) return Array.prototype.slice.call(o.a).map(function (x) { return typeof x === 'bigint' ? Number(x) : toJs(vm, x, depth + 1); });
+	if (o.$j !== undefined && o.cls.name.indexOf(G) === 0) return o.$j;
+	if (o.$list) return o.$list.map(function (x) { return toJs(vm, x, depth + 1); });
+	if (o.$m && !o.$set) { var r = {}; JVM.iterate(vm, vm.callVirtual(o, 'entrySet', '()Ljava/util/Set;', []), function (e) { r[String(JVM.stringOf ? JVM.stringOf(vm, vm.callVirtual(e, 'getKey', '()' + OBJ, [])) : vm.callVirtual(e, 'getKey', '()' + OBJ, []))] = toJs(vm, vm.callVirtual(e, 'getValue', '()' + OBJ, []), depth + 1); }); return r; }
+	if (o.$set) { var s = []; JVM.iterate(vm, o, function (x) { s.push(toJs(vm, x, depth + 1)); }); return s; }
+	if (o.$name !== undefined && o.cls.superClass && o.cls.superClass.name === 'java/lang/Enum') return o.$name;
+	var out = {};
+	for (var c = o.cls; c && c.name !== 'java/lang/Object'; c = c.superClass) {
+		Object.keys(c.fields).forEach(function (fn) {
+			var f = c.fields[fn];
+			if (f.static || (f.access & 0x0080) || fn in out) return;
+			var v = o[':' + fn];
+			out[fn] = f.desc === 'Z' ? !!v : typeof v === 'bigint' ? Number(v) : toJs(vm, v, depth + 1);
+		});
+	}
+	return out;
+}
+function fromJs(vm, j, cls, desc) {
+	desc = desc || (cls ? 'L' + cls.name + ';' : OBJ);
+	switch (desc) {
+	case 'I': case 'S': case 'B': case 'C': return j == null ? 0 : (desc === 'C' ? String(j).charCodeAt(0) : Math.trunc(+j)) | 0;
+	case 'J': return BigInt(Math.trunc(+j || 0));
+	case 'F': return Math.fround(+j || 0);
+	case 'D': return +j || 0;
+	case 'Z': return j === true || j === 'true' ? 1 : 0;
+	}
+	if (j == null) return null;
+	if (desc === STR) return typeof j === 'object' ? JSON.stringify(j) : String(j);
+	if (desc[0] === '[') { var et = desc.substring(1); return JVM.javaArray(vm, et, (Array.isArray(j) ? j : [j]).map(function (x) { return fromJs(vm, x, null, et); })); }
+	var bx = { 'Ljava/lang/Integer;': 'I', 'Ljava/lang/Long;': 'J', 'Ljava/lang/Float;': 'F', 'Ljava/lang/Double;': 'D', 'Ljava/lang/Boolean;': 'Z', 'Ljava/lang/Short;': 'S', 'Ljava/lang/Byte;': 'B' }[desc];
+	if (bx) return JVM.box(vm, fromJs(vm, j, null, bx), bx);
+	var cn = desc.substring(1, desc.length - 1);
+	if (/^java[/]util[/](List|ArrayList|Collection|LinkedList|Set|HashSet)$/.test(cn) || (Array.isArray(j) && desc === OBJ)) {
+		var items = (Array.isArray(j) ? j : [j]).map(function (x) { return fromJs(vm, x, null, OBJ); });
+		if (/Set$/.test(cn)) { var hs = vm.newObject(vm.loadClass('java/util/LinkedHashSet')); vm.callVirtual(hs, '<init>', '()V', []); items.forEach(function (x) { vm.callVirtual(hs, 'add', '(' + OBJ + ')Z', [x]); }); return hs; }
+		return JVM.newList(vm, items);
+	}
+	if (/^java[/]util[/](Map|HashMap|LinkedHashMap|TreeMap)$/.test(cn) || (typeof j === 'object' && desc === OBJ)) {
+		var m = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(m, '<init>', '()V', []);
+		Object.keys(j).forEach(function (k) { vm.callVirtual(m, 'put', '(' + OBJ + OBJ + ')' + OBJ, [k, fromJs(vm, j[k], null, OBJ)]); });
+		return m;
+	}
+	if (desc === OBJ || desc === 'Ljava/lang/Number;') return typeof j === 'number' ? JVM.box(vm, j, Number.isInteger(j) ? 'D' : 'D') : typeof j === 'boolean' ? JVM.box(vm, j ? 1 : 0, 'Z') : String(j);
+	var c = cls || vm.loadClass(cn);
+	if (c.absent) return null;
+	vm.initClass(c);
+	if (c.superClass && c.superClass.name === 'java/lang/Enum') return (c.$values || []).filter(function (v) { return v.$name === String(j); })[0] || null;
+	if (cn.indexOf(G) === 0) { var e = vm.newObject(c); e.$j = j; return e; }
+	var o = vm.newObject(c), k = c.findDeclared('<init>()V');
+	if (k) vm.invoke(k, o, []);
+	if (typeof j !== 'object') return o;
+	for (var cc = c; cc && cc.name !== 'java/lang/Object'; cc = cc.superClass) {
+		Object.keys(cc.fields).forEach(function (fn) {
+			var f = cc.fields[fn];
+			if (f.static || (f.access & 0x0080) || !Object.prototype.hasOwnProperty.call(j, fn)) return;
+			o[':' + fn] = fromJs(vm, j[fn], null, f.desc);
+		});
+	}
+	return o;
+}
+
+JVM.installLibs = installLibs;
+})();
+
+(function () {
+'use strict';
+
 function inflateRaw(bytes) {
 	return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')))
 		.arrayBuffer().then(function (b) { return new Uint8Array(b); });
@@ -4096,6 +4440,7 @@ function installMc152(vm) {
 	function initBlock(vm, self, id, material) {
 		var c = vm.loadClass(SRC + 'Block');
 		if (c.initState !== 2) vm.initClass(c);
+		if (id === -1 && vm.autoBlockId) id = vm.autoBlockId(vm);
 		self[':blockID'] = id;
 		self[':blockMaterial'] = material;
 		self[':blockHardness'] = 0;
@@ -4184,6 +4529,7 @@ function installMc152(vm) {
 	function initItem(vm, self, id) {
 		var c = vm.loadClass(SRC + 'Item');
 		if (c.initState !== 2) vm.initClass(c);
+		if (id === -1 && vm.autoItemId) id = vm.autoItemId(vm);
 		self[':itemID'] = id;
 		self[':maxStackSize'] = 64;
 		self[':maxDamage'] = 0;
@@ -4319,6 +4665,8 @@ function installMc152(vm) {
 	if (JVM.installSettings) JVM.installSettings(vm);
 	if (JVM.installLegacy) JVM.installLegacy(vm);
 	if (JVM.installGui) JVM.installGui(vm);
+	if (JVM.installStation) JVM.installStation(vm);
+	if (JVM.installStates) JVM.installStates(vm);
 }
 
 var SIN_TABLE = null;
@@ -4527,8 +4875,20 @@ function installWorld(vm, def) {
 			return b ? b[':blockMaterial'] : mc.statics.air;
 		},
 	} });
+	var dwGet = function (dflt) { return function (vm, self, a) { var v = self.$dw[a[0]]; return v === undefined ? dflt : v && v.$box !== undefined ? JVM.unbox(v) : v; }; };
+	def('DataWatcher', { methods: {
+		'<init>()V': function (vm, self) { self.$dw = {}; },
+		'addObject(ILjava/lang/Object;)V': function (vm, self, a) { (self.$dw = self.$dw || {})[a[0]] = a[1]; },
+		'updateObject(ILjava/lang/Object;)V': function (vm, self, a) { (self.$dw = self.$dw || {})[a[0]] = a[1]; },
+		'getWatchableObjectByte(I)B': dwGet(0), 'getWatchableObjectShort(I)S': dwGet(0), 'getWatchableObjectInt(I)I': dwGet(0),
+		'getWatchableObjectFloat(I)F': dwGet(0), 'getWatchableObjectString(I)Ljava/lang/String;': dwGet(null),
+		'getWatchableObjectItemStack(I)Lnet/minecraft/src/ItemStack;': dwGet(null),
+		'setObjectWatched(I)V': function () {},
+	} });
+	var newWatcher = function (vm) { var w = vm.newObject(vm.loadClass(SRC + 'DataWatcher')); w.$dw = {}; return w; };
 	var ent = { methods: {
-		'<init>(Lnet/minecraft/src/World;)V': function (vm, self, a) { self[':worldObj'] = a[0]; },
+		'<init>(Lnet/minecraft/src/World;)V': function (vm, self, a) { self[':worldObj'] = a[0]; if (!self[':dataWatcher']) self[':dataWatcher'] = newWatcher(vm); },
+		'getDataWatcher()Lnet/minecraft/src/DataWatcher;': function (vm, self) { return self[':dataWatcher'] || (self[':dataWatcher'] = newWatcher(vm)); },
 		'setPosition(DDD)V': function (vm, self, a) { self[':posX'] = a[0]; self[':posY'] = a[1]; self[':posZ'] = a[2]; },
 		'setLocationAndAngles(DDDFF)V': function (vm, self, a) { self[':posX'] = a[0]; self[':posY'] = a[1]; self[':posZ'] = a[2]; },
 		'setDead()V': function () {},
@@ -4536,7 +4896,8 @@ function installWorld(vm, def) {
 		'getDistanceToEntity(Lnet/minecraft/src/Entity;)F': function (vm, self, a) { var dx = self[':posX'] - a[0][':posX'], dy = self[':posY'] - a[0][':posY'], dz = self[':posZ'] - a[0][':posZ']; return Math.sqrt(dx * dx + dy * dy + dz * dz); },
 		'getDistance(DDD)D': function (vm, self, a) { var dx = self[':posX'] - a[0], dy = self[':posY'] - a[1], dz = self[':posZ'] - a[2]; return Math.sqrt(dx * dx + dy * dy + dz * dz); },
 	} };
-	ent.anyInit = function (vm, self, args) { if (args[0] && args[0].cls && args[0].cls.name === SRC + 'World') self[':worldObj'] = args[0]; };
+	ent.anyInit = function (vm, self, args) { if (args[0] && args[0].cls && args[0].cls.name === SRC + 'World') self[':worldObj'] = args[0]; if (!self[':dataWatcher']) self[':dataWatcher'] = newWatcher(vm); };
+	ent.fields = { dataWatcher: 'L' + SRC + 'DataWatcher;' };
 	def('Entity', ent);
 	def('EntityLiving', { super: SRC + 'Entity', methods: {
 		'heal(I)V': function (vm, self, a) { op(vm, 'heal', a[0]); },
@@ -4601,10 +4962,12 @@ JVM.collectContent = function (vm, modId) {
 		if (shown && typeof shown === 'string' && !/^(tile|item)\.[^ ]*$/.test(shown.trim())) return shown.trim();
 		return k ? (r.lang[k + '.name'] || null) : null;
 	};
-	var overrides = function (o, keys) { return keys.some(function (k) { var m = o.cls.findMethod(k); return m && !m.cls.native; }); };
+	var betaAlt = {};
+	if (vm.$tag === 'babric' && JVM.STATION_BETA) JVM.STATION_BETA.block.concat(JVM.STATION_BETA.item).forEach(function (f) { betaAlt[f[0]] = f[1]; });
+	var overrides = function (o, keys) { return keys.some(function (k) { var m = o.cls.findMethod(k); if (!(m && !m.cls.native) && betaAlt[k]) m = o.cls.findMethod(betaAlt[k]); return m && !m.cls.native; }); };
 	var ref = function (id, data) {
 		var o = r.blocks[id] ? r.blocks[id] : r.items[id];
-		if (o) return (o.$mod === modId ? '' : o.$mod + ':') + (r.blocks[id] ? 'b' : 'i') + id;
+		if (o) return (o.$mod === modId ? '' : o.$mod + ':') + JVM.contentName(vm, id);
 		return 'minecraft:' + id + (data ? ':' + data : '');
 	};
 	var tex = function (icon) {
@@ -4613,12 +4976,19 @@ JVM.collectContent = function (vm, modId) {
 		return p >= 0 ? { mod: n.substring(0, p), name: n.substring(p + 1) } : { mod: null, name: n };
 	};
 	var legacy = function (o, side) {
-		if (!vm.$legacy || !JVM.legacyTexture) return null;
+		if (!(vm.$legacy || vm.$tag === 'babric') || !JVM.legacyTexture) return null;
 		var lt = JVM.legacyTexture(vm, o, side);
-		if (!lt || /^[/]?(terrain|gui[/]items)[.]png$/i.test(lt.sheet)) return null;
+		if (lt && lt.cell >= 4096) return null;
+		if (lt && /^[/]?(terrain|gui[/]items)[.]png$/i.test(lt.sheet)) {
+			var vn = JVM.vanillaCellName ? JVM.vanillaCellName(lt.sheet, lt.cell) : null;
+			return vn ? { mod: null, name: vn, vanilla: true } : null;
+		}
+		if (!lt) return null;
 		var base = lt.sheet.replace(/^[/]+/, '').replace(/[.]png$/i, '').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
 		return { mod: null, name: base + '_' + lt.cell, sheet: lt.sheet, cell: lt.cell };
 	};
+	var stFiles = vm.$stFiles && vm.$stFiles[modId];
+	var stationTex = function (o, side) { return stFiles && JVM.stationTexture ? JVM.stationTexture(vm, o, side, stFiles) : null; };
 	var BLOCK_SCRIPTED = ['onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z',
 		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V', 'onEntityWalking(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V',
 		'onBlockAdded(Lnet/minecraft/src/World;III)V', 'breakBlock(Lnet/minecraft/src/World;IIIII)V',
@@ -4635,8 +5005,10 @@ JVM.collectContent = function (vm, modId) {
 		safe(function () { vm.callVirtual(b, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [icons]); });
 		var faces = {}, FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
 		for (var s = 0; s < 6; s++) {
+			var sx = stationTex(b, s);
+			if (sx) { faces[FACE[s]] = sx.name; if (sx.file) out.textures['blocks/' + sx.name] = sx; continue; }
 			var lt = legacy(b, s);
-			if (lt) { faces[FACE[s]] = lt.name; out.textures['blocks/' + lt.name] = lt; continue; }
+			if (lt) { faces[FACE[s]] = lt.name; if (!lt.vanilla) out.textures['blocks/' + lt.name] = lt; continue; }
 			var t = tex(safe(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [s, 0]); }, null));
 			if (t) { faces[FACE[s]] = t.name; out.textures['blocks/' + t.name] = t; }
 		}
@@ -4663,20 +5035,20 @@ JVM.collectContent = function (vm, modId) {
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
 		if (overrides(b, BLOCK_SCRIPTED)) out.scripted.blocks[id] = true;
 		if (overrides(b, BLOCK_SCRIPTED.slice(0, 3)) || b[':needsRandomTick'] || overrides(b, [BLOCK_SCRIPTED[7]])) json.scripted = true;
-		out.blocks['b' + id] = json;
+		out.blocks[JVM.contentName(vm, id)] = json;
 	});
 	Object.keys(r.items).forEach(function (idS) {
 		var it = r.items[idS], id = +idS;
 		if (it.$mod !== modId || it.$override) return;
 		safe(function () { vm.callVirtual(it, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [icons]); });
-		var t = legacy(it, 0) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [0]); }, null));
-		if (t) out.textures['items/' + t.name] = t;
+		var t = stationTex(it, -1) || legacy(it, 0) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [0]); }, null));
+		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
 		var json = { name: langOf(it) || ('Item ' + id), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
 		if (it.$food) json.food = { hunger: it.$food[0], saturation: it.$food[1] };
 		if (it.$tool && it.$toolMat) json.tool = { type: it.$tool, level: it.$toolMat.$m[0], uses: it.$toolMat.$m[1], speed: it.$toolMat.$m[2], damage: it.$toolMat.$m[3] };
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED)) { json.scripted = true; out.scripted.items[id] = true; }
-		out.items['i' + id] = json;
+		out.items[JVM.contentName(vm, id)] = json;
 	});
 	var stackRef = function (o) {
 		if (!o) return null;
@@ -4724,6 +5096,21 @@ JVM.collectContent = function (vm, modId) {
 	return out;
 };
 
+JVM.contentName = function (vm, id) {
+	var r = reg(vm), o = r.blocks[id] || r.items[id];
+	var isBlock = !!r.blocks[id];
+	var st = o && o.$stId;
+	var n = st ? String(st).split(':').pop().toLowerCase().replace(/[^a-z0-9_]+/g, '_') : (isBlock ? 'b' : 'i') + id;
+	var map = vm.$cnames || (vm.$cnames = Object.create(null));
+	if (o) map[(o.$mod || '') + ':' + n] = id;
+	return n;
+};
+JVM.contentId = function (vm, mod, name) {
+	var m = /^[bi](\d+)$/.exec(name);
+	if (m) return +m[1];
+	var map = vm.$cnames;
+	return map && map[mod + ':' + name] != null ? map[mod + ':' + name] : null;
+};
 JVM.installMc152 = installMc152;
 JVM.mc152 = { worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
 })();
@@ -4797,6 +5184,7 @@ function installModels(vm) {
 		'<init>(Lnet/minecraft/src/ModelBase;Ljava/lang/String;)V': function (vm, self, a) { initRenderer(vm, self, a[0], a[1], 0, 0); },
 		'<init>(Lnet/minecraft/src/ModelBase;)V': function (vm, self, a) { initRenderer(vm, self, a[0], null, 0, 0); },
 		'<init>(Lnet/minecraft/src/ModelBase;II)V': function (vm, self, a) { initRenderer(vm, self, a[0], null, a[1], a[2]); },
+		'<init>(II)V': function (vm, self, a) { initRenderer(vm, self, null, null, a[0], a[1]); },
 		'addChild(Lnet/minecraft/src/ModelRenderer;)V': function (vm, self, a) { if (!self[':childModels']) self[':childModels'] = list(vm, []); listAdd(vm, self[':childModels'], a[0]); },
 		'setTextureOffset(II)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { self[':textureOffsetX'] = a[0]; self[':textureOffsetY'] = a[1]; return self; },
 		'addBox(Ljava/lang/String;FFFIII)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) {
@@ -4807,6 +5195,7 @@ function installModels(vm) {
 		},
 		'addBox(FFFIII)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { return addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], 0); },
 		'addBox(FFFIIIF)V': function (vm, self, a) { addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'addBox(FFFIII)V': function (vm, self, a) { addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], 0); },
 		'setRotationPoint(FFF)V': function (vm, self, a) { self[':rotationPointX'] = a[0]; self[':rotationPointY'] = a[1]; self[':rotationPointZ'] = a[2]; },
 		'setTextureSize(II)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { self[':textureWidth'] = a[0]; self[':textureHeight'] = a[1]; return self; },
 		'render(F)V': function (vm, self) { self.$drawn = true; }, 'renderWithRotation(F)V': function (vm, self) { self.$drawn = true; }, 'postRender(F)V': function () {},
@@ -4882,10 +5271,27 @@ function buildVanilla(vm, self, vmod, desc, args) {
 	Object.keys(arrays).forEach(function (k) { self[':' + k] = arrays[k]; });
 }
 
+function partsOf(vm, model) {
+	var all = listArr(vm, model[':boxList']);
+	if (all.length) return all;
+	var MRc = vm.loadClass(SRC + 'ModelRenderer'), out = [];
+	var add = function (v) { if (v && v.cls && out.indexOf(v) < 0 && vm.isInstance(v, MRc)) out.push(v); };
+	Object.keys(model).forEach(function (k) {
+		if (k[0] !== ':') return;
+		var v = model[k];
+		if (v instanceof JVM.JArray) Array.prototype.forEach.call(v.a, add); else add(v);
+	});
+	return out;
+}
+function callIfOwn(vm, o, key, args) {
+	var m = o.cls.findMethod(key);
+	if (m && !m.cls.native) JVM.run(vm, function () { vm.invoke(m, o, args); });
+}
+
 JVM.modelData = function (vm, model) {
 	if (!model) return null;
 	var seen = new Set(), childSet = new Set();
-	var all = listArr(vm, model[':boxList']);
+	var all = partsOf(vm, model);
 	all.forEach(function (r) { listArr(vm, r[':childModels']).forEach(function (c) { childSet.add(c); }); });
 	var part = function (r) {
 		seen.add(r);
@@ -4906,14 +5312,17 @@ JVM.pose = function (vm, model, entity) {
 	var e = entity || vm.newObject(vm.loadClass(SRC + 'EntityLiving'));
 	JVM.run(vm, function () { vm.callVirtual(model, 'setLivingAnimations', '(Lnet/minecraft/src/EntityLiving;FFF)V', [e, 0, 0, 1]); });
 	JVM.run(vm, function () { vm.callVirtual(model, 'setRotationAngles', '(FFFFFFLnet/minecraft/src/Entity;)V', [0, 0, 0, 0, 0, 0.0625, e]); });
+	callIfOwn(vm, model, 'setRotationAngles(FFFFFF)V', [0, 0, 0, 0, 0, 0.0625]);
 };
 JVM.drawnParts = function (vm, model, entity) {
-	var all = listArr(vm, model[':boxList']);
+	var all = partsOf(vm, model);
 	all.forEach(function (r) { r.$drawn = false; });
 	JVM.run(vm, function () { vm.callVirtual(model, 'render', '(Lnet/minecraft/src/Entity;FFFFFF)V', [entity || vm.newObject(vm.loadClass(SRC + 'EntityLiving')), 0, 0, 0, 0, 0, 0.0625]); });
+	callIfOwn(vm, model, 'render(FFFFFF)V', [0, 0, 0, 0, 0, 0.0625]);
 	var drawn = all.filter(function (r) { return r.$drawn; });
 	return drawn.length ? drawn : null;
 };
+JVM.modelParts = partsOf;
 JVM.installModels = installModels;
 })();
 
@@ -6515,6 +6924,7 @@ function installMobs(vm) {
 	});
 	var newOf = function (vm, cn) { return vm.newObject(vm.loadClass(cn)); };
 	var initLiving = function (vm, self, world) {
+		if (!self[':dataWatcher']) { var dw = vm.newObject(vm.loadClass(SRC + 'DataWatcher')); dw.$dw = {}; self[':dataWatcher'] = dw; }
 		if (self.$livingInit) return;
 		self.$livingInit = true;
 		if (world) self[':worldObj'] = world;
@@ -6570,7 +6980,8 @@ function installMobs(vm) {
 		c.$values = ['monster', 'creature', 'ambient', 'waterCreature'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
 	} });
 	vm.natives[SRC + 'EnumCreatureType'].staticMethods = { 'values()[Lnet/minecraft/src/EnumCreatureType;': function (vm) { var c = vm.loadClass(SRC + 'EnumCreatureType'); vm.initClass(c); return JVM.javaArray(vm, 'L' + SRC + 'EnumCreatureType;', c.$values.slice()); } };
-	var BIOMES = 'ocean Ocean,plains Plains,desert Desert,extremeHills Extreme Hills,forest Forest,taiga Taiga,swampland Swampland,river River,hell Hell,sky Sky,frozenOcean FrozenOcean,frozenRiver FrozenRiver,icePlains Ice Plains,iceMountains Ice Mountains,mushroomIsland MushroomIsland,mushroomIslandShore MushroomIslandShore,beach Beach,desertHills DesertHills,forestHills ForestHills,taigaHills TaigaHills,extremeHillsEdge Extreme Hills Edge,jungle Jungle,jungleHills JungleHills';
+	var BIOMES = 'ocean Ocean,plains Plains,desert Desert,extremeHills Extreme Hills,forest Forest,taiga Taiga,swampland Swampland,river River,hell Hell,sky Sky,frozenOcean FrozenOcean,frozenRiver FrozenRiver,icePlains Ice Plains,iceMountains Ice Mountains,mushroomIsland MushroomIsland,mushroomIslandShore MushroomIslandShore,beach Beach,desertHills DesertHills,forestHills ForestHills,taigaHills TaigaHills,extremeHillsEdge Extreme Hills Edge,jungle Jungle,jungleHills JungleHills' +
+		',rainforest Rainforest,seasonalForest Seasonal Forest,savanna Savanna,shrubland Shrubland,iceDesert Ice Desert,tundra Tundra';
 	var bstat = { biomeList: null };
 	BIOMES.split(',').forEach(function (kv) { bstat[kv.split(' ')[0]] = null; });
 	def('BiomeGenBase', { fields: { biomeName: 'Ljava/lang/String;', biomeID: 'I' }, statics: bstat, clinit: function (vm, c) {
@@ -6695,7 +7106,7 @@ function jemOf(vm, model, entity) {
 		else if (v && v.a && v.cls && v.cls.name === '[L' + SRC + 'ModelRenderer;') Array.prototype.forEach.call(v.a, function (x, i) { if (x && !fieldOf.has(x)) fieldOf.set(x, k.substring(1) + i); });
 	});
 	var all = [];
-	(function collect(l) { var arr = l ? Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a) : []; arr.forEach(function (r) { all.push(r); }); })(model[':boxList']);
+	JVM.modelParts(vm, model).forEach(function (r) { all.push(r); });
 	var nameFor = function (r, i) {
 		var n = fieldOf.get(r) || r[':boxName'] || ('part' + i);
 		n = String(n).replace(/^biped/, '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
@@ -6741,6 +7152,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 	if (f) f.spawns.forEach(function (s) { var a = s.args; spawns.push({ cls: a[0] && a[0].$cls, name: typeof a[0] === 'string' ? a[0] : null, weight: a[1], min: a[2], max: a[3], type: a[4] && a[4].$name, biomes: a[5] ? Array.prototype.slice.call(a[5].a) : null }); });
 	var renderers = new Map();
 	if (f) f.renderers.forEach(function (r) { if (r.cls) renderers.set(r.cls, r.render); });
+	mb.renderers.forEach(function (r) { if (r.cls && (r.mod || '') === modId) renderers.set(r.cls, r.render); });
 	reg(vm).mods.forEach(function (m) {
 		if ((m.$mod || m.cls.source) !== modId && m.cls.source !== modId) return;
 		safe(function () {
@@ -6832,6 +7244,8 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		var tex = safe(function () { return vm.callVirtual(ent, 'getTexture', '()Ljava/lang/String;', []); }, null) || ent[':texture'];
 		if ((!tex || tex === '/mob/char.png') && vanilla) tex = '/' + vanilla[1];
 		var tp = String(tex || '').replace(/^[/]+/, '');
+		var ns = /^([a-z0-9_.-]+):(.+)$/.exec(tp);
+		if (ns && !vm.resources[tp]) tp = ['assets/' + ns[1] + '/stationapi/' + ns[2], 'assets/' + ns[1] + '/' + ns[2], ns[2]].filter(function (p) { return vm.resources[p]; })[0] || tp;
 		if (vm.resources[tp]) { out.files['textures/entity/' + key + '.png'] = vm.resources[tp]; json.texture = 'textures/entity/' + key + '.png'; }
 		else if (/^mob[/]/.test(tp)) json.texture = 'minecraft:' + tp;
 		else { out.skipped.push(e.name + ' (no texture ' + tex + ')'); return; }
@@ -8021,8 +8435,15 @@ var LIBS = [
 	[/^net[/]minecraft[/]src[/](GuiAPI|WidgetSimplewindow)/, 'GuiAPI'],
 	[/^shadersmod|^optifine/i, 'OptiFine'],
 	[/^paulscode[/]sound|^ibxm[/]/, null],
+	[/^kotlin[/]|^kotlinx[/]/, 'Fabric Language Kotlin'],
+	[/^net[/]lomeli[/]lomlib[/]/, 'LomLib'],
+	[/^paulevs[/]bhcreative[/]/, 'BH Creative'],
+	[/^net[/]glasslauncher[/]mods[/]api[/]gcapi|^net[/]glasslauncher[/]mods[/]gcapi/, 'Glass Config API'],
+	[/^net[/]glasslauncher[/]mods[/]alwaysmoreitems|^net[/]glasslauncher[/]hmifabric/, null],
+	[/^com[/]terraformersmc[/]modmenu|^io[/]github[/]prospector[/]modmenu/, null],
+	[/^org[/]spongepowered[/]asm[/]/, null],
 ];
-var OWN = /^(java|javax|org[/]lwjgl|net[/]minecraft|cpw[/]mods[/]fml|net[/]minecraftforge|mcre|sun|com[/]google[/]common|argo|org[/]bouncycastle)[/]/;
+var OWN = /^(java|javax|org[/]lwjgl|net[/]minecraft|cpw[/]mods[/]fml|net[/]minecraftforge|mcre|sun|com[/]google[/]common|argo|org[/]bouncycastle|net[/]fabricmc|net[/]modificationstation|net[/]mine_diver|org[/]apache[/]logging|org[/]slf4j|it[/]unimi|org[/]jetbrains|lombok)[/]/;
 
 JVM.javaReport = function (vm, modId, o) {
 	o = o || {};
@@ -8033,6 +8454,8 @@ JVM.javaReport = function (vm, modId, o) {
 	var own = o.classes ? new Set(o.classes) : null;
 	Object.keys(un).forEach(function (key) {
 		var text = key + ' ' + un[key];
+		var fm = /^feature:(.+)$/.exec(key);
+		if (fm) { feats[fm[1]] = true; return; }
 		var cm = /^class:(.+)$/.exec(key);
 		if (cm && !OWN.test(cm[1]) && !(own && own.has(cm[1]))) {
 			var lib = null;
@@ -8093,9 +8516,10 @@ JVM.mapTagFor = function (version) {
 	if (/^1[.]5[.][01]$/.test(v)) return 'mcp151';
 	if (/^1[.]4[.][67]$|^1[.]4[.]x$/.test(v)) return 'mcp147';
 	if (/^1[.]6([.][0-4])?$|^1[.]6[.]x$/.test(v)) return 'mcp164';
+	if (/^(b|beta\s*)1[.]7([.]3)?$|^1[.]0[.]0-beta[.]7[.]3$/i.test(v)) return 'babric';
 	return null;
 };
-JVM.versionOfTag = { mcp147: '1.4.7', mcp151: '1.5.1', mcp152: '1.5.2', mcp164: '1.6.4' };
+JVM.versionOfTag = { mcp147: '1.4.7', mcp151: '1.5.1', mcp152: '1.5.2', mcp164: '1.6.4', babric: 'Beta 1.7.3' };
 
 JVM.javaKind = function (vm, classes, files) {
 	var text = function (n) { var b = files[n]; try { return b ? new TextDecoder().decode(b).replace(/^﻿/, '') : null; } catch (e) { return null; } };
@@ -8104,12 +8528,16 @@ JVM.javaKind = function (vm, classes, files) {
 	try { fj = text('fabric.mod.json') && JSON.parse(text('fabric.mod.json')); } catch (e) { fj = null; }
 	try { mi = text('mcmod.info') && JSON.parse(text('mcmod.info')); } catch (e) { mi = null; }
 	if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
+	if (!fj && files['plugin.yml'] && !classes.some(function (c) { return /^mod_[^/$]+$/.test(c); })) { out.loader = ''; out.cant = 'it is a server plugin (Bukkit / Spigot), not a mod for the game'; return out; }
 	if (fj) {
 		var dep = fj.depends && fj.depends.minecraft;
 		var babric = (typeof dep === 'string' && /b1[.]7|beta|1[.]0[.]0-beta/.test(dep)) || !!(fj.depends && (fj.depends.stationapi || fj.depends['station-api']));
 		out.loader = babric ? 'Babric' : 'Fabric';
 		out.version = babric ? 'Beta 1.7.3' : (typeof dep === 'string' ? dep.replace(/[~^>=<*\s]/g, '') : '');
-		if (!babric) out.cant = 'made for Fabric on Minecraft ' + (out.version || 'a newer version') + ' (only Beta 1.7.3 Babric mods can be supported)';
+		if (!babric) { out.cant = 'made for Fabric on Minecraft ' + (out.version || 'a newer version') + ' (only Beta 1.7.3 Babric mods can be supported)'; return out; }
+		var bk = JVM.babricKind ? JVM.babricKind(fj, files) : { runnable: true, mixins: 0 };
+		out.mixins = bk.mixins;
+		if (!bk.runnable) out.cant = bk.mixins ? "it only changes the game's own code (mixins), which can't be done here" : 'nothing in it runs (no entrypoints)';
 		return out;
 	}
 	var mlEntry = classes.some(function (c) { return /^mod_[^/$]+$/.test(c); });
@@ -8195,6 +8623,1165 @@ JVM.legacyTexture = function (vm, o, side) {
 };
 
 JVM.installLegacy = installLegacy;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', ST = 'net/modificationstation/stationapi/api/';
+var ID = ST + 'util/Identifier', NS = ST + 'util/Namespace';
+var LID = 'L' + ID + ';', LNS = 'L' + NS + ';', OBJ = 'Ljava/lang/Object;', STR = 'Ljava/lang/String;';
+var EV = 'net/mine_diver/unsafeevents/Event';
+var D = function () { return JVM.STATION_DATA || { blocks: {}, items: {}, terrain: {}, sheet: {}, templates: {} }; };
+function reg(vm) { return JVM.mc152.reg(vm); }
+function st(vm) {
+	return vm.$st || (vm.$st = {
+		ids: Object.create(null), spaces: Object.create(null),
+		listeners: [],
+		registries: Object.create(null),
+		fabricIds: Object.create(null),
+		mods: Object.create(null),
+		tags: Object.create(null),
+		sprites: Object.create(null),
+		nextSprite: 4096, nextBlock: 1000, nextItem: 5000, nextToolMat: 5,
+	});
+}
+
+function identifier(vm, ns, path) {
+	var s = st(vm), key = ns + ':' + path, o = s.ids[key];
+	if (o) return o;
+	o = vm.newObject(vm.loadClass(ID));
+	o[':namespace'] = namespace(vm, ns); o[':path'] = path; o.$s = key;
+	o[':modID'] = o[':namespace']; o[':id'] = path;
+	return (s.ids[key] = o);
+}
+function parseId(vm, str) {
+	str = String(str);
+	var i = str.indexOf(':');
+	return i < 0 ? identifier(vm, 'minecraft', str) : identifier(vm, str.substring(0, i), str.substring(i + 1));
+}
+function namespace(vm, name) {
+	var s = st(vm), o = s.spaces[name];
+	if (o) return o;
+	o = vm.newObject(vm.loadClass(NS)); o.$s = String(name);
+	return (s.spaces[name] = o);
+}
+function callerSpace(vm) {
+	var fr = vm.frames, s = st(vm);
+	if (fr) for (var i = fr.length - 1; i >= 0; i--) { var src = fr[i].m && fr[i].m.cls && fr[i].m.cls.source; if (src && s.fabricIds[src]) return s.fabricIds[src]; }
+	return s.fabricIds[vm.currentMod] || vm.currentMod || 'minecraft';
+}
+
+function registry(vm, name) {
+	var s = st(vm);
+	return s.registries[name] || (s.registries[name] = { name: name, byId: Object.create(null), list: [] });
+}
+function register(vm, regName, id, obj) {
+	var r = registry(vm, regName), key = id.$s || String(id);
+	r.byId[key] = obj; r.list.push(obj);
+	if (obj && typeof obj === 'object') obj.$stId = key;
+	return obj;
+}
+function regOf(vm, o) { return o && o.$stReg ? o.$stReg : (o && o.$s) || 'unknown'; }
+
+function fire(vm, ev, onlyMod) {
+	var s = st(vm);
+	s.listeners.slice().forEach(function (l) {
+		if (onlyMod && l.mod !== onlyMod) return;
+		var pc = vm.classFor(l.type);
+		if (pc.absent || !vm.isInstance(ev, pc)) return;
+		var prev = vm.currentMod;
+		vm.currentMod = l.mod;
+		var r = JVM.run(vm, function () { vm.invoke(l.m, l.m.access & JVM.ACC_STATIC ? null : l.obj, [ev]); });
+		if (!r.ok) vm.log('error', 'StationAPI event ' + ev.cls.name.split('/').pop() + ' -> ' + l.m.cls.name.split('/').pop() + '.' + l.m.name + ' failed');
+		vm.currentMod = prev;
+	});
+	return ev;
+}
+function newEvent(vm, cls, fields) {
+	var o = vm.newObject(vm.loadClass(cls));
+	Object.keys(fields || {}).forEach(function (k) { o[':' + k] = fields[k]; });
+	return o;
+}
+
+function superInit(vm, cls, self, desc, args) {
+	var sc = cls.superClass;
+	var m = sc && sc.findDeclared('<init>' + desc);
+	if (m) return vm.invoke(m, self, args);
+	for (var k = sc; k; k = k.superClass) {
+		var spec = k.native && vm.natives[k.name];
+		if (spec && spec.anyInit) return spec.anyInit(vm, self, args, desc);
+	}
+}
+function mapDesc(vm, d) { return d.replace(/L([^;]+);/g, function (all, c) { var m = vm.mapClass ? vm.mapClass(c) : null; return 'L' + (m || c) + ';'; }); }
+function mapName(vm, c) { return (vm.mapClass && vm.mapClass(c)) || c; }
+
+function installStation(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+	vm.autoBlockId = function (vm) {
+		var bc = vm.loadClass(SRC + 'Block'), list = bc.statics.blocksList.a, s = st(vm);
+		while (s.nextBlock < list.length && list[s.nextBlock]) s.nextBlock++;
+		return s.nextBlock++;
+	};
+	vm.autoItemId = function (vm) {
+		var ic = vm.loadClass(SRC + 'Item'), list = ic.statics.itemsList.a, s = st(vm);
+		while (s.nextItem < list.length && list[s.nextItem]) s.nextItem++;
+		return s.nextItem++;
+	};
+
+	def('net/fabricmc/api/ModInitializer', { access: I, abstractMethods: { 'onInitialize()V': true } });
+	def('net/fabricmc/api/ClientModInitializer', { access: I, abstractMethods: { 'onInitializeClient()V': true } });
+	def('net/fabricmc/api/DedicatedServerModInitializer', { access: I, abstractMethods: { 'onInitializeServer()V': true } });
+	def('net/fabricmc/api/EnvType', { super: 'java/lang/Enum', statics: { CLIENT: null, SERVER: null }, clinit: function (vm, c) {
+		['CLIENT', 'SERVER'].forEach(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; });
+		c.$values = [c.statics.CLIENT, c.statics.SERVER];
+	} });
+	var modContainer = function (vm, m) {
+		var o = vm.newObject(vm.loadClass('mcre/FabricMod')); o.$m = m; return o;
+	};
+	def('net/fabricmc/loader/api/ModContainer', { access: I });
+	def('net/fabricmc/loader/api/metadata/ModMetadata', { access: I });
+	def('net/fabricmc/loader/api/Version', { access: I });
+	def('mcre/FabricMod', { interfaces: ['net/fabricmc/loader/api/ModContainer', 'net/fabricmc/loader/api/metadata/ModMetadata', 'net/fabricmc/loader/api/Version'], methods: {
+		'getMetadata()Lnet/fabricmc/loader/api/metadata/ModMetadata;': function (vm, self) { return self; },
+		'getId()Ljava/lang/String;': function (vm, self) { return self.$m.id; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$m.name || self.$m.id; },
+		'getVersion()Lnet/fabricmc/loader/api/Version;': function (vm, self) { return self; },
+		'getFriendlyString()Ljava/lang/String;': function (vm, self) { return String(self.$m.version || '1.0'); },
+		'toString()Ljava/lang/String;': function (vm, self) { return String(self.$m.version || self.$m.id); },
+		'getDescription()Ljava/lang/String;': function (vm, self) { return String(self.$m.description || ''); },
+		'getType()Ljava/lang/String;': function () { return 'fabric'; },
+	} });
+	var BUILTIN = { minecraft: '1.0.0-beta.7.3', java: '17', fabricloader: '0.16.0', stationapi: '2.0.0', 'station-api': '2.0.0', fabric: '1' };
+	var loaded = function (vm, id) {
+		if (BUILTIN[id]) return { id: id, name: id, version: BUILTIN[id] };
+		if (/^station-/.test(id)) return { id: id, name: id, version: '2.0.0' };
+		return st(vm).mods[id] || null;
+	};
+	def('net/fabricmc/loader/api/FabricLoader', { access: I, staticMethods: {
+		'getInstance()Lnet/fabricmc/loader/api/FabricLoader;': function (vm) { return vm.$fabric || (vm.$fabric = vm.newObject(vm.loadClass('mcre/FabricLoader'))); },
+	} });
+	def('mcre/FabricLoader', { interfaces: ['net/fabricmc/loader/api/FabricLoader'], methods: {
+		'isModLoaded(Ljava/lang/String;)Z': function (vm, self, a) { return loaded(vm, a[0]) ? 1 : 0; },
+		'getModContainer(Ljava/lang/String;)Ljava/util/Optional;': function (vm, self, a) {
+			var m = loaded(vm, a[0]);
+			return vm.callStatic('java/util/Optional', m ? 'of' : 'empty', m ? '(Ljava/lang/Object;)Ljava/util/Optional;' : '()Ljava/util/Optional;', m ? [modContainer(vm, m)] : []);
+		},
+		'getAllMods()Ljava/util/Collection;': function (vm) { var s = st(vm); return JVM.newList(vm, Object.keys(s.mods).map(function (k) { return modContainer(vm, s.mods[k]); })); },
+		'getEnvironmentType()Lnet/fabricmc/api/EnvType;': function (vm) { var c = vm.loadClass('net/fabricmc/api/EnvType'); vm.initClass(c); return c.statics.CLIENT; },
+		'isDevelopmentEnvironment()Z': function () { return 0; },
+		'getEntrypoints(Ljava/lang/String;Ljava/lang/Class;)Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getConfigDirectory()Ljava/io/File;': function (vm) { var f = vm.newObject(vm.loadClass('java/io/File')); vm.callVirtual(f, '<init>', '(Ljava/lang/String;)V', ['config']); return f; },
+		'getGameDirectory()Ljava/io/File;': function (vm) { var f = vm.newObject(vm.loadClass('java/io/File')); vm.callVirtual(f, '<init>', '(Ljava/lang/String;)V', ['.']); return f; },
+		'getGameInstance()Ljava/lang/Object;': function (vm) { return vm.callStatic(SRC + 'ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []); },
+	} });
+
+	var logFn = function (level) { return function (vm, self, a) { var t = a[0] == null ? 'null' : String(a[0].$s || a[0]); var args = a[1] && a[1].a ? a[1].a : a.slice(1); args.forEach(function (x) { t = t.replace('{}', x == null ? 'null' : JVM.stringOf ? JVM.stringOf(vm, x) : String(x)); }); vm.log(level === 'error' ? 'warn' : 'out', '[' + (self.$name || 'mod') + '] ' + t); }; };
+	var logMethods = {};
+	['info', 'warn', 'error', 'debug', 'trace', 'fatal'].forEach(function (lv) {
+		['(' + STR + ')V', '(' + STR + OBJ + ')V', '(' + STR + OBJ + OBJ + ')V', '(' + STR + '[' + OBJ + ')V', '(' + OBJ + ')V', '(' + STR + 'Ljava/lang/Throwable;)V'].forEach(function (d) { logMethods[lv + d] = lv === 'debug' || lv === 'trace' ? function () {} : logFn(lv); });
+	});
+	logMethods['getName()Ljava/lang/String;'] = function (vm, self) { return self.$name || ''; };
+	def('org/apache/logging/log4j/Logger', { access: I });
+	def('org/slf4j/Logger', { access: I });
+	def('mcre/Log', { interfaces: ['org/apache/logging/log4j/Logger', 'org/slf4j/Logger'], methods: logMethods });
+	var logger = function (vm, name) { var o = vm.newObject(vm.loadClass('mcre/Log')); o.$name = String(name); return o; };
+	def('org/apache/logging/log4j/LogManager', { staticMethods: {
+		'getLogger(Ljava/lang/String;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { return logger(vm, a[0]); },
+		'getLogger(Ljava/lang/Class;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { return logger(vm, a[0] && a[0].$cls ? a[0].$cls.name.split('/').pop() : 'mod'); },
+		'getLogger()Lorg/apache/logging/log4j/Logger;': function (vm) { return logger(vm, callerSpace(vm)); },
+	} });
+	def('org/slf4j/LoggerFactory', { staticMethods: {
+		'getLogger(Ljava/lang/String;)Lorg/slf4j/Logger;': function (vm, n, a) { return logger(vm, a[0]); },
+		'getLogger(Ljava/lang/Class;)Lorg/slf4j/Logger;': function (vm, n, a) { return logger(vm, a[0] && a[0].$cls ? a[0].$cls.name.split('/').pop() : 'mod'); },
+	} });
+
+	def(ID, { fields: { namespace: LNS, path: STR }, staticMethods: {
+		'of(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, n, a) { return parseId(vm, a[0]); },
+		'of(Lnet/modificationstation/stationapi/api/util/Namespace;Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, n, a) { return identifier(vm, a[0].$s, a[1]); },
+		'tryParse(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, n, a) { return a[0] == null ? null : parseId(vm, a[0]); },
+	}, methods: {
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$s; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$s); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$s === self.$s && a[0].cls === self.cls ? 1 : 0; },
+		'compareTo(Lnet/modificationstation/stationapi/api/util/Identifier;)I': function (vm, self, a) { return self.$s < a[0].$s ? -1 : self.$s > a[0].$s ? 1 : 0; },
+		'compareTo(Ljava/lang/Object;)I': function (vm, self, a) { return self.$s < a[0].$s ? -1 : self.$s > a[0].$s ? 1 : 0; },
+		'getNamespace()Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, self) { return self[':namespace']; },
+		'getPath()Ljava/lang/String;': function (vm, self) { return self[':path']; },
+		'getModID()Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, self) { return self[':namespace']; },
+		'getId()Ljava/lang/String;': function (vm, self) { return self[':path']; },
+		'withPath(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return identifier(vm, self[':namespace'].$s, a[0]); },
+		'withPrefixedPath(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return identifier(vm, self[':namespace'].$s, a[0] + self[':path']); },
+		'withSuffixedPath(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return identifier(vm, self[':namespace'].$s, self[':path'] + a[0]); },
+	} });
+	def(NS, { statics: { MINECRAFT: null }, clinit: function (vm, c) { c.statics.MINECRAFT = namespace(vm, 'minecraft'); }, staticMethods: {
+		'of(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, n, a) { return namespace(vm, a[0]); },
+		'of(Lnet/fabricmc/loader/api/ModContainer;)Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, n, a) { return namespace(vm, a[0] && a[0].$m ? a[0].$m.id : callerSpace(vm)); },
+		'of(Lnet/fabricmc/loader/api/metadata/ModMetadata;)Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, n, a) { return namespace(vm, a[0] && a[0].$m ? a[0].$m.id : callerSpace(vm)); },
+		'resolve()Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm) { return namespace(vm, callerSpace(vm)); },
+		'resolve(Ljava/lang/Class;)Lnet/modificationstation/stationapi/api/util/Namespace;': function (vm, n, a) {
+			var c = a[0] && a[0].$cls, s = st(vm);
+			return namespace(vm, (c && s.fabricIds[c.source]) || callerSpace(vm));
+		},
+	}, methods: {
+		'id(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return identifier(vm, self.$s, a[0]); },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$s; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$s; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$s); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] === self ? 1 : 0; },
+		'getLogger()Lorg/apache/logging/log4j/Logger;': function (vm, self) { return logger(vm, self.$s + '|Mod'); },
+		'getLogger(Ljava/lang/String;)Lorg/apache/logging/log4j/Logger;': function (vm, self, a) { return logger(vm, a[0]); },
+		'getContainer()Lnet/fabricmc/loader/api/ModContainer;': function (vm, self) { var m = loaded(vm, self.$s); return m ? modContainer(vm, m) : null; },
+	} });
+	def(ST + 'util/Null', { staticMethods: { 'get()Ljava/lang/Object;': function () { return null; } } });
+	def(ST + 'mod/entrypoint/EntrypointManager', { staticMethods: {
+		'registerLookup(Ljava/lang/invoke/MethodHandles$Lookup;)V': function () {},
+		'setup(Ljava/lang/Object;Lnet/fabricmc/loader/api/ModContainer;)V': function (vm, n, a) { setupEntrypoint(vm, a[0], vm.currentMod); },
+	} });
+	def('java/lang/invoke/MethodHandles', { staticMethods: { 'lookup()Ljava/lang/invoke/MethodHandles$Lookup;': function (vm) { return vm.newObject(vm.loadClass('java/lang/invoke/MethodHandles$Lookup')); } } });
+	def('java/lang/invoke/MethodHandles$Lookup', {});
+
+	def(EV, { methods: {
+		'isCanceled()Z': function (vm, self) { return self.$canceled ? 1 : 0; },
+		'isCancelled()Z': function (vm, self) { return self.$canceled ? 1 : 0; },
+		'cancel()V': function (vm, self) { self.$canceled = true; },
+		'isCancelable()Z': function () { return 1; },
+		'getEventID()I': function () { return 0; },
+	} });
+	def('net/mine_diver/unsafeevents/EventBus', { methods: {
+		'post(Lnet/mine_diver/unsafeevents/Event;)Lnet/mine_diver/unsafeevents/Event;': function (vm, self, a) { return fire(vm, a[0]); },
+		'register(Ljava/lang/Class;)V': function (vm, self, a) { if (a[0] && a[0].$cls) addListeners(vm, a[0].$cls, null, vm.currentMod); },
+		'register(Ljava/lang/Object;)V': function (vm, self, a) { if (a[0]) addListeners(vm, a[0].cls, a[0], vm.currentMod); },
+	} });
+	def(ST + 'StationAPI', { statics: { EVENT_BUS: null, NAMESPACE: null, LOGGER: null }, clinit: function (vm, c) {
+		c.statics.EVENT_BUS = vm.newObject(vm.loadClass('net/mine_diver/unsafeevents/EventBus'));
+		c.statics.NAMESPACE = namespace(vm, 'stationapi');
+		c.statics.LOGGER = logger(vm, 'StationAPI');
+	} });
+	var ev = function (name, sup, extra) { def(ST + name, Object.assign({ super: sup ? ST + sup : EV }, extra || {})); };
+	['event/mod/PreInitEvent', 'event/mod/InitEvent', 'event/mod/PostInitEvent', 'event/init/InitFinishedEvent',
+		'client/event/texture/TextureRegisterEvent', 'event/registry/AfterBlockAndItemRegisterEvent', 'event/tick/GameTickEvent'].forEach(function (n) { ev(n); });
+	ev('event/tick/GameTickEvent$End', 'event/tick/GameTickEvent');
+	ev('event/registry/RegistryEvent', null, { fields: { registry: OBJ } });
+	ev('event/registry/RegistryEvent$EntryTypeBound', 'event/registry/RegistryEvent', { methods: {
+		'register(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return register(vm, self[':registry'].$s, a[0], a[1]); },
+		'register(ILnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return register(vm, self[':registry'].$s, a[1], a[2]); },
+	} });
+	ev('event/registry/RegistryEvent$Logical', 'event/registry/RegistryEvent$EntryTypeBound');
+	['BlockRegistryEvent', 'ItemRegistryEvent', 'BlockItemRegistryEvent', 'DimensionRegistryEvent', 'EntityHandlerRegistryEvent',
+		'MobHandlerRegistryEvent', 'GuiHandlerRegistryEvent', 'MessageListenerRegistryEvent', 'StatRegistryEvent'].forEach(function (n) { ev('event/registry/' + n, 'event/registry/RegistryEvent$EntryTypeBound'); });
+	ev('event/recipe/RecipeRegisterEvent', null, { fields: { recipeId: LID } });
+	var RV = ST + 'event/recipe/RecipeRegisterEvent$Vanilla';
+	def(RV, { super: 'java/lang/Enum', statics: { CRAFTING_SHAPED: null, CRAFTING_SHAPELESS: null, SMELTING: null }, clinit: function (vm, c) {
+		c.$values = ['CRAFTING_SHAPED', 'CRAFTING_SHAPELESS', 'SMELTING'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; o.$type = identifier(vm, 'minecraft', n.toLowerCase()); c.statics[n] = o; return o; });
+	}, methods: {
+		'type()Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self) { return self.$type; },
+		'name()Ljava/lang/String;': function (vm, self) { return self.$name; },
+	}, staticMethods: {
+		'fromType(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/event/recipe/RecipeRegisterEvent$Vanilla;': function (vm, n, a) { var c = vm.loadClass(RV); vm.initClass(c); return c.$values.filter(function (v) { return v.$type === a[0]; })[0] || null; },
+		'values()[Lnet/modificationstation/stationapi/api/event/recipe/RecipeRegisterEvent$Vanilla;': function (vm) { var c = vm.loadClass(RV); vm.initClass(c); return JVM.javaArray(vm, 'L' + RV + ';', c.$values.slice()); },
+	} });
+	ev('event/block/entity/BlockEntityRegisterEvent', null, { methods: {
+		'register(Ljava/lang/String;Ljava/lang/Class;)V': function (vm, self, a) { regTile(vm, a[1], a[0]); },
+		'register(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Class;)V': function (vm, self, a) { regTile(vm, a[1], a[0].$s); },
+	} });
+	var regTile = function (vm, cls, name) { if (JVM.registerTile && cls) JVM.registerTile(vm, cls.$cls || cls, String(name)); };
+	ev('event/entity/EntityRegister', null, { methods: {
+		'register(Ljava/lang/Class;Ljava/lang/String;)V': function (vm, self, a) { regEntity(vm, a[0], a[1]); },
+		'register(Ljava/lang/Class;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, self, a) { regEntity(vm, a[0], a[1].$s); },
+	} });
+	ev('event/entity/EntityRegisterEvent', 'event/entity/EntityRegister', { methods: {
+		'register(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Class;)V': function (vm, self, a) { regEntity(vm, a[1], a[0].$s); },
+		'register(Ljava/lang/String;Ljava/lang/Class;)V': function (vm, self, a) { regEntity(vm, a[1], a[0]); },
+	} });
+	var regEntity = function (vm, cls, name) {
+		var id = (vm.mcEntityIds = (vm.mcEntityIds || 200) + 1);
+		JVM.run(vm, function () { vm.callStatic(SRC + 'EntityList', 'addMapping', '(Ljava/lang/Class;Ljava/lang/String;I)V', [cls, String(name).replace(/^[^:]*:/, ''), id]); });
+	};
+	ev('event/world/WorldEvent', null, { fields: { world: OBJ } });
+	ev('event/world/gen/WorldGenEvent', 'event/world/WorldEvent', { fields: { worldSource: OBJ } });
+	ev('event/world/gen/WorldGenEvent$ChunkDecoration', 'event/world/gen/WorldGenEvent', { fields: { biome: OBJ, x: 'I', z: 'I', random: OBJ } });
+	ev('event/worldgen/biome/BiomeModificationEvent', null, { fields: { world: OBJ, biome: OBJ } });
+	ev('client/event/render/entity/EntityRendererRegisterEvent', null, { fields: { renderers: 'Ljava/util/Map;' } });
+	var MB = vm.natives[SRC + 'BiomeGenBase'];
+	var spawnAdd = function (type) { return function (vm, self, a) {
+		var r = reg(vm), mb = r.mobs || (r.mobs = { entities: [], spawns: [], renderers: [], mappings: [] });
+		mb.spawns.push({ cls: a[0] && a[0].$cls, weight: a[1], min: 1, max: 4, type: type, biomes: [self], mod: vm.currentMod });
+	}; };
+	if (MB) MB.methods = Object.assign({}, MB.methods, {
+		'addPassiveEntity(Ljava/lang/Class;I)V': spawnAdd('creature'),
+		'addHostileEntity(Ljava/lang/Class;I)V': spawnAdd('monster'),
+		'addWaterEntity(Ljava/lang/Class;I)V': spawnAdd('waterCreature'),
+	});
+
+	var regClass = function (name, key) {
+		def(ST + 'registry/' + name, { statics: { INSTANCE: null, KEY: null, AUTO_ID: null }, clinit: function (vm, c) {
+			var o = vm.newObject(c); o.$s = key; c.statics.INSTANCE = o;
+			var k = vm.newObject(vm.loadClass(ST + 'registry/RegistryKey')); k.$s = key; c.statics.KEY = k;
+			c.statics.AUTO_ID = name === 'ItemRegistry' ? -257 : -1;
+		}, methods: {
+			'get(Lnet/modificationstation/stationapi/api/util/Identifier;)Ljava/lang/Object;': function (vm, self, a) { return a[0] ? (registry(vm, key).byId[a[0].$s] || lookupVanilla(vm, key, a[0].$s)) : null; },
+			'getId(Ljava/lang/Object;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return a[0] && a[0].$stId ? parseId(vm, a[0].$stId) : null; },
+			'containsId(Lnet/modificationstation/stationapi/api/util/Identifier;)Z': function (vm, self, a) { return a[0] && (registry(vm, key).byId[a[0].$s] || lookupVanilla(vm, key, a[0].$s)) ? 1 : 0; },
+			'getOrEmpty(Lnet/modificationstation/stationapi/api/util/Identifier;)Ljava/util/Optional;': function (vm, self, a) { var v = a[0] ? registry(vm, key).byId[a[0].$s] || lookupVanilla(vm, key, a[0].$s) : null; return vm.callStatic('java/util/Optional', 'ofNullable', '(Ljava/lang/Object;)Ljava/util/Optional;', [v || null]); },
+		} });
+	};
+	def(ST + 'registry/RegistryKey', { methods: { 'toString()Ljava/lang/String;': function (vm, self) { return self.$s; } }, staticMethods: {
+		'of(Lnet/modificationstation/stationapi/api/registry/RegistryKey;Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/registry/RegistryKey;': function (vm, n, a) { var k = vm.newObject(vm.loadClass(ST + 'registry/RegistryKey')); k.$s = a[1].$s; k.$reg = a[0] && a[0].$s; return k; },
+	} });
+	[['BlockRegistry', 'block'], ['ItemRegistry', 'item'], ['BlockEntityRegistry', 'block_entity'], ['EntityRegistry', 'entity_type'], ['DimensionRegistry', 'dimension'], ['BiomeRegistry', 'biome']].forEach(function (p) { regClass(p[0], p[1]); });
+	def(ST + 'registry/Registry', { access: I, staticMethods: {
+		'register(Lnet/modificationstation/stationapi/api/registry/Registry;Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { return register(vm, a[0] ? a[0].$s : '?', a[1], a[2]); },
+		'register(Lnet/modificationstation/stationapi/api/registry/Registry;ILnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { return register(vm, a[0] ? a[0].$s : '?', a[2], a[3]); },
+		'register(Lnet/modificationstation/stationapi/api/registry/Registry;Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, n, a) { return register(vm, a[0] ? a[0].$s : '?', parseId(vm, a[1]), a[2]); },
+	} });
+	function lookupVanilla(vm, regKey, str) {
+		var p = String(str).split(':'), name = p.length > 1 ? p[1] : p[0];
+		if (p.length > 1 && p[0] !== 'minecraft') return null;
+		if (regKey === 'block' && D().blocks[name]) { var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc); return bc.statics.blocksList.a[D().blocks[name]] || null; }
+		if (regKey === 'item') {
+			var ic = vm.loadClass(SRC + 'Item'); vm.initClass(ic);
+			if (D().items[name]) return ic.statics.itemsList.a[D().items[name]] || null;
+			if (D().blocks[name]) return blockItem(vm, D().blocks[name]);
+		}
+		return null;
+	}
+	function blockItem(vm, id) {
+		var ic = vm.loadClass(SRC + 'Item'); vm.initClass(ic);
+		var it = ic.statics.itemsList.a[id];
+		if (it) return it;
+		var o = vm.newObject(vm.loadClass(SRC + 'ItemBlock'));
+		vm.callVirtual(o, '<init>', '(I)V', [id - 256]);
+		return o;
+	}
+
+	def(ST + 'tag/TagKey', { methods: {
+		'id()Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self) { return parseId(vm, self.$s); },
+		'tryCast(Lnet/modificationstation/stationapi/api/registry/RegistryKey;)Ljava/util/Optional;': function (vm, self) { return vm.callStatic('java/util/Optional', 'of', '(Ljava/lang/Object;)Ljava/util/Optional;', [self]); },
+		'toString()Ljava/lang/String;': function (vm, self) { return '#' + self.$s; },
+	}, staticMethods: {
+		'of(Lnet/modificationstation/stationapi/api/registry/RegistryKey;Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/tag/TagKey;': function (vm, n, a) { var t = vm.newObject(vm.loadClass(ST + 'tag/TagKey')); t.$s = a[1].$s; t.$reg = a[0] && a[0].$s; return t; },
+	} });
+
+	var argsOf = function (vm, arr) { return Array.prototype.slice.call(arr.a).map(function (x) { return tagStack(vm, x); }); };
+	def(ST + 'recipe/CraftingRegistry', { staticMethods: {
+		'addShapedRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': function (vm, n, a) { reg(vm).recipes.push({ mod: vm.currentMod, shaped: true, out: a[0], args: argsOf(vm, a[1]) }); },
+		'addShapelessRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': function (vm, n, a) { reg(vm).recipes.push({ mod: vm.currentMod, shaped: false, out: a[0], args: argsOf(vm, a[1]) }); },
+	} });
+	def(ST + 'recipe/SmeltingRegistry', { staticMethods: {
+		'addSmeltingRecipe(ILnet/minecraft/src/ItemStack;)V': function (vm, n, a) { reg(vm).smelting.push({ mod: vm.currentMod, input: a[0], out: a[1] }); },
+		'addSmeltingRecipe(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/ItemStack;)V': function (vm, n, a) { if (a[0]) reg(vm).smelting.push({ mod: vm.currentMod, input: a[0][':itemID'], out: a[1] }); },
+		'addSmeltingRecipe(Lnet/modificationstation/stationapi/api/tag/TagKey;Lnet/minecraft/src/ItemStack;)V': function (vm, n, a) { var s = tagStack(vm, a[0]); if (s && s[':itemID']) reg(vm).smelting.push({ mod: vm.currentMod, input: s[':itemID'], out: a[1] }); },
+	} });
+
+	def(ST + 'item/tool/ToolMaterialFactory', { staticMethods: {
+		'create(Ljava/lang/String;IIFI)Lnet/minecraft/src/EnumToolMaterial;': function (vm, n, a) {
+			var c = vm.loadClass(SRC + 'EnumToolMaterial'); vm.initClass(c);
+			var o = vm.newObject(c), s = st(vm);
+			o.$name = String(a[0]).toUpperCase(); o[':name'] = o.$name; o[':ordinal'] = s.nextToolMat++;
+			o.$m = [a[1], a[2], a[3], a[4], 10];
+			return o;
+		},
+	} });
+	def(ST + 'item/tool/ToolLevel', { staticMethods: { 'getNumeric(I)Lnet/modificationstation/stationapi/api/item/tool/ToolLevel;': function (vm, n, a) { var o = vm.newObject(vm.loadClass(ST + 'item/tool/ToolLevel')); o.$level = a[0]; return o; } } });
+	var SPRITE = ST + 'client/texture/atlas/Atlas$Sprite';
+	def(SPRITE, { fields: { index: 'I', id: LID } });
+	var sprite = function (vm, id) {
+		var s = st(vm), o = vm.newObject(vm.loadClass(SPRITE)), k = s.nextSprite++;
+		s.sprites[k] = id.$s; o[':index'] = k; o[':id'] = id;
+		return o;
+	};
+	def(ST + 'client/texture/atlas/Atlas', { methods: {
+		'addTexture(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/client/texture/atlas/Atlas$Sprite;': function (vm, self, a) { return sprite(vm, a[0]); },
+		'getTexture(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/client/texture/atlas/Atlas$Sprite;': function (vm, self, a) { return sprite(vm, a[0]); },
+	} });
+	def(ST + 'client/texture/atlas/Atlases', { staticMethods: {
+		'getTerrain()Lnet/modificationstation/stationapi/api/client/texture/atlas/ExpandableAtlas;': function (vm) { return atlas(vm, 'terrain'); },
+		'getGuiItems()Lnet/modificationstation/stationapi/api/client/texture/atlas/ExpandableAtlas;': function (vm) { return atlas(vm, 'gui_items'); },
+		'getStationTerrain()Lnet/modificationstation/stationapi/api/client/texture/atlas/ExpandableAtlas;': function (vm) { return atlas(vm, 'terrain'); },
+		'getStationGuiItems()Lnet/modificationstation/stationapi/api/client/texture/atlas/ExpandableAtlas;': function (vm) { return atlas(vm, 'gui_items'); },
+	} });
+	def(ST + 'client/texture/atlas/ExpandableAtlas', { super: ST + 'client/texture/atlas/Atlas' });
+	var atlas = function (vm, n) { var o = vm.newObject(vm.loadClass(ST + 'client/texture/atlas/ExpandableAtlas')); o.$atlas = n; return o; };
+
+	var B = vm.natives[SRC + 'Block'], It = vm.natives[SRC + 'Item'], S = vm.natives[SRC + 'ItemStack'];
+	var setKey = function (vm, self, key) {
+		self[':unlocalizedName'] = key; return self;
+	};
+	var blockKey = function (vm, self) { return self; };
+	B.methods = Object.assign({}, B.methods, {
+		'setTranslationKey(Lnet/modificationstation/stationapi/api/util/Namespace;Ljava/lang/String;)Lnet/minecraft/src/Block;': function (vm, self, a) { return setKey(vm, self, a[0].$s + '.' + a[1]); },
+		'setTranslationKey(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/minecraft/src/Block;': function (vm, self, a) { return setKey(vm, self, a[0][':namespace'].$s + '.' + a[0][':path']); },
+		'asItem()Lnet/minecraft/src/Item;': function (vm, self) { return blockItem(vm, self[':blockID']); },
+		'appendProperties(Lnet/modificationstation/stationapi/api/state/StateManager$Builder;)V': function () {},
+		'getTranslatedName()Ljava/lang/String;': function (vm, self) { return vm.callVirtual(self, 'getLocalizedName', '()Ljava/lang/String;', []); },
+		'setTexture(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/minecraft/src/Block;': function (vm, self, a) { self.$stTex = a[0].$s; return self; },
+	});
+	It.methods = Object.assign({}, It.methods, {
+		'setTranslationKey(Lnet/modificationstation/stationapi/api/util/Namespace;Ljava/lang/String;)Lnet/minecraft/src/Item;': function (vm, self, a) { return setKey(vm, self, a[0].$s + '.' + a[1]); },
+		'setTranslationKey(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/minecraft/src/Item;': function (vm, self, a) { return setKey(vm, self, a[0][':namespace'].$s + '.' + a[0][':path']); },
+		'setTexture(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/client/texture/atlas/Atlas$Sprite;': function (vm, self, a) { self.$stTex = a[0].$s; return sprite(vm, a[0]); },
+		'setTexture(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/client/texture/atlas/Atlas$Sprite;': function (vm, self, a) { var id = parseId(vm, a[0]); self.$stTex = id.$s; return sprite(vm, id); },
+		'asItem()Lnet/minecraft/src/Item;': function (vm, self) { return self; },
+		'getTranslatedName()Ljava/lang/String;': function (vm, self) { return vm.callVirtual(self, 'getItemDisplayName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [null]); },
+	});
+	S.methods = Object.assign({}, S.methods, {
+		'getStationNbt()Lnet/minecraft/src/NBTTagCompound;': function (vm, self) {
+			if (!self.$stNbt) { self.$stNbt = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(self.$stNbt, '<init>', '()V', []); }
+			return self.$stNbt;
+		},
+		'isOf(Lnet/minecraft/src/Item;)Z': function (vm, self, a) { return a[0] && a[0][':itemID'] === self[':itemID'] ? 1 : 0; },
+		'isIn(Lnet/modificationstation/stationapi/api/tag/TagKey;)Z': function (vm, self, a) { return inTag(vm, a[0], self[':itemID']) ? 1 : 0; },
+	});
+	var A = vm.natives[SRC + 'ItemArmor'];
+	A.methods = Object.assign({}, A.methods, {
+		'<init>(IIII)V': function (vm, self, a) {
+			vm.natives[SRC + 'Item'].anyInit(vm, self, [a[0]], '(I)V');
+			self.$armor = { mat: null, slot: a[3], tier: a[1] };
+			self[':armorType'] = a[3]; self[':renderIndex'] = a[2]; self[':maxStackSize'] = 1; self[':armorLevel'] = a[1];
+			self[':maxDamage'] = ([11, 16, 15, 13][a[3]] * 3) << a[1];
+			self[':damageReduceAmount'] = [3, 8, 6, 3][a[3]];
+		},
+	});
+
+	var W = 'Lnet/minecraft/src/World;', EP = 'Lnet/minecraft/src/EntityPlayer;', EL = 'Lnet/minecraft/src/EntityLiving;', IS = 'Lnet/minecraft/src/ItemStack;', RND = 'Ljava/util/Random;';
+	var BETA = JVM.STATION_BETA = {
+		block: [
+			['onBlockActivated(' + W + 'III' + EP + 'IFFF)Z', 'blockActivated(' + W + 'III' + EP + ')Z', function (a) { return a.slice(0, 5); }],
+			['breakBlock(' + W + 'IIIII)V', 'onBlockRemoval(' + W + 'III)V', function (a) { return a.slice(0, 4); }],
+			['onBlockPlacedBy(' + W + 'III' + EL + IS + ')V', 'onBlockPlacedBy(' + W + 'III' + EL + ')V', function (a) { return a.slice(0, 5); }],
+			['idDropped(I' + RND + 'I)I', 'idDropped(I' + RND + ')I', function (a) { return a.slice(0, 2); }],
+			['dropBlockAsItemWithChance(' + W + 'IIIIFI)V', 'dropBlockAsItemWithChance(' + W + 'IIIIF)V', function (a) { return a.slice(0, 6); }],
+			['dropBlockAsItem(' + W + 'IIIII)V', 'dropBlockAsItem(' + W + 'IIII)V', function (a) { return a.slice(0, 5); }],
+			['tickRate(' + W + ')I', 'tickRate()I', function () { return []; }],
+		],
+		item: [
+			['onItemUse(' + IS + EP + W + 'IIIIFFF)Z', 'onItemUse(' + IS + EP + W + 'IIII)Z', function (a) { return a.slice(0, 7); }],
+			['onBlockDestroyed(' + IS + W + 'IIII' + EL + ')Z', 'onBlockDestroyed(' + IS + 'IIII' + EL + ')Z', function (a) { return [a[0], a[2], a[3], a[4], a[5], a[6]]; }],
+		],
+	};
+	var forward = function (spec, list) {
+		spec.methods = Object.assign({}, spec.methods);
+		list.forEach(function (f) {
+			var orig = spec.methods[f[0]];
+			spec.methods[f[0]] = function (vm, self, a) {
+				var m = self.cls.findMethod(f[1]);
+				if (m && !m.cls.native) return vm.invoke(m, self, f[2](a));
+				return orig ? orig(vm, self, a) : undefined;
+			};
+		});
+	};
+	forward(B, BETA.block);
+	forward(It, BETA.item);
+	A.statics = Object.assign({}, A.statics || {}, { maxDamageArray: null, damageReduceAmountArray: null });
+	var aClinit = A.clinit;
+	A.clinit = function (vm, c) {
+		if (aClinit) aClinit(vm, c);
+		c.statics.maxDamageArray = JVM.javaArray(vm, 'I', [11, 16, 15, 13]);
+		c.statics.damageReduceAmountArray = JVM.javaArray(vm, 'I', [3, 8, 6, 3]);
+	};
+	vm.defineNative(SRC + 'CraftingManager', { methods: {
+		'getRecipeList()Ljava/util/List;': function (vm, self) { return self.$list || (self.$list = JVM.newList(vm, [])); },
+		'addRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': function (vm, self, a) { reg(vm).recipes.push({ mod: vm.currentMod, shaped: true, out: a[0], args: argsOf(vm, a[1]) }); },
+		'addShapelessRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': function (vm, self, a) { reg(vm).recipes.push({ mod: vm.currentMod, shaped: false, out: a[0], args: argsOf(vm, a[1]) }); },
+	}, staticMethods: {
+		'getInstance()Lnet/minecraft/src/CraftingManager;': function (vm) { return vm.$craftMgr || (vm.$craftMgr = vm.newObject(vm.loadClass(SRC + 'CraftingManager'))); },
+	} });
+	var FU = 'it/unimi/dsi/fastutil/';
+	var unboxed = function (v) { return v && v.$box !== undefined ? JVM.unbox(v) : v; };
+	vm.defineNative(FU + 'ints/Int2IntFunction', { access: I, interfaces: ['java/util/function/Function', 'java/util/function/IntUnaryOperator'], abstractMethods: { 'get(I)I': true }, methods: {
+		'apply(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return JVM.box(vm, vm.callVirtual(self, 'get', '(I)I', [unboxed(a[0]) | 0]), 'I'); },
+		'applyAsInt(I)I': function (vm, self, a) { return vm.callVirtual(self, 'get', '(I)I', [a[0]]); },
+		'get(Ljava/lang/Object;)Ljava/lang/Integer;': function (vm, self, a) { return JVM.box(vm, vm.callVirtual(self, 'get', '(I)I', [unboxed(a[0]) | 0]), 'I'); },
+	} });
+	vm.defineNative(FU + 'ints/Int2ObjectFunction', { access: I, interfaces: ['java/util/function/Function', 'java/util/function/IntFunction'], abstractMethods: { 'get(I)Ljava/lang/Object;': true }, methods: {
+		'apply(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return vm.callVirtual(self, 'get', '(I)Ljava/lang/Object;', [unboxed(a[0]) | 0]); },
+		'apply(I)Ljava/lang/Object;': function (vm, self, a) { return vm.callVirtual(self, 'get', '(I)Ljava/lang/Object;', [a[0]]); },
+	} });
+	vm.defineNative(FU + 'objects/Object2IntFunction', { access: I, interfaces: ['java/util/function/Function', 'java/util/function/ToIntFunction'], abstractMethods: { 'getInt(Ljava/lang/Object;)I': true }, methods: {
+		'apply(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return JVM.box(vm, vm.callVirtual(self, 'getInt', '(Ljava/lang/Object;)I', [a[0]]), 'I'); },
+		'applyAsInt(Ljava/lang/Object;)I': function (vm, self, a) { return vm.callVirtual(self, 'getInt', '(Ljava/lang/Object;)I', [a[0]]); },
+	} });
+
+	var T = D().templates;
+	Object.keys(T).forEach(function (name) {
+		var sup = mapName(vm, T[name][0]), methods = {};
+		T[name][1].forEach(function (d0) {
+			var d = mapDesc(vm, d0);
+			var withId = d.indexOf('(' + LID) === 0;
+			methods['<init>' + d] = function (vm, self, a) {
+				var cls = vm.loadClass(name);
+				if (withId) {
+					var isItem = vm.isInstance(self, vm.loadClass(SRC + 'Item'));
+					superInit(vm, cls, self, '(I' + d.substring(1 + LID.length), [isItem ? -257 : -1].concat(a.slice(1)));
+					register(vm, isItem ? 'item' : 'block', a[0], self);
+					setKey(vm, self, a[0][':namespace'].$s + '.' + a[0][':path']);
+				} else superInit(vm, cls, self, d, a);
+				var sig = JVM.parseDesc(d);
+				if (sig.args[0] !== 'I' && !withId) return;
+				if (sig.args[1] === 'I' && vm.isInstance(self, vm.loadClass(SRC + 'Block')) && self[':blockIndexInTexture'] === undefined) self[':blockIndexInTexture'] = a[1];
+			};
+		});
+		def(name, { super: sup, methods: methods, access: T[name][2] ? JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT : JVM.ACC_PUBLIC });
+	});
+	var OLD = {};
+	OLD[ST + 'registry/Identifier'] = ID;
+	OLD[ST + 'registry/ModID'] = NS;
+	OLD[ST + 'mod/entrypoint/Entrypoint$ModID'] = ST + 'mod/entrypoint/Entrypoint$Namespace';
+	var prevMap = vm.mapClass;
+	vm.mapClass = function (n) {
+		if (OLD[n]) return OLD[n];
+		var m = /^(net\/modificationstation\/stationapi\/api\/template\/(?:block|item)\/Template)(\w*?)Base$/.exec(n);
+		if (m) {
+			var cands = [m[1] + m[2], m[1] + m[2] + 'Block', m[1] + m[2] + 'Item'];
+			for (var i = 0; i < cands.length; i++) if (T[cands[i]]) return cands[i];
+		}
+		return prevMap ? prevMap(n) : null;
+	};
+	def(ST + 'registry/tag/BlockTags', tagConsts(vm, D().blockTags || {}, 'block'));
+	def(ST + 'registry/tag/ItemTags', tagConsts(vm, D().itemTags || {}, 'item'));
+	var FMT = 'BLACK0 DARK_BLUE1 DARK_GREEN2 DARK_AQUA3 DARK_RED4 DARK_PURPLE5 GOLD6 GRAY7 DARK_GRAY8 BLUE9 GREENa AQUAb REDc LIGHT_PURPLEd YELLOWe WHITEf OBFUSCATEDk BOLDl STRIKETHROUGHm UNDERLINEn ITALICo RESETr'.split(' ');
+	var fstat = {}; FMT.forEach(function (x) { fstat[x.slice(0, -1)] = null; });
+	def(ST + 'util/Formatting', { super: 'java/lang/Enum', statics: fstat, clinit: function (vm, c) {
+		c.$values = FMT.map(function (x, i) { var o = vm.newObject(c); o.$name = x.slice(0, -1); o[':name'] = o.$name; o[':ordinal'] = i; o.$code = x.slice(-1); c.statics[o.$name] = o; return o; });
+	}, methods: {
+		'toString()Ljava/lang/String;': function (vm, self) { return '§' + self.$code; },
+		'getCode()C': function (vm, self) { return self.$code.charCodeAt(0); },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name.toLowerCase(); },
+	} });
+	var fuel = function (vm) { vm.warnOnce('feature:fuel', 'StationAPI FuelRegistry: fuel items are not available here'); };
+	def(ST + 'recipe/FuelRegistry', { staticMethods: {
+		'addFuelItem(Lnet/minecraft/src/Item;I)V': fuel, 'addFuelItem(Lnet/minecraft/src/Item;II)V': fuel,
+		'addFuelTag(Lnet/modificationstation/stationapi/api/tag/TagKey;I)V': fuel,
+		'getFuelTime(Lnet/minecraft/src/ItemStack;)I': function () { return 0; },
+	} });
+	var ctxMethods = {
+		'getWorld()Lnet/minecraft/src/World;': function (vm, self) { return self.$world; },
+		'getPlayer()Lnet/minecraft/src/EntityPlayer;': function (vm, self) { return self.$player; },
+		'getStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return self.$stack; },
+		'getSide()Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, self) { return dirOf(vm, self.$side); },
+		'getHorizontalPlayerFacing()Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, self) { return dirOf(vm, playerFacing(self.$player)); },
+		'getVerticalPlayerLookDirection()Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, self) { return dirOf(vm, self.$player && self.$player[':rotationPitch'] < 0 ? 1 : 0); },
+		'getPlayerLookDirection()Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, self) { var p = self.$player, pt = p ? p[':rotationPitch'] : 0; return dirOf(vm, pt < -45 ? 1 : pt > 45 ? 0 : playerFacing(p)); },
+		'getPlayerYaw()F': function (vm, self) { return self.$player ? self.$player[':rotationYaw'] : 0; },
+		'shouldCancelInteraction()Z': function (vm, self) { return self.$player && self.$player.$sneaking ? 1 : 0; },
+		'canPlace()Z': function () { return 1; },
+	};
+	def(ST + 'item/ItemUsageContext', { methods: ctxMethods });
+	def(ST + 'item/ItemPlacementContext', { super: ST + 'item/ItemUsageContext' });
+	def(ST + 'template/block/BlockTemplate', { access: I, staticMethods: {
+		'getNextId()I': function () { return -1; },
+		'onConstructor(Lnet/minecraft/src/Block;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, n, a) { register(vm, 'block', a[1], a[0]); setKey(vm, a[0], a[1][':namespace'].$s + '.' + a[1][':path']); },
+	} });
+	def(ST + 'template/item/ItemTemplate', { access: I, staticMethods: {
+		'getNextId()I': function () { return -257; },
+		'onConstructor(Lnet/minecraft/src/Item;Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, n, a) { register(vm, 'item', a[1], a[0]); setKey(vm, a[0], a[1][':namespace'].$s + '.' + a[1][':path']); },
+	} });
+	void blockKey; void regOf;
+}
+
+function tagConsts(vm, table, reg) {
+	var statics = {};
+	Object.keys(table).forEach(function (k) { statics[k] = null; });
+	return { statics: statics, clinit: function (vm, c) {
+		Object.keys(table).forEach(function (k) { var t = vm.newObject(vm.loadClass(ST + 'tag/TagKey')); t.$s = table[k]; t.$reg = reg; c.statics[k] = t; });
+	} };
+}
+function dirOf(vm, id) { var c = vm.loadClass(ST + 'util/math/Direction'); vm.initClass(c); return c.$values[id] || null; }
+function playerFacing(p) { var y = p ? p[':rotationYaw'] : 0; return [3, 4, 2, 5][Math.floor(y * 4 / 360 + 0.5) & 3]; }
+function tagValues(vm, key, depth) {
+	if ((depth | 0) > 8) return [];
+	var mine = st(vm).tags[key] || [], van = D().tags && D().tags[key] || [], out = [];
+	mine.concat(van).forEach(function (v) {
+		v = String(v);
+		if (v[0] === '#') out = out.concat(tagValues(vm, (key.indexOf('blocks/') === 0 ? 'blocks/' : '') + v.slice(1), (depth | 0) + 1));
+		else out.push(v);
+	});
+	return out;
+}
+function tagStack(vm, x) {
+	if (!x || !x.cls || x.cls.name !== ST + 'tag/TagKey') return x;
+	var vals = tagValues(vm, x.$s);
+	for (var i = 0; i < vals.length; i++) {
+		var id = itemIdOf(vm, vals[i]);
+		if (id) return JVM.mc152.newStack(vm, id, 1, -1);
+	}
+	vm.warnOnce('st:tag:' + x.$s, 'recipe tag #' + x.$s + ' has nothing in it here');
+	return null;
+}
+function inTag(vm, tag, itemId) {
+	var vals = tag ? tagValues(vm, tag.$s) : [];
+	return vals.some(function (v) { return itemIdOf(vm, v) === itemId; });
+}
+function itemIdOf(vm, str) {
+	str = String(str);
+	if (str.indexOf(':') < 0) str = 'minecraft:' + str;
+	var s = st(vm), it = s.registries.item && s.registries.item.byId[str];
+	if (it) return it[':itemID'];
+	var b = s.registries.block && s.registries.block.byId[str];
+	if (b) return b[':blockID'];
+	var p = str.split(':');
+	if (p[0] === 'minecraft') return D().items[p[1]] || D().blocks[p[1]] || 0;
+	return 0;
+}
+
+var LISTENER = ['net/mine_diver/unsafeevents/listener/EventListener', ST + 'event/EventListener'];
+function isListener(vm, m) { return m.annotations && LISTENER.some(function (t) { return JVM.annotation(vm, m.annotations, t); }); }
+function addListeners(vm, cls, obj, mod) {
+	var s = st(vm), seen = {};
+	for (var c = cls; c && !c.native; c = c.superClass) {
+		Object.keys(c.methods).forEach(function (k) {
+			var m = c.methods[k];
+			if (seen[k] || !m.sig || m.sig.args.length !== 1 || !isListener(vm, m)) return;
+			var isStatic = !!(m.access & JVM.ACC_STATIC);
+			if (!isStatic && !obj) return;
+			seen[k] = true;
+			if (s.listeners.some(function (l) { return l.m === m && l.obj === (isStatic ? null : obj); })) return;
+			s.listeners.push({ mod: mod, obj: isStatic ? null : obj, m: m, type: m.sig.args[0] });
+		});
+	}
+}
+function setupEntrypoint(vm, o, mod) {
+	if (!o) return;
+	var cls = o.$cls || o.cls, isClass = !!o.$cls;
+	addListeners(vm, cls, isClass ? null : o, mod);
+	if (isClass) return;
+	var ns = st(vm).fabricIds[mod] || mod;
+	Object.keys(cls.fields).forEach(function (fn) {
+		var fd = cls.fields[fn], v;
+		if (!fd.annotations) return;
+		var a;
+		if (JVM.annotation(vm, fd.annotations, ST + 'mod/entrypoint/Entrypoint$Instance')) v = o;
+		else if ((a = JVM.annotation(vm, fd.annotations, ST + 'mod/entrypoint/Entrypoint$Namespace'))) { var nv = a.values && a.values.value && a.values.value.v; v = namespace(vm, nv || ns); }
+		else if ((a = JVM.annotation(vm, fd.annotations, ST + 'mod/entrypoint/Entrypoint$Logger'))) { var lv = a.values && a.values.value && a.values.value.v; var lo = vm.newObject(vm.loadClass('mcre/Log')); lo.$name = lv || ns + '|Mod'; v = lo; }
+		else return;
+		if (fd.static) cls.statics[fn] = v; else o[':' + fn] = v;
+	});
+}
+function entrypointObject(vm, v) {
+	var val = typeof v === 'string' ? v : v && v.value;
+	if (!val) return null;
+	var p = val.split('::'), cn = p[0].replace(/[.]/g, '/');
+	var cls = vm.loadClass(cn);
+	if (cls.absent) { vm.log('error', 'entrypoint class ' + p[0] + ' is not in the mod'); return null; }
+	vm.initClass(cls);
+	if (p[1]) { var f = cls.findField(p[1]); return f ? f.owner.statics[p[1]] : null; }
+	if (cls.statics && cls.statics.INSTANCE && cls.statics.INSTANCE.cls === cls) return cls.statics.INSTANCE;
+	var ctor = cls.findDeclared('<init>()V');
+	if (!ctor) return { $cls: cls };
+	var o = vm.newObject(cls);
+	vm.invoke(ctor, o, []);
+	return o;
+}
+
+var EVENT_FEATURES = [
+	[/Biome/, 'new biomes'], [/Dimension/, 'new dimensions'], [/KeyBinding|KeyState/, 'its keys'],
+	[/Tooltip/, 'item tooltips'], [/Colors/, 'tinted blocks and items'], [/Renderer|ModelPredicate|Model/, 'custom-drawn blocks and items'],
+	[/Achievement|Stat/, 'achievements'], [/GuiHandler|Screen/, 'its screens'], [/Effect/, 'status effects'],
+	[/Burnable/, 'blocks catching fire'], [/Packet|Message|Network|Login|Logout|Server/, null], [/Resource|Reload|DataFixer|Option/, null],
+	[/Player|Item|Block|Crafting|Slot/, 'some of its block and item behaviour'],
+];
+JVM.babricLoad = function (vm, modId, fj, files, classes) {
+	var s = st(vm), id = String(fj.id || modId);
+	s.fabricIds[modId] = id;
+	s.mods[id] = { id: id, name: fj.name || id, version: fj.version || '1.0', description: fj.description || '', folder: modId };
+	vm.currentMod = modId;
+	stationTags(vm, files);
+	var eps = fj.entrypoints || {}, objs = [];
+	var run = function (what, fn) { var r = JVM.run(vm, fn); if (!r.ok) vm.log('error', id + ': ' + what + ' failed'); return r; };
+	['stationapi:event_bus', 'stationapi:event_bus_client'].forEach(function (k) {
+		(eps[k] || []).forEach(function (v) { run(k + ' ' + (v.value || v), function () { var o = entrypointObject(vm, v); if (o) { setupEntrypoint(vm, o, modId); objs.push(o); } }); });
+	});
+	(eps.main || []).forEach(function (v) { run('onInitialize', function () { var o = entrypointObject(vm, v); if (o && o.cls && !o.$cls) vm.callVirtual(o, 'onInitialize', '()V', []); }); });
+	(eps.client || []).forEach(function (v) { run('onInitializeClient', function () { var o = entrypointObject(vm, v); if (o && o.cls && !o.$cls) vm.callVirtual(o, 'onInitializeClient', '()V', []); }); });
+	var E = function (n) { return ST + n; };
+	var fireNew = function (cls, fields) { var r = JVM.run(vm, function () { return newEvent(vm, cls, fields); }); if (r.ok) fire(vm, r.value, modId); };
+	var regObj = function (key) { var c = vm.loadClass(ST + 'registry/' + key); vm.initClass(c); return c.statics.INSTANCE; };
+	fireNew(E('event/mod/PreInitEvent'));
+	fireNew(E('event/mod/InitEvent'));
+	fireNew(E('event/mod/PostInitEvent'));
+	fireNew(E('event/registry/BlockRegistryEvent'), { registry: regObj('BlockRegistry') });
+	fireNew(E('event/registry/BlockItemRegistryEvent'), { registry: regObj('ItemRegistry') });
+	fireNew(E('event/registry/ItemRegistryEvent'), { registry: regObj('ItemRegistry') });
+	fireNew(E('event/entity/EntityRegisterEvent'));
+	fireNew(E('event/block/entity/BlockEntityRegisterEvent'));
+	JVM.run(vm, function () {
+		var map = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(map, '<init>', '()V', []);
+		fire(vm, newEvent(vm, E('client/event/render/entity/EntityRendererRegisterEvent'), { renderers: map }), modId);
+		var r = reg(vm), mb = r.mobs || (r.mobs = { entities: [], spawns: [], renderers: [], mappings: [] });
+		var ks = vm.callVirtual(vm.callVirtual(map, 'keySet', '()Ljava/util/Set;', []), 'toArray', '()[Ljava/lang/Object;', []).a;
+		Array.prototype.forEach.call(ks, function (k) { mb.renderers.push({ cls: k && k.$cls, render: vm.callVirtual(map, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', [k]), mod: modId }); });
+		var bc = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(bc);
+		Array.prototype.forEach.call(bc.statics.biomeList.a, function (b) { if (b) fire(vm, newEvent(vm, E('event/worldgen/biome/BiomeModificationEvent'), { world: null, biome: b }), modId); });
+	});
+	fireNew(E('event/registry/AfterBlockAndItemRegisterEvent'));
+	var rv = vm.loadClass(ST + 'event/recipe/RecipeRegisterEvent$Vanilla'); vm.initClass(rv);
+	rv.$values.forEach(function (v) { fireNew(E('event/recipe/RecipeRegisterEvent'), { recipeId: v.$type }); });
+	fireNew(E('client/event/texture/TextureRegisterEvent'));
+	fireNew(E('event/init/InitFinishedEvent'));
+	stationAssets(vm, modId, id, files);
+	var SENT = /(EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)Event?;$/;
+	s.listeners.forEach(function (l) {
+		if (l.mod !== modId || SENT.test(l.type)) return;
+		var n = l.type.replace(/^L|;$/g, '').split('/').pop();
+		var f = null;
+		for (var i = 0; i < EVENT_FEATURES.length; i++) if (EVENT_FEATURES[i][0].test(n)) { f = EVENT_FEATURES[i][1]; break; }
+		if (i === EVENT_FEATURES.length) f = 'some of its game hooks';
+		vm.warnOnce(f ? 'feature:' + f : 'st:event:' + n, 'StationAPI event ' + n + ' is not sent here' + (f ? ' (' + f + ')' : ''));
+	});
+	return { objs: objs.length };
+};
+
+function text(files, k) { try { return new TextDecoder().decode(files[k]).replace(/^﻿/, ''); } catch (e) { return null; } }
+function json(files, k) { var t = text(files, k); try { return t == null ? null : JSON.parse(t); } catch (e) { return null; } }
+function stationTags(vm, files) {
+	var s = st(vm);
+	Object.keys(files).forEach(function (k) {
+		var m = /^(?:data|assets)[/]([^/]+)[/]stationapi[/]tags[/](items?|blocks?)[/](.+)[.]json$/i.exec(k);
+		if (!m) return;
+		var j = json(files, k), key = (/^block/i.test(m[2]) ? 'blocks/' : '') + m[1] + ':' + m[3];
+		if (!j || !Array.isArray(j.values)) return;
+		s.tags[key] = (s.tags[key] || []).concat(j.values.map(function (v) { return typeof v === 'string' ? v : v && v.id; }).filter(Boolean));
+	});
+}
+function stationAssets(vm, modId, fabricId, files) {
+	var r = reg(vm);
+	Object.keys(files).forEach(function (k) {
+		var m = /^assets[/]([^/]+)[/]stationapi[/]lang[/]en_us[.]lang$/i.exec(k);
+		if (m) {
+			(text(files, k) || '').split(/\r?\n/).forEach(function (l) {
+				var i = l.indexOf('=');
+				if (i <= 0 || /^\s*#/.test(l)) return;
+				var key = l.slice(0, i).trim().replace(/(^|[.])@([.]|$)/g, '$1' + m[1] + '$2');
+				r.lang[key] = l.slice(i + 1).trim();
+			});
+			return;
+		}
+		if (/^(?:data|assets)[/][^/]+[/]stationapi[/]recipes[/].+[.]json$/i.test(k)) jsonRecipe(vm, modId, json(files, k), k);
+	});
+}
+function stackOf(vm, j, dflt) {
+	if (!j) return null;
+	if (Array.isArray(j)) j = j[0];
+	if (typeof j === 'string') j = { item: j };
+	var id = 0;
+	if (j.item) id = itemIdOf(vm, j.item);
+	else if (j.tag) { var vals = tagValues(vm, j.tag.indexOf(':') < 0 ? 'minecraft:' + j.tag : j.tag); for (var i = 0; i < vals.length && !id; i++) id = itemIdOf(vm, vals[i]); }
+	if (!id) return null;
+	return JVM.mc152.newStack(vm, id, j.count || 1, j.damage != null ? j.damage : j.data != null ? j.data : dflt);
+}
+function jsonRecipe(vm, modId, j, file) {
+	if (!j || !j.type) return;
+	var r = reg(vm), type = String(j.type).replace(/^minecraft:/, ''), out = stackOf(vm, j.result, 0);
+	var bad = function (why) { vm.warnOnce('st:recipe:' + file, file + ': ' + why); };
+	if (!out) return bad('its result isn\'t known here');
+	if (type === 'crafting_shaped') {
+		var args = [JVM.javaArray(vm, 'Ljava/lang/String;', (j.pattern || []).slice())];
+		var ok = true;
+		Object.keys(j.key || {}).forEach(function (ch) { var s = stackOf(vm, j.key[ch], -1); if (!s) ok = false; args.push(ch, s); });
+		if (!ok) return bad('an ingredient isn\'t known here');
+		r.recipes.push({ mod: modId, shaped: true, out: out, args: args });
+	} else if (type === 'crafting_shapeless') {
+		var ing = (j.ingredients || []).map(function (x) { return stackOf(vm, x, -1); });
+		if (ing.some(function (x) { return !x; })) return bad('an ingredient isn\'t known here');
+		r.recipes.push({ mod: modId, shaped: false, out: out, args: ing });
+	} else if (type === 'smelting') {
+		var inp = stackOf(vm, j.ingredient, 0);
+		if (!inp) return bad('its ingredient isn\'t known here');
+		r.smelting.push({ mod: modId, input: inp[':itemID'], out: out });
+	} else bad('recipe type ' + j.type + ' isn\'t available here');
+}
+
+var FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
+function texFile(id) {
+	var p = String(id).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
+	return { ns: ns, path: path, file: 'assets/' + ns + '/stationapi/textures/' + path + '.png' };
+}
+function texRef(files, id) {
+	var t = texFile(id);
+	if (t.ns === 'minecraft') return { mod: null, name: t.path.replace(/^(block|item)s?[/]/, '') };
+	if (!files[t.file]) return null;
+	return { mod: null, name: (t.ns + '_' + t.path).toLowerCase().replace(/[^a-z0-9]+/g, '_'), file: t.file };
+}
+function modelTextures(files, modelId, depth) {
+	if (!modelId || depth > 8) return {};
+	var p = String(modelId).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
+	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json');
+	if (!j) return { $parent: path };
+	var base = j.parent ? modelTextures(files, j.parent, depth + 1) : {};
+	var out = Object.assign({}, base, j.textures || {});
+	out.$parent = base.$parent || (j.parent ? String(j.parent).replace(/^minecraft:/, '') : '');
+	if (Array.isArray(j.elements)) out.$elements = j.elements;
+	return out;
+}
+function resolveTex(t, k) { var v = t[k]; for (var i = 0; i < 8 && typeof v === 'string' && v[0] === '#'; i++) v = t[v.slice(1)]; return v || null; }
+function blockModelFaces(files, id) {
+	var p = String(id).split(':');
+	if (p.length < 2) return null;
+	var bs = json(files, 'assets/' + p[0] + '/stationapi/blockstates/' + p[1] + '.json');
+	var model = null;
+	if (bs && bs.variants) { var v = bs.variants[''] || bs.variants[Object.keys(bs.variants)[0]]; if (Array.isArray(v)) v = v[0]; model = v && v.model; }
+	else if (bs && bs.multipart && bs.multipart[0]) { var ap = bs.multipart[0].apply; if (Array.isArray(ap)) ap = ap[0]; model = ap && ap.model; }
+	if (!model) model = p[0] + ':block/' + p[1];
+	var t = modelTextures(files, model, 0), f = {};
+	if (t.$elements) {
+		FACE.forEach(function (k) {
+			var cands = [];
+			t.$elements.forEach(function (e) { var fc = e && e.faces && e.faces[k]; if (fc && fc.texture) { var v = resolveTex(Object.assign({ $f: fc.texture }, t), '$f'); if (v) cands.push(v); } });
+			var inJar = cands.filter(function (v) { var r = texRef(files, v); return r && (r.file || /^minecraft:/.test(v)); });
+			if (cands.length) f[k] = inJar.length ? inJar[inJar.length - 1] : cands[0];
+		});
+	}
+	if (resolveTex(t, 'all')) FACE.forEach(function (k) { f[k] = resolveTex(t, 'all'); });
+	if (resolveTex(t, 'side')) ['north', 'south', 'west', 'east'].forEach(function (k) { f[k] = resolveTex(t, 'side'); });
+	if (resolveTex(t, 'end')) { f.up = f.down = resolveTex(t, 'end'); }
+	if (resolveTex(t, 'top')) f.up = resolveTex(t, 'top');
+	if (resolveTex(t, 'bottom')) f.down = resolveTex(t, 'bottom');
+	if (resolveTex(t, 'front')) f.north = resolveTex(t, 'front');
+	FACE.forEach(function (k) { if (resolveTex(t, k)) f[k] = resolveTex(t, k); });
+	var any = resolveTex(t, 'particle') || resolveTex(t, 'texture') || resolveTex(t, 'cross') || resolveTex(t, 'plant') || resolveTex(t, 'layer0') ||
+		Object.keys(t).filter(function (k) { return k[0] !== '$'; }).map(function (k) { return resolveTex(t, k); }).filter(Boolean)[0];
+	FACE.forEach(function (k) { if (!f[k] && any) f[k] = any; });
+	return Object.keys(f).length ? f : null;
+}
+JVM.stationTexture = function (vm, o, side, files) {
+	if (!files) return null;
+	var s = st(vm), isBlock = side >= 0;
+	if (o.$stTex) return texRef(files, o.$stTex);
+	var id = o.$stId;
+	if (isBlock) {
+		if (id) { var f = blockModelFaces(files, id); if (f) return texRef(files, f[FACE[side]]); }
+		var cell = o[':blockIndexInTexture'];
+		if (cell >= 4096 && s.sprites[cell]) return texRef(files, s.sprites[cell]);
+		return null;
+	}
+	if (id) {
+		var p = id.split(':'), t = modelTextures(files, p[0] + ':item/' + p[1], 0);
+		var l0 = resolveTex(t, 'layer0');
+		if (l0) return texRef(files, l0);
+		var bl = s.registries.block && s.registries.block.byId[id];
+		if (bl) { var bf = blockModelFaces(files, id); if (bf) return texRef(files, bf.north || bf.up); }
+	}
+	var ic = o[':iconIndex'];
+	if (ic >= 4096 && s.sprites[ic]) return texRef(files, s.sprites[ic]);
+	return null;
+};
+JVM.vanillaCellName = function (sheet, cell) {
+	var d = D();
+	if (/^[/]?terrain[.]png$/i.test(sheet)) return d.terrain[cell] || null;
+	if (/^[/]?gui[/]items[.]png$/i.test(sheet)) return d.sheet[cell] || null;
+	return null;
+};
+
+JVM.stationWantsGen = function (vm) {
+	return st(vm).listeners.some(function (l) { return l.type === 'L' + ST + 'event/world/gen/WorldGenEvent$ChunkDecoration;' || l.type === 'L' + ST + 'event/world/gen/WorldGenEvent;'; });
+};
+JVM.stationGenerate = function (vm, world, cx, cz, seed) {
+	var rnd = vm.newObject(vm.loadClass('java/util/Random'));
+	vm.callVirtual(rnd, '<init>', '(J)V', [BigInt.asIntN(64, BigInt(seed) ^ (BigInt(cx) * 341873128712n + BigInt(cz) * 132897987541n))]);
+	var biome = null;
+	JVM.run(vm, function () { var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c); biome = c.statics.plains || null; });
+	var ev = newEvent(vm, ST + 'event/world/gen/WorldGenEvent$ChunkDecoration', { world: world, worldSource: null, biome: biome, x: cx * 16, z: cz * 16, random: rnd });
+	fire(vm, ev);
+};
+
+JVM.babricKind = function (fj, files) {
+	var eps = fj.entrypoints || {};
+	var runnable = ['main', 'client', 'stationapi:event_bus', 'stationapi:event_bus_client'].some(function (k) { return (eps[k] || []).length; });
+	var data = Object.keys(files).some(function (k) { return /^(?:data|assets)[/][^/]+[/]stationapi[/](recipes|lang)[/]/i.test(k); });
+	var mixins = 0;
+	(fj.mixins || []).forEach(function (m) {
+		var j = json(files, typeof m === 'string' ? m : m && m.config);
+		if (j) mixins += (j.mixins || []).length + (j.client || []).length;
+	});
+	return { runnable: runnable || data, mixins: mixins };
+};
+
+JVM.installStation = installStation;
+JVM.station = { st: st, fire: fire, identifier: identifier, parseId: parseId, itemIdOf: itemIdOf,
+	blockInTag: function (vm, tag, block) {
+		var vals = tag ? tagValues(vm, 'blocks/' + tag.$s) : [];
+		return vals.some(function (v) { var bid = String(v).indexOf(':') < 0 ? 'minecraft:' + v : String(v); return block.$stId === bid || (bid.indexOf('minecraft:') === 0 && D().blocks[bid.slice(10)] === block[':blockID']); });
+	} };
+})();
+
+JVM.STATION_DATA = {"blockTags":{"BOOKSHELVES":"c:bookshelves","BRICK_BLOCKS":"c:brick_blocks","BROWN_MUSHROOMS":"c:mushrooms/brown","BUTTONS":"c:buttons","CACTI":"c:cacti","CHESTS":"c:chests","CLAY_BLOCKS":"c:clay_blocks","COAL_ORES":"c:ores/coal","COBBLESTONES":"c:cobblestones","COBBLESTONE_STAIRS":"c:stairs/cobblestone","COLORLESS_GLASS_BLOCKS":"c:glass_blocks/colorless","DIAMOND_ORES":"c:ores/diamond","DIAMOND_STORAGE_BLOCKS":"c:storage_blocks/diamond","DIRTS":"c:dirts","DOORS":"c:doors","FARMLANDS":"c:farmlands","FENCES":"c:fences","FENCE_GATES":"c:fence_gates","FLOWERS":"c:flowers","GLASS_BLOCKS":"c:glass_blocks","GOLD_ORES":"c:ores/gold","GOLD_STORAGE_BLOCKS":"c:storage_blocks/gold","GRASS_BLOCKS":"c:grass_blocks","GRAVELS":"c:gravels","INFINIBURN":"infiniburn","IRON_DOORS":"c:doors/iron","IRON_ORES":"c:ores/iron","IRON_STORAGE_BLOCKS":"c:storage_blocks/iron","JACK_O_LANTERNS":"c:pumpkins/jack_o_lanterns","LADDERS":"c:ladders","LAPIS_ORES":"c:ores/lapis","LAPIS_STORAGE_BLOCKS":"c:storage_blocks/lapis","LEAVES":"c:leaves","LOGS":"c:logs","MINEABLE_AXE":"mineable/axe","MINEABLE_HOE":"mineable/hoe","MINEABLE_PICKAXE":"mineable/pickaxe","MINEABLE_SHEARS":"mineable/shears","MINEABLE_SHOVEL":"mineable/shovel","MINEABLE_SWORD":"mineable/sword","MOSSY_COBBLESTONES":"c:cobblestones/mossy","MUSHROOMS":"c:mushrooms","NEEDS_DIAMOND_TOOL":"needs_diamond_tool","NEEDS_IRON_TOOL":"needs_iron_tool","NEEDS_STONE_TOOL":"needs_stone_tool","NETHERRACKS":"c:netherracks","NORMAL_BRICK_BLOCKS":"c:brick_blocks/normal","NORMAL_COBBLESTONES":"c:cobblestones/normal","NORMAL_FARMLANDS":"c:farmlands/normal","NORMAL_FLOWERS":"c:flowers/normal","NORMAL_OBSIDIANS":"c:obsidians/normal","NORMAL_PUMPKINS":"c:pumpkins/normal","NORMAL_SANDS":"c:sands/normal","NORMAL_SANDSTONE_BLOCKS":"c:sandstone/normal_blocks","OAK_DOORS":"c:doors/wooden/oak","OAK_FENCES":"c:fences/wooden/oak","OAK_LADDERS":"c:ladders/wooden/oak","OAK_PLANKS":"c:planks/oak","OAK_PRESSURE_PLATES":"c:pressure_plates/wooden/oak","OAK_SIGNS":"c:signs/wooden/oak","OAK_STAIRS":"c:stairs/wooden/oak","OAK_STANDING_SIGNS":"c:signs/wooden/oak/standing","OAK_TRAPDOORS":"c:trapdoors/wooden/oak","OAK_WALL_SIGNS":"c:signs/wooden/oak/wall","OBSIDIANS":"c:obsidians","ORES":"c:ores","ORE_BEARING_GROUND_NETHERRACK":"c:ore_bearing_ground/netherrack","ORE_BEARING_GROUND_STONE":"c:ore_bearing_ground/stone","PLANKS":"c:planks","PRESSURE_PLATES":"c:pressure_plates","PUMPKINS":"c:pumpkins","RAILS":"c:rails","REDSTONE_ORES":"c:ores/redstone","RED_MUSHROOMS":"c:mushrooms/red","SANDS":"c:sands","SANDSTONE_BLOCKS":"c:sandstone/blocks","SAPLINGS":"c:saplings","SIGNS":"c:signs","SNOW":"c:snow","STAIRS":"c:stairs","STONES":"c:stones","STONE_BUTTONS":"c:buttons/stone","STONE_PRESSURE_PLATES":"c:pressure_plates/stone","STORAGE_BLOCKS":"c:storage_blocks","TALL_FLOWERS":"c:flowers/tall","TRAPDOORS":"c:trapdoors","WOODEN_CHESTS":"c:chests/wooden","WOODEN_DOORS":"c:doors/wooden","WOODEN_FENCES":"c:fences/wooden","WOODEN_FENCE_GATES":"c:fence_gates/wooden","WOODEN_LADDERS":"c:ladders/wooden","WOODEN_PRESSURE_PLATES":"c:pressure_plates/wooden","WOODEN_SIGNS":"c:signs/wooden","WOODEN_STAIRS":"c:stairs/wooden","WOODEN_TRAPDOORS":"c:trapdoors/wooden","WOOLS":"c:wools"},"blocks":{"bedrock":7,"bookshelf":47,"bricks":45,"brown_mushroom":39,"cactus":81,"cake":92,"carved_pumpkin":86,"chest":54,"clay":82,"coal_ore":16,"cobblestone":4,"cobblestone_stairs":67,"cobweb":30,"crafting_table":58,"dandelion":37,"dead_bush":32,"detector_rail":28,"diamond_block":57,"diamond_ore":56,"dirt":3,"dispenser":23,"double_slab":43,"farmland":60,"fire":51,"flowing_lava":10,"flowing_water":8,"furnace":61,"furnace_lit":62,"glass":20,"glowstone":89,"gold_block":41,"gold_ore":14,"grass":31,"grass_block":2,"gravel":13,"ice":79,"iron_block":42,"iron_door":71,"iron_ore":15,"jack_o_lantern":91,"jukebox":84,"ladder":65,"lapis_block":22,"lapis_ore":21,"lava":11,"leaves":18,"lever":69,"locked_chest":95,"log":17,"mossy_cobblestone":48,"moving_piston":36,"nether_portal":90,"netherrack":87,"note_block":25,"oak_door":64,"oak_fence":85,"oak_planks":5,"oak_pressure_plate":72,"oak_sign":63,"oak_stairs":53,"oak_trapdoor":96,"oak_wall_sign":68,"obsidian":49,"piston":33,"piston_head":34,"powered_rail":27,"rail":66,"red_bed":26,"red_mushroom":40,"redstone_ore":73,"redstone_ore_lit":74,"redstone_torch":75,"redstone_torch_lit":76,"redstone_wire":55,"repeater":93,"repeater_lit":94,"rose":38,"sand":12,"sandstone":24,"sapling":6,"slab":44,"snow":78,"snow_block":80,"soul_sand":88,"spawner":52,"sponge":19,"sticky_piston":29,"stone":1,"stone_button":77,"stone_pressure_plate":70,"sugar_cane":83,"tnt":46,"torch":50,"water":9,"wheat":59,"wool":35},"itemTags":{"ARMORS":"c:armors","AXES":"c:tools/axes","BIRCH_LEAVES":"c:leaves/birch","BIRCH_LOGS":"c:logs/birch","BIRCH_SAPLINGS":"c:saplings/birch","BLACK_DYES":"c:dyes/black","BLACK_WOOLS":"c:wools/black","BLUE_DYES":"c:dyes/blue","BLUE_WOOLS":"c:wools/blue","BONES":"c:bones","BOOKSHELVES":"c:bookshelves","BOOTS":"c:armors/boots","BOWLS":"c:bowls","BOWS":"c:tools/bows","BREAD_FOODS":"c:foods/bread","BRICKS":"c:bricks","BRICK_BLOCKS":"c:brick_blocks","BROWN_DYES":"c:dyes/brown","BROWN_MUSHROOMS":"c:mushrooms/brown","BROWN_WOOLS":"c:wools/brown","BUCKETS":"c:buckets","BUTTONS":"c:buttons","CACTUS_CROPS":"c:crops/cactus","CHAINMAIL_BOOTS":"c:armors/boots/chainmail","CHAINMAIL_CHESTPLATES":"c:armors/chestplates/chainmail","CHAINMAIL_HELMETS":"c:armors/helmets/chainmail","CHAINMAIL_LEGGINGS":"c:armors/leggings/chainmail","CHESTPLATES":"c:armors/chestplates","CHESTS":"c:chests","CHICKEN_EGGS":"c:eggs/chicken","CHICKEN_FEATHERS":"c:feathers/chicken","CLAY_BLOCKS":"c:clay_blocks","COALS":"c:coals","COAL_ORES":"c:ores/coal","COBBLESTONES":"c:cobblestones","COBBLESTONE_SLABS":"c:slabs/cobblestone","COBBLESTONE_STAIRS":"c:stairs/cobblestone","COLORLESS_GLASS_BLOCKS":"c:glass_blocks/colorless","COOKED_FISH_FOODS":"c:foods/cooked_fish","COOKED_MEAT_FOODS":"c:foods/cooked_meat","COOKIE_FOODS":"c:foods/cookie","COW_LEATHERS":"c:leathers/cow","CROPS":"c:crops","CYAN_DYES":"c:dyes/cyan","CYAN_WOOLS":"c:wools/cyan","DIAMOND_AXES":"c:tools/axes/diamond","DIAMOND_BOOTS":"c:armors/boots/diamond","DIAMOND_CHESTPLATES":"c:armors/chestplates/diamond","DIAMOND_GEMS":"c:gems/diamond","DIAMOND_HELMETS":"c:armors/helmets/diamond","DIAMOND_HOES":"c:tools/hoes/diamond","DIAMOND_LEGGINGS":"c:armors/leggings/diamond","DIAMOND_ORES":"c:ores/diamond","DIAMOND_PICKAXES":"c:tools/pickaxes/diamond","DIAMOND_SHOVELS":"c:tools/shovels/diamond","DIAMOND_STORAGE_BLOCKS":"c:storage_blocks/diamond","DIAMOND_SWORDS":"c:tools/swords/diamond","DIRTS":"c:dirts","DOORS":"c:doors","DUSTS":"c:dusts","DYES":"c:dyes","EDIBLE_WHEN_PLACED_FOODS":"c:foods/edible_when_placed","EGGS":"c:eggs","EMPTY_BUCKETS":"c:buckets/empty","FEATHERS":"c:feathers","FENCES":"c:fences","FENCE_GATES":"c:fence_gates","FISHING_RODS":"c:tools/fishing_rods","FLOWERS":"c:flowers","FOODS":"c:foods","FRUIT_FOODS":"c:foods/fruit","GEMS":"c:gems","GLASS_BLOCKS":"c:glass_blocks","GLOWSTONE_DUSTS":"c:dusts/glowstone","GOLDEN_FOODS":"c:foods/golden","GOLD_AXES":"c:tools/axes/gold","GOLD_BOOTS":"c:armors/boots/gold","GOLD_CHESTPLATES":"c:armors/chestplates/gold","GOLD_HELMETS":"c:armors/helmets/gold","GOLD_HOES":"c:tools/hoes/gold","GOLD_INGOTS":"c:ingots/gold","GOLD_LEGGINGS":"c:armors/leggings/gold","GOLD_ORES":"c:ores/gold","GOLD_PICKAXES":"c:tools/pickaxes/gold","GOLD_SHOVELS":"c:tools/shovels/gold","GOLD_STORAGE_BLOCKS":"c:storage_blocks/gold","GOLD_SWORDS":"c:tools/swords/gold","GRASS_BLOCKS":"c:grass_blocks","GRAVELS":"c:gravels","GRAY_DYES":"c:dyes/gray","GRAY_WOOLS":"c:wools/gray","GREEN_DYES":"c:dyes/green","GREEN_WOOLS":"c:wools/green","GUNPOWDERS":"c:gunpowders","HELMETS":"c:armors/helmets","HOES":"c:tools/hoes","IGNITERS":"c:tools/igniters","INGOTS":"c:ingots","IRON_AXES":"c:tools/axes/iron","IRON_BOOTS":"c:armors/boots/iron","IRON_CHESTPLATES":"c:armors/chestplates/iron","IRON_DOORS":"c:doors/iron","IRON_HELMETS":"c:armors/helmets/iron","IRON_HOES":"c:tools/hoes/iron","IRON_INGOTS":"c:ingots/iron","IRON_LEGGINGS":"c:armors/leggings/iron","IRON_ORES":"c:ores/iron","IRON_PICKAXES":"c:tools/pickaxes/iron","IRON_SHOVELS":"c:tools/shovels/iron","IRON_STORAGE_BLOCKS":"c:storage_blocks/iron","IRON_SWORDS":"c:tools/swords/iron","JACK_O_LANTERNS":"c:pumpkins/jack_o_lanterns","LADDERS":"c:ladders","LAPIS_GEMS":"c:gems/lapis","LAPIS_ORES":"c:ores/lapis","LAPIS_STORAGE_BLOCKS":"c:storage_blocks/lapis","LAVA_BUCKETS":"c:buckets/lava","LEATHERS":"c:leathers","LEATHER_BOOTS":"c:armors/boots/leather","LEATHER_CHESTPLATES":"c:armors/chestplates/leather","LEATHER_HELMETS":"c:armors/helmets/leather","LEATHER_LEGGINGS":"c:armors/leggings/leather","LEAVES":"c:leaves","LEGGINGS":"c:armors/leggings","LIGHT_BLUE_DYES":"c:dyes/light_blue","LIGHT_BLUE_WOOLS":"c:wools/light_blue","LIGHT_GRAY_DYES":"c:dyes/light_gray","LIGHT_GRAY_WOOLS":"c:wools/light_gray","LIME_DYES":"c:dyes/lime","LIME_WOOLS":"c:wools/lime","LOGS":"c:logs","MAGENTA_DYES":"c:dyes/magenta","MAGENTA_WOOLS":"c:wools/magenta","MILK_BUCKETS":"c:buckets/milk","MOSSY_COBBLESTONES":"c:cobblestones/mossy","MUSHROOMS":"c:mushrooms","NETHERRACKS":"c:netherracks","NORMAL_BRICKS":"c:bricks/normal","NORMAL_BRICK_BLOCKS":"c:brick_blocks/normal","NORMAL_COBBLESTONES":"c:cobblestones/normal","NORMAL_COBBLESTONE_STAIRS":"c:stairs/cobblestone/normal","NORMAL_FLOWERS":"c:flowers/normal","NORMAL_OBSIDIANS":"c:obsidians/normal","NORMAL_PUMPKINS":"c:pumpkins/normal","NORMAL_SANDS":"c:sands/normal","NORMAL_SANDSTONE_BLOCKS":"c:sandstone/normal_blocks","NORMAL_TORCHES":"c:torches/normal","OAK_DOORS":"c:doors/wooden/oak","OAK_FENCES":"c:fences/wooden/oak","OAK_LADDERS":"c:ladders/wooden/oak","OAK_LEAVES":"c:leaves/oak","OAK_LOGS":"c:logs/oak","OAK_PLANKS":"c:planks/oak","OAK_PRESSURE_PLATES":"c:pressure_plates/wooden/oak","OAK_SAPLINGS":"c:saplings/oak","OAK_SIGNS":"c:signs/wooden/oak","OAK_SLABS":"c:slabs/wooden/oak","OAK_STAIRS":"c:stairs/wooden/oak","OAK_STANDING_SIGNS":"c:signs/wooden/oak/standing","OAK_TRAPDOORS":"c:trapdoors/wooden/oak","OAK_WALL_SIGNS":"c:signs/wooden/oak/wall","OBSIDIANS":"c:obsidians","ORANGE_DYES":"c:dyes/orange","ORANGE_WOOLS":"c:wools/orange","ORES":"c:ores","ORE_BEARING_GROUND_NETHERRACK":"c:ore_bearing_ground/netherrack","ORE_BEARING_GROUND_STONE":"c:ore_bearing_ground/stone","PICKAXES":"c:tools/pickaxes","PINK_DYES":"c:dyes/pink","PINK_WOOLS":"c:wools/pink","PLANKS":"c:planks","PRESSURE_PLATES":"c:pressure_plates","PUMPKINS":"c:pumpkins","PUMPKIN_CROPS":"c:crops/pumpkin","PURPLE_DYES":"c:dyes/purple","PURPLE_WOOLS":"c:wools/purple","RAILS":"c:rails","RAW_FISH_FOODS":"c:foods/raw_fish","RAW_MEAT_FOODS":"c:foods/raw_meat","REDSTONE_DUSTS":"c:dusts/redstone","REDSTONE_ORES":"c:ores/redstone","REDSTONE_TORCHES":"c:torches/redstone","RED_DYES":"c:dyes/red","RED_MUSHROOMS":"c:mushrooms/red","RED_WOOLS":"c:wools/red","SANDS":"c:sands","SANDSTONE_BLOCKS":"c:sandstone/blocks","SANDSTONE_SLABS":"c:slabs/sandstone","SAPLINGS":"c:saplings","SEEDS":"c:seeds","SHEARS":"c:tools/shears","SHOVELS":"c:tools/shovels","SIGNS":"c:signs","SLABS":"c:slabs","SLIME_BALLS":"c:slime_balls","SNOW":"c:snow","SOUP_FOODS":"c:foods/soup","SPRUCE_LEAVES":"c:leaves/spruce","SPRUCE_LOGS":"c:logs/spruce","SPRUCE_SAPLINGS":"c:saplings/spruce","STAIRS":"c:stairs","STICKS":"c:sticks","STONES":"c:stones","STONE_AXES":"c:tools/axes/stone","STONE_BUTTONS":"c:buttons/stone","STONE_HOES":"c:tools/hoes/stone","STONE_PICKAXES":"c:tools/pickaxes/stone","STONE_PRESSURE_PLATES":"c:pressure_plates/stone","STONE_SHOVELS":"c:tools/shovels/stone","STONE_SLABS":"c:slabs/stone","STONE_SWORDS":"c:tools/swords/stone","STORAGE_BLOCKS":"c:storage_blocks","STRINGS":"c:strings","SUGAR_CANE_CROPS":"c:crops/sugar_cane","SWORDS":"c:tools/swords","TALL_FLOWERS":"c:flowers/tall","TOOLS":"c:tools","TORCHES":"c:torches","TRAPDOORS":"c:trapdoors","VEGETABLE_FOODS":"c:foods/vegetable","WATER_BUCKETS":"c:buckets/water","WHEAT_CROPS":"c:crops/wheat","WHEAT_SEEDS":"c:seeds/wheat","WHITE_DYES":"c:dyes/white","WHITE_WOOLS":"c:wools/white","WOODEN_AXES":"c:tools/axes/wooden","WOODEN_BOWLS":"c:bowls/wooden","WOODEN_CHESTS":"c:chests/wooden","WOODEN_DOORS":"c:doors/wooden","WOODEN_FENCES":"c:fences/wooden","WOODEN_FENCE_GATES":"c:fence_gates/wooden","WOODEN_HOES":"c:tools/hoes/wooden","WOODEN_LADDERS":"c:ladders/wooden","WOODEN_PICKAXES":"c:tools/pickaxes/wooden","WOODEN_PRESSURE_PLATES":"c:pressure_plates/wooden","WOODEN_SHOVELS":"c:tools/shovels/wooden","WOODEN_SIGNS":"c:signs/wooden","WOODEN_STAIRS":"c:stairs/wooden","WOODEN_STICKS":"c:sticks/wooden","WOODEN_SWORDS":"c:tools/swords/wooden","WOODEN_TRAPDOORS":"c:trapdoors/wooden","WOOLS":"c:wools","YELLOW_DYES":"c:dyes/yellow","YELLOW_WOOLS":"c:wools/yellow"},"items":{"apple":260,"arrow":262,"bone":352,"book":340,"bow":261,"bowl":281,"bread":297,"brick":336,"bucket":325,"cake":354,"chainmail_boots":305,"chainmail_chestplate":303,"chainmail_helmet":302,"chainmail_leggings":304,"chest_minecart":342,"clay_ball":337,"clock":347,"coal":263,"cod":349,"compass":345,"cooked_cod":350,"cooked_porkchop":320,"cookie":357,"diamond":264,"diamond_axe":279,"diamond_boots":313,"diamond_chestplate":311,"diamond_helmet":310,"diamond_hoe":293,"diamond_leggings":312,"diamond_pickaxe":278,"diamond_shovel":277,"diamond_sword":276,"dye":351,"egg":344,"feather":288,"fishing_rod":346,"flint":318,"flint_and_steel":259,"furnace_minecart":343,"glowstone_dust":348,"gold_ingot":266,"golden_apple":322,"golden_axe":286,"golden_boots":317,"golden_chestplate":315,"golden_helmet":314,"golden_hoe":294,"golden_leggings":316,"golden_pickaxe":285,"golden_shovel":284,"golden_sword":283,"gunpowder":289,"iron_axe":258,"iron_boots":309,"iron_chestplate":307,"iron_door":330,"iron_helmet":306,"iron_hoe":292,"iron_ingot":265,"iron_leggings":308,"iron_pickaxe":257,"iron_shovel":256,"iron_sword":267,"lava_bucket":327,"leather":334,"leather_boots":301,"leather_chestplate":299,"leather_helmet":298,"leather_leggings":300,"map":358,"milk_bucket":335,"minecart":328,"mushroom_stew":282,"music_disc_13":2256,"music_disc_cat":2257,"oak_boat":333,"oak_door":324,"oak_sign":323,"painting":321,"paper":339,"porkchop":319,"red_bed":355,"redstone":331,"repeater":356,"saddle":329,"shears":359,"slime_ball":341,"snowball":332,"stick":280,"stone_axe":275,"stone_hoe":291,"stone_pickaxe":274,"stone_shovel":273,"stone_sword":272,"string":287,"sugar":353,"sugar_cane":338,"water_bucket":326,"wheat":296,"wheat_seeds":295,"wooden_axe":271,"wooden_hoe":290,"wooden_pickaxe":270,"wooden_shovel":269,"wooden_sword":268},"sheet":{"0":"leather_helmet","1":"chainmail_helmet","2":"iron_helmet","3":"diamond_helmet","4":"gold_helmet","5":"flint_and_steel","6":"flint","7":"coal","8":"string","9":"seeds_wheat","10":"apple","11":"apple_golden","12":"egg","13":"sugar","14":"snowball","16":"leather_chestplate","17":"chainmail_chestplate","18":"iron_chestplate","19":"diamond_chestplate","20":"gold_chestplate","21":"bow_standby","22":"brick","23":"iron_ingot","24":"feather","25":"wheat","26":"painting","27":"reeds","28":"bone","29":"cake","30":"slime_ball","32":"leather_leggings","33":"chainmail_leggings","34":"iron_leggings","35":"diamond_leggings","36":"gold_leggings","37":"arrow","38":"quiver","39":"gold_ingot","40":"gunpowder","41":"bread","42":"sign","43":"door_wood","44":"iron_door","45":"bed","48":"leather_boots","49":"chainmail_boots","50":"iron_boots","51":"diamond_boots","52":"gold_boots","53":"stick","54":"compass","55":"diamond","56":"redstone_dust","57":"clay_ball","58":"paper","59":"book_normal","60":"map_filled","64":"wood_sword","65":"stone_sword","66":"iron_sword","67":"diamond_sword","68":"gold_sword","69":"fishing_rod_uncast","70":"clock","71":"bowl","72":"mushroom_stew","73":"glowstone_dust","74":"bucket_empty","75":"bucket_water","76":"bucket_lava","77":"bucket_milk","78":"ink_sac","79":"dye_powder_gray","80":"wood_shovel","81":"stone_shovel","82":"iron_shovel","83":"diamond_shovel","84":"gold_shovel","85":"fishing_rod_cast","86":"repeater","87":"porkchop","88":"cooked_porkchop","89":"fish_cod_raw","90":"fish_cod_cooked","92":"cookie","93":"shears","94":"dye_powder_red","95":"dye_powder_pink","96":"wood_pickaxe","97":"stone_pickaxe","98":"iron_pickaxe","99":"diamond_pickaxe","100":"gold_pickaxe","103":"leather","104":"saddle","110":"dye_powder_green","111":"dye_powder_lime","112":"wood_axe","113":"stone_axe","114":"iron_axe","115":"diamond_axe","116":"gold_axe","126":"cocoa_beans","127":"dye_powder_yellow","128":"wood_hoe","129":"stone_hoe","130":"iron_hoe","131":"diamond_hoe","132":"gold_hoe","135":"minecart_normal","136":"boat","142":"lapis_lazuli","143":"dye_powder_light_blue","151":"minecart_chest","158":"dye_powder_purple","159":"dye_powder_magenta","167":"minecart_furnace","174":"dye_powder_cyan","175":"dye_powder_orange","190":"dye_powder_silver","191":"bone_meal","240":"record_13","241":"record_cat"},"tags":{"blocks/c:bookshelves":["minecraft:bookshelf"],"blocks/c:brick_blocks":["#c:brick_blocks/normal"],"blocks/c:brick_blocks/normal":["minecraft:bricks"],"blocks/c:buttons":["#c:buttons/stone"],"blocks/c:buttons/stone":["minecraft:stone_button"],"blocks/c:chests":["#c:chests/wooden"],"blocks/c:chests/wooden":["minecraft:chest"],"blocks/c:clay_blocks":["minecraft:clay"],"blocks/c:cobblestones":["#c:cobblestones/mossy","#c:cobblestones/normal"],"blocks/c:cobblestones/mossy":["minecraft:mossy_cobblestone"],"blocks/c:cobblestones/normal":["minecraft:cobblestone"],"blocks/c:crops":["#c:crops/cactus","#c:crops/pumpkin","#c:crops/sugar_cane","#c:crops/wheat"],"blocks/c:crops/cactus":["minecraft:cactus"],"blocks/c:crops/pumpkin":["minecraft:carved_pumpkin"],"blocks/c:crops/sugar_cane":["minecraft:sugar_cane"],"blocks/c:crops/wheat":["minecraft:wheat"],"blocks/c:dirts":["minecraft:dirt"],"blocks/c:doors":["#c:doors/iron","#c:doors/wooden"],"blocks/c:doors/iron":["minecraft:iron_door"],"blocks/c:doors/wooden":["#c:doors/wooden/oak"],"blocks/c:doors/wooden/oak":["minecraft:oak_door"],"blocks/c:farmlands":[],"blocks/c:farmlands/normal":["minecraft:farmland"],"blocks/c:fence_gates":["#c:fence_gates/wooden"],"blocks/c:fence_gates/wooden":[],"blocks/c:fences":["#c:fences/wooden"],"blocks/c:fences/wooden":["#c:fences/wooden/oak"],"blocks/c:fences/wooden/oak":["minecraft:oak_fence"],"blocks/c:flowers":["#c:flowers/small","#c:flowers/tall"],"blocks/c:flowers/normal":["minecraft:dandelion","minecraft:rose"],"blocks/c:flowers/tall":[],"blocks/c:glass_blocks":["#c:glass_blocks/colorless"],"blocks/c:glass_blocks/colorless":["minecraft:glass"],"blocks/c:grass_blocks":["minecraft:grass_block"],"blocks/c:gravels":["minecraft:gravel"],"blocks/c:ice":["#c:ice/normal"],"blocks/c:ice/normal":["minecraft:ice"],"blocks/c:ladders":["#c:ladders/wooden"],"blocks/c:ladders/wooden":["#c:ladders/wooden/oak"],"blocks/c:ladders/wooden/oak":["minecraft:ladder"],"blocks/c:leaves":["#c:leaves/birch","#c:leaves/oak","#c:leaves/spruce"],"blocks/c:leaves/birch":["minecraft:leaves@10","minecraft:leaves@14","minecraft:leaves@2","minecraft:leaves@6"],"blocks/c:leaves/oak":["minecraft:leaves@0","minecraft:leaves@12","minecraft:leaves@4","minecraft:leaves@8"],"blocks/c:leaves/spruce":["minecraft:leaves@1","minecraft:leaves@13","minecraft:leaves@5","minecraft:leaves@9"],"blocks/c:logs":["#c:logs/birch","#c:logs/oak","#c:logs/spruce"],"blocks/c:logs/birch":["minecraft:log@2"],"blocks/c:logs/oak":["minecraft:log@0"],"blocks/c:logs/spruce":["minecraft:log@1"],"blocks/c:mushrooms":["#c:mushrooms/brown","#c:mushrooms/red"],"blocks/c:mushrooms/brown":["minecraft:brown_mushroom"],"blocks/c:mushrooms/red":["minecraft:red_mushroom"],"blocks/c:netherracks":["minecraft:netherrack"],"blocks/c:obsidians":["#c:obsidians/normal"],"blocks/c:obsidians/normal":["minecraft:obsidian"],"blocks/c:ore_bearing_ground/netherrack":["minecraft:netherrack"],"blocks/c:ore_bearing_ground/stone":["minecraft:stone"],"blocks/c:ores":["#c:ores/coal","#c:ores/diamond","#c:ores/gold","#c:ores/iron","#c:ores/lapis","#c:ores/redstone"],"blocks/c:ores/coal":["minecraft:coal_ore"],"blocks/c:ores/diamond":["minecraft:diamond_ore"],"blocks/c:ores/gold":["minecraft:gold_ore"],"blocks/c:ores/iron":["minecraft:iron_ore"],"blocks/c:ores/lapis":["minecraft:lapis_ore"],"blocks/c:ores/redstone":["minecraft:redstone_ore","minecraft:redstone_ore_lit"],"blocks/c:planks":["#c:planks/oak"],"blocks/c:planks/oak":["minecraft:oak_planks"],"blocks/c:pressure_plates":["#c:pressure_plates/stone","#c:pressure_plates/wooden"],"blocks/c:pressure_plates/stone":["minecraft:stone_pressure_plate"],"blocks/c:pressure_plates/wooden":["#c:pressure_plates/wooden/oak"],"blocks/c:pressure_plates/wooden/oak":["minecraft:oak_pressure_plate"],"blocks/c:pumpkins":["#c:pumpkins/jack_o_lanterns","#c:pumpkins/normal"],"blocks/c:pumpkins/jack_o_lanterns":["minecraft:jack_o_lantern"],"blocks/c:pumpkins/normal":["minecraft:carved_pumpkin"],"blocks/c:rails":["detector_rail","powered_rail","rail"],"blocks/c:sands":["#c:sands/normal"],"blocks/c:sands/normal":["minecraft:sand"],"blocks/c:sandstone/blocks":["#c:sandstone/normal_blocks"],"blocks/c:sandstone/normal_blocks":["minecraft:sandstone"],"blocks/c:saplings":["#c:saplings/birch","#c:saplings/oak","#c:saplings/spruce"],"blocks/c:saplings/birch":["minecraft:sapling@2"],"blocks/c:saplings/oak":["minecraft:sapling@0"],"blocks/c:saplings/spruce":["minecraft:sapling@1"],"blocks/c:signs":["#c:signs/wooden"],"blocks/c:signs/wooden":["#c:signs/wooden/oak"],"blocks/c:signs/wooden/oak":["#c:signs/wooden/oak/standing","#c:signs/wooden/oak/wall"],"blocks/c:signs/wooden/oak/standing":["minecraft:oak_sign"],"blocks/c:signs/wooden/oak/wall":["minecraft:oak_wall_sign"],"blocks/c:slabs":["#c:slabs/cobblestone","#c:slabs/sandstone","#c:slabs/stone","#c:slabs/wooden"],"blocks/c:slabs/cobblestone":["#c:slabs/cobblestone/normal"],"blocks/c:slabs/cobblestone/normal":["minecraft:slab@3"],"blocks/c:slabs/sandstone":["minecraft:slab@1"],"blocks/c:slabs/stone":["minecraft:slab@0"],"blocks/c:slabs/wooden":["#c:slabs/wooden/oak"],"blocks/c:slabs/wooden/oak":["minecraft:slab@2"],"blocks/c:snow":["#c:snow/block","#c:snow/layer"],"blocks/c:snow/block":["minecraft:snow_block"],"blocks/c:snow/layer":["minecraft:snow"],"blocks/c:stairs":["#c:stairs/cobblestone","#c:stairs/wooden"],"blocks/c:stairs/cobblestone":["#c:stairs/cobblestone/normal"],"blocks/c:stairs/cobblestone/normal":["minecraft:cobblestone_stairs"],"blocks/c:stairs/wooden":["#c:stairs/wooden/oak"],"blocks/c:stairs/wooden/oak":["minecraft:oak_stairs"],"blocks/c:stones":["minecraft:stone"],"blocks/c:storage_blocks":["#c:storage_blocks/diamond","#c:storage_blocks/gold","#c:storage_blocks/iron","#c:storage_blocks/lapis"],"blocks/c:storage_blocks/diamond":["minecraft:diamond_block"],"blocks/c:storage_blocks/gold":["minecraft:gold_block"],"blocks/c:storage_blocks/iron":["minecraft:iron_block"],"blocks/c:storage_blocks/lapis":["minecraft:lapis_block"],"blocks/c:torches":["#c:torches/normal","#c:torches/redstone"],"blocks/c:torches/normal":["minecraft:torch"],"blocks/c:torches/redstone":["minecraft:redstone_torch_lit"],"blocks/c:trapdoors":["#c:trapdoors/wooden"],"blocks/c:trapdoors/wooden":["#c:trapdoors/wooden/oak"],"blocks/c:trapdoors/wooden/oak":["minecraft:oak_trapdoor"],"blocks/c:wools":["#c:wools/black","#c:wools/blue","#c:wools/brown","#c:wools/cyan","#c:wools/gray","#c:wools/green","#c:wools/light_blue","#c:wools/light_gray","#c:wools/lime","#c:wools/magenta","#c:wools/orange","#c:wools/pink","#c:wools/purple","#c:wools/red","#c:wools/white","#c:wools/yellow"],"blocks/c:wools/black":["minecraft:wool@15"],"blocks/c:wools/blue":["minecraft:wool@11"],"blocks/c:wools/brown":["minecraft:wool@12"],"blocks/c:wools/cyan":["minecraft:wool@9"],"blocks/c:wools/gray":["minecraft:wool@7"],"blocks/c:wools/green":["minecraft:wool@13"],"blocks/c:wools/light_blue":["minecraft:wool@3"],"blocks/c:wools/light_gray":["minecraft:wool@8"],"blocks/c:wools/lime":["minecraft:wool@5"],"blocks/c:wools/magenta":["minecraft:wool@2"],"blocks/c:wools/orange":["minecraft:wool@1"],"blocks/c:wools/pink":["minecraft:wool@6"],"blocks/c:wools/purple":["minecraft:wool@10"],"blocks/c:wools/red":["minecraft:wool@14"],"blocks/c:wools/white":["minecraft:wool@0"],"blocks/c:wools/yellow":["minecraft:wool@4"],"blocks/minecraft:infiniburn":["netherrack"],"blocks/minecraft:mineable/axe":["#c:logs","#c:planks","bookshelf","chest"],"blocks/minecraft:mineable/hoe":[],"blocks/minecraft:mineable/pickaxe":["#c:rails","bricks","coal_ore","cobblestone","cobblestone_stairs","diamond_block","diamond_ore","dispenser","double_slab","furnace","furnace_lit","glowstone","gold_block","gold_ore","iron_block","iron_door","iron_ore","lapis_block","lapis_ore","mossy_cobblestone","netherrack","obsidian","piston","piston_head","redstone_ore","redstone_ore_lit","sandstone","slab","spawner","sticky_piston","stone","stone_button","stone_pressure_plate"],"blocks/minecraft:mineable/shears":["#c:leaves","#c:wools","cobweb"],"blocks/minecraft:mineable/shovel":["clay","dirt","farmland","grass_block","gravel","sand","snow","snow_block"],"blocks/minecraft:mineable/sword":["cobweb"],"blocks/minecraft:needs_diamond_tool":["obsidian"],"blocks/minecraft:needs_iron_tool":["diamond_block","diamond_ore","gold_block","gold_ore","redstone_ore","redstone_ore_lit"],"blocks/minecraft:needs_stone_tool":["iron_block","iron_ore","lapis_block","lapis_ore"],"c:armors":["#c:armors/boots","#c:armors/chestplates","#c:armors/helmets","#c:armors/leggings"],"c:armors/boots":["#c:armors/boots/chainmail","#c:armors/boots/diamond","#c:armors/boots/gold","#c:armors/boots/iron","#c:armors/boots/leather"],"c:armors/boots/chainmail":["minecraft:chainmail_boots"],"c:armors/boots/diamond":["minecraft:diamond_boots"],"c:armors/boots/gold":["minecraft:golden_boots"],"c:armors/boots/iron":["minecraft:iron_boots"],"c:armors/boots/leather":["minecraft:leather_boots"],"c:armors/chestplates":["#c:armors/chestplates/chainmail","#c:armors/chestplates/diamond","#c:armors/chestplates/gold","#c:armors/chestplates/iron","#c:armors/chestplates/leather"],"c:armors/chestplates/chainmail":["minecraft:chainmail_chestplate"],"c:armors/chestplates/diamond":["minecraft:diamond_chestplate"],"c:armors/chestplates/gold":["minecraft:golden_chestplate"],"c:armors/chestplates/iron":["minecraft:iron_chestplate"],"c:armors/chestplates/leather":["minecraft:leather_chestplate"],"c:armors/helmets":["#c:armors/helmets/chainmail","#c:armors/helmets/diamond","#c:armors/helmets/gold","#c:armors/helmets/iron","#c:armors/helmets/leather"],"c:armors/helmets/chainmail":["minecraft:chainmail_helmet"],"c:armors/helmets/diamond":["minecraft:diamond_helmet"],"c:armors/helmets/gold":["minecraft:golden_helmet"],"c:armors/helmets/iron":["minecraft:iron_helmet"],"c:armors/helmets/leather":["minecraft:leather_helmet"],"c:armors/leggings":["#c:armors/leggings/chainmail","#c:armors/leggings/diamond","#c:armors/leggings/gold","#c:armors/leggings/iron","#c:armors/leggings/leather"],"c:armors/leggings/chainmail":["minecraft:chainmail_leggings"],"c:armors/leggings/diamond":["minecraft:diamond_leggings"],"c:armors/leggings/gold":["minecraft:golden_leggings"],"c:armors/leggings/iron":["minecraft:iron_leggings"],"c:armors/leggings/leather":["minecraft:leather_leggings"],"c:arrows":["#c:arrows/normal"],"c:arrows/normal":["minecraft:arrow"],"c:bones":["minecraft:bone"],"c:bookshelves":["minecraft:bookshelf"],"c:bowls":["#c:bowls/wooden"],"c:bowls/wooden":["minecraft:bowl"],"c:brick_blocks":["#c:brick_blocks/normal"],"c:brick_blocks/normal":["minecraft:bricks"],"c:bricks":["#c:bricks/normal"],"c:bricks/normal":["minecraft:brick"],"c:buckets":["#c:buckets/empty","#c:buckets/lava","#c:buckets/milk","#c:buckets/water"],"c:buckets/empty":["minecraft:bucket"],"c:buckets/lava":["minecraft:lava_bucket"],"c:buckets/milk":["minecraft:milk_bucket"],"c:buckets/water":["minecraft:water_bucket"],"c:buttons":["#c:buttons/stone"],"c:buttons/stone":["minecraft:stone_button"],"c:chests":["#c:chests/wooden"],"c:chests/wooden":["minecraft:chest"],"c:clay_blocks":["minecraft:clay"],"c:coals":["#c:coals/charcoal","#c:coals/normal"],"c:coals/charcoal":["minecraft:coal@1"],"c:coals/normal":["minecraft:coal@0"],"c:cobblestones":["#c:cobblestones/mossy","#c:cobblestones/normal"],"c:cobblestones/mossy":["minecraft:mossy_cobblestone"],"c:cobblestones/normal":["minecraft:cobblestone"],"c:crops":["#c:crops/cactus","#c:crops/pumpkin","#c:crops/sugar_cane","#c:crops/wheat"],"c:crops/cactus":["minecraft:cactus"],"c:crops/pumpkin":["minecraft:carved_pumpkin"],"c:crops/sugar_cane":["minecraft:sugar_cane"],"c:crops/wheat":["minecraft:wheat"],"c:dirts":["minecraft:dirt"],"c:doors":["#c:doors/iron","#c:doors/wooden"],"c:doors/iron":["minecraft:iron_door"],"c:doors/wooden":["#c:doors/wooden/oak"],"c:doors/wooden/oak":["minecraft:oak_door"],"c:dusts":["#c:dusts/glowstone","#c:dusts/redstone"],"c:dusts/glowstone":["minecraft:glowstone_dust"],"c:dusts/redstone":["minecraft:redstone"],"c:dyes":["#c:dyes/black","#c:dyes/blue","#c:dyes/brown","#c:dyes/cyan","#c:dyes/gray","#c:dyes/green","#c:dyes/light_blue","#c:dyes/light_gray","#c:dyes/lime","#c:dyes/magenta","#c:dyes/orange","#c:dyes/pink","#c:dyes/purple","#c:dyes/red","#c:dyes/white","#c:dyes/yellow"],"c:dyes/black":["minecraft:dye@0"],"c:dyes/blue":["minecraft:dye@4"],"c:dyes/brown":["minecraft:dye@3"],"c:dyes/cyan":["minecraft:dye@6"],"c:dyes/gray":["minecraft:dye@8"],"c:dyes/green":["minecraft:dye@2"],"c:dyes/light_blue":["minecraft:dye@12"],"c:dyes/light_gray":["minecraft:dye@7"],"c:dyes/lime":["minecraft:dye@10"],"c:dyes/magenta":["minecraft:dye@13"],"c:dyes/orange":["minecraft:dye@14"],"c:dyes/pink":["minecraft:dye@9"],"c:dyes/purple":["minecraft:dye@5"],"c:dyes/red":["minecraft:dye@1"],"c:dyes/white":["minecraft:dye@15"],"c:dyes/yellow":["minecraft:dye@11"],"c:eggs":["#c:eggs/chicken"],"c:eggs/chicken":["minecraft:egg"],"c:feathers":["#c:feathers/chicken"],"c:feathers/chicken":["minecraft:feather"],"c:fence_gates":["#c:fence_gates/wooden"],"c:fence_gates/wooden":[],"c:fences":["#c:fences/wooden"],"c:fences/wooden":["#c:fences/wooden/oak"],"c:fences/wooden/oak":["minecraft:oak_fence"],"c:flowers":["#c:flowers/small","#c:flowers/tall"],"c:flowers/normal":["minecraft:dandelion","minecraft:rose"],"c:flowers/tall":[],"c:foods":["#c:foods/bread","#c:foods/cooked_fish","#c:foods/cooked_meat","#c:foods/cookie","#c:foods/edible_when_placed","#c:foods/fruit","#c:foods/golden","#c:foods/raw_fish","#c:foods/raw_meat","#c:foods/soup","#c:foods/vegetable"],"c:foods/bread":["minecraft:bread"],"c:foods/cooked_fish":["minecraft:cooked_cod"],"c:foods/cooked_meat":["minecraft:cooked_porkchop"],"c:foods/cookie":["minecraft:cookie"],"c:foods/edible_when_placed":["minecraft:cake"],"c:foods/fruit":["minecraft:apple","minecraft:golden_apple"],"c:foods/golden":["minecraft:golden_apple"],"c:foods/raw_fish":["minecraft:cod"],"c:foods/raw_meat":["minecraft:porkchop"],"c:foods/soup":["minecraft:mushroom_stew"],"c:foods/vegetable":[],"c:gems":["#c:gems/diamond","#c:gems/lapis"],"c:gems/diamond":["minecraft:diamond"],"c:gems/lapis":["minecraft:dye@4"],"c:glass_blocks":["#c:glass_blocks/colorless"],"c:glass_blocks/colorless":["minecraft:glass"],"c:grass_blocks":["minecraft:grass_block"],"c:gravels":["minecraft:gravel"],"c:gunpowders":["minecraft:gunpowder"],"c:ice":["#c:ice/normal"],"c:ice/normal":["minecraft:ice"],"c:ingots":["#c:ingots/gold","#c:ingots/iron"],"c:ingots/gold":["minecraft:gold_ingot"],"c:ingots/iron":["minecraft:iron_ingot"],"c:ladders":["#c:ladders/wooden"],"c:ladders/wooden":["#c:ladders/wooden/oak"],"c:ladders/wooden/oak":["minecraft:ladder"],"c:leathers":["#c:leathers/cow"],"c:leathers/cow":["minecraft:leather"],"c:leaves":["#c:leaves/birch","#c:leaves/oak","#c:leaves/spruce"],"c:leaves/birch":["minecraft:leaves@2"],"c:leaves/oak":["minecraft:leaves@0"],"c:leaves/spruce":["minecraft:leaves@1"],"c:logs":["#c:logs/birch","#c:logs/oak","#c:logs/spruce"],"c:logs/birch":["minecraft:log@2"],"c:logs/oak":["minecraft:log@0"],"c:logs/spruce":["minecraft:log@1"],"c:mushrooms":["#c:mushrooms/brown","#c:mushrooms/red"],"c:mushrooms/brown":["minecraft:brown_mushroom"],"c:mushrooms/red":["minecraft:red_mushroom"],"c:netherracks":["minecraft:netherrack"],"c:obsidians":["#c:obsidians/normal"],"c:obsidians/normal":["minecraft:obsidian"],"c:ore_bearing_ground/netherrack":["minecraft:netherrack"],"c:ore_bearing_ground/stone":["minecraft:stone"],"c:ores":["#c:ores/coal","#c:ores/diamond","#c:ores/gold","#c:ores/iron","#c:ores/lapis","#c:ores/redstone"],"c:ores/coal":["minecraft:coal_ore"],"c:ores/diamond":["minecraft:diamond_ore"],"c:ores/gold":["minecraft:gold_ore"],"c:ores/iron":["minecraft:iron_ore"],"c:ores/lapis":["minecraft:lapis_ore"],"c:ores/redstone":["minecraft:redstone_ore","minecraft:redstone_ore_lit"],"c:planks":["#c:planks/oak"],"c:planks/oak":["minecraft:oak_planks"],"c:pressure_plates":["#c:pressure_plates/stone","#c:pressure_plates/wooden"],"c:pressure_plates/stone":["minecraft:stone_pressure_plate"],"c:pressure_plates/wooden":["#c:pressure_plates/wooden/oak"],"c:pressure_plates/wooden/oak":["minecraft:oak_pressure_plate"],"c:pumpkins":["#c:pumpkins/jack_o_lanterns","#c:pumpkins/normal"],"c:pumpkins/jack_o_lanterns":["minecraft:jack_o_lantern"],"c:pumpkins/normal":["minecraft:carved_pumpkin"],"c:rails":["detector_rail","powered_rail","rail"],"c:sands":["#c:sands/normal"],"c:sands/normal":["minecraft:sand"],"c:sandstone/blocks":["#c:sandstone/normal_blocks"],"c:sandstone/normal_blocks":["minecraft:sandstone"],"c:saplings":["#c:saplings/birch","#c:saplings/oak","#c:saplings/spruce"],"c:saplings/birch":["minecraft:sapling@2"],"c:saplings/oak":["minecraft:sapling@0"],"c:saplings/spruce":["minecraft:sapling@1"],"c:seeds":["#c:seeds/wheat"],"c:seeds/wheat":["minecraft:wheat_seeds"],"c:signs":["#c:signs/wooden"],"c:signs/wooden":["#c:signs/wooden/oak"],"c:signs/wooden/oak":["minecraft:oak_sign"],"c:slabs":["#c:slabs/cobblestone","#c:slabs/sandstone","#c:slabs/stone","#c:slabs/wooden"],"c:slabs/cobblestone":["#c:slabs/cobblestone/normal"],"c:slabs/cobblestone/normal":["minecraft:slab@3"],"c:slabs/sandstone":["minecraft:slab@1"],"c:slabs/stone":["minecraft:slab@0"],"c:slabs/wooden":["#c:slabs/wooden/oak"],"c:slabs/wooden/oak":["minecraft:slab@2"],"c:slime_balls":["minecraft:slime_ball"],"c:snow":["#c:snow/block","#c:snow/layer"],"c:snow/block":["minecraft:snow_block"],"c:snow/layer":["minecraft:snow"],"c:stairs":["#c:stairs/cobblestone","#c:stairs/wooden"],"c:stairs/cobblestone":["#c:stairs/cobblestone/normal"],"c:stairs/cobblestone/normal":["minecraft:cobblestone_stairs"],"c:stairs/wooden":["#c:stairs/wooden/oak"],"c:stairs/wooden/oak":["minecraft:oak_stairs"],"c:sticks":["#c:sticks/wooden"],"c:sticks/wooden":["minecraft:stick"],"c:stones":["minecraft:stone"],"c:storage_blocks":["#c:storage_blocks/diamond","#c:storage_blocks/gold","#c:storage_blocks/iron","#c:storage_blocks/lapis"],"c:storage_blocks/diamond":["minecraft:diamond_block"],"c:storage_blocks/gold":["minecraft:gold_block"],"c:storage_blocks/iron":["minecraft:iron_block"],"c:storage_blocks/lapis":["minecraft:lapis_block"],"c:strings":["minecraft:string"],"c:tools":["#c:tools/axes","#c:tools/bows","#c:tools/fishing_rods","#c:tools/hoes","#c:tools/igniters","#c:tools/pickaxes","#c:tools/shears","#c:tools/shovels","#c:tools/swords"],"c:tools/axes":["#c:tools/axes/diamond","#c:tools/axes/gold","#c:tools/axes/iron","#c:tools/axes/stone","#c:tools/axes/wooden"],"c:tools/axes/diamond":["minecraft:diamond_axe"],"c:tools/axes/gold":["minecraft:golden_axe"],"c:tools/axes/iron":["minecraft:iron_axe"],"c:tools/axes/stone":["minecraft:stone_axe"],"c:tools/axes/wooden":["minecraft:wooden_axe"],"c:tools/bows":["minecraft:bow"],"c:tools/fishing_rods":["#c:tools/fishing_rods/wooden"],"c:tools/fishing_rods/wooden":["minecraft:fishing_rod"],"c:tools/hoes":["#c:tools/hoes/diamond","#c:tools/hoes/gold","#c:tools/hoes/iron","#c:tools/hoes/stone","#c:tools/hoes/wooden"],"c:tools/hoes/diamond":["minecraft:diamond_hoe"],"c:tools/hoes/gold":["minecraft:golden_hoe"],"c:tools/hoes/iron":["minecraft:iron_hoe"],"c:tools/hoes/stone":["minecraft:stone_hoe"],"c:tools/hoes/wooden":["minecraft:wooden_hoe"],"c:tools/igniters":["minecraft:flint_and_steel"],"c:tools/pickaxes":["#c:tools/pickaxes/diamond","#c:tools/pickaxes/gold","#c:tools/pickaxes/iron","#c:tools/pickaxes/stone","#c:tools/pickaxes/wooden"],"c:tools/pickaxes/diamond":["minecraft:diamond_pickaxe"],"c:tools/pickaxes/gold":["minecraft:golden_pickaxe"],"c:tools/pickaxes/iron":["minecraft:iron_pickaxe"],"c:tools/pickaxes/stone":["minecraft:stone_pickaxe"],"c:tools/pickaxes/wooden":["minecraft:wooden_pickaxe"],"c:tools/shears":["minecraft:shears"],"c:tools/shovels":["#c:tools/shovels/diamond","#c:tools/shovels/gold","#c:tools/shovels/iron","#c:tools/shovels/stone","#c:tools/shovels/wooden"],"c:tools/shovels/diamond":["minecraft:diamond_shovel"],"c:tools/shovels/gold":["minecraft:golden_shovel"],"c:tools/shovels/iron":["minecraft:iron_shovel"],"c:tools/shovels/stone":["minecraft:stone_shovel"],"c:tools/shovels/wooden":["minecraft:wooden_shovel"],"c:tools/swords":["#c:tools/swords/diamond","#c:tools/swords/gold","#c:tools/swords/iron","#c:tools/swords/stone","#c:tools/swords/wooden"],"c:tools/swords/diamond":["minecraft:diamond_sword"],"c:tools/swords/gold":["minecraft:golden_sword"],"c:tools/swords/iron":["minecraft:iron_sword"],"c:tools/swords/stone":["minecraft:stone_sword"],"c:tools/swords/wooden":["minecraft:wooden_sword"],"c:torches":["#c:torches/normal","#c:torches/redstone"],"c:torches/normal":["minecraft:torch"],"c:torches/redstone":["minecraft:redstone_torch_lit"],"c:trapdoors":["#c:trapdoors/wooden"],"c:trapdoors/wooden":["#c:trapdoors/wooden/oak"],"c:trapdoors/wooden/oak":["minecraft:oak_trapdoor"],"c:wools":["#c:wools/black","#c:wools/blue","#c:wools/brown","#c:wools/cyan","#c:wools/gray","#c:wools/green","#c:wools/light_blue","#c:wools/light_gray","#c:wools/lime","#c:wools/magenta","#c:wools/orange","#c:wools/pink","#c:wools/purple","#c:wools/red","#c:wools/white","#c:wools/yellow"],"c:wools/black":["minecraft:wool@15"],"c:wools/blue":["minecraft:wool@11"],"c:wools/brown":["minecraft:wool@12"],"c:wools/cyan":["minecraft:wool@9"],"c:wools/gray":["minecraft:wool@7"],"c:wools/green":["minecraft:wool@13"],"c:wools/light_blue":["minecraft:wool@3"],"c:wools/light_gray":["minecraft:wool@8"],"c:wools/lime":["minecraft:wool@5"],"c:wools/magenta":["minecraft:wool@2"],"c:wools/orange":["minecraft:wool@1"],"c:wools/pink":["minecraft:wool@6"],"c:wools/purple":["minecraft:wool@10"],"c:wools/red":["minecraft:wool@14"],"c:wools/white":["minecraft:wool@0"],"c:wools/yellow":["minecraft:wool@4"]},"templates":{"net/modificationstation/stationapi/api/template/achievement/TemplateAchievement":["net/minecraft/class_24",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;IILnet/minecraft/class_124;Lnet/minecraft/class_24;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;IILnet/minecraft/class_17;Lnet/minecraft/class_24;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;IILnet/minecraft/class_31;Lnet/minecraft/class_24;)V","(ILjava/lang/String;IILnet/minecraft/class_124;Lnet/minecraft/class_24;)V","(ILjava/lang/String;IILnet/minecraft/class_17;Lnet/minecraft/class_24;)V","(ILjava/lang/String;IILnet/minecraft/class_31;Lnet/minecraft/class_24;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateBedBlock":["net/minecraft/class_485",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateBlock":["net/minecraft/class_17",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V","(IILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateBlockWithEntity":["net/minecraft/class_395",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V","(IILnet/minecraft/class_15;)V"],1],"net/modificationstation/stationapi/api/template/block/TemplateBookshelfBlock":["net/minecraft/class_149",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateButtonBlock":["net/minecraft/class_323",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateCactusBlock":["net/minecraft/class_329",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateCakeBlock":["net/minecraft/class_463",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateChestBlock":["net/minecraft/class_110",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateClayBlock":["net/minecraft/class_400",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateCobwebBlock":["net/minecraft/class_383",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateCropBlock":["net/minecraft/class_301",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateDeadBushBlock":["net/minecraft/class_204",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateDetectorRailBlock":["net/minecraft/class_342",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateDirtBlock":["net/minecraft/class_332",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateDispenserBlock":["net/minecraft/class_526",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateDoorBlock":["net/minecraft/class_252",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateFarmlandBlock":["net/minecraft/class_492",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateFenceBlock":["net/minecraft/class_229",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateFireBlock":["net/minecraft/class_474",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateFlowingLiquidBlock":["net/minecraft/class_327",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateFurnaceBlock":["net/minecraft/class_421",["(Lnet/modificationstation/stationapi/api/util/Identifier;Z)V","(IZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateGlassBlock":["net/minecraft/class_78",["(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_15;Z)V","(IILnet/minecraft/class_15;Z)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateGlowstoneBlock":["net/minecraft/class_265",["(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_15;)V","(IILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateGrassBlock":["net/minecraft/class_476",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateGravelBlock":["net/minecraft/class_297",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateIceBlock":["net/minecraft/class_302",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateJukeboxBlock":["net/minecraft/class_88",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLadderBlock":["net/minecraft/class_627",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLeavesBlock":["net/minecraft/class_299",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLeverBlock":["net/minecraft/class_530",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLiquidBlock":["net/minecraft/class_385",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLockedChestBlock":["net/minecraft/class_244",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateLogBlock":["net/minecraft/class_487",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateMushroomPlantBlock":["net/minecraft/class_429",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateNetherPortalBlock":["net/minecraft/class_207",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateNetherrackBlock":["net/minecraft/class_544",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateNoteBlock":["net/minecraft/class_348",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateObsidianBlock":["net/minecraft/class_48",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateOreBlock":["net/minecraft/class_291",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateOreStorageBlock":["net/minecraft/class_324",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePistonBlock":["net/minecraft/class_223",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePistonExtensionBlock":["net/minecraft/class_469",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePistonHeadBlock":["net/minecraft/class_205",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePlantBlock":["net/minecraft/class_473",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePressurePlateBlock":["net/minecraft/class_457",["(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_389;Lnet/minecraft/class_15;)V","(IILnet/minecraft/class_389;Lnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplatePumpkinBlock":["net/minecraft/class_49",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateRailBlock":["net/minecraft/class_16",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateRedstoneOreBlock":["net/minecraft/class_396",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateRedstoneTorchBlock":["net/minecraft/class_619",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateRedstoneWireBlock":["net/minecraft/class_408",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateRepeaterBlock":["net/minecraft/class_510",["(Lnet/modificationstation/stationapi/api/util/Identifier;Z)V","(IZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSandBlock":["net/minecraft/class_123",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSandstoneBlock":["net/minecraft/class_370",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSaplingBlock":["net/minecraft/class_154",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSignBlock":["net/minecraft/class_460",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Class;Z)V","(ILjava/lang/Class;Z)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSlabBlock":["net/minecraft/class_553",["(Lnet/modificationstation/stationapi/api/util/Identifier;Z)V","(IZ)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSnowBlock":["net/minecraft/class_606",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSnowyBlock":["net/minecraft/class_224",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSoulSandBlock":["net/minecraft/class_316",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSpawnerBlock":["net/minecraft/class_620",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSpongeBlock":["net/minecraft/class_523",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateStairsBlock":["net/minecraft/class_416",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_17;)V","(ILnet/minecraft/class_17;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateStillLiquidBlock":["net/minecraft/class_315",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateStoneBlock":["net/minecraft/class_21",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateSugarCaneBlock":["net/minecraft/class_376",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateTallPlantBlock":["net/minecraft/class_392",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateTntBlock":["net/minecraft/class_132",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateTorchBlock":["net/minecraft/class_494",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateTranslucentBlock":["net/minecraft/class_221",["(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_15;Z)V","(IILnet/minecraft/class_15;Z)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateTrapdoorBlock":["net/minecraft/class_328",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;)V","(ILnet/minecraft/class_15;)V"],0],"net/modificationstation/stationapi/api/template/block/TemplateWorkbenchBlock":["net/minecraft/class_74",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/entityrenderer/TemplateEntityRenderer":["net/minecraft/class_579",["()V"],1],"net/modificationstation/stationapi/api/template/item/TemplateArmorItem":["net/minecraft/class_500",["(Lnet/modificationstation/stationapi/api/util/Identifier;III)V","(IIII)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateAxeItem":["net/minecraft/class_420",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_428;)V","(ILnet/minecraft/class_428;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateBedItem":["net/minecraft/class_261",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateBlockItem":["net/minecraft/class_533",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateBoatItem":["net/minecraft/class_483",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateBowItem":["net/minecraft/class_367",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateBucketItem":["net/minecraft/class_220",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateCoalItem":["net/minecraft/class_397",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateDoorItem":["net/minecraft/class_177",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_15;Lnet/minecraft/class_17;)V","(ILnet/minecraft/class_15;Lnet/minecraft/class_17;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateDyeItem":["net/minecraft/class_242",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateEggItem":["net/minecraft/class_280",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateFishingRodItem":["net/minecraft/class_607",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateFlintAndSteelItem":["net/minecraft/class_539",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateFoodItem":["net/minecraft/class_554",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZ)V","(IIZ)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateHoeItem":["net/minecraft/class_249",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_428;)V","(ILnet/minecraft/class_428;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateItem":["net/minecraft/class_124",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateLeavesBlockItem":["net/minecraft/class_479",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateLogBlockItem":["net/minecraft/class_129",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateMapBaseItem":["net/minecraft/class_561",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateMapItem":["net/minecraft/class_125",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateMinecartItem":["net/minecraft/class_381",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateMushroomStewItem":["net/minecraft/class_495",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateMusicDiscItem":["net/minecraft/class_449",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;)V","(ILjava/lang/String;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplatePaintingItem":["net/minecraft/class_551",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplatePickaxeItem":["net/minecraft/class_116",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_428;)V","(ILnet/minecraft/class_428;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplatePistonBlockItem":["net/minecraft/class_361",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateRedstoneItem":["net/minecraft/class_183",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSaddleItem":["net/minecraft/class_401",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSaplingBlockItem":["net/minecraft/class_286",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSecondaryBlockItem":["net/minecraft/class_262",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_17;)V","(ILnet/minecraft/class_17;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSeedsItem":["net/minecraft/class_380",["(Lnet/modificationstation/stationapi/api/util/Identifier;I)V","(II)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateShearsItem":["net/minecraft/class_126",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateShovelItem":["net/minecraft/class_501",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_428;)V","(ILnet/minecraft/class_428;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSignItem":["net/minecraft/class_482",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSlabBlockItem":["net/minecraft/class_19",["(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSnowballItem":["net/minecraft/class_626",["(Lnet/modificationstation/stationapi/api/util/Identifier;)V","(I)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateStackableFoodItem":["net/minecraft/class_355",["(Lnet/modificationstation/stationapi/api/util/Identifier;IZI)V","(IIZI)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateSwordItem":["net/minecraft/class_352",["(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/minecraft/class_428;)V","(ILnet/minecraft/class_428;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateToolItem":["net/minecraft/class_632",["(Lnet/modificationstation/stationapi/api/util/Identifier;ILnet/minecraft/class_428;[Lnet/minecraft/class_17;)V","(IILnet/minecraft/class_428;[Lnet/minecraft/class_17;)V"],0],"net/modificationstation/stationapi/api/template/item/TemplateWoolBlockItem":["net/minecraft/class_278",["(I)V"],0],"net/modificationstation/stationapi/api/template/stat/TemplateItemOrBlockStat":["net/minecraft/class_98",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;I)V","(ILjava/lang/String;I)V"],0],"net/modificationstation/stationapi/api/template/stat/TemplateSimpleStat":["net/minecraft/class_542",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;Lnet/minecraft/class_498;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;)V","(ILjava/lang/String;Lnet/minecraft/class_498;)V","(ILjava/lang/String;)V"],0],"net/modificationstation/stationapi/api/template/stat/TemplateStat":["net/minecraft/class_139",["(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;Lnet/minecraft/class_498;)V","(Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/String;)V","(ILjava/lang/String;Lnet/minecraft/class_498;)V","(ILjava/lang/String;)V"],0]},"terrain":{"0":"grass_block_top","1":"stone","2":"dirt","3":"grass_block_side","4":"oak_planks","5":"smooth_stone_slab_side","6":"smooth_stone","7":"bricks","8":"tnt_side","9":"tnt_top","10":"tnt_bottom","11":"cobweb","12":"rose","13":"dandelion","14":"nether_portal","15":"oak_sapling","16":"cobblestone","17":"bedrock","18":"sand","19":"gravel","20":"oak_log","21":"oak_log_top","22":"iron_block","23":"gold_block","24":"diamond_block","25":"chest_top","26":"chest_side","27":"chest_front","28":"red_mushroom","29":"brown_mushroom","31":"fire_e_w","32":"gold_ore","33":"iron_ore","34":"coal_ore","35":"bookshelf","36":"mossy_cobblestone","37":"obsidian","38":"grass_block_side_overlay","39":"grass","41":"double_chest_front_left","42":"double_chest_front_right","43":"crafting_table_top","44":"furnace_front","45":"furnace_side","46":"dispenser_front","47":"fire_n_s","48":"sponge","49":"glass","50":"diamond_ore","51":"redstone_ore","52":"oak_leaves","53":"fast_oak_leaves","55":"dead_bush","56":"fern","57":"double_chest_back_left","58":"double_chest_back_right","59":"crafting_table_side","60":"crafting_table_front","61":"furnace_front_on","62":"furnace_top","63":"spruce_sapling","64":"white_wool","65":"spawner","66":"snow","67":"ice","68":"grass_block_snow","69":"cactus_top","70":"cactus_side","71":"cactus_bottom","72":"clay","73":"sugar_cane","74":"note_block","75":"jukebox_top","79":"birch_sapling","80":"torch","81":"oak_door_top","82":"iron_door_top","83":"ladder","84":"oak_trapdoor","86":"farmland_moist","87":"farmland","88":"wheat_stage0","89":"wheat_stage1","90":"wheat_stage2","91":"wheat_stage3","92":"wheat_stage4","93":"wheat_stage5","94":"wheat_stage6","95":"wheat_stage7","96":"lever","97":"oak_door_bottom","98":"iron_door_bottom","99":"redstone_torch","102":"pumpkin_top","103":"netherrack","104":"soul_sand","105":"glowstone","106":"piston_top_sticky","107":"piston_top","108":"piston_side","109":"piston_bottom","110":"piston_inner","112":"rail_corner","113":"black_wool","114":"gray_wool","115":"redstone_torch_off","116":"spruce_log","117":"birch_log","118":"pumpkin_side","119":"carved_pumpkin","120":"jack_o_lantern","121":"cake_top","122":"cake_side","123":"cake_inner","124":"cake_bottom","128":"rail","129":"red_wool","130":"pink_wool","131":"repeater","132":"spruce_leaves","133":"fast_spruce_leaves","134":"red_bed_top_left","135":"red_bed_top_right","144":"lapis_block","145":"green_wool","146":"lime_wool","147":"repeater_on","149":"red_bed_front","150":"red_bed_side_left","151":"red_bed_side_right","152":"red_bed_back","160":"lapis_ore","161":"brown_wool","162":"yellow_wool","163":"powered_rail","164":"redstone_dust_cross","165":"redstone_dust_line0","176":"sandstone_top","177":"blue_wool","178":"light_blue_wool","179":"powered_rail_on","192":"sandstone","193":"purple_wool","194":"magenta_wool","195":"detector_rail","205":"water_still","206":"water_flow","208":"sandstone_bottom","209":"cyan_wool","210":"orange_wool","225":"light_gray_wool","237":"lava_still","238":"lava_flow","240":"destroy_stage_0","241":"destroy_stage_1","242":"destroy_stage_2","243":"destroy_stage_3","244":"destroy_stage_4","245":"destroy_stage_5","246":"destroy_stage_6","247":"destroy_stage_7","248":"destroy_stage_8","249":"destroy_stage_9"}};
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', ST = 'net/modificationstation/stationapi/api/';
+var P = ST + 'state/property/', DIR = ST + 'util/math/Direction', BS = ST + 'block/BlockState';
+var LBS = 'L' + BS + ';', LP = 'L' + P + 'Property;', OBJ = 'Ljava/lang/Object;', STR = 'Ljava/lang/String;';
+var CMP = 'Ljava/lang/Comparable;';
+
+var DIRS = [['DOWN', 0, 1, -1, 'Y', [0, -1, 0]], ['UP', 1, 0, -1, 'Y', [0, 1, 0]], ['NORTH', 2, 3, 2, 'Z', [0, 0, -1]],
+	['SOUTH', 3, 2, 0, 'Z', [0, 0, 1]], ['WEST', 4, 5, 1, 'X', [-1, 0, 0]], ['EAST', 5, 4, 3, 'X', [1, 0, 0]]];
+
+function enumOf(vm, cname, names, init) {
+	var c = vm.loadClass(cname);
+	c.$values = names.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; if (init) init(o, i); c.statics[n] = o; return o; });
+}
+function dirs(vm) { var c = vm.loadClass(DIR); vm.initClass(c); return c.$values; }
+function axes(vm) { var c = vm.loadClass(DIR + '$Axis'); vm.initClass(c); return c.$values; }
+function boxB(vm, b) { return JVM.box(vm, b ? 1 : 0, 'Z'); }
+function boxI(vm, i) { return JVM.box(vm, i, 'I'); }
+function valueName(vm, v) {
+	if (v == null) return 'null';
+	if (v.$box !== undefined) return v.cls.name === 'java/lang/Boolean' ? (JVM.unbox(v) ? 'true' : 'false') : String(JVM.unbox(v));
+	if (v.$name !== undefined && v.cls.native) return v.$name.toLowerCase();
+	var r = JVM.run(vm, function () { return vm.callVirtual(v, 'asString', '()Ljava/lang/String;', []); });
+	return r.ok && r.value != null ? String(r.value) : String(v.$name || '').toLowerCase();
+}
+function sameValue(a, b) {
+	if (a === b) return true;
+	return !!(a && b && a.$box !== undefined && b.$box !== undefined && a.cls === b.cls && JVM.unbox(a) === JVM.unbox(b));
+}
+
+function samePropAs(a, b) {
+	if (a === b) return true;
+	if (!a || !b || a.cls !== b.cls || a.$name !== b.$name || a.$values.length !== b.$values.length) return false;
+	for (var i = 0; i < a.$values.length; i++) if (!sameValue(a.$values[i], b.$values[i])) return false;
+	return true;
+}
+
+function managerOf(vm, block) {
+	if (block.$stMgr) return block.$stMgr;
+	var mgr = vm.newObject(vm.loadClass(ST + 'state/StateManager'));
+	mgr.$block = block; mgr.$props = []; mgr.$states = Object.create(null);
+	block.$stMgr = mgr;
+	var b = vm.newObject(vm.loadClass(ST + 'state/StateManager$Builder'));
+	b.$props = mgr.$props;
+	var r = JVM.run(vm, function () { vm.callVirtual(block, 'appendProperties', '(L' + ST + 'state/StateManager$Builder;)V', [b]); });
+	if (!r.ok) vm.log('error', 'a block\'s appendProperties failed');
+	var n = mgr.$props.reduce(function (a, p) { return a * p.$values.length; }, 1);
+	if (n > 16) vm.warnOnce('st:states:' + block.cls.name, block.cls.name.split('/').pop() + ' has ' + n + ' block states - this game keeps 16 per block: the rest look like the 16th');
+	return mgr;
+}
+function stateAt(vm, mgr, idx) {
+	var s = mgr.$states[idx];
+	if (s) return s;
+	s = vm.newObject(vm.loadClass(BS));
+	s.$mgr = mgr; s.$idx = idx; s.$block = mgr.$block;
+	return (mgr.$states[idx] = s);
+}
+function indexOfValues(mgr, vals) {
+	var idx = 0, mul = 1;
+	mgr.$props.forEach(function (p, i) { idx += vals[i] * mul; mul *= p.$values.length; });
+	return idx;
+}
+function valuesOf(mgr, idx) {
+	return mgr.$props.map(function (p) { var n = p.$values.length, v = idx % n; idx = Math.floor(idx / n); return v; });
+}
+function defaultOf(vm, block) {
+	if (block.$stDefault) return block.$stDefault;
+	return stateAt(vm, managerOf(vm, block), 0);
+}
+function stateOfMeta(vm, block, meta) {
+	var mgr = managerOf(vm, block);
+	if (!mgr.$props.length) return defaultOf(vm, block);
+	return stateAt(vm, mgr, meta | 0);
+}
+function metaOf(state) { return state && state.$idx !== undefined ? Math.min(state.$idx, 15) : 0; }
+
+function installStates(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+	def(ST + 'util/StringIdentifiable', { access: I, abstractMethods: { 'asString()Ljava/lang/String;': true } });
+
+	def(DIR + '$Axis', { super: 'java/lang/Enum', interfaces: [ST + 'util/StringIdentifiable', 'java/util/function/Predicate'], statics: { X: null, Y: null, Z: null }, clinit: function (vm) { enumOf(vm, DIR + '$Axis', ['X', 'Y', 'Z']); }, methods: {
+		'isHorizontal()Z': function (vm, self) { return self.$name !== 'Y' ? 1 : 0; },
+		'isVertical()Z': function (vm, self) { return self.$name === 'Y' ? 1 : 0; },
+		'asString()Ljava/lang/String;': function (vm, self) { return self.$name.toLowerCase(); },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name.toLowerCase(); },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$name.toLowerCase(); },
+		'test(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$axis === self.$name ? 1 : 0; },
+		'test(Lnet/modificationstation/stationapi/api/util/math/Direction;)Z': function (vm, self, a) { return a[0] && a[0].$axis === self.$name ? 1 : 0; },
+	}, staticMethods: { 'values()[Lnet/modificationstation/stationapi/api/util/math/Direction$Axis;': function (vm) { return JVM.javaArray(vm, 'L' + DIR + '$Axis;', axes(vm).slice()); } } });
+	def(DIR + '$Type', { super: 'java/lang/Enum', interfaces: ['java/util/function/Predicate', 'java/lang/Iterable'], statics: { HORIZONTAL: null, VERTICAL: null }, clinit: function (vm) { enumOf(vm, DIR + '$Type', ['HORIZONTAL', 'VERTICAL']); }, methods: {
+		'test(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && ((a[0].$axis === 'Y') === (self.$name === 'VERTICAL')) ? 1 : 0; },
+		'test(Lnet/modificationstation/stationapi/api/util/math/Direction;)Z': function (vm, self, a) { return a[0] && ((a[0].$axis === 'Y') === (self.$name === 'VERTICAL')) ? 1 : 0; },
+		'iterator()Ljava/util/Iterator;': function (vm, self) { return vm.callVirtual(JVM.newList(vm, typeDirs(vm, self)), 'iterator', '()Ljava/util/Iterator;', []); },
+	} });
+	var typeDirs = function (vm, t) { var d = dirs(vm); return t.$name === 'VERTICAL' ? [d[1], d[0]] : [d[2], d[5], d[3], d[4]]; };
+	var vec = function (vm, x, y, z) { var v = vm.newObject(vm.loadClass(ST + 'util/math/Vec3i')); v[':x'] = x; v[':y'] = y; v[':z'] = z; return v; };
+	def(ST + 'util/math/Vec3i', { fields: { x: 'I', y: 'I', z: 'I' }, methods: {
+		'<init>(III)V': function (vm, self, a) { self[':x'] = a[0]; self[':y'] = a[1]; self[':z'] = a[2]; },
+		'getX()I': function (vm, self) { return self[':x']; }, 'getY()I': function (vm, self) { return self[':y']; }, 'getZ()I': function (vm, self) { return self[':z']; },
+	} });
+	var dirFn = function (f) { return function (vm, self, a) { return f(vm, self, a); }; };
+	def(DIR, { super: 'java/lang/Enum', interfaces: [ST + 'util/StringIdentifiable'], statics: { DOWN: null, UP: null, NORTH: null, SOUTH: null, WEST: null, EAST: null }, clinit: function (vm) {
+		enumOf(vm, DIR, DIRS.map(function (d) { return d[0]; }), function (o, i) { var d = DIRS[i]; o.$id = d[1]; o.$opp = d[2]; o.$h = d[3]; o.$axis = d[4]; o.$off = d[5]; });
+	}, methods: {
+		'getId()I': dirFn(function (vm, s) { return s.$id; }),
+		'getHorizontal()I': dirFn(function (vm, s) { return s.$h; }),
+		'getOpposite()Lnet/modificationstation/stationapi/api/util/math/Direction;': dirFn(function (vm, s) { return dirs(vm)[s.$opp]; }),
+		'getAxis()Lnet/modificationstation/stationapi/api/util/math/Direction$Axis;': dirFn(function (vm, s) { return axes(vm)['XYZ'.indexOf(s.$axis)]; }),
+		'getOffsetX()I': dirFn(function (vm, s) { return s.$off[0]; }), 'getOffsetY()I': dirFn(function (vm, s) { return s.$off[1]; }), 'getOffsetZ()I': dirFn(function (vm, s) { return s.$off[2]; }),
+		'getVector()Lnet/modificationstation/stationapi/api/util/math/Vec3i;': dirFn(function (vm, s) { return vec(vm, s.$off[0], s.$off[1], s.$off[2]); }),
+		'asString()Ljava/lang/String;': dirFn(function (vm, s) { return s.$name.toLowerCase(); }),
+		'getName()Ljava/lang/String;': dirFn(function (vm, s) { return s.$name.toLowerCase(); }),
+		'toString()Ljava/lang/String;': dirFn(function (vm, s) { return s.$name.toLowerCase(); }),
+		'rotateYClockwise()Lnet/modificationstation/stationapi/api/util/math/Direction;': dirFn(function (vm, s) { var d = dirs(vm); return s.$h < 0 ? s : d[[3, 4, 2, 5][(s.$h + 1) & 3]]; }),
+		'rotateYCounterclockwise()Lnet/modificationstation/stationapi/api/util/math/Direction;': dirFn(function (vm, s) { var d = dirs(vm); return s.$h < 0 ? s : d[[3, 4, 2, 5][(s.$h + 3) & 3]]; }),
+		'asRotation()F': dirFn(function (vm, s) { return ((s.$h & 3) * 90); }),
+	}, staticMethods: {
+		'byId(I)Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, n, a) { return dirs(vm)[Math.abs(a[0] % 6)]; },
+		'fromHorizontal(I)Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, n, a) { return dirs(vm)[[3, 4, 2, 5][Math.abs(a[0] % 4)]]; },
+		'fromRotation(D)Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, n, a) { return dirs(vm)[[3, 4, 2, 5][Math.floor(a[0] / 90 + 0.5) & 3]]; },
+		'byName(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm, n, a) { return dirs(vm).filter(function (d) { return d.$name.toLowerCase() === String(a[0]).toLowerCase(); })[0] || null; },
+		'values()[Lnet/modificationstation/stationapi/api/util/math/Direction;': function (vm) { return JVM.javaArray(vm, 'L' + DIR + ';', dirs(vm).slice()); },
+	} });
+
+	var propMethods = {
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'getValues()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, self.$values.slice()); },
+		'getType()Ljava/lang/Class;': function (vm, self) { return vm.classObject ? vm.classObject(vm.loadClass(self.$type)) : null; },
+		'name(Ljava/lang/Comparable;)Ljava/lang/String;': function (vm, self, a) { return valueName(vm, a[0]); },
+		'parse(Ljava/lang/String;)Ljava/util/Optional;': function (vm, self, a) {
+			var v = self.$values.filter(function (x) { return valueName(vm, x) === String(a[0]); })[0];
+			return vm.callStatic('java/util/Optional', 'ofNullable', '(Ljava/lang/Object;)Ljava/util/Optional;', [v || null]);
+		},
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$name); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return samePropAs(self, a[0]) ? 1 : 0; },
+	};
+	def(P + 'Property', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: propMethods });
+	var prop = function (vm, cls, name, values, type) { var p = vm.newObject(vm.loadClass(P + cls)); p.$name = String(name); p.$values = values; p.$type = type; return p; };
+	var intProp = function (vm, name, lo, hi) { var v = []; for (var i = lo; i <= hi; i++) v.push(boxI(vm, i)); return prop(vm, 'IntProperty', name, v, 'java/lang/Integer'); };
+	var boolProp = function (vm, name) { return prop(vm, 'BooleanProperty', name, [boxB(vm, 1), boxB(vm, 0)], 'java/lang/Boolean'); };
+	var enumValues = function (vm, clsObj) {
+		var c = clsObj && clsObj.$cls;
+		if (!c) return [];
+		vm.initClass(c);
+		if (c.$values) return c.$values.slice();
+		var r = JVM.run(vm, function () { return vm.callStatic(c.name, 'values', '()[L' + c.name + ';', []); });
+		return r.ok && r.value ? Array.prototype.slice.call(r.value.a) : [];
+	};
+	var filterBy = function (vm, vals, pred) { return pred ? vals.filter(function (v) { var r = JVM.run(vm, function () { return vm.callVirtual(pred, 'test', '(' + OBJ + ')Z', [v]); }); return r.ok && r.value; }) : vals; };
+	def(P + 'IntProperty', { super: P + 'Property', staticMethods: { 'of(Ljava/lang/String;II)Lnet/modificationstation/stationapi/api/state/property/IntProperty;': function (vm, n, a) { return intProp(vm, a[0], a[1], a[2]); } } });
+	def(P + 'BooleanProperty', { super: P + 'Property', staticMethods: { 'of(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/state/property/BooleanProperty;': function (vm, n, a) { return boolProp(vm, a[0]); } } });
+	def(P + 'EnumProperty', { super: P + 'Property', staticMethods: {
+		'of(Ljava/lang/String;Ljava/lang/Class;)Lnet/modificationstation/stationapi/api/state/property/EnumProperty;': function (vm, n, a) { return prop(vm, 'EnumProperty', a[0], enumValues(vm, a[1]), a[1] && a[1].$cls ? a[1].$cls.name : OBJ); },
+		'of(Ljava/lang/String;Ljava/lang/Class;Ljava/util/function/Predicate;)Lnet/modificationstation/stationapi/api/state/property/EnumProperty;': function (vm, n, a) { return prop(vm, 'EnumProperty', a[0], filterBy(vm, enumValues(vm, a[1]), a[2]), a[1] && a[1].$cls ? a[1].$cls.name : OBJ); },
+		'of(Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Enum;)Lnet/modificationstation/stationapi/api/state/property/EnumProperty;': function (vm, n, a) { return prop(vm, 'EnumProperty', a[0], Array.prototype.slice.call(a[2].a), a[1] && a[1].$cls ? a[1].$cls.name : OBJ); },
+		'of(Ljava/lang/String;Ljava/lang/Class;Ljava/util/Collection;)Lnet/modificationstation/stationapi/api/state/property/EnumProperty;': function (vm, n, a) { var v = []; JVM.iterate(vm, a[2], function (x) { v.push(x); }); return prop(vm, 'EnumProperty', a[0], v, a[1] && a[1].$cls ? a[1].$cls.name : OBJ); },
+	} });
+	def(P + 'DirectionProperty', { super: P + 'EnumProperty', staticMethods: {
+		'of(Ljava/lang/String;[Lnet/modificationstation/stationapi/api/util/math/Direction;)Lnet/modificationstation/stationapi/api/state/property/DirectionProperty;': function (vm, n, a) { return prop(vm, 'DirectionProperty', a[0], Array.prototype.slice.call(a[1].a), DIR); },
+		'of(Ljava/lang/String;Ljava/util/function/Predicate;)Lnet/modificationstation/stationapi/api/state/property/DirectionProperty;': function (vm, n, a) { return prop(vm, 'DirectionProperty', a[0], filterBy(vm, dirs(vm).slice(), a[1]), DIR); },
+		'of(Ljava/lang/String;Ljava/util/Collection;)Lnet/modificationstation/stationapi/api/state/property/DirectionProperty;': function (vm, n, a) { var v = []; JVM.iterate(vm, a[1], function (x) { v.push(x); }); return prop(vm, 'DirectionProperty', a[0], v, DIR); },
+	} });
+	var BOOLS = 'attached bottom conditional disarmed drag enabled extended eye falling hanging has_bottle_0 has_bottle_1 has_bottle_2 has_record has_book inverted in_wall lit locked occupied open persistent powered short signal_fire snowy triggered unstable waterlogged vine_end up down north east south west'.split(' ');
+	var INTS = { AGE_1: ['age', 0, 1], AGE_2: ['age', 0, 2], AGE_3: ['age', 0, 3], AGE_5: ['age', 0, 5], AGE_7: ['age', 0, 7], AGE_15: ['age', 0, 15], AGE_25: ['age', 0, 25],
+		BITES: ['bites', 0, 6], DELAY: ['delay', 1, 4], DISTANCE_1_7: ['distance', 1, 7], EGGS: ['eggs', 1, 4], HATCH: ['hatch', 0, 2], LAYERS: ['layers', 1, 8],
+		LEVEL_3: ['level', 0, 3], LEVEL_8: ['level', 0, 8], LEVEL_1_8: ['level', 1, 8], HONEY_LEVEL: ['honey_level', 0, 5], LEVEL_15: ['level', 0, 15],
+		MOISTURE: ['moisture', 0, 7], NOTE: ['note', 0, 24], PICKLES: ['pickles', 1, 4], POWER: ['power', 0, 15], STAGE: ['stage', 0, 1],
+		DISTANCE_0_7: ['distance', 0, 7], CHARGES: ['charges', 0, 4], ROTATION: ['rotation', 0, 15] };
+	var pstat = { HORIZONTAL_AXIS: null, AXIS: null, FACING: null, HOPPER_FACING: null, HORIZONTAL_FACING: null };
+	BOOLS.forEach(function (b) { pstat[b.toUpperCase()] = null; });
+	Object.keys(INTS).forEach(function (k) { pstat[k] = null; });
+	def(P + 'Properties', { statics: pstat, clinit: function (vm, c) {
+		BOOLS.forEach(function (b) { c.statics[b.toUpperCase()] = boolProp(vm, b); });
+		Object.keys(INTS).forEach(function (k) { c.statics[k] = intProp(vm, INTS[k][0], INTS[k][1], INTS[k][2]); });
+		var d = dirs(vm), ax = axes(vm);
+		c.statics.AXIS = prop(vm, 'EnumProperty', 'axis', ax.slice(), DIR + '$Axis');
+		c.statics.HORIZONTAL_AXIS = prop(vm, 'EnumProperty', 'axis', [ax[0], ax[2]], DIR + '$Axis');
+		c.statics.FACING = prop(vm, 'DirectionProperty', 'facing', [d[4], d[2], d[5], d[3], d[1], d[0]], DIR);
+		c.statics.HOPPER_FACING = prop(vm, 'DirectionProperty', 'facing', d.filter(function (x) { return x.$name !== 'UP'; }), DIR);
+		c.statics.HORIZONTAL_FACING = prop(vm, 'DirectionProperty', 'facing', [d[2], d[5], d[3], d[4]], DIR);
+	} });
+
+	def(ST + 'state/StateManager$Builder', { methods: {
+		'add([Lnet/modificationstation/stationapi/api/state/property/Property;)Lnet/modificationstation/stationapi/api/state/StateManager$Builder;': function (vm, self, a) {
+			Array.prototype.slice.call(a[0].a).forEach(function (p) { if (p && !self.$props.some(function (q) { return q.$name === p.$name; })) self.$props.push(p); });
+			return self;
+		},
+	} });
+	def(ST + 'state/StateManager', { methods: {
+		'getDefaultState()Lnet/modificationstation/stationapi/api/state/State;': function (vm, self) { return defaultOf(vm, self.$block); },
+		'getStates()Lcom/google/common/collect/ImmutableList;': function (vm, self) { var n = self.$props.reduce(function (a, p) { return a * p.$values.length; }, 1), out = []; for (var i = 0; i < Math.min(n, 4096); i++) out.push(stateAt(vm, self, i)); return JVM.newList(vm, out); },
+		'getProperties()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, self.$props.slice()); },
+		'getProperty(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/state/property/Property;': function (vm, self, a) { return self.$props.filter(function (p) { return p.$name === a[0]; })[0] || null; },
+		'getOwner()Ljava/lang/Object;': function (vm, self) { return self.$block; },
+	} });
+	def(ST + 'state/State', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT });
+	var propIdx = function (s, p) { var ps = s.$mgr.$props; for (var i = 0; i < ps.length; i++) if (samePropAs(ps[i], p)) return i; return -1; };
+	var withV = function (vm, s, p, v) {
+		var i = propIdx(s, p);
+		if (i < 0) { vm.throwNew('java/lang/IllegalArgumentException', 'Cannot set property ' + (p && p.$name) + ' as it does not exist in ' + s.$block.cls.name); return s; }
+		var vi = -1;
+		p.$values.forEach(function (x, k) { if (vi < 0 && sameValue(x, v)) vi = k; });
+		if (vi < 0) { vm.throwNew('java/lang/IllegalArgumentException', 'Cannot set property ' + p.$name + ' to ' + valueName(vm, v)); return s; }
+		var vals = valuesOf(s.$mgr, s.$idx);
+		vals[i] = vi;
+		return stateAt(vm, s.$mgr, indexOfValues(s.$mgr, vals));
+	};
+	var getV = function (vm, s, p) {
+		var i = propIdx(s, p);
+		if (i < 0) { vm.throwNew('java/lang/IllegalArgumentException', 'Cannot get property ' + (p && p.$name) + ' as it does not exist in ' + s.$block.cls.name); return null; }
+		return p.$values[valuesOf(s.$mgr, s.$idx)[i]];
+	};
+	def(BS, { super: ST + 'state/State', methods: {
+		'with(Lnet/modificationstation/stationapi/api/state/property/Property;Ljava/lang/Comparable;)Ljava/lang/Object;': function (vm, self, a) { return withV(vm, self, a[0], a[1]); },
+		'with(Lnet/modificationstation/stationapi/api/state/property/Property;Ljava/lang/Comparable;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return withV(vm, self, a[0], a[1]); },
+		'get(Lnet/modificationstation/stationapi/api/state/property/Property;)Ljava/lang/Comparable;': function (vm, self, a) { return getV(vm, self, a[0]); },
+		'getOrEmpty(Lnet/modificationstation/stationapi/api/state/property/Property;)Ljava/util/Optional;': function (vm, self, a) { return vm.callStatic('java/util/Optional', 'ofNullable', '(' + OBJ + ')Ljava/util/Optional;', [propIdx(self, a[0]) < 0 ? null : getV(vm, self, a[0])]); },
+		'contains(Lnet/modificationstation/stationapi/api/state/property/Property;)Z': function (vm, self, a) { return propIdx(self, a[0]) >= 0 ? 1 : 0; },
+		'cycle(Lnet/modificationstation/stationapi/api/state/property/Property;)Ljava/lang/Object;': function (vm, self, a) { var p = a[0], i = propIdx(self, p); if (i < 0) return self; var vals = valuesOf(self.$mgr, self.$idx); vals[i] = (vals[i] + 1) % p.$values.length; return stateAt(vm, self.$mgr, indexOfValues(self.$mgr, vals)); },
+		'getProperties()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, self.$mgr.$props.slice()); },
+		'getBlock()Lnet/minecraft/src/Block;': function (vm, self) { return self.$block; },
+		'isOf(Lnet/minecraft/src/Block;)Z': function (vm, self, a) { return a[0] === self.$block ? 1 : 0; },
+		'isIn(Lnet/modificationstation/stationapi/api/tag/TagKey;)Z': function (vm, self, a) { return JVM.station && JVM.station.blockInTag ? (JVM.station.blockInTag(vm, a[0], self.$block) ? 1 : 0) : 0; },
+		'isAir()Z': function (vm, self) { return self.$block && self.$block[':blockID'] ? 0 : 1; },
+		'getMaterial()Lnet/minecraft/src/Material;': function (vm, self) { return self.$block ? self.$block[':blockMaterial'] : null; },
+		'getLuminance()I': function (vm, self) { return self.$block ? self.$block.$light | 0 : 0; },
+		'getHardness()F': function (vm, self) { return self.$block ? self.$block[':blockHardness'] : 0; },
+		'toString()Ljava/lang/String;': function (vm, self) {
+			var vals = valuesOf(self.$mgr, self.$idx);
+			return 'Block{' + (self.$block.$stId || self.$block.cls.name) + '}' + (self.$mgr.$props.length ? '[' + self.$mgr.$props.map(function (p, i) { return p.$name + '=' + valueName(vm, p.$values[vals[i]]); }).join(',') + ']' : '');
+		},
+	} });
+	def(ST + 'block/States', { statics: { AIR: null }, clinit: function (vm, c) {
+		var air = vm.newObject(vm.loadClass(SRC + 'Block'));
+		air[':blockID'] = 0; air.$stId = 'minecraft:air'; air.$stMgr = null;
+		c.statics.AIR = stateAt(vm, managerOf(vm, air), 0);
+	} });
+
+	var B = vm.natives[SRC + 'Block'];
+	B.methods = Object.assign({}, B.methods, {
+		'setDefaultState(Lnet/modificationstation/stationapi/api/block/BlockState;)V': function (vm, self, a) { self.$stDefault = a[0]; },
+		'getDefaultState()Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self) { return defaultOf(vm, self); },
+		'getStateManager()Lnet/modificationstation/stationapi/api/state/StateManager;': function (vm, self) { return managerOf(vm, self); },
+		'getPlacementState(Lnet/modificationstation/stationapi/api/item/ItemPlacementContext;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self) { return defaultOf(vm, self); },
+	});
+	var blockById = function (vm, id) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); return c.statics.blocksList.a[id] || null; };
+	var getState = function (vm, w, x, y, z) {
+		var id = vm.callVirtual(w, 'getBlockId', '(III)I', [x, y, z]);
+		var b = blockById(vm, id);
+		if (!b) { var sc = vm.loadClass(ST + 'block/States'); vm.initClass(sc); return sc.statics.AIR; }
+		return stateOfMeta(vm, b, vm.callVirtual(w, 'getBlockMetadata', '(III)I', [x, y, z]));
+	};
+	var setState = function (vm, w, x, y, z, s, notify) {
+		var old = getState(vm, w, x, y, z);
+		var id = s && s.$block ? s.$block[':blockID'] : 0;
+		vm.callVirtual(w, 'setBlock', '(IIIIII)Z', [x, y, z, id, metaOf(s), notify ? 3 : 2]);
+		return old;
+	};
+	var W = vm.natives[SRC + 'World'];
+	if (W) W.methods = Object.assign({}, W.methods, {
+		'getBlockState(III)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return getState(vm, self, a[0], a[1], a[2]); },
+		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
+		'setBlockStateWithNotify(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
+		'setBlockStateWithoutNotifyingNeighbors(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], false); },
+		'setBlockStateWithMetadata(IIILnet/modificationstation/stationapi/api/block/BlockState;I)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
+	});
+	def(ST + 'world/BlockStateView', { access: I });
+}
+
+JVM.stationState = { defaultOf: defaultOf, managerOf: managerOf, stateOfMeta: stateOfMeta, metaOf: metaOf, valueName: valueName };
+JVM.installStates = installStates;
 })();
 
 (function () {

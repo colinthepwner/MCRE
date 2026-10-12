@@ -1444,6 +1444,7 @@ F	agi	y	field_76268_x	cactus
 F	agi	z	field_76267_y	clay
 F	ahq	a	field_76189_a	dirty
 F	ahq	h	field_76190_i	mapName
+F	ahv	a	field_75772_a	logger
 F	ahx	l	field_76105_j	dimension
 F	amq	A	field_71988_x	planks
 F	amq	B	field_71987_y	sapling
@@ -1675,10 +1676,14 @@ F	atn	d	field_73811_d	width
 F	atn	e	field_73812_e	height
 F	atn	f	field_73809_f	text
 F	atn	l	field_73818_l	isFocused
+F	atn	s	field_73823_s	visible
 F	atq	b	field_78288_b	FONT_HEIGHT
 F	atq	i	field_78298_i	renderEngine
 F	atq	j	field_78295_j	posX
 F	atq	k	field_78296_k	posY
+F	atq	n	field_78291_n	red
+F	atq	o	field_78292_o	blue
+F	atq	p	field_78306_p	green
 F	ats	j	field_73735_i	zLevel
 F	aul	f	field_73882_e	mc
 F	aul	g	field_73880_f	width
@@ -1869,6 +1874,7 @@ F	bz	a	field_74753_a	data
 F	cb	a	field_74752_a	data
 F	cc	a	field_74751_a	data
 F	cd	a	field_74741_a	name
+F	gm	a	field_72406_a	logger
 F	gm	b	field_72404_b	playerEntityList
 F	gm	f	field_72400_f	mcServer
 F	gm	i	field_72414_i	ops
@@ -1884,6 +1890,7 @@ F	lq	O	field_70131_O	height
 F	lq	W	field_70139_V	ySize
 F	lq	aa	field_70146_Z	rand
 F	lq	af	field_70178_ae	isImmuneToFire
+F	lq	ag	field_70180_af	dataWatcher
 F	lq	aq	field_71093_bK	dimension
 F	lq	d	field_70151_c	fire
 F	lq	k	field_70157_k	entityId
@@ -1918,6 +1925,7 @@ F	me	b	creature	creature
 F	me	c	ambient	ambient
 F	me	d	waterCreature	waterCreature
 F	net/minecraft/client/Minecraft	J	field_71425_J	running
+F	net/minecraft/client/Minecraft	K	field_71426_K	debug
 F	net/minecraft/client/Minecraft	T	field_71428_T	timer
 F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
 F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
@@ -1927,9 +1935,11 @@ F	net/minecraft/client/Minecraft	o	field_71446_o	renderEngine
 F	net/minecraft/client/Minecraft	p	field_71466_p	fontRenderer
 F	net/minecraft/client/Minecraft	r	field_71462_r	currentScreen
 F	net/minecraft/client/Minecraft	y	field_71474_y	gameSettings
+F	net/minecraft/server/MinecraftServer	a	field_71306_a	logger
 F	net/minecraft/server/MinecraftServer	c	field_71305_c	worldServers
 F	net/minecraft/server/MinecraftServer	l	field_71309_l	mcServer
 F	net/minecraft/server/MinecraftServer	v	field_71316_v	serverStopped
+F	px	a	field_70292_b	age
 F	px	d	field_70291_e	health
 F	qv	b	field_75100_b	isFlying
 F	qv	c	field_75101_c	allowFlying
@@ -1962,6 +1972,7 @@ F	sr	i	field_75221_f	yDisplayPosition
 F	su	a	field_77881_a	armorType
 F	su	b	field_77879_b	damageReduceAmount
 F	su	c	field_77880_c	renderIndex
+F	su	co	field_77882_bY	maxDamageArray
 F	su	cp	field_77878_bZ	material
 F	sv	a	CLOTH	CLOTH
 F	sv	b	CHAIN	CHAIN
@@ -2304,6 +2315,7 @@ M	amq	m	(Lyc;III)F	func_71934_m	getBlockHardness
 M	amq	n	()I	func_71856_s_	getRenderBlockPass
 M	amq	o	()I	func_71933_m	getBlockColor
 M	amq	q_	()I	func_71915_e	getMobilityFlag
+M	amq	r_	()I	func_71859_p_	tickRate
 M	amq	s	()Lamq;	func_71875_q	setBlockUnbreakable
 M	amq	u	()Z	func_71887_s	hasTileEntity
 M	amu	a	()Ljava/lang/String;	func_72676_a	getBreakSound
@@ -2737,6 +2749,7 @@ M	lq	equals	(Ljava/lang/Object;)Z	equals	equals
 M	lq	f	(DDD)D	func_70011_f	getDistance
 M	lq	hashCode	()I	hashCode	hashCode
 M	lq	toString	()Ljava/lang/String;	toString	toString
+M	lq	v	()Lmj;	func_70096_w	getDataWatcher
 M	lq	x	()V	func_70106_y	setDead
 M	lv	a	(Ljava/lang/Class;Ljava/lang/String;I)V	func_75618_a	addMapping
 M	lv	a	(Ljava/lang/Class;Ljava/lang/String;III)V	func_75614_a	addMapping
@@ -2872,6 +2885,7 @@ M	rq	b	(Lrw;)V	func_82847_b	removeCraftingFromCrafters
 M	rw	a	(Lrq;II)V	func_71112_a	sendProgressBarUpdate
 M	rw	a	(Lrq;ILur;)V	func_71111_a	sendSlotContents
 M	s	b	(III)V	func_71571_b	set
+M	s	compareTo	(Ljava/lang/Object;)I	compareTo	compareTo
 M	s	e	(III)F	func_71569_e	getDistanceSquared
 M	s	equals	(Ljava/lang/Object;)Z	equals	equals
 M	s	hashCode	()I	hashCode	hashCode

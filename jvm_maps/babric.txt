@@ -1,0 +1,2177 @@
+C	argo/format/CompactJsonFormatter	net/minecraft/src/J_CompactJsonFormatter
+C	argo/format/CompactJsonFormatter$1	net/minecraft/src/EnumJsonNodeTypeMappingHelper
+C	argo/format/JsonEscapedString	net/minecraft/src/J_JsonEscapedString
+C	argo/format/JsonFormatter	net/minecraft/src/J_JsonFormatter
+C	argo/jdom/ChainedFunctor	net/minecraft/src/J_ChainedFunctor
+C	argo/jdom/Functor	net/minecraft/src/J_Functor
+C	argo/jdom/JdomParser	net/minecraft/src/J_JdomParser
+C	argo/jdom/JsonArray	net/minecraft/src/J_JsonArray
+C	argo/jdom/JsonArray$1	net/minecraft/src/J_JsonNodeList
+C	argo/jdom/JsonArrayNodeBuilder	net/minecraft/src/J_JsonArrayNodeBuilder
+C	argo/jdom/JsonConstants	net/minecraft/src/J_JsonConstants
+C	argo/jdom/JsonFieldBuilder	net/minecraft/src/J_JsonFieldBuilder
+C	argo/jdom/JsonListenerToJdomAdapter	net/minecraft/src/J_JsonListenerToJdomAdapter
+C	argo/jdom/JsonListenerToJdomAdapter$1	net/minecraft/src/J_ArrayNodeContainer
+C	argo/jdom/JsonListenerToJdomAdapter$2	net/minecraft/src/J_ObjectNodeContainer
+C	argo/jdom/JsonListenerToJdomAdapter$3	net/minecraft/src/J_FieldNodeContainer
+C	argo/jdom/JsonListenerToJdomAdapter$NodeContainer	net/minecraft/src/J_NodeContainer
+C	argo/jdom/JsonNode	net/minecraft/src/J_JsonNode
+C	argo/jdom/JsonNodeBuilder	net/minecraft/src/J_JsonNodeBuilder
+C	argo/jdom/JsonNodeBuilders	net/minecraft/src/J_JsonNodeBuilders
+C	argo/jdom/JsonNodeBuilders$1	net/minecraft/src/J_JsonNullNodeBuilder
+C	argo/jdom/JsonNodeBuilders$2	net/minecraft/src/J_JsonTrueNodeBuilder
+C	argo/jdom/JsonNodeBuilders$3	net/minecraft/src/J_JsonFalseNodeBuilder
+C	argo/jdom/JsonNodeDoesNotMatchChainedJsonNodeSelectorException	net/minecraft/src/J_JsonNodeDoesNotMatchChainedJsonNodeSelectorException
+C	argo/jdom/JsonNodeDoesNotMatchJsonNodeSelectorException	net/minecraft/src/J_JsonNodeDoesNotMatchJsonNodeSelectorException
+C	argo/jdom/JsonNodeDoesNotMatchPathElementsException	net/minecraft/src/J_JsonNodeDoesNotMatchPathElementsException
+C	argo/jdom/JsonNodeFactories	net/minecraft/src/J_JsonNodeFactories
+C	argo/jdom/JsonNodeSelector	net/minecraft/src/J_JsonNodeSelector
+C	argo/jdom/JsonNodeSelectors	net/minecraft/src/J_JsonNodeSelectors
+C	argo/jdom/JsonNodeSelectors$1	net/minecraft/src/J_JsonStringNodeSelector
+C	argo/jdom/JsonNodeSelectors$10	net/minecraft/src/J_JsonObjectNodeSelector
+C	argo/jdom/JsonNodeSelectors$12	net/minecraft/src/J_JsonFieldNodeSelector
+C	argo/jdom/JsonNodeSelectors$13	net/minecraft/src/J_JsonElementNodeSelector
+C	argo/jdom/JsonNodeSelectors$8	net/minecraft/src/J_JsonArrayNodeSelector
+C	argo/jdom/JsonNodeType	net/minecraft/src/EnumJsonNodeType
+C	argo/jdom/JsonNumberNode	net/minecraft/src/J_JsonNumberNode
+C	argo/jdom/JsonNumberNodeBuilder	net/minecraft/src/J_JsonNumberNodeBuilder
+C	argo/jdom/JsonObject	net/minecraft/src/J_JsonObject
+C	argo/jdom/JsonObjectNodeBuilder	net/minecraft/src/J_JsonObjectNodeBuilder
+C	argo/jdom/JsonObjectNodeBuilder$1	net/minecraft/src/J_JsonObjectNodeList
+C	argo/jdom/JsonRootNode	net/minecraft/src/J_JsonRootNode
+C	argo/jdom/JsonStringNode	net/minecraft/src/J_JsonStringNode
+C	argo/jdom/JsonStringNodeBuilder	net/minecraft/src/J_JsonStringNodeBuilder
+C	argo/jdom/LeafFunctor	net/minecraft/src/J_LeafFunctor
+C	argo/saj/InvalidSyntaxException	net/minecraft/src/J_InvalidSyntaxException
+C	argo/saj/JsonListener	net/minecraft/src/J_JsonListener
+C	argo/saj/PositionTrackingPushbackReader	net/minecraft/src/J_PositionTrackingPushbackReader
+C	argo/saj/SajParser	net/minecraft/src/J_SajParser
+C	argo/saj/ThingWithPosition	net/minecraft/src/J_ThingWithPosition
+C	net/minecraft/class_1	net/minecraft/src/Packet7UseEntity
+C	net/minecraft/class_100	net/minecraft/src/BiomeGenDesert
+C	net/minecraft/class_103	net/minecraft/src/TileEntityMobSpawnerRenderer
+C	net/minecraft/class_104	net/minecraft/src/TileEntityMobSpawner
+C	net/minecraft/class_105	net/minecraft/src/MapGenBase
+C	net/minecraft/class_106	net/minecraft/src/RenderPainting
+C	net/minecraft/class_107	net/minecraft/src/EntityPainting
+C	net/minecraft/class_108	net/minecraft/src/Pathfinder
+C	net/minecraft/class_109	net/minecraft/src/Path
+C	net/minecraft/class_110	net/minecraft/src/BlockChest
+C	net/minecraft/class_111	net/minecraft/src/WorldGenCactus
+C	net/minecraft/class_112	net/minecraft/src/ModelSheep1
+C	net/minecraft/class_113	net/minecraft/src/EntityBoat
+C	net/minecraft/class_114	net/minecraft/src/EntityCreeper
+C	net/minecraft/class_115	net/minecraft/src/WorldGenGlowStone1
+C	net/minecraft/class_116	net/minecraft/src/ItemPickaxe
+C	net/minecraft/class_117	net/minecraft/src/NetworkManager
+C	net/minecraft/class_117$1	net/minecraft/src/NetworkWriterThread
+C	net/minecraft/class_117$2	net/minecraft/src/ThreadCloseConnection
+C	net/minecraft/class_117$3	net/minecraft/src/NetworkMasterThread
+C	net/minecraft/class_117$4	net/minecraft/src/NetworkReaderThread
+C	net/minecraft/class_118	net/minecraft/src/Packet1Login
+C	net/minecraft/class_119	net/minecraft/src/Packet28EntityVelocity
+C	net/minecraft/class_12	net/minecraft/src/MouseFilter
+C	net/minecraft/class_121	net/minecraft/src/EntityWolf
+C	net/minecraft/class_122	net/minecraft/src/ModelPig
+C	net/minecraft/class_123	net/minecraft/src/BlockSand
+C	net/minecraft/class_124	net/minecraft/src/Item
+C	net/minecraft/class_125	net/minecraft/src/ItemMap
+C	net/minecraft/class_126	net/minecraft/src/ItemShears
+C	net/minecraft/class_127	net/minecraft/src/EntityLiving
+C	net/minecraft/class_128	net/minecraft/src/ModelZombie
+C	net/minecraft/class_129	net/minecraft/src/ItemLog
+C	net/minecraft/class_13	net/minecraft/src/RenderBlocks
+C	net/minecraft/class_130	net/minecraft/src/ThreadDownloadImageData
+C	net/minecraft/class_130$1	net/minecraft/src/ThreadDownloadImage
+C	net/minecraft/class_131	net/minecraft/src/ImageBuffer
+C	net/minecraft/class_132	net/minecraft/src/BlockTNT
+C	net/minecraft/class_133	net/minecraft/src/Slot
+C	net/minecraft/class_134	net/minecraft/src/IInventory
+C	net/minecraft/class_135	net/minecraft/src/EntityFish
+C	net/minecraft/class_136	net/minecraft/src/InventoryPlayer
+C	net/minecraft/class_137	net/minecraft/src/TileEntityDispenser
+C	net/minecraft/class_138	net/minecraft/src/TileEntityFurnace
+C	net/minecraft/class_139	net/minecraft/src/StatBase
+C	net/minecraft/class_14	net/minecraft/src/IBlockAccess
+C	net/minecraft/class_140	net/minecraft/src/TileEntitySign
+C	net/minecraft/class_141	net/minecraft/src/EnumStatus
+C	net/minecraft/class_142	net/minecraft/src/EntityItem
+C	net/minecraft/class_143	net/minecraft/src/EntityPickupFX
+C	net/minecraft/class_144	net/minecraft/src/Empty1
+C	net/minecraft/class_145	net/minecraft/src/Packet15Place
+C	net/minecraft/class_146	net/minecraft/src/EntityMob
+C	net/minecraft/class_147	net/minecraft/src/RecipesTools
+C	net/minecraft/class_148	net/minecraft/src/CraftingManager
+C	net/minecraft/class_148$1	net/minecraft/src/RecipeSorter
+C	net/minecraft/class_149	net/minecraft/src/BlockBookshelf
+C	net/minecraft/class_15	net/minecraft/src/Material
+C	net/minecraft/class_150	net/minecraft/src/RenderSquid
+C	net/minecraft/class_151	net/minecraft/src/EntitySquid
+C	net/minecraft/class_152	net/minecraft/src/WorldChunkManagerHell
+C	net/minecraft/class_153	net/minecraft/src/BiomeGenBase
+C	net/minecraft/class_154	net/minecraft/src/BlockSapling
+C	net/minecraft/class_156	net/minecraft/src/Packet4UpdateTime
+C	net/minecraft/class_157	net/minecraft/src/SaveConverterMcRegion
+C	net/minecraft/class_158	net/minecraft/src/GuiConnectFailed
+C	net/minecraft/class_159	net/minecraft/src/InventoryCrafting
+C	net/minecraft/class_16	net/minecraft/src/BlockRail
+C	net/minecraft/class_16$class_338	net/minecraft/src/RailLogic
+C	net/minecraft/class_160	net/minecraft/src/IRecipe
+C	net/minecraft/class_161	net/minecraft/src/Packet131MapData
+C	net/minecraft/class_162	net/minecraft/src/ModelBoat
+C	net/minecraft/class_163	net/minecraft/src/ModelRenderer
+C	net/minecraft/class_164	net/minecraft/src/BiomeGenTaiga
+C	net/minecraft/class_165	net/minecraft/src/NBTTagByteArray
+C	net/minecraft/class_169	net/minecraft/src/Packet
+C	net/minecraft/class_17	net/minecraft/src/Block
+C	net/minecraft/class_170	net/minecraft/src/Packet16BlockItemSwitch
+C	net/minecraft/class_171	net/minecraft/src/Packet103SetSlot
+C	net/minecraft/class_172	net/minecraft/src/RenderBoat
+C	net/minecraft/class_173	net/minecraft/src/ModelBase
+C	net/minecraft/class_175	net/minecraft/src/StepSoundStone
+C	net/minecraft/class_176	net/minecraft/src/WorldProviderSky
+C	net/minecraft/class_177	net/minecraft/src/ItemDoor
+C	net/minecraft/class_178	net/minecraft/src/EntityLavaFX
+C	net/minecraft/class_179	net/minecraft/src/Empty2
+C	net/minecraft/class_18	net/minecraft/src/World
+C	net/minecraft/class_180	net/minecraft/src/GuiCreateWorld
+C	net/minecraft/class_181	net/minecraft/src/GuiTextField
+C	net/minecraft/class_182	net/minecraft/src/ISaveFormat
+C	net/minecraft/class_183	net/minecraft/src/ItemRedstone
+C	net/minecraft/class_184	net/minecraft/src/Packet10Flying
+C	net/minecraft/class_185	net/minecraft/src/StepSoundSand
+C	net/minecraft/class_186	net/minecraft/src/WorldGenBigTree
+C	net/minecraft/class_187	net/minecraft/src/NBTBase
+C	net/minecraft/class_188	net/minecraft/src/EntityCreature
+C	net/minecraft/class_189	net/minecraft/src/MathHelper
+C	net/minecraft/class_19	net/minecraft/src/ItemSlab
+C	net/minecraft/class_190	net/minecraft/src/EnumOptionsMappingHelper
+C	net/minecraft/class_191	net/minecraft/src/EnumArt
+C	net/minecraft/class_192	net/minecraft/src/WorldGenReed
+C	net/minecraft/class_193	net/minecraft/src/ShapedRecipes
+C	net/minecraft/class_194	net/minecraft/src/GuiTexturePacks
+C	net/minecraft/class_194$class_195	net/minecraft/src/GuiTexturePackSlot
+C	net/minecraft/class_196	net/minecraft/src/ContainerWorkbench
+C	net/minecraft/class_197	net/minecraft/src/GuiMainMenu
+C	net/minecraft/class_198	net/minecraft/src/MapData
+C	net/minecraft/class_198$class_199	net/minecraft/src/MapCoord
+C	net/minecraft/class_198$class_200	net/minecraft/src/MapInfo
+C	net/minecraft/class_2	net/minecraft/src/EntityWaterMob
+C	net/minecraft/class_20	net/minecraft/src/EntityNoteFX
+C	net/minecraft/class_201	net/minecraft/src/Packet100OpenWindow
+C	net/minecraft/class_202	net/minecraft/src/NBTTagList
+C	net/minecraft/class_203	net/minecraft/src/CanvasMojangLogo
+C	net/minecraft/class_204	net/minecraft/src/BlockDeadBush
+C	net/minecraft/class_205	net/minecraft/src/BlockPistonExtension
+C	net/minecraft/class_206	net/minecraft/src/EntityList
+C	net/minecraft/class_207	net/minecraft/src/BlockPortal
+C	net/minecraft/class_208	net/minecraft/src/ChunkProviderSky
+C	net/minecraft/class_209	net/minecraft/src/NoiseGeneratorOctaves
+C	net/minecraft/class_21	net/minecraft/src/BlockStone
+C	net/minecraft/class_210	net/minecraft/src/Packet38EntityStatus
+C	net/minecraft/class_211	net/minecraft/src/GuiChat
+C	net/minecraft/class_212	net/minecraft/src/EnumMovingObjectType
+C	net/minecraft/class_213	net/minecraft/src/ModelBed
+C	net/minecraft/class_214	net/minecraft/src/GLAllocation
+C	net/minecraft/class_215	net/minecraft/src/Packet24MobSpawn
+C	net/minecraft/class_216	net/minecraft/src/DataWatcher
+C	net/minecraft/class_217	net/minecraft/src/StatList
+C	net/minecraft/class_218	net/minecraft/src/GuiDownloadTerrain
+C	net/minecraft/class_219	net/minecraft/src/NetClientHandler
+C	net/minecraft/class_22	net/minecraft/src/OpenGlCapsChecker
+C	net/minecraft/class_220	net/minecraft/src/ItemBucket
+C	net/minecraft/class_221	net/minecraft/src/BlockBreakable
+C	net/minecraft/class_222	net/minecraft/src/GuiSleepMP
+C	net/minecraft/class_223	net/minecraft/src/BlockPistonBase
+C	net/minecraft/class_224	net/minecraft/src/BlockSnow
+C	net/minecraft/class_225	net/minecraft/src/TileEntityChest
+C	net/minecraft/class_226	net/minecraft/src/EntityFallingSand
+C	net/minecraft/class_227	net/minecraft/src/EntityFootStepFX
+C	net/minecraft/class_228	net/minecraft/src/Packet14BlockDig
+C	net/minecraft/class_229	net/minecraft/src/BlockFence
+C	net/minecraft/class_23	net/minecraft/src/AchievementList
+C	net/minecraft/class_230	net/minecraft/src/RenderFallingSand
+C	net/minecraft/class_231	net/minecraft/src/WorldGenFlowers
+C	net/minecraft/class_232	net/minecraft/src/MCHashEntry
+C	net/minecraft/class_233	net/minecraft/src/RecipesCrafting
+C	net/minecraft/class_234	net/minecraft/src/Packet17Sleep
+C	net/minecraft/class_235	net/minecraft/src/GuiDispenser
+C	net/minecraft/class_236	net/minecraft/src/Packet104WindowItems
+C	net/minecraft/class_237	net/minecraft/src/Session
+C	net/minecraft/class_238	net/minecraft/src/EnumCreatureType
+C	net/minecraft/class_239	net/minecraft/src/WorldGenerator
+C	net/minecraft/class_24	net/minecraft/src/Achievement
+C	net/minecraft/class_240	net/minecraft/src/NetHandler
+C	net/minecraft/class_241	net/minecraft/src/IStatStringFormat
+C	net/minecraft/class_242	net/minecraft/src/ItemDye
+C	net/minecraft/class_243	net/minecraft/src/IChunkLoader
+C	net/minecraft/class_244	net/minecraft/src/BlockLockedChest
+C	net/minecraft/class_245	net/minecraft/src/RenderLiving
+C	net/minecraft/class_246	net/minecraft/src/WorldGenDeadBush
+C	net/minecraft/class_248	net/minecraft/src/EntityExplodeFX
+C	net/minecraft/class_249	net/minecraft/src/ItemHoe
+C	net/minecraft/class_25	net/minecraft/src/AxisAlignedBB
+C	net/minecraft/class_250	net/minecraft/src/WorldGenForest
+C	net/minecraft/class_251	net/minecraft/src/McRegionChunkLoader
+C	net/minecraft/class_252	net/minecraft/src/BlockDoor
+C	net/minecraft/class_253	net/minecraft/src/NBTTagEnd
+C	net/minecraft/class_254	net/minecraft/src/MD5String
+C	net/minecraft/class_255	net/minecraft/src/EmptyChunk
+C	net/minecraft/class_256	net/minecraft/src/ModelCow
+C	net/minecraft/class_257	net/minecraft/src/NibbleArray
+C	net/minecraft/class_258	net/minecraft/src/EntityAnimal
+C	net/minecraft/class_259	net/minecraft/src/MapColor
+C	net/minecraft/class_26	net/minecraft/src/Vec3D
+C	net/minecraft/class_260	net/minecraft/src/ScreenShotHelper
+C	net/minecraft/class_261	net/minecraft/src/ItemBed
+C	net/minecraft/class_262	net/minecraft/src/ItemReed
+C	net/minecraft/class_263	net/minecraft/src/MaterialTransparent
+C	net/minecraft/class_264	net/minecraft/src/GuiChest
+C	net/minecraft/class_265	net/minecraft/src/BlockGlowStone
+C	net/minecraft/class_266	net/minecraft/src/SoundPool
+C	net/minecraft/class_267	net/minecraft/src/SoundPoolEntry
+C	net/minecraft/class_268	net/minecraft/src/Packet0KeepAlive
+C	net/minecraft/class_269	net/minecraft/src/TexturePortalFX
+C	net/minecraft/class_27	net/minecraft/src/MovingObjectPosition
+C	net/minecraft/class_270	net/minecraft/src/WatchableObject
+C	net/minecraft/class_271	net/minecraft/src/EnumOptions
+C	net/minecraft/class_272	net/minecraft/src/Packet20NamedEntitySpawn
+C	net/minecraft/class_273	net/minecraft/src/NBTTagLong
+C	net/minecraft/class_274	net/minecraft/src/IInvBasic
+C	net/minecraft/class_275	net/minecraft/src/InventoryBasic
+C	net/minecraft/class_276	net/minecraft/src/Packet101CloseWindow
+C	net/minecraft/class_277	net/minecraft/src/ContainerPlayer
+C	net/minecraft/class_277$1	net/minecraft/src/SlotArmor
+C	net/minecraft/class_278	net/minecraft/src/ItemCloth
+C	net/minecraft/class_279	net/minecraft/src/ColorizerWater
+C	net/minecraft/class_28	net/minecraft/src/ThreadDownloadResources
+C	net/minecraft/class_280	net/minecraft/src/ItemEgg
+C	net/minecraft/class_281	net/minecraft/src/Packet2Handshake
+C	net/minecraft/class_282	net/minecraft/src/TileEntityRendererPiston
+C	net/minecraft/class_283	net/minecraft/src/TileEntityPiston
+C	net/minecraft/class_285	net/minecraft/src/TexturePackBase
+C	net/minecraft/class_286	net/minecraft/src/ItemSapling
+C	net/minecraft/class_287	net/minecraft/src/ColorizerGrass
+C	net/minecraft/class_288	net/minecraft/src/SpawnListEntry
+C	net/minecraft/class_289	net/minecraft/src/WorldGenClay
+C	net/minecraft/class_29	net/minecraft/src/PathPoint
+C	net/minecraft/class_290	net/minecraft/src/PositionTextureVertex
+C	net/minecraft/class_291	net/minecraft/src/BlockOre
+C	net/minecraft/class_292	net/minecraft/src/Packet105UpdateProgressbar
+C	net/minecraft/class_293	net/minecraft/src/GuiContainer
+C	net/minecraft/class_294	net/minecraft/src/SaveOldDir
+C	net/minecraft/class_295	net/minecraft/src/Packet21PickupSpawn
+C	net/minecraft/class_296	net/minecraft/src/TextureLavaFlowFX
+C	net/minecraft/class_297	net/minecraft/src/BlockGravel
+C	net/minecraft/class_298	net/minecraft/src/RecipesDyes
+C	net/minecraft/class_299	net/minecraft/src/BlockLeaves
+C	net/minecraft/class_3	net/minecraft/src/BlockCloth
+C	net/minecraft/class_30	net/minecraft/src/WorldGenDungeons
+C	net/minecraft/class_300	net/minecraft/src/StringTranslate
+C	net/minecraft/class_301	net/minecraft/src/BlockCrops
+C	net/minecraft/class_302	net/minecraft/src/BlockIce
+C	net/minecraft/class_303	net/minecraft/src/TexturePackList
+C	net/minecraft/class_304	net/minecraft/src/ModelCreeper
+C	net/minecraft/class_305	net/minecraft/src/Packet18Animation
+C	net/minecraft/class_306	net/minecraft/src/EntityReddustFX
+C	net/minecraft/class_307	net/minecraft/src/BlockLeavesBase
+C	net/minecraft/class_308	net/minecraft/src/Packet39AttachEntity
+C	net/minecraft/class_309	net/minecraft/src/CodecMus
+C	net/minecraft/class_309$class_310	net/minecraft/src/MusInputStream
+C	net/minecraft/class_31	net/minecraft/src/ItemStack
+C	net/minecraft/class_311	net/minecraft/src/EntityGiantZombie
+C	net/minecraft/class_312	net/minecraft/src/RenderChicken
+C	net/minecraft/class_313	net/minecraft/src/EntityChicken
+C	net/minecraft/class_314	net/minecraft/src/PacketCounter
+C	net/minecraft/class_315	net/minecraft/src/BlockStationary
+C	net/minecraft/class_316	net/minecraft/src/BlockSoulSand
+C	net/minecraft/class_317	net/minecraft/src/StatTypeDistance
+C	net/minecraft/class_318	net/minecraft/src/RecipesFood
+C	net/minecraft/class_319	net/minecraft/src/Packet200Statistic
+C	net/minecraft/class_32	net/minecraft/src/GuiScreen
+C	net/minecraft/class_320	net/minecraft/src/InventoryLargeChest
+C	net/minecraft/class_321	net/minecraft/src/MapItemRenderer
+C	net/minecraft/class_322	net/minecraft/src/GameSettings
+C	net/minecraft/class_323	net/minecraft/src/BlockButton
+C	net/minecraft/class_324	net/minecraft/src/BlockOreStorage
+C	net/minecraft/class_325	net/minecraft/src/Packet106Transaction
+C	net/minecraft/class_326	net/minecraft/src/ChunkProvider
+C	net/minecraft/class_327	net/minecraft/src/BlockFlowing
+C	net/minecraft/class_328	net/minecraft/src/BlockTrapDoor
+C	net/minecraft/class_329	net/minecraft/src/BlockCactus
+C	net/minecraft/class_33	net/minecraft/src/GuiButton
+C	net/minecraft/class_330	net/minecraft/src/TileEntitySpecialRenderer
+C	net/minecraft/class_331	net/minecraft/src/TileEntityRenderer
+C	net/minecraft/class_332	net/minecraft/src/BlockDirt
+C	net/minecraft/class_333	net/minecraft/src/MaterialPortal
+C	net/minecraft/class_334	net/minecraft/src/ColorizerFoliage
+C	net/minecraft/class_335	net/minecraft/src/Packet9Respawn
+C	net/minecraft/class_336	net/minecraft/src/TextureFX
+C	net/minecraft/class_337	net/minecraft/src/ContainerFurnace
+C	net/minecraft/class_339	net/minecraft/src/ChunkPosition
+C	net/minecraft/class_34	net/minecraft/src/FontRenderer
+C	net/minecraft/class_340	net/minecraft/src/Packet3Chat
+C	net/minecraft/class_341	net/minecraft/src/GuiRenameWorld
+C	net/minecraft/class_342	net/minecraft/src/BlockDetectorRail
+C	net/minecraft/class_343	net/minecraft/src/EnumOS1
+C	net/minecraft/class_344	net/minecraft/src/MapGenCavesHell
+C	net/minecraft/class_345	net/minecraft/src/EntitySorter
+C	net/minecraft/class_346	net/minecraft/src/StatTypeTime
+C	net/minecraft/class_347	net/minecraft/src/NBTTagInt
+C	net/minecraft/class_348	net/minecraft/src/BlockNote
+C	net/minecraft/class_349	net/minecraft/src/WorldGenTaiga1
+C	net/minecraft/class_35	net/minecraft/src/GuiParticle
+C	net/minecraft/class_350	net/minecraft/src/Packet33RelEntityMoveLook
+C	net/minecraft/class_351	net/minecraft/src/WorldGenHellLava
+C	net/minecraft/class_352	net/minecraft/src/ItemSword
+C	net/minecraft/class_353	net/minecraft/src/RegionFile
+C	net/minecraft/class_353$class_354	net/minecraft/src/RegionFileChunkBuffer
+C	net/minecraft/class_355	net/minecraft/src/ItemCookie
+C	net/minecraft/class_356	net/minecraft/src/TextureCompassFX
+C	net/minecraft/class_357	net/minecraft/src/Packet27Position
+C	net/minecraft/class_358	net/minecraft/src/NBTTagFloat
+C	net/minecraft/class_359	net/minecraft/src/ChunkProviderHell
+C	net/minecraft/class_36	net/minecraft/src/Packet8UpdateHealth
+C	net/minecraft/class_360	net/minecraft/src/NBTTagByte
+C	net/minecraft/class_361	net/minecraft/src/ItemPiston
+C	net/minecraft/class_362	net/minecraft/src/EntityHeartFX
+C	net/minecraft/class_363	net/minecraft/src/Packet102WindowClick
+C	net/minecraft/class_364	net/minecraft/src/EntityGhast
+C	net/minecraft/class_365	net/minecraft/src/EntityTNTPrimed
+C	net/minecraft/class_366	net/minecraft/src/NextTickListEntry
+C	net/minecraft/class_367	net/minecraft/src/ItemBow
+C	net/minecraft/class_368	net/minecraft/src/BiomeGenForest
+C	net/minecraft/class_369	net/minecraft/src/NoiseGeneratorPerlin
+C	net/minecraft/class_37	net/minecraft/src/Packet13PlayerLookMove
+C	net/minecraft/class_370	net/minecraft/src/BlockSandStone
+C	net/minecraft/class_371	net/minecraft/src/RenderFireball
+C	net/minecraft/class_372	net/minecraft/src/EntityFireball
+C	net/minecraft/class_373	net/minecraft/src/Packet6SpawnPosition
+C	net/minecraft/class_374	net/minecraft/src/Packet34EntityTeleport
+C	net/minecraft/class_375	net/minecraft/src/EnumOSMappingHelper
+C	net/minecraft/class_376	net/minecraft/src/BlockReed
+C	net/minecraft/class_377	net/minecraft/src/WorldProviderSurface
+C	net/minecraft/class_378	net/minecraft/src/StatTypeSimple
+C	net/minecraft/class_379	net/minecraft/src/RegionFileCache
+C	net/minecraft/class_380	net/minecraft/src/ItemSeeds
+C	net/minecraft/class_381	net/minecraft/src/ItemMinecart
+C	net/minecraft/class_382	net/minecraft/src/Packet60Explosion
+C	net/minecraft/class_383	net/minecraft/src/BlockWeb
+C	net/minecraft/class_384	net/minecraft/src/TextureWatchFX
+C	net/minecraft/class_385	net/minecraft/src/BlockFluid
+C	net/minecraft/class_386	net/minecraft/src/KeyBinding
+C	net/minecraft/class_387	net/minecraft/src/ChunkFilePattern
+C	net/minecraft/class_388	net/minecraft/src/Particle
+C	net/minecraft/class_389	net/minecraft/src/EnumMobType
+C	net/minecraft/class_390	net/minecraft/src/ChunkProviderLoadOrGenerate
+C	net/minecraft/class_392	net/minecraft/src/BlockTallGrass
+C	net/minecraft/class_393	net/minecraft/src/Packet5PlayerInventory
+C	net/minecraft/class_394	net/minecraft/src/Packet29DestroyEntity
+C	net/minecraft/class_395	net/minecraft/src/BlockContainer
+C	net/minecraft/class_396	net/minecraft/src/BlockRedstoneOre
+C	net/minecraft/class_397	net/minecraft/src/ItemCoal
+C	net/minecraft/class_398	net/minecraft/src/ModelSkeleton
+C	net/minecraft/class_399	net/minecraft/src/BiomeGenSky
+C	net/minecraft/class_4	net/minecraft/src/TileEntityRecordPlayer
+C	net/minecraft/class_40	net/minecraft/src/EntityPlayerSP
+C	net/minecraft/class_400	net/minecraft/src/BlockClay
+C	net/minecraft/class_401	net/minecraft/src/ItemSaddle
+C	net/minecraft/class_402	net/minecraft/src/Packet32EntityLook
+C	net/minecraft/class_403	net/minecraft/src/Packet50PreChunk
+C	net/minecraft/class_404	net/minecraft/src/AchievementMap
+C	net/minecraft/class_405	net/minecraft/src/WorldGenGlowStone2
+C	net/minecraft/class_406	net/minecraft/src/MaterialLiquid
+C	net/minecraft/class_407	net/minecraft/src/ContainerDispenser
+C	net/minecraft/class_408	net/minecraft/src/BlockRedstoneWire
+C	net/minecraft/class_409	net/minecraft/src/ModelGhast
+C	net/minecraft/class_41	net/minecraft/src/MovementInput
+C	net/minecraft/class_410	net/minecraft/src/EntityArrow
+C	net/minecraft/class_411	net/minecraft/src/EntityLightningBolt
+C	net/minecraft/class_412	net/minecraft/src/GuiMultiplayer
+C	net/minecraft/class_413	net/minecraft/src/MovementInputFromOptions
+C	net/minecraft/class_414	net/minecraft/src/Packet23VehicleSpawn
+C	net/minecraft/class_415	net/minecraft/src/MapGenCaves
+C	net/minecraft/class_416	net/minecraft/src/BlockStairs
+C	net/minecraft/class_417	net/minecraft/src/MetadataChunkBlock
+C	net/minecraft/class_418	net/minecraft/src/Packet31RelEntityMove
+C	net/minecraft/class_419	net/minecraft/src/NBTTagDouble
+C	net/minecraft/class_42	net/minecraft/src/ChunkCache
+C	net/minecraft/class_420	net/minecraft/src/ItemAxe
+C	net/minecraft/class_421	net/minecraft/src/BlockFurnace
+C	net/minecraft/class_422	net/minecraft/src/BiomeGenHell
+C	net/minecraft/class_423	net/minecraft/src/RenderCreeper
+C	net/minecraft/class_424	net/minecraft/src/BiomeGenSwamp
+C	net/minecraft/class_425	net/minecraft/src/RenderEntity
+C	net/minecraft/class_427	net/minecraft/src/RenderArrow
+C	net/minecraft/class_428	net/minecraft/src/EnumToolMaterial
+C	net/minecraft/class_429	net/minecraft/src/BlockMushroom
+C	net/minecraft/class_43	net/minecraft/src/Chunk
+C	net/minecraft/class_430	net/minecraft/src/RenderSorter
+C	net/minecraft/class_431	net/minecraft/src/Packet19EntityAction
+C	net/minecraft/class_432	net/minecraft/src/Packet130UpdateSign
+C	net/minecraft/class_433	net/minecraft/src/Packet255KickDisconnect
+C	net/minecraft/class_434	net/minecraft/src/Packet70Bed
+C	net/minecraft/class_435	net/minecraft/src/Packet22Collect
+C	net/minecraft/class_436	net/minecraft/src/Packet53BlockChange
+C	net/minecraft/class_437	net/minecraft/src/Packet30Entity
+C	net/minecraft/class_438	net/minecraft/src/Packet40EntityMetadata
+C	net/minecraft/class_439	net/minecraft/src/Packet25EntityPainting
+C	net/minecraft/class_44	net/minecraft/src/FurnaceRecipes
+C	net/minecraft/class_440	net/minecraft/src/Packet54PlayNoteBlock
+C	net/minecraft/class_441	net/minecraft/src/Packet52MultiBlockChange
+C	net/minecraft/class_442	net/minecraft/src/RenderPig
+C	net/minecraft/class_443	net/minecraft/src/EntityPig
+C	net/minecraft/class_444	net/minecraft/src/TileEntityNote
+C	net/minecraft/class_445	net/minecraft/src/ChunkLoader
+C	net/minecraft/class_446	net/minecraft/src/RecipesIngots
+C	net/minecraft/class_447	net/minecraft/src/UnexpectedThrowable
+C	net/minecraft/class_448	net/minecraft/src/SaveFormatOld
+C	net/minecraft/class_449	net/minecraft/src/ItemRecord
+C	net/minecraft/class_45	net/minecraft/src/Packet71Weather
+C	net/minecraft/class_450	net/minecraft/src/RenderSlime
+C	net/minecraft/class_451	net/minecraft/src/EntitySlime
+C	net/minecraft/class_452	net/minecraft/src/LoadingScreenRenderer
+C	net/minecraft/class_453	net/minecraft/src/ShapelessRecipes
+C	net/minecraft/class_454	net/minecraft/src/WorldClient
+C	net/minecraft/class_454$class_456	net/minecraft/src/WorldBlockPositionType
+C	net/minecraft/class_455	net/minecraft/src/ChunkProviderClient
+C	net/minecraft/class_457	net/minecraft/src/BlockPressurePlate
+C	net/minecraft/class_458	net/minecraft/src/NoiseGeneratorOctaves2
+C	net/minecraft/class_459	net/minecraft/src/NoiseGenerator2
+C	net/minecraft/class_460	net/minecraft/src/BlockSign
+C	net/minecraft/class_461	net/minecraft/src/EntitySnowShovelFX
+C	net/minecraft/class_462	net/minecraft/src/NBTTagShort
+C	net/minecraft/class_463	net/minecraft/src/BlockCake
+C	net/minecraft/class_464	net/minecraft/src/ModelSheep2
+C	net/minecraft/class_465	net/minecraft/src/GuiSmallButton
+C	net/minecraft/class_466	net/minecraft/src/EntityCow
+C	net/minecraft/class_467	net/minecraft/src/Teleporter
+C	net/minecraft/class_468	net/minecraft/src/MinecraftException
+C	net/minecraft/class_469	net/minecraft/src/BlockPistonMoving
+C	net/minecraft/class_47	net/minecraft/src/RenderSnowball
+C	net/minecraft/class_470	net/minecraft/src/RecipesArmor
+C	net/minecraft/class_471	net/minecraft/src/RenderGlobal
+C	net/minecraft/class_472	net/minecraft/src/RenderList
+C	net/minecraft/class_473	net/minecraft/src/BlockFlower
+C	net/minecraft/class_474	net/minecraft/src/BlockFire
+C	net/minecraft/class_475	net/minecraft/src/StepSound
+C	net/minecraft/class_476	net/minecraft/src/BlockGrass
+C	net/minecraft/class_477	net/minecraft/src/CanvasIsomPreview
+C	net/minecraft/class_477$1	net/minecraft/src/ThreadRunIsoClient
+C	net/minecraft/class_478	net/minecraft/src/IsoImageBuffer
+C	net/minecraft/class_479	net/minecraft/src/ItemLeaves
+C	net/minecraft/class_48	net/minecraft/src/BlockObsidian
+C	net/minecraft/class_480	net/minecraft/src/EntityZombie
+C	net/minecraft/class_482	net/minecraft/src/ItemSign
+C	net/minecraft/class_483	net/minecraft/src/ItemBoat
+C	net/minecraft/class_484	net/minecraft/src/EntitySnowball
+C	net/minecraft/class_485	net/minecraft/src/BlockBed
+C	net/minecraft/class_486	net/minecraft/src/GuiVideoSettings
+C	net/minecraft/class_487	net/minecraft/src/BlockLog
+C	net/minecraft/class_489	net/minecraft/src/Packet12PlayerLook
+C	net/minecraft/class_49	net/minecraft/src/BlockPumpkin
+C	net/minecraft/class_490	net/minecraft/src/ChunkBlockMap
+C	net/minecraft/class_491	net/minecraft/src/ModelQuadruped
+C	net/minecraft/class_492	net/minecraft/src/BlockFarmland
+C	net/minecraft/class_493	net/minecraft/src/ModelSlime
+C	net/minecraft/class_494	net/minecraft/src/BlockTorch
+C	net/minecraft/class_495	net/minecraft/src/ItemSoup
+C	net/minecraft/class_496	net/minecraft/src/ModelMinecart
+C	net/minecraft/class_497	net/minecraft/src/SlotFurnace
+C	net/minecraft/class_498	net/minecraft/src/IStatType
+C	net/minecraft/class_499	net/minecraft/src/EntityEgg
+C	net/minecraft/class_5	net/minecraft/src/EntityBubbleFX
+C	net/minecraft/class_50	net/minecraft/src/WorldProvider
+C	net/minecraft/class_500	net/minecraft/src/ItemArmor
+C	net/minecraft/class_501	net/minecraft/src/ItemSpade
+C	net/minecraft/class_502	net/minecraft/src/WorldProviderHell
+C	net/minecraft/class_503	net/minecraft/src/ModelWolf
+C	net/minecraft/class_504	net/minecraft/src/PlayerController
+C	net/minecraft/class_505	net/minecraft/src/PistonBlockTextures
+C	net/minecraft/class_506	net/minecraft/src/ContainerChest
+C	net/minecraft/class_507	net/minecraft/src/InventoryCraftResult
+C	net/minecraft/class_509	net/minecraft/src/TextureWaterFlowFX
+C	net/minecraft/class_51	net/minecraft/src/IChunkProvider
+C	net/minecraft/class_510	net/minecraft/src/BlockRedstoneRepeater
+C	net/minecraft/class_511	net/minecraft/src/EntityFlying
+C	net/minecraft/class_512	net/minecraft/src/WorldGenTaiga2
+C	net/minecraft/class_513	net/minecraft/src/RenderTNTPrimed
+C	net/minecraft/class_515	net/minecraft/src/ChunkCoordIntPair
+C	net/minecraft/class_516	net/minecraft/src/GuiCrafting
+C	net/minecraft/class_517	net/minecraft/src/WorldGenPumpkin
+C	net/minecraft/class_518	net/minecraft/src/EntityPortalFX
+C	net/minecraft/class_519	net/minecraft/src/WorldChunkManager
+C	net/minecraft/class_52	net/minecraft/src/ISaveHandler
+C	net/minecraft/class_520	net/minecraft/src/PlayerControllerSP
+C	net/minecraft/class_521	net/minecraft/src/RecipesWeapons
+C	net/minecraft/class_522	net/minecraft/src/NBTTagString
+C	net/minecraft/class_523	net/minecraft/src/BlockSponge
+C	net/minecraft/class_524	net/minecraft/src/GuiFurnace
+C	net/minecraft/class_525	net/minecraft/src/GuiIngameMenu
+C	net/minecraft/class_526	net/minecraft/src/BlockDispenser
+C	net/minecraft/class_527	net/minecraft/src/TexturePackDefault
+C	net/minecraft/class_528	net/minecraft/src/EntitySlimeFX
+C	net/minecraft/class_529	net/minecraft/src/WorldGenLiquids
+C	net/minecraft/class_53	net/minecraft/src/MapStorage
+C	net/minecraft/class_530	net/minecraft/src/BlockLever
+C	net/minecraft/class_531	net/minecraft/src/EnumOS2
+C	net/minecraft/class_532	net/minecraft/src/WorldGenFire
+C	net/minecraft/class_533	net/minecraft/src/ItemBlock
+C	net/minecraft/class_534	net/minecraft/src/RedstoneUpdateInfo
+C	net/minecraft/class_535	net/minecraft/src/EntityPigZombie
+C	net/minecraft/class_536	net/minecraft/src/RenderLightningBolt
+C	net/minecraft/class_537	net/minecraft/src/PlayerControllerTest
+C	net/minecraft/class_538	net/minecraft/src/ChunkProviderGenerate
+C	net/minecraft/class_539	net/minecraft/src/ItemFlintAndSteel
+C	net/minecraft/class_54	net/minecraft/src/EntityPlayer
+C	net/minecraft/class_540	net/minecraft/src/RenderFish
+C	net/minecraft/class_541	net/minecraft/src/MaterialLogic
+C	net/minecraft/class_542	net/minecraft/src/StatBasic
+C	net/minecraft/class_543	net/minecraft/src/WorldGenTrees
+C	net/minecraft/class_544	net/minecraft/src/BlockNetherrack
+C	net/minecraft/class_545	net/minecraft/src/TileEntitySignRenderer
+C	net/minecraft/class_546	net/minecraft/src/SignModel
+C	net/minecraft/class_547	net/minecraft/src/BiomeGenRainforest
+C	net/minecraft/class_548	net/minecraft/src/RenderGhast
+C	net/minecraft/class_549	net/minecraft/src/EntityMinecart
+C	net/minecraft/class_55	net/minecraft/src/TileEntity
+C	net/minecraft/class_550	net/minecraft/src/ChunkFolderPattern
+C	net/minecraft/class_551	net/minecraft/src/ItemPainting
+C	net/minecraft/class_552	net/minecraft/src/TexturedQuad
+C	net/minecraft/class_553	net/minecraft/src/BlockStep
+C	net/minecraft/class_554	net/minecraft/src/ItemFood
+C	net/minecraft/class_555	net/minecraft/src/EntityRenderer
+C	net/minecraft/class_556	net/minecraft/src/ItemRenderer
+C	net/minecraft/class_557	net/minecraft/src/SlotCrafting
+C	net/minecraft/class_558	net/minecraft/src/EntitySpider
+C	net/minecraft/class_559	net/minecraft/src/Timer
+C	net/minecraft/class_56	net/minecraft/src/EnumSkyBlock
+C	net/minecraft/class_560	net/minecraft/src/EntityWeatherEffect
+C	net/minecraft/class_561	net/minecraft/src/ItemMapBase
+C	net/minecraft/class_562	net/minecraft/src/GuiConflictWarning
+C	net/minecraft/class_563	net/minecraft/src/EntityDiggingFX
+C	net/minecraft/class_564	net/minecraft/src/ScaledResolution
+C	net/minecraft/class_565	net/minecraft/src/GuiYesNo
+C	net/minecraft/class_566	net/minecraft/src/EntityFlameFX
+C	net/minecraft/class_567	net/minecraft/src/SpawnerAnimals
+C	net/minecraft/class_568	net/minecraft/src/GuiSelectWorld
+C	net/minecraft/class_568$class_569	net/minecraft/src/GuiWorldSlot
+C	net/minecraft/class_57	net/minecraft/src/Entity
+C	net/minecraft/class_570	net/minecraft/src/ImageBufferDownload
+C	net/minecraft/class_571	net/minecraft/src/ModelSpider
+C	net/minecraft/class_572	net/minecraft/src/TextureFlamesFX
+C	net/minecraft/class_573	net/minecraft/src/Frustrum
+C	net/minecraft/class_574	net/minecraft/src/ChatLine
+C	net/minecraft/class_575	net/minecraft/src/EntitySplashFX
+C	net/minecraft/class_576	net/minecraft/src/RenderMinecart
+C	net/minecraft/class_577	net/minecraft/src/ModelChicken
+C	net/minecraft/class_578	net/minecraft/src/RenderManager
+C	net/minecraft/class_579	net/minecraft/src/Render
+C	net/minecraft/class_58	net/minecraft/src/MapDataBase
+C	net/minecraft/class_580	net/minecraft/src/EntityClientPlayerMP
+C	net/minecraft/class_581	net/minecraft/src/OsMap
+C	net/minecraft/class_583	net/minecraft/src/RenderHelper
+C	net/minecraft/class_584	net/minecraft/src/Gui
+C	net/minecraft/class_585	net/minecraft/src/GuiInventory
+C	net/minecraft/class_586	net/minecraft/src/TerrainTextureManager
+C	net/minecraft/class_587	net/minecraft/src/GuiControls
+C	net/minecraft/class_588	net/minecraft/src/GuiIngame
+C	net/minecraft/class_589	net/minecraft/src/RenderBiped
+C	net/minecraft/class_59	net/minecraft/src/IWorldAccess
+C	net/minecraft/class_590	net/minecraft/src/RenderCow
+C	net/minecraft/class_591	net/minecraft/src/SaveFormatComparator
+C	net/minecraft/class_592	net/minecraft/src/TexturePackCustom
+C	net/minecraft/class_593	net/minecraft/src/TextureWaterFX
+C	net/minecraft/class_594	net/minecraft/src/GuiAchievement
+C	net/minecraft/class_595	net/minecraft/src/GuiConnecting
+C	net/minecraft/class_595$1	net/minecraft/src/ThreadConnectToServer
+C	net/minecraft/class_596	net/minecraft/src/MouseHelper
+C	net/minecraft/class_597	net/minecraft/src/GuiSlider
+C	net/minecraft/class_598	net/minecraft/src/ClippingHelperImpl
+C	net/minecraft/class_599	net/minecraft/src/RenderWolf
+C	net/minecraft/class_6	net/minecraft/src/Packet51MapChunk
+C	net/minecraft/class_60	net/minecraft/src/Explosion
+C	net/minecraft/class_600	net/minecraft/src/ModelSquid
+C	net/minecraft/class_601	net/minecraft/src/CanvasCrashReport
+C	net/minecraft/class_602	net/minecraft/src/SaveHandlerMP
+C	net/minecraft/class_603	net/minecraft/src/GuiErrorScreen
+C	net/minecraft/class_604	net/minecraft/src/EntityRainFX
+C	net/minecraft/class_605	net/minecraft/src/StatsSyncher
+C	net/minecraft/class_605$1	net/minecraft/src/ThreadStatSyncherSend
+C	net/minecraft/class_605$2	net/minecraft/src/ThreadStatSyncherReceive
+C	net/minecraft/class_606	net/minecraft/src/BlockSnowBlock
+C	net/minecraft/class_607	net/minecraft/src/ItemFishingRod
+C	net/minecraft/class_608	net/minecraft/src/PlayerControllerMP
+C	net/minecraft/class_609	net/minecraft/src/GuiAchievements
+C	net/minecraft/class_61	net/minecraft/src/PathEntity
+C	net/minecraft/class_610	net/minecraft/src/EntitySmokeFX
+C	net/minecraft/class_611	net/minecraft/src/MinecraftError
+C	net/minecraft/class_612	net/minecraft/src/RenderSheep
+C	net/minecraft/class_613	net/minecraft/src/EntitySheep
+C	net/minecraft/class_614	net/minecraft/src/EntityOtherPlayerMP
+C	net/minecraft/class_615	net/minecraft/src/GuiEditSign
+C	net/minecraft/class_616	net/minecraft/src/RenderGiantZombie
+C	net/minecraft/class_617	net/minecraft/src/SoundManager
+C	net/minecraft/class_618	net/minecraft/src/RenderSpider
+C	net/minecraft/class_619	net/minecraft/src/BlockRedstoneTorch
+C	net/minecraft/class_62	net/minecraft/src/IProgressUpdate
+C	net/minecraft/class_620	net/minecraft/src/BlockMobSpawner
+C	net/minecraft/class_621	net/minecraft/src/NoiseGenerator
+C	net/minecraft/class_622	net/minecraft/src/PanelCrashReport
+C	net/minecraft/class_623	net/minecraft/src/WorldGenTallGrass
+C	net/minecraft/class_624	net/minecraft/src/WorldGenLakes
+C	net/minecraft/class_625	net/minecraft/src/GuiUnused
+C	net/minecraft/class_626	net/minecraft/src/ItemSnowball
+C	net/minecraft/class_627	net/minecraft/src/BlockLadder
+C	net/minecraft/class_628	net/minecraft/src/TextureLavaFX
+C	net/minecraft/class_629	net/minecraft/src/StatCollector
+C	net/minecraft/class_63	net/minecraft/src/ChunkCoordinates
+C	net/minecraft/class_630	net/minecraft/src/GuiGameOver
+C	net/minecraft/class_632	net/minecraft/src/ItemTool
+C	net/minecraft/class_633	net/minecraft/src/ICrafting
+C	net/minecraft/class_634	net/minecraft/src/ChunkFile
+C	net/minecraft/class_635	net/minecraft/src/GuiOptions
+C	net/minecraft/class_64	net/minecraft/src/Packet11PlayerPosition
+C	net/minecraft/class_65	net/minecraft/src/IMob
+C	net/minecraft/class_66	net/minecraft/src/WorldRenderer
+C	net/minecraft/class_67	net/minecraft/src/Tessellator
+C	net/minecraft/class_68	net/minecraft/src/ICamera
+C	net/minecraft/class_7	net/minecraft/src/WorldInfo
+C	net/minecraft/class_71	net/minecraft/src/Container
+C	net/minecraft/class_74	net/minecraft/src/BlockWorkbench
+C	net/minecraft/class_75	net/minecraft/src/EffectRenderer
+C	net/minecraft/class_76	net/minecraft/src/RenderEngine
+C	net/minecraft/class_77	net/minecraft/src/EntityFX
+C	net/minecraft/class_78	net/minecraft/src/BlockGlass
+C	net/minecraft/class_8	net/minecraft/src/NBTTagCompound
+C	net/minecraft/class_80	net/minecraft/src/MCHash
+C	net/minecraft/class_81	net/minecraft/src/SaveHandler
+C	net/minecraft/class_82	net/minecraft/src/WorldGenMinable
+C	net/minecraft/class_83	net/minecraft/src/CompressedStreamTools
+C	net/minecraft/class_84	net/minecraft/src/ClippingHelper
+C	net/minecraft/class_85	net/minecraft/src/Packet61DoorChange
+C	net/minecraft/class_86	net/minecraft/src/RenderPlayer
+C	net/minecraft/class_87	net/minecraft/src/ModelBiped
+C	net/minecraft/class_88	net/minecraft/src/BlockJukeBox
+C	net/minecraft/class_89	net/minecraft/src/ChatAllowedCharacters
+C	net/minecraft/class_90	net/minecraft/src/EntitySkeleton
+C	net/minecraft/class_91	net/minecraft/src/GuiStats
+C	net/minecraft/class_91$class_93	net/minecraft/src/GuiSlotStatsGeneral
+C	net/minecraft/class_91$class_94	net/minecraft/src/GuiSlotStatsItem
+C	net/minecraft/class_91$class_94$1	net/minecraft/src/SorterStatsItem
+C	net/minecraft/class_91$class_95	net/minecraft/src/GuiSlotStatsBlock
+C	net/minecraft/class_91$class_95$1	net/minecraft/src/SorterStatsBlock
+C	net/minecraft/class_91$class_99	net/minecraft/src/GuiSlotStats
+C	net/minecraft/class_92	net/minecraft/src/RenderItem
+C	net/minecraft/class_96	net/minecraft/src/StatFileWriter
+C	net/minecraft/class_97	net/minecraft/src/GuiSlot
+C	net/minecraft/class_98	net/minecraft/src/StatCrafting
+C	net/minecraft/client/Minecraft$class_636	net/minecraft/src/ThreadSleepForever
+C	net/minecraft/client/Minecraft$class_637	net/minecraft/src/StatStringFormatKeyInv
+C	net/minecraft/client/Minecraft$class_638	net/minecraft/src/GameWindowListener
+C	net/minecraft/client/Minecraft$class_639	net/minecraft/src/ThreadCheckHasPaid
+C	net/minecraft/client/Minecraft$class_640	net/minecraft/src/MinecraftImpl
+C	net/minecraft/client/MinecraftApplet$class_641	net/minecraft/src/MinecraftAppletImpl
+C	net/minecraft/client/MinecraftApplet$class_642	net/minecraft/src/CanvasMinecraftApplet
+F	argo/jdom/JsonNodeType	NULL	NULL	NULL
+F	argo/jdom/JsonNodeType	STRING	STRING	STRING
+F	net/minecraft/class_4	field_4	field_4	record
+F	net/minecraft/class_6	field_5	field_5	xPosition
+F	net/minecraft/class_6	field_6	field_6	yPosition
+F	net/minecraft/class_6	field_8	field_8	xSize
+F	net/minecraft/class_6	field_9	field_9	ySize
+F	net/minecraft/class_6	field_11	field_11	chunk
+F	net/minecraft/class_7	field_21	field_21	dimension
+F	net/minecraft/class_25	field_129	field_129	minX
+F	net/minecraft/class_25	field_130	field_130	minY
+F	net/minecraft/class_25	field_131	field_131	minZ
+F	net/minecraft/class_25	field_132	field_132	maxX
+F	net/minecraft/class_25	field_133	field_133	maxY
+F	net/minecraft/class_25	field_134	field_134	maxZ
+F	net/minecraft/class_28	field_139	field_139	closing
+F	net/minecraft/class_29	field_140	field_140	xCoord
+F	net/minecraft/class_29	field_141	field_141	yCoord
+F	net/minecraft/class_29	field_142	field_142	zCoord
+F	net/minecraft/class_29	field_143	field_143	index
+F	net/minecraft/class_29	field_149	field_149	hash
+F	net/minecraft/class_32	field_152	field_152	width
+F	net/minecraft/class_32	field_153	field_153	height
+F	net/minecraft/class_32	field_156	field_156	fontRenderer
+F	net/minecraft/class_42	field_166	field_166	chunkX
+F	net/minecraft/class_42	field_167	field_167	chunkZ
+F	net/minecraft/class_42	field_169	field_169	worldObj
+F	net/minecraft/class_49	field_178	field_178	blockType
+F	net/minecraft/class_18	field_198	field_198	loadedEntityList
+F	net/minecraft/class_18	field_200	field_200	playerEntities
+F	net/minecraft/class_18	field_214	field_214	rand
+F	net/minecraft/class_18	field_218	field_218	chunkProvider
+F	net/minecraft/class_18	field_220	field_220	worldInfo
+F	net/minecraft/class_66	field_228	field_228	tileEntities
+F	net/minecraft/class_66	field_229	field_229	worldObj
+F	net/minecraft/class_66	field_231	field_231	posX
+F	net/minecraft/class_66	field_232	field_232	posY
+F	net/minecraft/class_66	field_233	field_233	posZ
+F	net/minecraft/class_75	field_269	field_269	worldObj
+F	net/minecraft/class_75	field_271	field_271	renderer
+F	net/minecraft/class_75	field_272	field_272	rand
+F	net/minecraft/class_81	field_278	field_278	logger
+F	net/minecraft/class_81	field_282	field_282	now
+F	net/minecraft/class_82	field_283	field_283	minableBlockId
+F	net/minecraft/class_82	field_284	field_284	numberOfBlocks
+F	net/minecraft/class_86	field_294	field_294	modelBipedMain
+F	net/minecraft/class_105	field_331	field_331	rand
+F	net/minecraft/class_106	field_332	field_332	rand
+F	net/minecraft/class_108	field_334	field_334	path
+F	net/minecraft/class_110	field_337	field_337	random
+F	net/minecraft/class_119	field_364	field_364	entityId
+F	net/minecraft/class_124	field_376	field_376	axeDiamond
+F	net/minecraft/class_124	field_377	field_377	stick
+F	net/minecraft/class_124	field_378	field_378	bowlEmpty
+F	net/minecraft/class_124	field_379	field_379	bowlSoup
+F	net/minecraft/class_124	field_380	field_380	swordGold
+F	net/minecraft/class_124	field_381	field_381	shovelGold
+F	net/minecraft/class_124	field_382	field_382	pickaxeGold
+F	net/minecraft/class_124	field_383	field_383	axeGold
+F	net/minecraft/class_124	field_384	field_384	silk
+F	net/minecraft/class_124	field_385	field_385	feather
+F	net/minecraft/class_124	field_386	field_386	gunpowder
+F	net/minecraft/class_124	field_387	field_387	hoeWood
+F	net/minecraft/class_124	field_388	field_388	hoeStone
+F	net/minecraft/class_124	field_389	field_389	hoeIron
+F	net/minecraft/class_124	field_390	field_390	hoeDiamond
+F	net/minecraft/class_124	field_391	field_391	hoeGold
+F	net/minecraft/class_124	field_392	field_392	seeds
+F	net/minecraft/class_124	field_393	field_393	wheat
+F	net/minecraft/class_124	field_394	field_394	bread
+F	net/minecraft/class_124	field_395	field_395	helmetLeather
+F	net/minecraft/class_124	field_396	field_396	plateLeather
+F	net/minecraft/class_124	field_397	field_397	legsLeather
+F	net/minecraft/class_124	field_398	field_398	bootsLeather
+F	net/minecraft/class_124	field_399	field_399	helmetChain
+F	net/minecraft/class_124	field_400	field_400	plateChain
+F	net/minecraft/class_124	field_401	field_401	legsChain
+F	net/minecraft/class_124	field_402	field_402	maxDamage
+F	net/minecraft/class_124	field_403	field_403	redstone
+F	net/minecraft/class_124	field_404	field_404	snowball
+F	net/minecraft/class_124	field_405	field_405	boat
+F	net/minecraft/class_124	field_406	field_406	leather
+F	net/minecraft/class_124	field_407	field_407	bucketMilk
+F	net/minecraft/class_124	field_408	field_408	brick
+F	net/minecraft/class_124	field_409	field_409	clay
+F	net/minecraft/class_124	field_410	field_410	reed
+F	net/minecraft/class_124	field_411	field_411	paper
+F	net/minecraft/class_124	field_412	field_412	book
+F	net/minecraft/class_124	field_413	field_413	slimeBall
+F	net/minecraft/class_124	field_414	field_414	minecartCrate
+F	net/minecraft/class_124	field_415	field_415	minecartPowered
+F	net/minecraft/class_124	field_416	field_416	egg
+F	net/minecraft/class_124	field_417	field_417	compass
+F	net/minecraft/class_124	field_418	field_418	fishingRod
+F	net/minecraft/class_124	field_419	field_419	pocketSundial
+F	net/minecraft/class_124	field_420	field_420	lightStoneDust
+F	net/minecraft/class_124	field_421	field_421	fishRaw
+F	net/minecraft/class_124	field_422	field_422	fishCooked
+F	net/minecraft/class_124	field_423	field_423	dyePowder
+F	net/minecraft/class_124	field_424	field_424	bone
+F	net/minecraft/class_124	field_425	field_425	sugar
+F	net/minecraft/class_124	field_426	field_426	cake
+F	net/minecraft/class_124	field_427	field_427	bed
+F	net/minecraft/class_124	field_428	field_428	redstoneRepeater
+F	net/minecraft/class_124	field_429	field_429	bootsChain
+F	net/minecraft/class_124	field_430	field_430	helmetIron
+F	net/minecraft/class_124	field_431	field_431	plateIron
+F	net/minecraft/class_124	field_432	field_432	legsIron
+F	net/minecraft/class_124	field_433	field_433	bootsIron
+F	net/minecraft/class_124	field_434	field_434	helmetDiamond
+F	net/minecraft/class_124	field_435	field_435	plateDiamond
+F	net/minecraft/class_124	field_436	field_436	legsDiamond
+F	net/minecraft/class_124	field_437	field_437	bootsDiamond
+F	net/minecraft/class_124	field_438	field_438	helmetGold
+F	net/minecraft/class_124	field_439	field_439	plateGold
+F	net/minecraft/class_124	field_440	field_440	legsGold
+F	net/minecraft/class_124	field_441	field_441	bootsGold
+F	net/minecraft/class_124	field_442	field_442	flint
+F	net/minecraft/class_124	field_443	field_443	porkRaw
+F	net/minecraft/class_124	field_444	field_444	porkCooked
+F	net/minecraft/class_124	field_445	field_445	painting
+F	net/minecraft/class_124	field_446	field_446	appleGold
+F	net/minecraft/class_124	field_447	field_447	sign
+F	net/minecraft/class_124	field_448	field_448	doorWood
+F	net/minecraft/class_124	field_449	field_449	bucketEmpty
+F	net/minecraft/class_124	field_450	field_450	bucketWater
+F	net/minecraft/class_124	field_451	field_451	bucketLava
+F	net/minecraft/class_124	field_452	field_452	minecartEmpty
+F	net/minecraft/class_124	field_453	field_453	saddle
+F	net/minecraft/class_124	field_454	field_454	doorIron
+F	net/minecraft/class_124	field_455	field_455	itemRand
+F	net/minecraft/class_124	field_456	field_456	cookie
+F	net/minecraft/class_124	field_458	field_458	shears
+F	net/minecraft/class_124	field_459	field_459	record13
+F	net/minecraft/class_124	field_460	field_460	recordCat
+F	net/minecraft/class_124	field_461	field_461	itemID
+F	net/minecraft/class_124	field_462	field_462	maxStackSize
+F	net/minecraft/class_124	field_463	field_463	iconIndex
+F	net/minecraft/class_124	field_464	field_464	bFull3D
+F	net/minecraft/class_124	field_465	field_465	hasSubtypes
+F	net/minecraft/class_124	field_466	field_466	containerItem
+F	net/minecraft/class_124	field_468	field_468	itemsList
+F	net/minecraft/class_124	field_469	field_469	shovelIron
+F	net/minecraft/class_124	field_470	field_470	pickaxeIron
+F	net/minecraft/class_124	field_471	field_471	axeIron
+F	net/minecraft/class_124	field_472	field_472	flintAndSteel
+F	net/minecraft/class_124	field_473	field_473	appleRed
+F	net/minecraft/class_124	field_474	field_474	bow
+F	net/minecraft/class_124	field_475	field_475	arrow
+F	net/minecraft/class_124	field_476	field_476	coal
+F	net/minecraft/class_124	field_477	field_477	diamond
+F	net/minecraft/class_124	field_478	field_478	ingotIron
+F	net/minecraft/class_124	field_479	field_479	ingotGold
+F	net/minecraft/class_124	field_480	field_480	swordIron
+F	net/minecraft/class_124	field_481	field_481	swordWood
+F	net/minecraft/class_124	field_482	field_482	shovelWood
+F	net/minecraft/class_124	field_483	field_483	pickaxeWood
+F	net/minecraft/class_124	field_484	field_484	axeWood
+F	net/minecraft/class_124	field_485	field_485	swordStone
+F	net/minecraft/class_124	field_486	field_486	shovelStone
+F	net/minecraft/class_124	field_487	field_487	pickaxeStone
+F	net/minecraft/class_124	field_488	field_488	axeStone
+F	net/minecraft/class_124	field_489	field_489	swordDiamond
+F	net/minecraft/class_124	field_490	field_490	shovelDiamond
+F	net/minecraft/class_124	field_491	field_491	pickaxeDiamond
+F	net/minecraft/class_133	field_499	field_499	slotNumber
+F	net/minecraft/class_133	field_500	field_500	xDisplayPosition
+F	net/minecraft/class_133	field_501	field_501	yDisplayPosition
+F	net/minecraft/class_133	field_502	field_502	slotIndex
+F	net/minecraft/class_133	field_503	field_503	inventory
+F	net/minecraft/class_54	field_519	field_519	inventory
+F	net/minecraft/class_54	field_520	field_520	inventorySlots
+F	net/minecraft/class_54	field_523	field_523	score
+F	net/minecraft/class_54	field_528	field_528	username
+F	net/minecraft/class_54	field_529	field_529	dimension
+F	net/minecraft/class_145	field_542	field_542	xPosition
+F	net/minecraft/class_145	field_543	field_543	yPosition
+F	net/minecraft/class_146	field_547	field_547	attackStrength
+F	net/minecraft/class_156	field_558	field_558	time
+F	net/minecraft/class_148	field_561	field_561	instance
+F	net/minecraft/class_148	field_562	field_562	recipes
+F	net/minecraft/class_142	field_564	field_564	item
+F	net/minecraft/class_142	field_565	field_565	age
+F	net/minecraft/class_142	field_569	field_569	health
+F	net/minecraft/class_162	field_573	field_573	boatSides
+F	net/minecraft/class_58	field_575	field_575	dirty
+F	net/minecraft/class_170	field_592	field_592	id
+F	net/minecraft/class_171	field_593	field_593	windowId
+F	net/minecraft/class_87	field_619	field_619	bipedHead
+F	net/minecraft/class_87	field_620	field_620	bipedHeadwear
+F	net/minecraft/class_87	field_621	field_621	bipedBody
+F	net/minecraft/class_87	field_622	field_622	bipedRightArm
+F	net/minecraft/class_87	field_623	field_623	bipedLeftArm
+F	net/minecraft/class_87	field_624	field_624	bipedRightLeg
+F	net/minecraft/class_87	field_625	field_625	bipedLeftLeg
+F	net/minecraft/class_87	field_626	field_626	bipedEars
+F	net/minecraft/class_87	field_627	field_627	bipedCloak
+F	net/minecraft/class_184	field_636	field_636	xPosition
+F	net/minecraft/class_184	field_637	field_637	yPosition
+F	net/minecraft/class_184	field_640	field_640	yaw
+F	net/minecraft/class_184	field_641	field_641	pitch
+F	net/minecraft/class_184	field_642	field_642	onGround
+F	net/minecraft/class_184	field_644	field_644	rotating
+F	net/minecraft/class_186	field_647	field_647	worldObj
+F	net/minecraft/class_186	field_650	field_650	height
+F	net/minecraft/class_187	field_660	field_660	key
+F	net/minecraft/class_189	field_664	field_664	SIN_TABLE
+F	net/minecraft/class_191	field_669	field_669	offsetX
+F	net/minecraft/class_191	field_670	field_670	offsetY
+F	net/minecraft/class_191	field_695	field_695	Skeleton
+F	net/minecraft/class_197	field_716	field_716	rand
+F	net/minecraft/class_201	field_741	field_741	windowId
+F	net/minecraft/class_136	field_745	field_745	mainInventory
+F	net/minecraft/class_136	field_746	field_746	armorInventory
+F	net/minecraft/class_136	field_747	field_747	currentItem
+F	net/minecraft/class_136	field_748	field_748	player
+F	net/minecraft/class_31	field_751	field_751	stackSize
+F	net/minecraft/class_31	field_753	field_753	itemID
+F	net/minecraft/class_31	field_754	field_754	itemDamage
+F	net/minecraft/class_206	field_757	field_757	stringToClassMapping
+F	net/minecraft/class_206	field_758	field_758	classToStringMapping
+F	net/minecraft/class_206	field_759	field_759	IDtoClassMapping
+F	net/minecraft/class_206	field_760	field_760	classToIDMapping
+F	net/minecraft/class_210	field_784	field_784	entityId
+F	net/minecraft/class_211	field_786	field_786	message
+F	net/minecraft/class_215	field_797	field_797	pitch
+F	net/minecraft/class_215	field_800	field_800	entityId
+F	net/minecraft/class_215	field_801	field_801	type
+F	net/minecraft/class_215	field_802	field_802	xPosition
+F	net/minecraft/class_215	field_803	field_803	yPosition
+F	net/minecraft/class_215	field_805	field_805	yaw
+F	net/minecraft/class_223	field_844	field_844	isSticky
+F	net/minecraft/class_226	field_847	field_847	blockID
+F	net/minecraft/class_228	field_852	field_852	xPosition
+F	net/minecraft/class_228	field_853	field_853	yPosition
+F	net/minecraft/class_228	field_855	field_855	face
+F	net/minecraft/class_228	field_856	field_856	status
+F	net/minecraft/class_80	field_859	field_859	slots
+F	net/minecraft/class_80	field_860	field_860	count
+F	net/minecraft/class_236	field_869	field_869	windowId
+F	net/minecraft/class_237	field_872	field_872	username
+F	net/minecraft/class_153	field_875	field_875	rainforest
+F	net/minecraft/class_153	field_876	field_876	swampland
+F	net/minecraft/class_153	field_877	field_877	seasonalForest
+F	net/minecraft/class_153	field_878	field_878	forest
+F	net/minecraft/class_153	field_879	field_879	savanna
+F	net/minecraft/class_153	field_880	field_880	shrubland
+F	net/minecraft/class_153	field_881	field_881	taiga
+F	net/minecraft/class_153	field_882	field_882	desert
+F	net/minecraft/class_153	field_883	field_883	plains
+F	net/minecraft/class_153	field_884	field_884	iceDesert
+F	net/minecraft/class_153	field_885	field_885	tundra
+F	net/minecraft/class_153	field_886	field_886	hell
+F	net/minecraft/class_153	field_887	field_887	sky
+F	net/minecraft/class_153	field_888	field_888	biomeName
+F	net/minecraft/class_153	field_889	field_889	color
+F	net/minecraft/class_153	field_890	field_890	topBlock
+F	net/minecraft/class_153	field_891	field_891	fillerBlock
+F	net/minecraft/class_153	field_893	field_893	spawnableMonsterList
+F	net/minecraft/class_153	field_894	field_894	spawnableCreatureList
+F	net/minecraft/class_153	field_895	field_895	spawnableWaterCreatureList
+F	net/minecraft/class_153	field_896	field_896	enableSnow
+F	net/minecraft/class_153	field_897	field_897	enableRain
+F	net/minecraft/class_245	field_909	field_909	mainModel
+F	net/minecraft/class_245	field_910	field_910	renderPassModel
+F	net/minecraft/class_109	field_932	field_932	count
+F	net/minecraft/class_238	field_942	field_942	monster
+F	net/minecraft/class_238	field_943	field_943	creature
+F	net/minecraft/class_238	field_944	field_944	waterCreature
+F	net/minecraft/class_43	field_954	field_954	blocks
+F	net/minecraft/class_43	field_956	field_956	worldObj
+F	net/minecraft/class_43	field_957	field_957	data
+F	net/minecraft/class_43	field_962	field_962	xPosition
+F	net/minecraft/class_43	field_965	field_965	entities
+F	net/minecraft/class_15	field_976	field_976	isOpaque
+F	net/minecraft/class_15	field_979	field_979	air
+F	net/minecraft/class_15	field_981	field_981	ground
+F	net/minecraft/class_15	field_982	field_982	wood
+F	net/minecraft/class_15	field_983	field_983	rock
+F	net/minecraft/class_15	field_984	field_984	iron
+F	net/minecraft/class_15	field_985	field_985	water
+F	net/minecraft/class_15	field_986	field_986	lava
+F	net/minecraft/class_15	field_987	field_987	leaves
+F	net/minecraft/class_15	field_988	field_988	plants
+F	net/minecraft/class_15	field_989	field_989	sponge
+F	net/minecraft/class_15	field_990	field_990	cloth
+F	net/minecraft/class_15	field_991	field_991	fire
+F	net/minecraft/class_15	field_992	field_992	sand
+F	net/minecraft/class_15	field_993	field_993	circuits
+F	net/minecraft/class_15	field_994	field_994	glass
+F	net/minecraft/class_15	field_995	field_995	tnt
+F	net/minecraft/class_15	field_997	field_997	ice
+F	net/minecraft/class_15	field_998	field_998	snow
+F	net/minecraft/class_15	field_1000	field_1000	cactus
+F	net/minecraft/class_15	field_1001	field_1001	clay
+F	net/minecraft/class_15	field_1002	field_1002	pumpkin
+F	net/minecraft/class_15	field_1003	field_1003	portal
+F	net/minecraft/class_127	field_1019	field_1019	texture
+F	net/minecraft/class_127	field_1033	field_1033	moveSpeed
+F	net/minecraft/class_127	field_1036	field_1036	health
+F	net/minecraft/class_266	field_1088	field_1088	rand
+F	net/minecraft/class_272	field_1114	field_1114	entityId
+F	net/minecraft/class_272	field_1115	field_1115	name
+F	net/minecraft/class_272	field_1116	field_1116	xPosition
+F	net/minecraft/class_272	field_1117	field_1117	yPosition
+F	net/minecraft/class_272	field_1119	field_1119	rotation
+F	net/minecraft/class_272	field_1120	field_1120	pitch
+F	net/minecraft/class_272	field_1121	field_1121	currentItem
+F	net/minecraft/class_276	field_1123	field_1123	windowId
+F	net/minecraft/class_277	field_1126	field_1126	isSinglePlayer
+F	net/minecraft/class_277$1	field_1127	field_1127	armorType
+F	net/minecraft/class_277$1	field_1128	field_1128	inventory
+F	net/minecraft/class_281	field_1130	field_1130	username
+F	net/minecraft/class_289	field_1145	field_1145	numberOfBlocks
+F	net/minecraft/class_292	field_1149	field_1149	windowId
+F	net/minecraft/class_293	field_1152	field_1152	xSize
+F	net/minecraft/class_293	field_1153	field_1153	ySize
+F	net/minecraft/class_293	field_1154	field_1154	inventorySlots
+F	net/minecraft/class_295	field_1156	field_1156	entityId
+F	net/minecraft/class_295	field_1157	field_1157	xPosition
+F	net/minecraft/class_295	field_1158	field_1158	yPosition
+F	net/minecraft/class_295	field_1160	field_1160	rotation
+F	net/minecraft/class_295	field_1161	field_1161	pitch
+F	net/minecraft/class_295	field_1163	field_1163	itemID
+F	net/minecraft/class_295	field_1164	field_1164	count
+F	net/minecraft/class_295	field_1165	field_1165	itemDamage
+F	net/minecraft/class_300	field_1173	field_1173	instance
+F	net/minecraft/class_304	field_1182	field_1182	head
+F	net/minecraft/class_304	field_1184	field_1184	body
+F	net/minecraft/class_304	field_1185	field_1185	leg1
+F	net/minecraft/class_304	field_1186	field_1186	leg2
+F	net/minecraft/class_304	field_1187	field_1187	leg3
+F	net/minecraft/class_304	field_1188	field_1188	leg4
+F	net/minecraft/class_305	field_1189	field_1189	entityId
+F	net/minecraft/class_308	field_1193	field_1193	entityId
+F	net/minecraft/class_309$class_310	field_1197	field_1197	hash
+F	net/minecraft/class_118	field_1210	field_1210	username
+F	net/minecraft/class_118	field_1212	field_1212	dimension
+F	net/minecraft/class_320	field_1215	field_1215	name
+F	net/minecraft/class_325	field_1222	field_1222	windowId
+F	net/minecraft/class_326	field_1227	field_1227	chunkProvider
+F	net/minecraft/class_55	field_1238	field_1238	worldObj
+F	net/minecraft/class_55	field_1239	field_1239	xCoord
+F	net/minecraft/class_55	field_1240	field_1240	yCoord
+F	net/minecraft/class_55	field_1241	field_1241	zCoord
+F	net/minecraft/class_76	field_1253	field_1253	options
+F	net/minecraft/class_337	field_1258	field_1258	furnace
+F	net/minecraft/class_16$class_338	field_1263	field_1263	rail
+F	net/minecraft/class_16$class_338	field_1264	field_1264	worldObj
+F	net/minecraft/class_340	field_1270	field_1270	message
+F	net/minecraft/class_343	field_1307	field_1307	unknown
+F	net/minecraft/class_353	field_1318	field_1318	offsets
+F	net/minecraft/class_359	field_1350	field_1350	worldObj
+F	net/minecraft/class_363	field_1365	field_1365	action
+F	net/minecraft/class_33	field_1368	field_1368	width
+F	net/minecraft/class_33	field_1369	field_1369	height
+F	net/minecraft/class_33	field_1370	field_1370	xPosition
+F	net/minecraft/class_33	field_1371	field_1371	yPosition
+F	net/minecraft/class_33	field_1372	field_1372	displayString
+F	net/minecraft/class_33	field_1373	field_1373	id
+F	net/minecraft/class_33	field_1374	field_1374	enabled
+F	net/minecraft/class_107	field_1385	field_1385	xPosition
+F	net/minecraft/class_107	field_1386	field_1386	yPosition
+F	net/minecraft/class_60	field_1399	field_1399	worldObj
+F	net/minecraft/class_366	field_1400	field_1400	xCoord
+F	net/minecraft/class_366	field_1401	field_1401	yCoord
+F	net/minecraft/class_366	field_1402	field_1402	zCoord
+F	net/minecraft/class_366	field_1403	field_1403	blockID
+F	net/minecraft/class_369	field_1408	field_1408	xCoord
+F	net/minecraft/class_369	field_1409	field_1409	yCoord
+F	net/minecraft/class_369	field_1410	field_1410	zCoord
+F	net/minecraft/class_336	field_1412	field_1412	iconIndex
+F	net/minecraft/class_373	field_1417	field_1417	xPosition
+F	net/minecraft/class_373	field_1418	field_1418	yPosition
+F	net/minecraft/class_374	field_1420	field_1420	entityId
+F	net/minecraft/class_374	field_1421	field_1421	xPosition
+F	net/minecraft/class_374	field_1422	field_1422	yPosition
+F	net/minecraft/class_374	field_1424	field_1424	yaw
+F	net/minecraft/class_374	field_1425	field_1425	pitch
+F	net/minecraft/class_173	field_1427	field_1427	onGround
+F	net/minecraft/class_173	field_1428	field_1428	isRiding
+F	net/minecraft/class_322	field_1450	field_1450	guiScale
+F	net/minecraft/class_322	field_1465	field_1465	fancyGraphics
+F	net/minecraft/class_322	field_1468	field_1468	keyBindForward
+F	net/minecraft/class_322	field_1469	field_1469	keyBindLeft
+F	net/minecraft/class_322	field_1470	field_1470	keyBindBack
+F	net/minecraft/class_322	field_1471	field_1471	keyBindRight
+F	net/minecraft/class_322	field_1472	field_1472	keyBindJump
+F	net/minecraft/class_322	field_1473	field_1473	keyBindInventory
+F	net/minecraft/class_322	field_1474	field_1474	keyBindDrop
+F	net/minecraft/class_322	field_1475	field_1475	keyBindChat
+F	net/minecraft/class_322	field_1477	field_1477	keyBindSneak
+F	net/minecraft/class_322	field_1478	field_1478	keyBindings
+F	net/minecraft/class_63	field_1482	field_1482	x
+F	net/minecraft/class_63	field_1483	field_1483	y
+F	net/minecraft/class_63	field_1484	field_1484	z
+F	net/minecraft/class_389	field_1506	field_1506	mobs
+F	net/minecraft/class_389	field_1507	field_1507	players
+F	net/minecraft/class_390	field_1512	field_1512	chunkProvider
+F	net/minecraft/class_390	field_1515	field_1515	worldObj
+F	net/minecraft/class_393	field_1523	field_1523	slot
+F	net/minecraft/class_393	field_1524	field_1524	itemID
+F	net/minecraft/class_393	field_1525	field_1525	itemDamage
+F	net/minecraft/class_394	field_1526	field_1526	entityId
+F	net/minecraft/class_97	field_1529	field_1529	width
+F	net/minecraft/class_97	field_1530	field_1530	height
+F	net/minecraft/class_97	field_1531	field_1531	right
+F	net/minecraft/class_97	field_1532	field_1532	left
+F	net/minecraft/class_97	field_1535	field_1535	top
+F	net/minecraft/class_97	field_1536	field_1536	bottom
+F	net/minecraft/class_97	field_1537	field_1537	posZ
+F	net/minecraft/class_403	field_1546	field_1546	xPosition
+F	net/minecraft/class_403	field_1547	field_1547	yPosition
+F	net/minecraft/class_403	field_1548	field_1548	mode
+F	net/minecraft/class_404	field_1549	field_1549	instance
+F	net/minecraft/class_331	field_1552	field_1552	instance
+F	net/minecraft/class_331	field_1556	field_1556	renderEngine
+F	net/minecraft/class_331	field_1557	field_1557	worldObj
+F	net/minecraft/class_331	field_1565	field_1565	fontRenderer
+F	net/minecraft/class_409	field_1572	field_1572	body
+F	net/minecraft/class_409	field_1573	field_1573	tentacles
+F	net/minecraft/class_410	field_1576	field_1576	owner
+F	net/minecraft/class_26	field_1585	field_1585	xCoord
+F	net/minecraft/class_26	field_1586	field_1586	yCoord
+F	net/minecraft/class_26	field_1587	field_1587	zCoord
+F	net/minecraft/class_57	field_1591	field_1591	entityId
+F	net/minecraft/class_57	field_1596	field_1596	worldObj
+F	net/minecraft/class_57	field_1600	field_1600	posX
+F	net/minecraft/class_57	field_1601	field_1601	posY
+F	net/minecraft/class_57	field_1602	field_1602	posZ
+F	net/minecraft/class_57	field_1606	field_1606	rotationYaw
+F	net/minecraft/class_57	field_1607	field_1607	rotationPitch
+F	net/minecraft/class_57	field_1610	field_1610	boundingBox
+F	net/minecraft/class_57	field_1614	field_1614	air
+F	net/minecraft/class_57	field_1615	field_1615	isImmuneToFire
+F	net/minecraft/class_57	field_1616	field_1616	dataWatcher
+F	net/minecraft/class_57	field_1623	field_1623	onGround
+F	net/minecraft/class_57	field_1631	field_1631	yOffset
+F	net/minecraft/class_57	field_1632	field_1632	width
+F	net/minecraft/class_57	field_1633	field_1633	height
+F	net/minecraft/class_57	field_1640	field_1640	ySize
+F	net/minecraft/class_57	field_1644	field_1644	rand
+F	net/minecraft/class_57	field_1647	field_1647	fire
+F	net/minecraft/class_413	field_1662	field_1662	gameSettings
+F	net/minecraft/class_414	field_1663	field_1663	entityId
+F	net/minecraft/class_414	field_1664	field_1664	xPosition
+F	net/minecraft/class_414	field_1665	field_1665	yPosition
+F	net/minecraft/class_414	field_1670	field_1670	type
+F	net/minecraft/class_428	field_1688	field_1688	WOOD
+F	net/minecraft/class_428	field_1689	field_1689	STONE
+F	net/minecraft/class_428	field_1690	field_1690	IRON
+F	net/minecraft/class_428	field_1691	field_1691	EMERALD
+F	net/minecraft/class_428	field_1692	field_1692	GOLD
+F	net/minecraft/class_444	field_1699	field_1699	note
+F	net/minecraft/class_447	field_1704	field_1704	description
+F	net/minecraft/class_447	field_1705	field_1705	exception
+F	net/minecraft/class_92	field_1709	field_1709	random
+F	net/minecraft/class_431	field_1712	field_1712	entityId
+F	net/minecraft/class_431	field_1713	field_1713	state
+F	net/minecraft/class_436	field_1735	field_1735	xPosition
+F	net/minecraft/class_436	field_1736	field_1736	yPosition
+F	net/minecraft/class_436	field_1738	field_1738	type
+F	net/minecraft/class_436	field_1739	field_1739	metadata
+F	net/minecraft/class_437	field_1748	field_1748	entityId
+F	net/minecraft/class_437	field_1749	field_1749	xPosition
+F	net/minecraft/class_437	field_1750	field_1750	yPosition
+F	net/minecraft/class_437	field_1752	field_1752	yaw
+F	net/minecraft/class_437	field_1753	field_1753	pitch
+F	net/minecraft/class_437	field_1754	field_1754	rotating
+F	net/minecraft/class_432	field_1755	field_1755	xPosition
+F	net/minecraft/class_432	field_1756	field_1756	yPosition
+F	net/minecraft/class_471	field_1795	field_1795	tileEntities
+F	net/minecraft/class_471	field_1805	field_1805	worldObj
+F	net/minecraft/class_471	field_1806	field_1806	renderEngine
+F	net/minecraft/class_17	field_1821	field_1821	bedrock
+F	net/minecraft/class_17	field_1822	field_1822	waterMoving
+F	net/minecraft/class_17	field_1823	field_1823	waterStill
+F	net/minecraft/class_17	field_1824	field_1824	lavaMoving
+F	net/minecraft/class_17	field_1825	field_1825	lavaStill
+F	net/minecraft/class_17	field_1826	field_1826	sand
+F	net/minecraft/class_17	field_1827	field_1827	gravel
+F	net/minecraft/class_17	field_1828	field_1828	oreGold
+F	net/minecraft/class_17	field_1829	field_1829	oreIron
+F	net/minecraft/class_17	field_1830	field_1830	oreCoal
+F	net/minecraft/class_17	field_1831	field_1831	wood
+F	net/minecraft/class_17	field_1832	field_1832	leaves
+F	net/minecraft/class_17	field_1833	field_1833	sponge
+F	net/minecraft/class_17	field_1834	field_1834	glass
+F	net/minecraft/class_17	field_1835	field_1835	oreLapis
+F	net/minecraft/class_17	field_1836	field_1836	blockLapis
+F	net/minecraft/class_17	field_1837	field_1837	dispenser
+F	net/minecraft/class_17	field_1838	field_1838	sandStone
+F	net/minecraft/class_17	field_1839	field_1839	music
+F	net/minecraft/class_17	field_1840	field_1840	bed
+F	net/minecraft/class_17	field_1841	field_1841	railPowered
+F	net/minecraft/class_17	field_1842	field_1842	railDetector
+F	net/minecraft/class_17	field_1843	field_1843	pistonStickyBase
+F	net/minecraft/class_17	field_1844	field_1844	web
+F	net/minecraft/class_17	field_1845	field_1845	tallGrass
+F	net/minecraft/class_17	field_1846	field_1846	deadBush
+F	net/minecraft/class_17	field_1848	field_1848	crops
+F	net/minecraft/class_17	field_1849	field_1849	tilledField
+F	net/minecraft/class_17	field_1850	field_1850	furnaceIdle
+F	net/minecraft/class_17	field_1851	field_1851	furnaceBurning
+F	net/minecraft/class_17	field_1852	field_1852	signPost
+F	net/minecraft/class_17	field_1853	field_1853	doorWood
+F	net/minecraft/class_17	field_1854	field_1854	ladder
+F	net/minecraft/class_17	field_1855	field_1855	rail
+F	net/minecraft/class_17	field_1856	field_1856	stairsCobblestone
+F	net/minecraft/class_17	field_1857	field_1857	signWall
+F	net/minecraft/class_17	field_1858	field_1858	lever
+F	net/minecraft/class_17	field_1859	field_1859	pressurePlateStone
+F	net/minecraft/class_17	field_1860	field_1860	doorIron
+F	net/minecraft/class_17	field_1861	field_1861	pressurePlatePlanks
+F	net/minecraft/class_17	field_1862	field_1862	oreRedstone
+F	net/minecraft/class_17	field_1863	field_1863	oreRedstoneGlowing
+F	net/minecraft/class_17	field_1864	field_1864	torchRedstoneIdle
+F	net/minecraft/class_17	field_1865	field_1865	torchRedstoneActive
+F	net/minecraft/class_17	field_1866	field_1866	stoneButton
+F	net/minecraft/class_17	field_1867	field_1867	snow
+F	net/minecraft/class_17	field_1868	field_1868	ice
+F	net/minecraft/class_17	field_1869	field_1869	blockSnow
+F	net/minecraft/class_17	field_1870	field_1870	cactus
+F	net/minecraft/class_17	field_1871	field_1871	blockClay
+F	net/minecraft/class_17	field_1872	field_1872	reed
+F	net/minecraft/class_17	field_1873	field_1873	jukebox
+F	net/minecraft/class_17	field_1874	field_1874	pistonBase
+F	net/minecraft/class_17	field_1875	field_1875	pistonExtension
+F	net/minecraft/class_17	field_1876	field_1876	cloth
+F	net/minecraft/class_17	field_1877	field_1877	pistonMoving
+F	net/minecraft/class_17	field_1878	field_1878	plantYellow
+F	net/minecraft/class_17	field_1879	field_1879	plantRed
+F	net/minecraft/class_17	field_1880	field_1880	mushroomBrown
+F	net/minecraft/class_17	field_1881	field_1881	mushroomRed
+F	net/minecraft/class_17	field_1882	field_1882	blockGold
+F	net/minecraft/class_17	field_1883	field_1883	blockIron
+F	net/minecraft/class_17	field_1884	field_1884	stoneDoubleSlab
+F	net/minecraft/class_17	field_1885	field_1885	stoneSingleSlab
+F	net/minecraft/class_17	field_1886	field_1886	brick
+F	net/minecraft/class_17	field_1887	field_1887	tnt
+F	net/minecraft/class_17	field_1888	field_1888	bookShelf
+F	net/minecraft/class_17	field_1889	field_1889	cobblestoneMossy
+F	net/minecraft/class_17	field_1890	field_1890	obsidian
+F	net/minecraft/class_17	field_1891	field_1891	torchWood
+F	net/minecraft/class_17	field_1892	field_1892	fire
+F	net/minecraft/class_17	field_1893	field_1893	mobSpawner
+F	net/minecraft/class_17	field_1894	field_1894	stairsWoodOak
+F	net/minecraft/class_17	field_1895	field_1895	chest
+F	net/minecraft/class_17	field_1896	field_1896	redstoneWire
+F	net/minecraft/class_17	field_1897	field_1897	oreDiamond
+F	net/minecraft/class_17	field_1898	field_1898	blockDiamond
+F	net/minecraft/class_17	field_1899	field_1899	workbench
+F	net/minecraft/class_17	field_1900	field_1900	blockMaterial
+F	net/minecraft/class_17	field_1901	field_1901	slipperiness
+F	net/minecraft/class_17	field_1902	field_1902	fence
+F	net/minecraft/class_17	field_1903	field_1903	pumpkin
+F	net/minecraft/class_17	field_1904	field_1904	netherrack
+F	net/minecraft/class_17	field_1905	field_1905	slowSand
+F	net/minecraft/class_17	field_1906	field_1906	glowStone
+F	net/minecraft/class_17	field_1907	field_1907	portal
+F	net/minecraft/class_17	field_1908	field_1908	pumpkinLantern
+F	net/minecraft/class_17	field_1909	field_1909	cake
+F	net/minecraft/class_17	field_1910	field_1910	redstoneRepeaterIdle
+F	net/minecraft/class_17	field_1911	field_1911	redstoneRepeaterActive
+F	net/minecraft/class_17	field_1912	field_1912	lockedChest
+F	net/minecraft/class_17	field_1913	field_1913	trapdoor
+F	net/minecraft/class_17	field_1914	field_1914	blockIndexInTexture
+F	net/minecraft/class_17	field_1915	field_1915	blockID
+F	net/minecraft/class_17	field_1916	field_1916	blockHardness
+F	net/minecraft/class_17	field_1917	field_1917	blockResistance
+F	net/minecraft/class_17	field_1919	field_1919	enableStats
+F	net/minecraft/class_17	field_1920	field_1920	minX
+F	net/minecraft/class_17	field_1921	field_1921	minY
+F	net/minecraft/class_17	field_1922	field_1922	minZ
+F	net/minecraft/class_17	field_1923	field_1923	maxX
+F	net/minecraft/class_17	field_1924	field_1924	maxY
+F	net/minecraft/class_17	field_1925	field_1925	maxZ
+F	net/minecraft/class_17	field_1926	field_1926	stepSound
+F	net/minecraft/class_17	field_1927	field_1927	blockParticleGravity
+F	net/minecraft/class_17	field_1928	field_1928	soundPowderFootstep
+F	net/minecraft/class_17	field_1929	field_1929	soundWoodFootstep
+F	net/minecraft/class_17	field_1930	field_1930	soundGravelFootstep
+F	net/minecraft/class_17	field_1931	field_1931	soundGrassFootstep
+F	net/minecraft/class_17	field_1932	field_1932	soundStoneFootstep
+F	net/minecraft/class_17	field_1933	field_1933	soundMetalFootstep
+F	net/minecraft/class_17	field_1934	field_1934	soundGlassFootstep
+F	net/minecraft/class_17	field_1935	field_1935	soundClothFootstep
+F	net/minecraft/class_17	field_1936	field_1936	soundSandFootstep
+F	net/minecraft/class_17	field_1937	field_1937	blocksList
+F	net/minecraft/class_17	field_1939	field_1939	opaqueCubeLookup
+F	net/minecraft/class_17	field_1940	field_1940	isBlockContainer
+F	net/minecraft/class_17	field_1941	field_1941	lightOpacity
+F	net/minecraft/class_17	field_1942	field_1942	canBlockGrass
+F	net/minecraft/class_17	field_1943	field_1943	lightValue
+F	net/minecraft/class_17	field_1945	field_1945	stone
+F	net/minecraft/class_17	field_1946	field_1946	grass
+F	net/minecraft/class_17	field_1947	field_1947	dirt
+F	net/minecraft/class_17	field_1948	field_1948	cobblestone
+F	net/minecraft/class_17	field_1949	field_1949	planks
+F	net/minecraft/class_17	field_1950	field_1950	sapling
+F	net/minecraft/class_477	field_1955	field_1955	xPosition
+F	net/minecraft/class_477	field_1956	field_1956	yPosition
+F	net/minecraft/class_477	field_1960	field_1960	worldObj
+F	net/minecraft/class_477	field_1962	field_1962	running
+F	net/minecraft/class_219	field_1969	field_1969	rand
+F	net/minecraft/class_438	field_1975	field_1975	entityId
+F	net/minecraft/class_491	field_2010	field_2010	head
+F	net/minecraft/class_491	field_2011	field_2011	body
+F	net/minecraft/class_491	field_2012	field_2012	leg1
+F	net/minecraft/class_491	field_2013	field_2013	leg2
+F	net/minecraft/class_491	field_2014	field_2014	leg3
+F	net/minecraft/class_491	field_2015	field_2015	leg4
+F	net/minecraft/class_493	field_2016	field_2016	slimeBodies
+F	net/minecraft/class_496	field_2020	field_2020	sideModels
+F	net/minecraft/class_497	field_2021	field_2021	thePlayer
+F	net/minecraft/class_439	field_2032	field_2032	entityId
+F	net/minecraft/class_439	field_2033	field_2033	xPosition
+F	net/minecraft/class_439	field_2034	field_2034	yPosition
+F	net/minecraft/class_440	field_2051	field_2051	pitch
+F	net/minecraft/class_67	field_2054	field_2054	instance
+F	net/minecraft/class_67	field_2064	field_2064	color
+F	net/minecraft/class_67	field_2073	field_2073	yOffset
+F	net/minecraft/class_67	field_2075	field_2075	normal
+F	net/minecraft/class_500	field_2082	field_2082	armorLevel
+F	net/minecraft/class_500	field_2083	field_2083	armorType
+F	net/minecraft/class_500	field_2084	field_2084	damageReduceAmount
+F	net/minecraft/class_500	field_2085	field_2085	renderIndex
+F	net/minecraft/class_500	field_2086	field_2086	damageReduceAmountArray
+F	net/minecraft/class_500	field_2087	field_2087	maxDamageArray
+F	net/minecraft/class_503	field_2089	field_2089	wolfHeadMain
+F	net/minecraft/class_503	field_2090	field_2090	wolfBody
+F	net/minecraft/class_503	field_2091	field_2091	wolfLeg1
+F	net/minecraft/class_503	field_2092	field_2092	wolfLeg2
+F	net/minecraft/class_503	field_2093	field_2093	wolfLeg3
+F	net/minecraft/class_503	field_2094	field_2094	wolfLeg4
+F	net/minecraft/class_503	field_2098	field_2098	wolfTail
+F	net/minecraft/class_503	field_2099	field_2099	wolfMane
+F	net/minecraft/class_339	field_2100	field_2100	x
+F	net/minecraft/class_339	field_2101	field_2101	y
+F	net/minecraft/class_339	field_2102	field_2102	z
+F	net/minecraft/class_257	field_2103	field_2103	data
+F	net/minecraft/class_441	field_2153	field_2153	xPosition
+F	net/minecraft/class_441	field_2158	field_2158	size
+F	net/minecraft/class_50	field_2173	field_2173	worldObj
+F	net/minecraft/class_50	field_2176	field_2176	isHellWorld
+F	net/minecraft/class_50	field_2177	field_2177	hasNoSky
+F	net/minecraft/class_526	field_2206	field_2206	random
+F	net/minecraft/class_531	field_2214	field_2214	unknown
+F	net/minecraft/class_533	field_2216	field_2216	blockID
+F	net/minecraft/class_534	field_2231	field_2231	x
+F	net/minecraft/class_534	field_2232	field_2232	y
+F	net/minecraft/class_534	field_2233	field_2233	z
+F	net/minecraft/class_519	field_2235	field_2235	temperature
+F	net/minecraft/class_538	field_2254	field_2254	rand
+F	net/minecraft/class_538	field_2260	field_2260	worldObj
+F	net/minecraft/class_549	field_2276	field_2276	fuel
+F	net/minecraft/class_163	field_2292	field_2292	rotationPointX
+F	net/minecraft/class_163	field_2293	field_2293	rotationPointY
+F	net/minecraft/class_163	field_2294	field_2294	rotationPointZ
+F	net/minecraft/class_163	field_2295	field_2295	rotateAngleX
+F	net/minecraft/class_163	field_2296	field_2296	rotateAngleY
+F	net/minecraft/class_163	field_2297	field_2297	rotateAngleZ
+F	net/minecraft/class_163	field_2298	field_2298	mirror
+F	net/minecraft/class_163	field_2299	field_2299	showModel
+F	net/minecraft/class_163	field_2302	field_2302	faces
+F	net/minecraft/class_163	field_2303	field_2303	textureOffsetX
+F	net/minecraft/class_163	field_2304	field_2304	textureOffsetY
+F	net/minecraft/class_433	field_2322	field_2322	reason
+F	net/minecraft/class_553	field_2324	field_2324	blockType
+F	net/minecraft/class_554	field_2325	field_2325	healAmount
+F	net/minecraft/class_554	field_2326	field_2326	isWolfsFavoriteMeat
+F	net/minecraft/class_555	field_2336	field_2336	random
+F	net/minecraft/class_557	field_2367	field_2367	thePlayer
+F	net/minecraft/class_386	field_2380	field_2380	keyDescription
+F	net/minecraft/class_386	field_2381	field_2381	keyCode
+F	net/minecraft/class_478	field_2411	field_2411	worldObj
+F	net/minecraft/class_546	field_2418	field_2418	signBoard
+F	net/minecraft/class_546	field_2419	field_2419	signStick
+F	net/minecraft/class_181	field_2420	field_2420	isFocused
+F	net/minecraft/class_181	field_2422	field_2422	fontRenderer
+F	net/minecraft/class_181	field_2423	field_2423	xPos
+F	net/minecraft/class_181	field_2424	field_2424	yPos
+F	net/minecraft/class_181	field_2425	field_2425	width
+F	net/minecraft/class_181	field_2426	field_2426	height
+F	net/minecraft/class_181	field_2427	field_2427	text
+F	net/minecraft/class_571	field_2448	field_2448	spiderHead
+F	net/minecraft/class_571	field_2449	field_2449	spiderNeck
+F	net/minecraft/class_571	field_2450	field_2450	spiderBody
+F	net/minecraft/class_571	field_2451	field_2451	spiderLeg1
+F	net/minecraft/class_571	field_2452	field_2452	spiderLeg2
+F	net/minecraft/class_571	field_2453	field_2453	spiderLeg3
+F	net/minecraft/class_571	field_2454	field_2454	spiderLeg4
+F	net/minecraft/class_571	field_2455	field_2455	spiderLeg5
+F	net/minecraft/class_571	field_2456	field_2456	spiderLeg6
+F	net/minecraft/class_571	field_2457	field_2457	spiderLeg7
+F	net/minecraft/class_571	field_2458	field_2458	spiderLeg8
+F	net/minecraft/class_573	field_2466	field_2466	xPosition
+F	net/minecraft/class_573	field_2467	field_2467	yPosition
+F	net/minecraft/class_574	field_2469	field_2469	message
+F	net/minecraft/class_577	field_2472	field_2472	head
+F	net/minecraft/class_577	field_2473	field_2473	body
+F	net/minecraft/class_577	field_2474	field_2474	rightLeg
+F	net/minecraft/class_577	field_2475	field_2475	leftLeg
+F	net/minecraft/class_577	field_2476	field_2476	rightWing
+F	net/minecraft/class_577	field_2477	field_2477	leftWing
+F	net/minecraft/class_577	field_2478	field_2478	bill
+F	net/minecraft/class_577	field_2479	field_2479	chin
+F	net/minecraft/class_578	field_2489	field_2489	instance
+F	net/minecraft/class_578	field_2493	field_2493	renderEngine
+F	net/minecraft/class_578	field_2495	field_2495	worldObj
+F	net/minecraft/class_578	field_2499	field_2499	options
+F	net/minecraft/class_578	field_2504	field_2504	fontRenderer
+F	net/minecraft/class_584	field_2522	field_2522	zLevel
+F	net/minecraft/class_41	field_2535	field_2535	jump
+F	net/minecraft/class_41	field_2536	field_2536	sneak
+F	net/minecraft/class_587	field_2539	field_2539	options
+F	net/minecraft/class_588	field_2546	field_2546	rand
+F	net/minecraft/class_455	field_2555	field_2555	worldObj
+F	net/minecraft/class_589	field_2556	field_2556	modelBipedMain
+F	net/minecraft/class_598	field_2594	field_2594	instance
+F	net/minecraft/class_600	field_2601	field_2601	squidBody
+F	net/minecraft/class_600	field_2602	field_2602	squidTentacles
+F	net/minecraft/class_616	field_2666	field_2666	scale
+F	net/minecraft/class_617	field_2672	field_2672	options
+F	net/minecraft/class_617	field_2673	field_2673	loaded
+F	net/minecraft/class_617	field_2674	field_2674	rand
+F	net/minecraft/class_579	field_2678	field_2678	shadowSize
+F	net/minecraft/class_104	field_2681	field_2681	delay
+F	net/minecraft/class_104	field_2682	field_2682	yaw
+F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
+F	net/minecraft/class_71	field_2734	field_2734	slots
+F	net/minecraft/class_71	field_2735	field_2735	windowId
+F	net/minecraft/class_56	field_2757	field_2757	Sky
+F	net/minecraft/class_56	field_2758	field_2758	Block
+F	net/minecraft/class_635	field_2763	field_2763	options
+M	net/minecraft/class_7	method_6	(J)V	method_6	setWorldTime
+M	net/minecraft/class_7	method_15	()I	method_15	getSpawnX
+M	net/minecraft/class_7	method_17	()I	method_17	getSpawnY
+M	net/minecraft/class_7	method_18	()I	method_18	getSpawnZ
+M	net/minecraft/class_7	method_19	()J	method_19	getWorldTime
+M	net/minecraft/class_7	method_21	()I	method_21	getDimension
+M	net/minecraft/class_7	method_32	()Ljava/lang/String;	method_32	getWorldName
+M	net/minecraft/class_25	method_86	(DDD)Lnet/minecraft/class_25;	method_86	addCoord
+M	net/minecraft/class_25	method_87	(DDDDDD)Lnet/minecraft/class_25;	method_87	getBoundingBox
+M	net/minecraft/class_25	method_90	(Lnet/minecraft/class_25;)Z	method_90	intersectsWith
+M	net/minecraft/class_25	method_92	()Lnet/minecraft/class_25;	method_92	copy
+M	net/minecraft/class_25	method_93	(DDD)Lnet/minecraft/class_25;	method_93	expand
+M	net/minecraft/class_25	method_96	(Lnet/minecraft/class_25;)V	method_96	setBB
+M	net/minecraft/class_25	method_98	(DDD)Lnet/minecraft/class_25;	method_98	getOffsetBoundingBox
+M	net/minecraft/class_25	method_99	(DDDDDD)Lnet/minecraft/class_25;	method_99	setBounds
+M	net/minecraft/class_25	method_102	(DDD)Lnet/minecraft/class_25;	method_102	offset
+M	net/minecraft/class_25	method_106	()D	method_106	getAverageEdgeLength
+M	net/minecraft/class_32	method_117	(CI)V	method_117	keyTyped
+M	net/minecraft/class_32	method_118	(IIF)V	method_118	drawScreen
+M	net/minecraft/class_32	method_119	()V	method_119	initGui
+M	net/minecraft/class_32	method_120	(Lnet/minecraft/class_33;)V	method_120	actionPerformed
+M	net/minecraft/class_32	method_121	()Z	method_121	doesGuiPauseGame
+M	net/minecraft/class_32	method_122	()V	method_122	updateScreen
+M	net/minecraft/class_32	method_123	(I)V	method_123	drawWorldBackground
+M	net/minecraft/class_32	method_124	(III)V	method_124	mouseClicked
+M	net/minecraft/class_32	method_125	(Lnet/minecraft/client/Minecraft;II)V	method_125	setWorldAndResolution
+M	net/minecraft/class_32	method_127	(I)V	method_127	drawBackground
+M	net/minecraft/class_32	method_128	(III)V	method_128	mouseMovedOrUp
+M	net/minecraft/class_32	method_129	()Ljava/lang/String;	method_129	getClipboardString
+M	net/minecraft/class_32	method_130	()V	method_130	handleInput
+M	net/minecraft/class_32	method_133	()V	method_133	onGuiClosed
+M	net/minecraft/class_32	method_134	()V	method_134	drawDefaultBackground
+M	net/minecraft/class_44	method_146	(ILnet/minecraft/class_31;)V	method_146	addSmelting
+M	net/minecraft/class_18	method_149	(DDDD)Lnet/minecraft/class_54;	method_149	getClosestPlayer
+M	net/minecraft/class_18	method_150	(DDDLjava/lang/String;FF)V	method_150	playSoundEffect
+M	net/minecraft/class_18	method_153	(IIII)Z	method_153	doChunksNearChunkExist
+M	net/minecraft/class_18	method_154	(IIIII)Z	method_154	setBlock
+M	net/minecraft/class_18	method_155	(IIIIII)Z	method_155	checkChunksExist
+M	net/minecraft/class_18	method_157	(IIILnet/minecraft/class_55;)V	method_157	setBlockTileEntity
+M	net/minecraft/class_18	method_159	(J)V	method_159	setWorldTime
+M	net/minecraft/class_18	method_175	(Ljava/lang/Class;Lnet/minecraft/class_25;)Ljava/util/List;	method_175	getEntitiesWithinAABB
+M	net/minecraft/class_18	method_177	(Ljava/lang/String;)Lnet/minecraft/class_54;	method_177	getPlayerEntityByName
+M	net/minecraft/class_18	method_178	(Ljava/lang/String;DDDDDD)V	method_178	spawnParticle
+M	net/minecraft/class_18	method_184	(Lnet/minecraft/class_57;)Z	method_184	addWeatherEffect
+M	net/minecraft/class_18	method_186	(Lnet/minecraft/class_57;D)Lnet/minecraft/class_54;	method_186	getClosestPlayerToEntity
+M	net/minecraft/class_18	method_190	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_190	getCollidingBoundingBoxes
+M	net/minecraft/class_18	method_191	(Lnet/minecraft/class_57;Ljava/lang/String;FF)V	method_191	playSoundAtEntity
+M	net/minecraft/class_18	method_200	(IIII)Z	method_200	setBlock
+M	net/minecraft/class_18	method_201	(IIIII)Z	method_201	setBlock
+M	net/minecraft/class_18	method_208	(Ljava/lang/String;)I	method_208	getUniqueDataId
+M	net/minecraft/class_18	method_211	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_211	getEntitiesWithinAABBExcludingEntity
+M	net/minecraft/class_18	method_216	(IIIII)V	method_216	scheduleBlockUpdate
+M	net/minecraft/class_18	method_220	()Z	method_220	isDaytime
+M	net/minecraft/class_18	method_222	(II)I	method_222	getHeightValue
+M	net/minecraft/class_18	method_229	(IIII)Z	method_229	setBlock
+M	net/minecraft/class_18	method_234	(III)Z	method_234	isAirBlock
+M	net/minecraft/class_18	method_239	(III)Z	method_239	blockExists
+M	net/minecraft/class_18	method_244	(IIII)V	method_244	notifyBlocksOfNeighborChange
+M	net/minecraft/class_18	method_249	(III)Z	method_249	canBlockSeeTheSky
+M	net/minecraft/class_18	method_251	()V	method_251	checkSessionLock
+M	net/minecraft/class_18	method_252	(III)I	method_252	getFullBlockLightValue
+M	net/minecraft/class_18	method_255	(III)I	method_255	getBlockLightValue
+M	net/minecraft/class_18	method_256	()J	method_256	getWorldTime
+M	net/minecraft/class_18	method_258	()Lnet/minecraft/class_63;	method_258	getSpawnPoint
+M	net/minecraft/class_18	method_260	(III)V	method_260	removeBlockTileEntity
+M	net/minecraft/class_18	method_262	()Lnet/minecraft/class_7;	method_262	getWorldInfo
+M	net/minecraft/class_18	method_265	(III)Z	method_265	isBlockIndirectlyGettingPowered
+M	net/minecraft/class_66	method_305	()V	method_305	markDirty
+M	net/minecraft/class_124	method_438	(Lnet/minecraft/class_31;Lnet/minecraft/class_17;)F	method_438	getStrVsBlock
+M	net/minecraft/class_124	method_439	(Lnet/minecraft/class_31;)I	method_439	getIconIndex
+M	net/minecraft/class_124	method_441	(I)I	method_441	getIconFromDamage
+M	net/minecraft/class_124	method_442	(Lnet/minecraft/class_31;)Ljava/lang/String;	method_442	getItemNameIS
+M	net/minecraft/class_124	method_443	()Ljava/lang/String;	method_443	getItemName
+M	net/minecraft/class_124	method_446	(Lnet/minecraft/class_31;Lnet/minecraft/class_127;Lnet/minecraft/class_127;)Z	method_446	hitEntity
+M	net/minecraft/class_124	method_447	(Lnet/minecraft/class_57;)I	method_447	getDamageVsEntity
+M	net/minecraft/class_124	method_448	()Z	method_448	isFull3D
+M	net/minecraft/class_124	method_450	(Lnet/minecraft/class_17;)Z	method_450	canHarvestBlock
+M	net/minecraft/class_124	method_451	(Lnet/minecraft/class_31;Lnet/minecraft/class_18;Lnet/minecraft/class_54;)Lnet/minecraft/class_31;	method_451	onItemRightClick
+M	net/minecraft/class_124	method_452	(II)Lnet/minecraft/class_124;	method_452	setIconCoord
+M	net/minecraft/class_124	method_453	(Lnet/minecraft/class_124;)Lnet/minecraft/class_124;	method_453	setContainerItem
+M	net/minecraft/class_124	method_454	(Lnet/minecraft/class_31;Lnet/minecraft/class_18;Lnet/minecraft/class_57;IZ)V	method_454	onUpdate
+M	net/minecraft/class_124	method_456	(Ljava/lang/String;)Lnet/minecraft/class_124;	method_456	setItemName
+M	net/minecraft/class_124	method_457	(Z)Lnet/minecraft/class_124;	method_457	setHasSubtypes
+M	net/minecraft/class_124	method_458	(I)Lnet/minecraft/class_124;	method_458	setIconIndex
+M	net/minecraft/class_124	method_459	()I	method_459	getItemStackLimit
+M	net/minecraft/class_124	method_460	(I)Lnet/minecraft/class_124;	method_460	setMaxStackSize
+M	net/minecraft/class_124	method_461	(Lnet/minecraft/class_31;Lnet/minecraft/class_18;Lnet/minecraft/class_54;)V	method_461	onCreated
+M	net/minecraft/class_124	method_462	()Z	method_462	getHasSubtypes
+M	net/minecraft/class_124	method_463	(I)Lnet/minecraft/class_124;	method_463	setMaxDamage
+M	net/minecraft/class_124	method_464	()I	method_464	getMaxDamage
+M	net/minecraft/class_124	method_466	()Lnet/minecraft/class_124;	method_466	setFull3D
+M	net/minecraft/class_124	method_467	()Lnet/minecraft/class_124;	method_467	getContainerItem
+M	net/minecraft/class_124	method_469	()Ljava/lang/String;	method_469	getStatName
+M	net/minecraft/class_133	method_472	()Lnet/minecraft/class_31;	method_472	getStack
+M	net/minecraft/class_133	method_473	(I)Lnet/minecraft/class_31;	method_473	decrStackSize
+M	net/minecraft/class_133	method_476	()Z	method_476	getHasStack
+M	net/minecraft/class_133	method_477	(Lnet/minecraft/class_31;)Z	method_477	isItemValid
+M	net/minecraft/class_133	method_478	()V	method_478	onSlotChanged
+M	net/minecraft/class_133	method_479	(Lnet/minecraft/class_31;)V	method_479	putStack
+M	net/minecraft/class_133	method_480	()I	method_480	getSlotStackLimit
+M	net/minecraft/class_54	method_486	(Lnet/minecraft/class_134;)V	method_486	displayGUIChest
+M	net/minecraft/class_54	method_490	(Ljava/lang/String;)V	method_490	addChatMessage
+M	net/minecraft/class_54	method_493	()V	method_493	closeScreen
+M	net/minecraft/class_54	method_502	()Lnet/minecraft/class_31;	method_502	getCurrentEquippedItem
+M	net/minecraft/class_54	method_514	(Lnet/minecraft/class_17;)Z	method_514	canHarvestBlock
+M	net/minecraft/class_53	method_523	()V	method_523	saveAllData
+M	net/minecraft/class_53	method_526	(Ljava/lang/String;)I	method_526	getUniqueDataId
+M	net/minecraft/class_148	method_538	()Lnet/minecraft/class_148;	method_538	getInstance
+M	net/minecraft/class_148	method_539	(Lnet/minecraft/class_31;[Ljava/lang/Object;)V	method_539	addRecipe
+M	net/minecraft/class_148	method_541	()Ljava/util/List;	method_541	getRecipeList
+M	net/minecraft/class_148	method_542	(Lnet/minecraft/class_31;[Ljava/lang/Object;)V	method_542	addShapelessRecipe
+M	net/minecraft/class_58	method_544	()V	method_544	markDirty
+M	net/minecraft/class_58	method_545	(Lnet/minecraft/class_8;)V	method_545	readFromNBT
+M	net/minecraft/class_58	method_546	(Z)V	method_546	setDirty
+M	net/minecraft/class_58	method_547	()Z	method_547	isDirty
+M	net/minecraft/class_58	method_548	(Lnet/minecraft/class_8;)V	method_548	writeToNBT
+M	net/minecraft/class_189	method_642	(D)F	method_642	sqrt_double
+M	net/minecraft/class_189	method_643	(DD)D	method_643	abs_max
+M	net/minecraft/class_189	method_644	(F)F	method_644	sin
+M	net/minecraft/class_189	method_645	(D)I	method_645	floor_double
+M	net/minecraft/class_189	method_646	(F)F	method_646	cos
+M	net/minecraft/class_189	method_647	(F)F	method_647	sqrt_float
+M	net/minecraft/class_189	method_648	(F)I	method_648	floor_float
+M	net/minecraft/class_189	method_649	(F)F	method_649	abs
+M	net/minecraft/class_189	method_650	(II)I	method_650	bucketInt
+M	net/minecraft/class_136	method_671	(Lnet/minecraft/class_31;)Z	method_671	addItemStackToInventory
+M	net/minecraft/class_136	method_672	(Lnet/minecraft/class_57;)I	method_672	getDamageVsEntity
+M	net/minecraft/class_136	method_675	()Lnet/minecraft/class_31;	method_675	getCurrentItem
+M	net/minecraft/class_136	method_676	(I)Z	method_676	consumeInventoryItem
+M	net/minecraft/class_136	method_677	(Lnet/minecraft/class_31;)V	method_677	setItemStack
+M	net/minecraft/class_136	method_679	(Lnet/minecraft/class_17;)Z	method_679	canHarvestBlock
+M	net/minecraft/class_136	method_687	()I	method_687	getTotalArmorValue
+M	net/minecraft/class_136	method_689	()Lnet/minecraft/class_31;	method_689	getItemStack
+M	net/minecraft/class_136	method_690	()I	method_690	getFirstEmptyStack
+M	net/minecraft/class_136	method_693	(I)Lnet/minecraft/class_31;	method_693	armorItemInSlot
+M	net/minecraft/class_31	method_694	()Lnet/minecraft/class_124;	method_694	getItem
+M	net/minecraft/class_31	method_695	(I)Lnet/minecraft/class_31;	method_695	splitStack
+M	net/minecraft/class_31	method_702	(Lnet/minecraft/class_31;)Z	method_702	isItemEqual
+M	net/minecraft/class_31	method_706	(Lnet/minecraft/class_8;)Lnet/minecraft/class_8;	method_706	writeToNBT
+M	net/minecraft/class_31	method_707	(Lnet/minecraft/class_57;)I	method_707	getDamageVsEntity
+M	net/minecraft/class_31	method_709	()I	method_709	getMaxStackSize
+M	net/minecraft/class_31	method_710	(I)V	method_710	setItemDamage
+M	net/minecraft/class_31	method_713	(Lnet/minecraft/class_8;)V	method_713	readFromNBT
+M	net/minecraft/class_31	method_714	(Lnet/minecraft/class_17;)Z	method_714	canHarvestBlock
+M	net/minecraft/class_31	method_715	()Z	method_715	isStackable
+M	net/minecraft/class_31	method_719	()Z	method_719	getHasSubtypes
+M	net/minecraft/class_31	method_722	()I	method_722	getItemDamage
+M	net/minecraft/class_31	method_723	()I	method_723	getMaxDamage
+M	net/minecraft/class_31	method_724	()Lnet/minecraft/class_31;	method_724	copy
+M	net/minecraft/class_31	method_726	()Ljava/lang/String;	method_726	getItemName
+M	net/minecraft/class_206	method_731	(Ljava/lang/Class;Ljava/lang/String;I)V	method_731	addMapping
+M	net/minecraft/class_206	method_733	(Lnet/minecraft/class_57;)I	method_733	getEntityID
+M	net/minecraft/class_206	method_734	(Lnet/minecraft/class_57;)Ljava/lang/String;	method_734	getEntityString
+M	net/minecraft/class_226	method_769	()Lnet/minecraft/class_18;	method_769	getWorld
+M	net/minecraft/class_153	method_789	(Lnet/minecraft/class_238;)Ljava/util/List;	method_789	getSpawnableList
+M	net/minecraft/class_153	method_790	(Ljava/lang/String;)Lnet/minecraft/class_153;	method_790	setBiomeName
+M	net/minecraft/class_153	method_791	()Lnet/minecraft/class_153;	method_791	setEnableSnow
+M	net/minecraft/class_153	method_792	(I)Lnet/minecraft/class_153;	method_792	setColor
+M	net/minecraft/class_153	method_793	()Z	method_793	getEnableSnow
+M	net/minecraft/class_153	method_794	()Z	method_794	canSpawnLightningBolt
+M	net/minecraft/class_153	method_795	()Lnet/minecraft/class_153;	method_795	setDisableRain
+M	net/minecraft/class_245	method_815	(Lnet/minecraft/class_173;)V	method_815	setRenderPassModel
+M	net/minecraft/class_43	method_874	(II)I	method_874	getHeightValue
+M	net/minecraft/class_43	method_875	(III)I	method_875	getBlockMetadata
+M	net/minecraft/class_43	method_879	(III)Z	method_879	canBlockSeeTheSky
+M	net/minecraft/class_15	method_905	()Z	method_905	isSolid
+M	net/minecraft/class_127	method_909	()Lnet/minecraft/class_31;	method_909	getHeldItem
+M	net/minecraft/class_127	method_911	()Ljava/lang/String;	method_911	getLivingSound
+M	net/minecraft/class_127	method_912	()Ljava/lang/String;	method_912	getHurtSound
+M	net/minecraft/class_127	method_913	()Ljava/lang/String;	method_913	getDeathSound
+M	net/minecraft/class_127	method_914	()I	method_914	getDropItemId
+M	net/minecraft/class_127	method_915	()F	method_915	getSoundVolume
+M	net/minecraft/class_127	method_936	()I	method_936	getTalkInterval
+M	net/minecraft/class_127	method_939	(I)V	method_939	heal
+M	net/minecraft/class_127	method_940	()Z	method_940	canDespawn
+M	net/minecraft/class_127	method_943	()Z	method_943	isPlayerSleeping
+M	net/minecraft/class_134	method_947	()V	method_947	onInventoryChanged
+M	net/minecraft/class_134	method_948	()I	method_948	getSizeInventory
+M	net/minecraft/class_134	method_949	(II)Lnet/minecraft/class_31;	method_949	decrStackSize
+M	net/minecraft/class_134	method_950	(ILnet/minecraft/class_31;)V	method_950	setInventorySlotContents
+M	net/minecraft/class_134	method_951	(Lnet/minecraft/class_54;)Z	method_951	canInteractWith
+M	net/minecraft/class_134	method_952	()Ljava/lang/String;	method_952	getInvName
+M	net/minecraft/class_134	method_953	()I	method_953	getInventoryStackLimit
+M	net/minecraft/class_134	method_954	(I)Lnet/minecraft/class_31;	method_954	getStackInSlot
+M	net/minecraft/class_300	method_992	()Lnet/minecraft/class_300;	method_992	getInstance
+M	net/minecraft/class_300	method_993	(Ljava/lang/String;)Ljava/lang/String;	method_993	translateKey
+M	net/minecraft/class_300	method_994	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	method_994	translateKeyFormat
+M	net/minecraft/class_300	method_995	(Ljava/lang/String;)Ljava/lang/String;	method_995	translateNamedKey
+M	net/minecraft/class_8	method_1012	(Ljava/lang/String;B)V	method_1012	setByte
+M	net/minecraft/class_8	method_1013	(Ljava/lang/String;D)V	method_1013	setDouble
+M	net/minecraft/class_8	method_1014	(Ljava/lang/String;F)V	method_1014	setFloat
+M	net/minecraft/class_8	method_1015	(Ljava/lang/String;I)V	method_1015	setInteger
+M	net/minecraft/class_8	method_1016	(Ljava/lang/String;J)V	method_1016	setLong
+M	net/minecraft/class_8	method_1017	(Ljava/lang/String;Lnet/minecraft/class_187;)V	method_1017	setTag
+M	net/minecraft/class_8	method_1018	(Ljava/lang/String;Lnet/minecraft/class_8;)V	method_1018	setCompoundTag
+M	net/minecraft/class_8	method_1019	(Ljava/lang/String;Ljava/lang/String;)V	method_1019	setString
+M	net/minecraft/class_8	method_1020	(Ljava/lang/String;S)V	method_1020	setShort
+M	net/minecraft/class_8	method_1021	(Ljava/lang/String;Z)V	method_1021	setBoolean
+M	net/minecraft/class_8	method_1022	(Ljava/lang/String;[B)V	method_1022	setByteArray
+M	net/minecraft/class_8	method_1023	(Ljava/lang/String;)Z	method_1023	hasKey
+M	net/minecraft/class_8	method_1025	(Ljava/lang/String;)B	method_1025	getByte
+M	net/minecraft/class_8	method_1026	(Ljava/lang/String;)S	method_1026	getShort
+M	net/minecraft/class_8	method_1027	(Ljava/lang/String;)I	method_1027	getInteger
+M	net/minecraft/class_8	method_1028	(Ljava/lang/String;)J	method_1028	getLong
+M	net/minecraft/class_8	method_1029	(Ljava/lang/String;)F	method_1029	getFloat
+M	net/minecraft/class_8	method_1030	(Ljava/lang/String;)D	method_1030	getDouble
+M	net/minecraft/class_8	method_1031	(Ljava/lang/String;)Ljava/lang/String;	method_1031	getString
+M	net/minecraft/class_8	method_1032	(Ljava/lang/String;)[B	method_1032	getByteArray
+M	net/minecraft/class_8	method_1033	(Ljava/lang/String;)Lnet/minecraft/class_8;	method_1033	getCompoundTag
+M	net/minecraft/class_8	method_1034	(Ljava/lang/String;)Lnet/minecraft/class_202;	method_1034	getTagList
+M	net/minecraft/class_8	method_1035	(Ljava/lang/String;)Z	method_1035	getBoolean
+M	net/minecraft/class_24	method_1043	()Ljava/lang/String;	method_1043	getDescription
+M	net/minecraft/class_55	method_1067	(Ljava/lang/Class;Ljava/lang/String;)V	method_1067	addMapping
+M	net/minecraft/class_55	method_1068	(Lnet/minecraft/class_8;)Lnet/minecraft/class_55;	method_1068	createAndLoadEntity
+M	net/minecraft/class_55	method_1069	()I	method_1069	getBlockMetadata
+M	net/minecraft/class_55	method_1074	(DDD)D	method_1074	getDistanceFrom
+M	net/minecraft/class_55	method_1075	()Lnet/minecraft/class_17;	method_1075	getBlockType
+M	net/minecraft/class_55	method_1076	()V	method_1076	updateEntity
+M	net/minecraft/class_55	method_1077	(Lnet/minecraft/class_8;)V	method_1077	readFromNBT
+M	net/minecraft/class_55	method_1078	(Lnet/minecraft/class_8;)V	method_1078	writeToNBT
+M	net/minecraft/class_76	method_1093	(Ljava/lang/String;Ljava/lang/String;)I	method_1093	getTextureForDownloadableImage
+M	net/minecraft/class_76	method_1097	(I)V	method_1097	bindTexture
+M	net/minecraft/class_76	method_1100	(Ljava/lang/String;)I	method_1100	getTexture
+M	net/minecraft/class_239	method_1142	(Lnet/minecraft/class_18;Ljava/util/Random;III)Z	method_1142	generate
+M	net/minecraft/class_59	method_1153	(Ljava/lang/String;DDDDDD)V	method_1153	spawnParticle
+M	net/minecraft/class_33	method_1185	(II)V	method_1185	mouseReleased
+M	net/minecraft/class_33	method_1186	(Lnet/minecraft/client/Minecraft;II)V	method_1186	drawButton
+M	net/minecraft/class_33	method_1187	(Z)I	method_1187	getHoverState
+M	net/minecraft/class_33	method_1188	(Lnet/minecraft/client/Minecraft;II)V	method_1188	mouseDragged
+M	net/minecraft/class_33	method_1189	(Lnet/minecraft/client/Minecraft;II)Z	method_1189	mousePressed
+M	net/minecraft/class_173	method_1209	(Lnet/minecraft/class_127;FFF)V	method_1209	setLivingAnimations
+M	net/minecraft/class_173	method_1210	(FFFFFF)V	method_1210	setRotationAngles
+M	net/minecraft/class_173	method_1211	(FFFFFF)V	method_1211	render
+M	net/minecraft/class_97	method_1256	(IIF)V	method_1256	drawScreen
+M	net/minecraft/class_97	method_1259	(Lnet/minecraft/class_33;)V	method_1259	actionPerformed
+M	net/minecraft/class_138	method_1281	()Z	method_1281	isBurning
+M	net/minecraft/class_26	method_1292	()V	method_1292	initialize
+M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
+M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
+M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
+M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
+M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet
+M	net/minecraft/class_57	method_1334	()Z	method_1334	isInWater
+M	net/minecraft/class_57	method_1340	(DDD)V	method_1340	setPosition
+M	net/minecraft/class_57	method_1341	(DDDFF)V	method_1341	setLocationAndAngles
+M	net/minecraft/class_57	method_1342	(FF)V	method_1342	setRotation
+M	net/minecraft/class_57	method_1346	(Lnet/minecraft/class_8;)V	method_1346	writeToNBT
+M	net/minecraft/class_57	method_1348	(Lnet/minecraft/class_8;)V	method_1348	readFromNBT
+M	net/minecraft/class_57	method_1350	(DDD)D	method_1350	getDistance
+M	net/minecraft/class_57	method_1351	(Lnet/minecraft/class_57;)F	method_1351	getDistanceToEntity
+M	net/minecraft/class_57	method_1359	()Z	method_1359	isBurning
+M	net/minecraft/class_57	method_1373	()Z	method_1373	isSneaking
+M	net/minecraft/class_57	method_1378	()F	method_1378	getEyeHeight
+M	net/minecraft/class_202	method_1396	(I)Lnet/minecraft/class_187;	method_1396	tagAt
+M	net/minecraft/class_202	method_1398	()I	method_1398	tagCount
+M	net/minecraft/class_428	method_1417	()I	method_1417	getMaxUses
+M	net/minecraft/class_428	method_1418	()F	method_1418	getEfficiencyOnProperMaterial
+M	net/minecraft/class_428	method_1419	()I	method_1419	getDamageVsEntity
+M	net/minecraft/class_428	method_1420	()I	method_1420	getHarvestLevel
+M	net/minecraft/class_92	method_1487	(Lnet/minecraft/class_34;Lnet/minecraft/class_76;Lnet/minecraft/class_31;II)V	method_1487	renderItemIntoGUI
+M	net/minecraft/class_92	method_1488	(Lnet/minecraft/class_34;Lnet/minecraft/class_76;Lnet/minecraft/class_31;II)V	method_1488	renderItemOverlayIntoGUI
+M	net/minecraft/class_216	method_1501	(I)B	method_1501	getWatchableObjectByte
+M	net/minecraft/class_216	method_1502	(ILjava/lang/Object;)V	method_1502	addObject
+M	net/minecraft/class_216	method_1508	(I)I	method_1508	getWatchableObjectInt
+M	net/minecraft/class_216	method_1509	(ILjava/lang/Object;)V	method_1509	updateObject
+M	net/minecraft/class_216	method_1510	(I)Ljava/lang/String;	method_1510	getWatchableObjectString
+M	net/minecraft/class_17	method_1560	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1560	onEntityWalking
+M	net/minecraft/class_17	method_1565	()I	method_1565	tickRate
+M	net/minecraft/class_17	method_1567	(Lnet/minecraft/class_18;III)Z	method_1567	canPlaceBlockAt
+M	net/minecraft/class_17	method_1574	()I	method_1574	getMobilityFlag
+M	net/minecraft/class_17	method_1576	()Z	method_1576	isCollidable
+M	net/minecraft/class_17	method_1577	(F)Lnet/minecraft/class_17;	method_1577	setLightValue
+M	net/minecraft/class_17	method_1578	(FFFFFF)V	method_1578	setBlockBounds
+M	net/minecraft/class_17	method_1580	(Lnet/minecraft/class_475;)Lnet/minecraft/class_17;	method_1580	setStepSound
+M	net/minecraft/class_17	method_1581	(Lnet/minecraft/class_18;IIILnet/minecraft/class_31;)V	method_1581	dropBlockAsItem_do
+M	net/minecraft/class_17	method_1583	(Ljava/lang/String;)Lnet/minecraft/class_17;	method_1583	setBlockName
+M	net/minecraft/class_17	method_1585	(F)Lnet/minecraft/class_17;	method_1585	setResistance
+M	net/minecraft/class_17	method_1587	(F)Lnet/minecraft/class_17;	method_1587	setHardness
+M	net/minecraft/class_17	method_1589	(I)I	method_1589	getRenderColor
+M	net/minecraft/class_17	method_1590	(I)Lnet/minecraft/class_17;	method_1590	setLightOpacity
+M	net/minecraft/class_17	method_1594	()Lnet/minecraft/class_17;	method_1594	setBlockUnbreakable
+M	net/minecraft/class_17	method_1595	()F	method_1595	getHardness
+M	net/minecraft/class_17	method_1596	()Ljava/lang/String;	method_1596	translateBlockName
+M	net/minecraft/class_17	method_1597	()Ljava/lang/String;	method_1597	getBlockName
+M	net/minecraft/class_17	method_1598	()Z	method_1598	getEnableStats
+M	net/minecraft/class_17	method_1599	()Lnet/minecraft/class_17;	method_1599	disableStats
+M	net/minecraft/class_17	method_1600	(Lnet/minecraft/class_14;III)I	method_1600	colorMultiplier
+M	net/minecraft/class_17	method_1602	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1602	updateTick
+M	net/minecraft/class_17	method_1603	(Ljava/util/Random;)I	method_1603	quantityDropped
+M	net/minecraft/class_17	method_1605	()V	method_1605	setBlockBoundsForItemRender
+M	net/minecraft/class_17	method_1607	(I)I	method_1607	getBlockTextureFromSide
+M	net/minecraft/class_17	method_1609	(Lnet/minecraft/class_18;IIII)V	method_1609	onNeighborBlockChange
+M	net/minecraft/class_17	method_1610	(Lnet/minecraft/class_18;IIILnet/minecraft/class_54;)V	method_1610	onBlockClicked
+M	net/minecraft/class_17	method_1611	(Lnet/minecraft/class_18;III)V	method_1611	onBlockAdded
+M	net/minecraft/class_17	method_1612	(Lnet/minecraft/class_18;IIII)V	method_1612	onBlockDestroyedByPlayer
+M	net/minecraft/class_17	method_1615	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1615	onEntityCollidedWithBlock
+M	net/minecraft/class_17	method_1617	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1617	randomDisplayTick
+M	net/minecraft/class_17	method_1619	()I	method_1619	getRenderBlockPass
+M	net/minecraft/class_17	method_1620	()Z	method_1620	isOpaqueCube
+M	net/minecraft/class_17	method_1621	()I	method_1621	getRenderType
+M	net/minecraft/class_17	method_1623	()Z	method_1623	renderAsNormalBlock
+M	net/minecraft/class_17	method_1624	(Lnet/minecraft/class_18;III)Lnet/minecraft/class_25;	method_1624	getCollisionBoundingBoxFromPool
+M	net/minecraft/class_17	method_1626	(Lnet/minecraft/class_14;IIII)I	method_1626	getBlockTexture
+M	net/minecraft/class_17	method_1627	(II)I	method_1627	getBlockTextureFromSideAndMetadata
+M	net/minecraft/class_17	method_1628	(Lnet/minecraft/class_18;Lnet/minecraft/class_54;IIII)V	method_1628	harvestBlock
+M	net/minecraft/class_17	method_1629	(I)I	method_1629	damageDropped
+M	net/minecraft/class_52	method_1734	(Lnet/minecraft/class_50;)Lnet/minecraft/class_243;	method_1734	getChunkLoader
+M	net/minecraft/class_14	method_1776	(III)I	method_1776	getBlockId
+M	net/minecraft/class_14	method_1777	(III)Lnet/minecraft/class_55;	method_1777	getBlockTileEntity
+M	net/minecraft/class_14	method_1778	(III)I	method_1778	getBlockMetadata
+M	net/minecraft/class_14	method_1779	(III)Lnet/minecraft/class_15;	method_1779	getBlockMaterial
+M	net/minecraft/class_163	method_1815	(F)V	method_1815	render
+M	net/minecraft/class_163	method_1816	(FFF)V	method_1816	setRotationPoint
+M	net/minecraft/class_163	method_1817	(FFFIII)V	method_1817	addBox
+M	net/minecraft/class_163	method_1818	(FFFIIIF)V	method_1818	addBox
+M	net/minecraft/class_163	method_1819	(F)V	method_1819	renderWithRotation
+M	net/minecraft/class_163	method_1820	(F)V	method_1820	postRender
+M	net/minecraft/class_554	method_1835	()I	method_1835	getHealAmount
+M	net/minecraft/class_181	method_1876	()Ljava/lang/String;	method_1876	getText
+M	net/minecraft/class_181	method_1878	(I)V	method_1878	setMaxStringLength
+M	net/minecraft/class_181	method_1879	(III)V	method_1879	mouseClicked
+M	net/minecraft/class_181	method_1880	(Ljava/lang/String;)V	method_1880	setText
+M	net/minecraft/class_181	method_1881	(Z)V	method_1881	setFocused
+M	net/minecraft/class_181	method_1882	()V	method_1882	updateCursorCounter
+M	net/minecraft/class_181	method_1883	()V	method_1883	drawTextBox
+M	net/minecraft/class_34	method_1901	(Ljava/lang/String;)I	method_1901	getStringWidth
+M	net/minecraft/class_583	method_1927	()V	method_1927	disableStandardItemLighting
+M	net/minecraft/class_583	method_1930	()V	method_1930	enableStandardItemLighting
+M	net/minecraft/class_584	method_1932	(IIIII)V	method_1932	drawRect
+M	net/minecraft/class_584	method_1933	(IIIIII)V	method_1933	drawGradientRect
+M	net/minecraft/class_584	method_1934	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1934	drawCenteredString
+M	net/minecraft/class_584	method_1936	(IIIIII)V	method_1936	drawTexturedModalRect
+M	net/minecraft/class_584	method_1937	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1937	drawString
+M	net/minecraft/class_588	method_1949	(Ljava/lang/String;)V	method_1949	addChatMessage
+M	net/minecraft/class_591	method_1958	()Ljava/lang/String;	method_1958	getDisplayName
+M	net/minecraft/class_475	method_1976	()F	method_1976	getVolume
+M	net/minecraft/class_475	method_1977	()F	method_1977	getPitch
+M	net/minecraft/class_68	method_2006	(DDD)V	method_2006	setPosition
+M	net/minecraft/class_579	method_2022	(Lnet/minecraft/class_57;DDDFF)V	method_2022	doRender
+M	net/minecraft/class_579	method_2026	(Ljava/lang/String;)V	method_2026	loadTexture
+M	net/minecraft/class_579	method_2029	(Lnet/minecraft/class_578;)V	method_2029	setRenderManager
+M	net/minecraft/class_629	method_2049	(Ljava/lang/String;)Ljava/lang/String;	method_2049	translateToLocal
+M	net/minecraft/class_629	method_2050	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	method_2050	translateToLocalFormatted
+M	net/minecraft/class_160	method_2071	()I	method_2071	getRecipeSize
+M	net/minecraft/class_160	method_2073	()Lnet/minecraft/class_31;	method_2073	getRecipeOutput
+M	net/minecraft/class_71	method_2084	(I)Lnet/minecraft/class_133;	method_2084	getSlot
+M	net/minecraft/class_71	method_2086	(I)Lnet/minecraft/class_31;	method_2086	getStackInSlot
+M	net/minecraft/class_71	method_2087	(Lnet/minecraft/class_54;)V	method_2087	onCraftGuiClosed
+M	net/minecraft/class_71	method_2088	(Lnet/minecraft/class_134;)V	method_2088	onCraftMatrixChanged
+M	net/minecraft/class_71	method_2089	(ILnet/minecraft/class_31;)V	method_2089	putStackInSlot
+S	net/minecraft/class_24	net/minecraft/class_139	
+S	net/minecraft/class_100	net/minecraft/class_153	
+S	net/minecraft/class_368	net/minecraft/class_153	
+S	net/minecraft/class_422	net/minecraft/class_153	
+S	net/minecraft/class_547	net/minecraft/class_153	
+S	net/minecraft/class_399	net/minecraft/class_153	
+S	net/minecraft/class_424	net/minecraft/class_153	
+S	net/minecraft/class_164	net/minecraft/class_153	
+S	net/minecraft/class_485	net/minecraft/class_17	
+S	net/minecraft/class_149	net/minecraft/class_17	
+S	net/minecraft/class_221	net/minecraft/class_17	
+S	net/minecraft/class_323	net/minecraft/class_17	
+S	net/minecraft/class_329	net/minecraft/class_17	
+S	net/minecraft/class_463	net/minecraft/class_17	
+S	net/minecraft/class_110	net/minecraft/class_395	
+S	net/minecraft/class_400	net/minecraft/class_17	
+S	net/minecraft/class_3	net/minecraft/class_17	
+S	net/minecraft/class_395	net/minecraft/class_17	
+S	net/minecraft/class_301	net/minecraft/class_473	
+S	net/minecraft/class_204	net/minecraft/class_473	
+S	net/minecraft/class_342	net/minecraft/class_16	
+S	net/minecraft/class_332	net/minecraft/class_17	
+S	net/minecraft/class_526	net/minecraft/class_395	
+S	net/minecraft/class_252	net/minecraft/class_17	
+S	net/minecraft/class_492	net/minecraft/class_17	
+S	net/minecraft/class_229	net/minecraft/class_17	
+S	net/minecraft/class_474	net/minecraft/class_17	
+S	net/minecraft/class_473	net/minecraft/class_17	
+S	net/minecraft/class_327	net/minecraft/class_385	
+S	net/minecraft/class_385	net/minecraft/class_17	
+S	net/minecraft/class_421	net/minecraft/class_395	
+S	net/minecraft/class_78	net/minecraft/class_221	
+S	net/minecraft/class_265	net/minecraft/class_17	
+S	net/minecraft/class_476	net/minecraft/class_17	
+S	net/minecraft/class_297	net/minecraft/class_123	
+S	net/minecraft/class_302	net/minecraft/class_221	
+S	net/minecraft/class_88	net/minecraft/class_395	
+S	net/minecraft/class_627	net/minecraft/class_17	
+S	net/minecraft/class_299	net/minecraft/class_307	
+S	net/minecraft/class_307	net/minecraft/class_17	
+S	net/minecraft/class_530	net/minecraft/class_17	
+S	net/minecraft/class_244	net/minecraft/class_17	
+S	net/minecraft/class_487	net/minecraft/class_17	
+S	net/minecraft/class_620	net/minecraft/class_395	
+S	net/minecraft/class_429	net/minecraft/class_473	
+S	net/minecraft/class_544	net/minecraft/class_17	
+S	net/minecraft/class_348	net/minecraft/class_395	
+S	net/minecraft/class_48	net/minecraft/class_21	
+S	net/minecraft/class_291	net/minecraft/class_17	
+S	net/minecraft/class_324	net/minecraft/class_17	
+S	net/minecraft/class_223	net/minecraft/class_17	
+S	net/minecraft/class_205	net/minecraft/class_17	
+S	net/minecraft/class_469	net/minecraft/class_395	
+S	net/minecraft/class_207	net/minecraft/class_221	
+S	net/minecraft/class_457	net/minecraft/class_17	
+S	net/minecraft/class_49	net/minecraft/class_17	
+S	net/minecraft/class_16	net/minecraft/class_17	
+S	net/minecraft/class_396	net/minecraft/class_17	
+S	net/minecraft/class_510	net/minecraft/class_17	
+S	net/minecraft/class_619	net/minecraft/class_494	
+S	net/minecraft/class_408	net/minecraft/class_17	
+S	net/minecraft/class_376	net/minecraft/class_17	
+S	net/minecraft/class_123	net/minecraft/class_17	
+S	net/minecraft/class_370	net/minecraft/class_17	
+S	net/minecraft/class_154	net/minecraft/class_473	
+S	net/minecraft/class_460	net/minecraft/class_395	
+S	net/minecraft/class_224	net/minecraft/class_17	
+S	net/minecraft/class_606	net/minecraft/class_17	
+S	net/minecraft/class_316	net/minecraft/class_17	
+S	net/minecraft/class_523	net/minecraft/class_17	
+S	net/minecraft/class_416	net/minecraft/class_17	
+S	net/minecraft/class_315	net/minecraft/class_385	
+S	net/minecraft/class_553	net/minecraft/class_17	
+S	net/minecraft/class_21	net/minecraft/class_17	
+S	net/minecraft/class_132	net/minecraft/class_17	
+S	net/minecraft/class_392	net/minecraft/class_473	
+S	net/minecraft/class_494	net/minecraft/class_17	
+S	net/minecraft/class_328	net/minecraft/class_17	
+S	net/minecraft/class_383	net/minecraft/class_17	
+S	net/minecraft/class_74	net/minecraft/class_17	
+S	net/minecraft/class_598	net/minecraft/class_84	
+S	net/minecraft/class_506	net/minecraft/class_71	
+S	net/minecraft/class_407	net/minecraft/class_71	
+S	net/minecraft/class_337	net/minecraft/class_71	
+S	net/minecraft/class_277	net/minecraft/class_71	
+S	net/minecraft/class_196	net/minecraft/class_71	
+S	net/minecraft/class_255	net/minecraft/class_43	
+S	net/minecraft/class_258	net/minecraft/class_188	
+S	net/minecraft/class_410	net/minecraft/class_57	
+S	net/minecraft/class_113	net/minecraft/class_57	
+S	net/minecraft/class_5	net/minecraft/class_77	
+S	net/minecraft/class_313	net/minecraft/class_258	
+S	net/minecraft/class_580	net/minecraft/class_40	
+S	net/minecraft/class_466	net/minecraft/class_258	
+S	net/minecraft/class_188	net/minecraft/class_127	
+S	net/minecraft/class_114	net/minecraft/class_146	
+S	net/minecraft/class_563	net/minecraft/class_77	
+S	net/minecraft/class_499	net/minecraft/class_57	
+S	net/minecraft/class_248	net/minecraft/class_77	
+S	net/minecraft/class_77	net/minecraft/class_57	
+S	net/minecraft/class_226	net/minecraft/class_57	
+S	net/minecraft/class_372	net/minecraft/class_57	
+S	net/minecraft/class_135	net/minecraft/class_57	
+S	net/minecraft/class_566	net/minecraft/class_77	
+S	net/minecraft/class_511	net/minecraft/class_127	
+S	net/minecraft/class_227	net/minecraft/class_77	
+S	net/minecraft/class_364	net/minecraft/class_511	
+S	net/minecraft/class_311	net/minecraft/class_146	
+S	net/minecraft/class_362	net/minecraft/class_77	
+S	net/minecraft/class_142	net/minecraft/class_57	
+S	net/minecraft/class_178	net/minecraft/class_77	
+S	net/minecraft/class_411	net/minecraft/class_560	
+S	net/minecraft/class_127	net/minecraft/class_57	
+S	net/minecraft/class_549	net/minecraft/class_57	
+S	net/minecraft/class_146	net/minecraft/class_188	
+S	net/minecraft/class_20	net/minecraft/class_77	
+S	net/minecraft/class_614	net/minecraft/class_54	
+S	net/minecraft/class_107	net/minecraft/class_57	
+S	net/minecraft/class_143	net/minecraft/class_77	
+S	net/minecraft/class_443	net/minecraft/class_258	
+S	net/minecraft/class_535	net/minecraft/class_480	
+S	net/minecraft/class_54	net/minecraft/class_127	
+S	net/minecraft/class_40	net/minecraft/class_54	
+S	net/minecraft/class_518	net/minecraft/class_77	
+S	net/minecraft/class_604	net/minecraft/class_77	
+S	net/minecraft/class_306	net/minecraft/class_77	
+S	net/minecraft/class_613	net/minecraft/class_258	
+S	net/minecraft/class_90	net/minecraft/class_146	
+S	net/minecraft/class_451	net/minecraft/class_127	
+S	net/minecraft/class_528	net/minecraft/class_77	
+S	net/minecraft/class_610	net/minecraft/class_77	
+S	net/minecraft/class_461	net/minecraft/class_77	
+S	net/minecraft/class_484	net/minecraft/class_57	
+S	net/minecraft/class_558	net/minecraft/class_146	
+S	net/minecraft/class_575	net/minecraft/class_604	
+S	net/minecraft/class_151	net/minecraft/class_2	
+S	net/minecraft/class_365	net/minecraft/class_57	
+S	net/minecraft/class_2	net/minecraft/class_188	
+S	net/minecraft/class_560	net/minecraft/class_57	
+S	net/minecraft/class_121	net/minecraft/class_258	
+S	net/minecraft/class_480	net/minecraft/class_146	
+S	net/minecraft/class_594	net/minecraft/class_584	
+S	net/minecraft/class_609	net/minecraft/class_32	
+S	net/minecraft/class_33	net/minecraft/class_584	
+S	net/minecraft/class_211	net/minecraft/class_32	
+S	net/minecraft/class_264	net/minecraft/class_293	
+S	net/minecraft/class_562	net/minecraft/class_32	
+S	net/minecraft/class_158	net/minecraft/class_32	
+S	net/minecraft/class_595	net/minecraft/class_32	
+S	net/minecraft/class_293	net/minecraft/class_32	
+S	net/minecraft/class_587	net/minecraft/class_32	
+S	net/minecraft/class_516	net/minecraft/class_293	
+S	net/minecraft/class_180	net/minecraft/class_32	
+S	net/minecraft/class_235	net/minecraft/class_293	
+S	net/minecraft/class_218	net/minecraft/class_32	
+S	net/minecraft/class_615	net/minecraft/class_32	
+S	net/minecraft/class_603	net/minecraft/class_32	
+S	net/minecraft/class_524	net/minecraft/class_293	
+S	net/minecraft/class_630	net/minecraft/class_32	
+S	net/minecraft/class_588	net/minecraft/class_584	
+S	net/minecraft/class_525	net/minecraft/class_32	
+S	net/minecraft/class_585	net/minecraft/class_293	
+S	net/minecraft/class_197	net/minecraft/class_32	
+S	net/minecraft/class_412	net/minecraft/class_32	
+S	net/minecraft/class_635	net/minecraft/class_32	
+S	net/minecraft/class_35	net/minecraft/class_584	
+S	net/minecraft/class_341	net/minecraft/class_32	
+S	net/minecraft/class_32	net/minecraft/class_584	
+S	net/minecraft/class_568	net/minecraft/class_32	
+S	net/minecraft/class_222	net/minecraft/class_211	
+S	net/minecraft/class_597	net/minecraft/class_33	
+S	net/minecraft/class_91$class_99	net/minecraft/class_97	
+S	net/minecraft/class_91$class_95	net/minecraft/class_91$class_99	
+S	net/minecraft/class_91$class_93	net/minecraft/class_97	
+S	net/minecraft/class_91$class_94	net/minecraft/class_91$class_99	
+S	net/minecraft/class_465	net/minecraft/class_33	
+S	net/minecraft/class_91	net/minecraft/class_32	
+S	net/minecraft/class_181	net/minecraft/class_584	
+S	net/minecraft/class_194$class_195	net/minecraft/class_97	
+S	net/minecraft/class_194	net/minecraft/class_32	
+S	net/minecraft/class_625	net/minecraft/class_32	
+S	net/minecraft/class_486	net/minecraft/class_32	
+S	net/minecraft/class_568$class_569	net/minecraft/class_97	
+S	net/minecraft/class_565	net/minecraft/class_32	
+S	net/minecraft/class_500	net/minecraft/class_124	
+S	net/minecraft/class_420	net/minecraft/class_632	
+S	net/minecraft/class_261	net/minecraft/class_124	
+S	net/minecraft/class_533	net/minecraft/class_124	
+S	net/minecraft/class_483	net/minecraft/class_124	
+S	net/minecraft/class_367	net/minecraft/class_124	
+S	net/minecraft/class_220	net/minecraft/class_124	
+S	net/minecraft/class_278	net/minecraft/class_533	
+S	net/minecraft/class_397	net/minecraft/class_124	
+S	net/minecraft/class_355	net/minecraft/class_554	
+S	net/minecraft/class_177	net/minecraft/class_124	
+S	net/minecraft/class_242	net/minecraft/class_124	
+S	net/minecraft/class_280	net/minecraft/class_124	
+S	net/minecraft/class_607	net/minecraft/class_124	
+S	net/minecraft/class_539	net/minecraft/class_124	
+S	net/minecraft/class_554	net/minecraft/class_124	
+S	net/minecraft/class_249	net/minecraft/class_124	
+S	net/minecraft/class_479	net/minecraft/class_533	
+S	net/minecraft/class_129	net/minecraft/class_533	
+S	net/minecraft/class_125	net/minecraft/class_561	
+S	net/minecraft/class_561	net/minecraft/class_124	
+S	net/minecraft/class_381	net/minecraft/class_124	
+S	net/minecraft/class_551	net/minecraft/class_124	
+S	net/minecraft/class_116	net/minecraft/class_632	
+S	net/minecraft/class_361	net/minecraft/class_533	
+S	net/minecraft/class_449	net/minecraft/class_124	
+S	net/minecraft/class_183	net/minecraft/class_124	
+S	net/minecraft/class_262	net/minecraft/class_124	
+S	net/minecraft/class_401	net/minecraft/class_124	
+S	net/minecraft/class_286	net/minecraft/class_533	
+S	net/minecraft/class_380	net/minecraft/class_124	
+S	net/minecraft/class_126	net/minecraft/class_124	
+S	net/minecraft/class_482	net/minecraft/class_124	
+S	net/minecraft/class_19	net/minecraft/class_533	
+S	net/minecraft/class_626	net/minecraft/class_124	
+S	net/minecraft/class_495	net/minecraft/class_554	
+S	net/minecraft/class_501	net/minecraft/class_632	
+S	net/minecraft/class_352	net/minecraft/class_124	
+S	net/minecraft/class_632	net/minecraft/class_124	
+S	argo/jdom/JsonArray	argo/jdom/JsonRootNode	
+S	argo/jdom/JsonNodeSelectors$8	argo/jdom/LeafFunctor	
+S	argo/jdom/JsonConstants	argo/jdom/JsonNode	
+S	argo/jdom/JsonNodeSelectors$13	argo/jdom/LeafFunctor	
+S	argo/jdom/JsonNodeSelectors$12	argo/jdom/LeafFunctor	
+S	argo/jdom/JsonNodeDoesNotMatchChainedJsonNodeSelectorException	argo/jdom/JsonNodeDoesNotMatchJsonNodeSelectorException	
+S	argo/jdom/JsonNodeDoesNotMatchPathElementsException	argo/jdom/JsonNodeDoesNotMatchJsonNodeSelectorException	
+S	argo/jdom/JsonNumberNode	argo/jdom/JsonNode	
+S	argo/jdom/JsonObject	argo/jdom/JsonRootNode	
+S	argo/jdom/JsonNodeSelectors$10	argo/jdom/LeafFunctor	
+S	argo/jdom/JsonRootNode	argo/jdom/JsonNode	
+S	argo/jdom/JsonStringNode	argo/jdom/JsonNode	
+S	argo/jdom/JsonNodeSelectors$1	argo/jdom/LeafFunctor	
+S	net/minecraft/class_198	net/minecraft/class_58	
+S	net/minecraft/class_415	net/minecraft/class_105	
+S	net/minecraft/class_344	net/minecraft/class_105	
+S	net/minecraft/class_406	net/minecraft/class_15	
+S	net/minecraft/class_541	net/minecraft/class_15	
+S	net/minecraft/class_333	net/minecraft/class_15	
+S	net/minecraft/class_263	net/minecraft/class_15	
+S	net/minecraft/class_87	net/minecraft/class_173	
+S	net/minecraft/class_162	net/minecraft/class_173	
+S	net/minecraft/class_577	net/minecraft/class_173	
+S	net/minecraft/class_256	net/minecraft/class_491	
+S	net/minecraft/class_304	net/minecraft/class_173	
+S	net/minecraft/class_409	net/minecraft/class_173	
+S	net/minecraft/class_496	net/minecraft/class_173	
+S	net/minecraft/class_122	net/minecraft/class_491	
+S	net/minecraft/class_491	net/minecraft/class_173	
+S	net/minecraft/class_112	net/minecraft/class_491	
+S	net/minecraft/class_464	net/minecraft/class_491	
+S	net/minecraft/class_398	net/minecraft/class_128	
+S	net/minecraft/class_493	net/minecraft/class_173	
+S	net/minecraft/class_571	net/minecraft/class_173	
+S	net/minecraft/class_600	net/minecraft/class_173	
+S	net/minecraft/class_503	net/minecraft/class_173	
+S	net/minecraft/class_128	net/minecraft/class_87	
+S	net/minecraft/class_413	net/minecraft/class_41	
+S	net/minecraft/class_360	net/minecraft/class_187	
+S	net/minecraft/class_165	net/minecraft/class_187	
+S	net/minecraft/class_8	net/minecraft/class_187	
+S	net/minecraft/class_419	net/minecraft/class_187	
+S	net/minecraft/class_253	net/minecraft/class_187	
+S	net/minecraft/class_358	net/minecraft/class_187	
+S	net/minecraft/class_347	net/minecraft/class_187	
+S	net/minecraft/class_202	net/minecraft/class_187	
+S	net/minecraft/class_273	net/minecraft/class_187	
+S	net/minecraft/class_462	net/minecraft/class_187	
+S	net/minecraft/class_522	net/minecraft/class_187	
+S	net/minecraft/class_219	net/minecraft/class_240	
+S	net/minecraft/class_209	net/minecraft/class_621	
+S	net/minecraft/class_458	net/minecraft/class_621	
+S	net/minecraft/class_369	net/minecraft/class_621	
+S	net/minecraft/class_268	net/minecraft/class_169	
+S	net/minecraft/class_201	net/minecraft/class_169	
+S	net/minecraft/class_276	net/minecraft/class_169	
+S	net/minecraft/class_363	net/minecraft/class_169	
+S	net/minecraft/class_171	net/minecraft/class_169	
+S	net/minecraft/class_236	net/minecraft/class_169	
+S	net/minecraft/class_292	net/minecraft/class_169	
+S	net/minecraft/class_325	net/minecraft/class_169	
+S	net/minecraft/class_184	net/minecraft/class_169	
+S	net/minecraft/class_64	net/minecraft/class_184	
+S	net/minecraft/class_489	net/minecraft/class_184	
+S	net/minecraft/class_432	net/minecraft/class_169	
+S	net/minecraft/class_161	net/minecraft/class_169	
+S	net/minecraft/class_37	net/minecraft/class_184	
+S	net/minecraft/class_228	net/minecraft/class_169	
+S	net/minecraft/class_145	net/minecraft/class_169	
+S	net/minecraft/class_170	net/minecraft/class_169	
+S	net/minecraft/class_234	net/minecraft/class_169	
+S	net/minecraft/class_305	net/minecraft/class_169	
+S	net/minecraft/class_431	net/minecraft/class_169	
+S	net/minecraft/class_118	net/minecraft/class_169	
+S	net/minecraft/class_319	net/minecraft/class_169	
+S	net/minecraft/class_272	net/minecraft/class_169	
+S	net/minecraft/class_295	net/minecraft/class_169	
+S	net/minecraft/class_435	net/minecraft/class_169	
+S	net/minecraft/class_414	net/minecraft/class_169	
+S	net/minecraft/class_215	net/minecraft/class_169	
+S	net/minecraft/class_433	net/minecraft/class_169	
+S	net/minecraft/class_439	net/minecraft/class_169	
+S	net/minecraft/class_357	net/minecraft/class_169	
+S	net/minecraft/class_119	net/minecraft/class_169	
+S	net/minecraft/class_394	net/minecraft/class_169	
+S	net/minecraft/class_281	net/minecraft/class_169	
+S	net/minecraft/class_437	net/minecraft/class_169	
+S	net/minecraft/class_418	net/minecraft/class_437	
+S	net/minecraft/class_402	net/minecraft/class_437	
+S	net/minecraft/class_350	net/minecraft/class_437	
+S	net/minecraft/class_374	net/minecraft/class_169	
+S	net/minecraft/class_210	net/minecraft/class_169	
+S	net/minecraft/class_308	net/minecraft/class_169	
+S	net/minecraft/class_340	net/minecraft/class_169	
+S	net/minecraft/class_438	net/minecraft/class_169	
+S	net/minecraft/class_156	net/minecraft/class_169	
+S	net/minecraft/class_403	net/minecraft/class_169	
+S	net/minecraft/class_6	net/minecraft/class_169	
+S	net/minecraft/class_441	net/minecraft/class_169	
+S	net/minecraft/class_436	net/minecraft/class_169	
+S	net/minecraft/class_440	net/minecraft/class_169	
+S	net/minecraft/class_393	net/minecraft/class_169	
+S	net/minecraft/class_382	net/minecraft/class_169	
+S	net/minecraft/class_85	net/minecraft/class_169	
+S	net/minecraft/class_373	net/minecraft/class_169	
+S	net/minecraft/class_434	net/minecraft/class_169	
+S	net/minecraft/class_45	net/minecraft/class_169	
+S	net/minecraft/class_1	net/minecraft/class_169	
+S	net/minecraft/class_36	net/minecraft/class_169	
+S	net/minecraft/class_335	net/minecraft/class_169	
+S	net/minecraft/class_608	net/minecraft/class_504	
+S	net/minecraft/class_520	net/minecraft/class_504	
+S	net/minecraft/class_537	net/minecraft/class_504	
+S	net/minecraft/class_427	net/minecraft/class_579	
+S	net/minecraft/class_589	net/minecraft/class_245	
+S	net/minecraft/class_172	net/minecraft/class_579	
+S	net/minecraft/class_312	net/minecraft/class_245	
+S	net/minecraft/class_590	net/minecraft/class_245	
+S	net/minecraft/class_423	net/minecraft/class_245	
+S	net/minecraft/class_425	net/minecraft/class_579	
+S	net/minecraft/class_230	net/minecraft/class_579	
+S	net/minecraft/class_371	net/minecraft/class_579	
+S	net/minecraft/class_540	net/minecraft/class_579	
+S	net/minecraft/class_548	net/minecraft/class_245	
+S	net/minecraft/class_616	net/minecraft/class_245	
+S	net/minecraft/class_92	net/minecraft/class_579	
+S	net/minecraft/class_536	net/minecraft/class_579	
+S	net/minecraft/class_245	net/minecraft/class_579	
+S	net/minecraft/class_576	net/minecraft/class_579	
+S	net/minecraft/class_106	net/minecraft/class_579	
+S	net/minecraft/class_442	net/minecraft/class_245	
+S	net/minecraft/class_86	net/minecraft/class_245	
+S	net/minecraft/class_612	net/minecraft/class_245	
+S	net/minecraft/class_450	net/minecraft/class_245	
+S	net/minecraft/class_47	net/minecraft/class_579	
+S	net/minecraft/class_618	net/minecraft/class_245	
+S	net/minecraft/class_150	net/minecraft/class_245	
+S	net/minecraft/class_513	net/minecraft/class_579	
+S	net/minecraft/class_599	net/minecraft/class_245	
+S	net/minecraft/class_157	net/minecraft/class_448	
+S	net/minecraft/class_294	net/minecraft/class_81	
+S	net/minecraft/class_277$1	net/minecraft/class_133	
+S	net/minecraft/class_557	net/minecraft/class_133	
+S	net/minecraft/class_497	net/minecraft/class_133	
+S	net/minecraft/class_542	net/minecraft/class_139	
+S	net/minecraft/class_98	net/minecraft/class_139	
+S	net/minecraft/class_185	net/minecraft/class_475	
+S	net/minecraft/class_175	net/minecraft/class_475	
+S	net/minecraft/class_356	net/minecraft/class_336	
+S	net/minecraft/class_572	net/minecraft/class_336	
+S	net/minecraft/class_628	net/minecraft/class_336	
+S	net/minecraft/class_296	net/minecraft/class_336	
+S	net/minecraft/class_592	net/minecraft/class_285	
+S	net/minecraft/class_527	net/minecraft/class_285	
+S	net/minecraft/class_269	net/minecraft/class_336	
+S	net/minecraft/class_384	net/minecraft/class_336	
+S	net/minecraft/class_593	net/minecraft/class_336	
+S	net/minecraft/class_509	net/minecraft/class_336	
+S	net/minecraft/class_225	net/minecraft/class_55	
+S	net/minecraft/class_137	net/minecraft/class_55	
+S	net/minecraft/class_138	net/minecraft/class_55	
+S	net/minecraft/class_104	net/minecraft/class_55	
+S	net/minecraft/class_103	net/minecraft/class_330	
+S	net/minecraft/class_444	net/minecraft/class_55	
+S	net/minecraft/class_283	net/minecraft/class_55	
+S	net/minecraft/class_4	net/minecraft/class_55	
+S	net/minecraft/class_282	net/minecraft/class_330	
+S	net/minecraft/class_140	net/minecraft/class_55	
+S	net/minecraft/class_545	net/minecraft/class_330	
+S	net/minecraft/class_152	net/minecraft/class_519	
+S	net/minecraft/class_454	net/minecraft/class_18	
+S	net/minecraft/class_186	net/minecraft/class_239	
+S	net/minecraft/class_111	net/minecraft/class_239	
+S	net/minecraft/class_289	net/minecraft/class_239	
+S	net/minecraft/class_246	net/minecraft/class_239	
+S	net/minecraft/class_30	net/minecraft/class_239	
+S	net/minecraft/class_532	net/minecraft/class_239	
+S	net/minecraft/class_231	net/minecraft/class_239	
+S	net/minecraft/class_250	net/minecraft/class_239	
+S	net/minecraft/class_115	net/minecraft/class_239	
+S	net/minecraft/class_405	net/minecraft/class_239	
+S	net/minecraft/class_351	net/minecraft/class_239	
+S	net/minecraft/class_624	net/minecraft/class_239	
+S	net/minecraft/class_529	net/minecraft/class_239	
+S	net/minecraft/class_82	net/minecraft/class_239	
+S	net/minecraft/class_517	net/minecraft/class_239	
+S	net/minecraft/class_192	net/minecraft/class_239	
+S	net/minecraft/class_349	net/minecraft/class_239	
+S	net/minecraft/class_512	net/minecraft/class_239	
+S	net/minecraft/class_623	net/minecraft/class_239	
+S	net/minecraft/class_543	net/minecraft/class_239	
+S	net/minecraft/class_502	net/minecraft/class_50	
+S	net/minecraft/class_176	net/minecraft/class_50	
+S	net/minecraft/class_377	net/minecraft/class_50	
