@@ -2024,6 +2024,8 @@
             J.reports = {};
             var errorCount = 0;
             J.reportOf = function (modId) { return J.reports[modId] || null; };
+            J.deps = {};
+            J.depsOf = function (modId) { return J.deps[modId] || []; };
             J.reportText = function (modId) { var r = J.reports[modId]; return r && window.JVM && window.JVM.javaReportText ? window.JVM.javaReportText(r) : ''; };
             J.decls = {};
             J.settingsOf = function (modId) { return J.decls[modId] || null; };
@@ -2318,6 +2320,10 @@
             J.pre = {};
             J.preload = function (modId, files, problem) {
                 if (J.pre[modId]) return Promise.resolve(J.pre[modId]);
+                try {
+                    var fmj = files['fabric.mod.json'] && JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, ''));
+                    J.deps[modId] = fmj && fmj.depends && typeof fmj.depends === 'object' ? Object.keys(fmj.depends).map(function (k) { return String(k).toLowerCase(); }) : [];
+                } catch (e) { J.deps[modId] = []; }
                 var JVM = null;
                 return loadJvm().then(function (j) { JVM = j; return JVM.expandNestedJars ? JVM.expandNestedJars(files) : files; })
                     .then(function () { return versionTag(JVM, files); }).then(function (ver) {
@@ -3104,7 +3110,7 @@
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
                 if (Module.mcJava) Module.mcJava.begin();
                 var javaFiles = {};
-                var rankOf = function (x) { return x.justAdded ? -1e15 : -(x.onAt || 0) * 1000 + mods.indexOf(x); };
+                var rankOf = function (x) { return x.justAdded ? -Infinity : -(x.onAt || 0) * 1000 + mods.indexOf(x); };
                 var javaPick = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
@@ -4687,6 +4693,7 @@
                     bump(note ? note + (n ? ' (' + probs + ' - choose a mod to see them)' : '') : n ? probs + ' in your mods - choose a mod to see them' : keep);
                     if (tell && Module._mcModsApplied) Module._mcModsApplied();
                     applied++;
+                    setTimeout(autoLibs, 0);
                     if (again) { again = false; return reapply(tell); }
                 }).catch(function (e) {
                     busy = false;
@@ -4816,6 +4823,62 @@
                 },
             };
             function find(id) { for (var i = 0; i < mods.length; i++) if (mods[i].id === id) return i; return -1; }
+            var LIB_KNOWN = {
+                'fabric-language-kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true, name: 'Fabric Language Kotlin' },
+                'Fabric Language Kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true },
+            };
+            var LIB_BUILTIN = /^(minecraft|java|fabricloader|fabric|fabric-api|fabric-.*-v\d+|stationapi|station-.*|gcapi\d*|glass.*config.*|modmenu|mixinextras|babric|apron|forge|fml|mcp|optifabric)$/;
+            var libTried = {};
+            function libFetch(key, mcVersion) {
+                var k = LIB_KNOWN[key], slug = k ? k.slug : String(key).toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+                var gv = /^Beta /.test(mcVersion || '') ? 'b' + mcVersion.slice(5) : mcVersion;
+                var tries = k ? [{ loaders: k.loaders, gv: k.any ? null : gv }]
+                    : /^b1[.]/.test(gv || '') ? [{ loaders: ['babric'], gv: gv }, { loaders: ['fabric'], gv: gv }]
+                    : [{ loaders: ['forge'], gv: gv }, { loaders: ['modloader'], gv: gv }];
+                var api = 'https://api.modrinth.com/v2/project/' + encodeURIComponent(slug) + '/version?loaders=';
+                return tries.reduce(function (pr, t) {
+                    return pr.then(function (got) {
+                        if (got) return got;
+                        var url = api + encodeURIComponent(JSON.stringify(t.loaders)) + (t.gv ? '&game_versions=' + encodeURIComponent(JSON.stringify([t.gv])) : '');
+                        return fetch(url).then(function (r) { return r.ok ? r.json() : []; }).then(function (vs) {
+                            var v = Array.isArray(vs) && vs[0];
+                            var f = v && v.files && (v.files.filter(function (x) { return x.primary; })[0] || v.files[0]);
+                            return f && f.url ? { url: f.url, name: f.filename || slug + '.jar', title: v.name || slug } : null;
+                        }, function () { return null; });
+                    });
+                }, Promise.resolve(null)).then(function (pick) {
+                    if (!pick) return null;
+                    return fetch(pick.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (ab) {
+                        return ab ? new File([ab], pick.name) : null;
+                    });
+                });
+            }
+            function autoLibs() {
+                if (!Module.mcJava || session || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+                var want = {};
+                mods.forEach(function (x) {
+                    if (!x.enabled || x.err) return;
+                    var id = cid(x), rep = Module.mcJava.reportOf ? Module.mcJava.reportOf(id) : null;
+                    if (rep && rep.status === 'cant') return;
+                    var ver = rep && rep.version || '';
+                    var add = function (k) { if (k && LIB_KNOWN[k]) k = LIB_KNOWN[k].slug; if (!k || libTried[k] || LIB_BUILTIN.test(k) || byContentId(k)) return; if (!want[k]) want[k] = { by: x.m.name, ver: ver }; };
+                    (Module.mcJava.depsOf ? Module.mcJava.depsOf(id) : []).forEach(add);
+                    (rep && rep.needs || []).forEach(add);
+                });
+                var keys = Object.keys(want);
+                if (!keys.length) return;
+                keys.reduce(function (pr, k) {
+                    return pr.then(function () {
+                        libTried[k] = true;
+                        var nice = LIB_KNOWN[k] && LIB_KNOWN[k].name || k;
+                        bump('Getting ' + nice + ' (needed by ' + want[k].by + ')...');
+                        return libFetch(k, want[k].ver).then(function (file) {
+                            if (file) return install(file);
+                            bump(want[k].by + ' needs ' + k + ' - it couldn\'t be found to add by itself');
+                        }, function () { bump(want[k].by + ' needs ' + k + ' - it couldn\'t be downloaded (offline?)'); });
+                    });
+                }, Promise.resolve());
+            }
             function byContentId(id) { for (var i = 0; i < mods.length; i++) if (cid(mods[i]) === id || mods[i].id === id) return mods[i]; return null; }
             api.toggle = function (id) {
                 var i = find(id);
