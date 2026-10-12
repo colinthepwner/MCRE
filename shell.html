@@ -2158,38 +2158,86 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; J.reports = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
-            J.define = function (modId, files, problem) {
-                return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
-                    var JVM = r[0], map = r[1];
-                    if (!vm) {
-                        vm = JVM.create({
-                            log: function (level, text) {
-                                if (level === 'error') errorCount++;
-                                if (level === 'error') problem('', String(text).split('\n')[0]);
-                                (level === 'out' ? console.log : console.warn)('[java ' + (vm && vm.currentMod || '') + '] ' + text);
-                            },
-                            install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
-                        });
-                        vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
-                                    itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
+            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164'];
+            function versionTag(JVM, files) {
+                var said = null;
+                try {
+                    var mi = files['mcmod.info'] && JSON.parse(new TextDecoder().decode(files['mcmod.info']).replace(/^\uFEFF/, ''));
+                    if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
+                    said = mi && mi[0] && mi[0].mcversion ? String(mi[0].mcversion).replace(/^Minecraft\s*/i, '') : null;
+                } catch (e) { said = null; }
+                var tag = said && JVM.mapTagFor ? JVM.mapTagFor(said) : null;
+                if (tag) return Promise.resolve({ tag: tag, said: said });
+                return Promise.all(MAP_TAGS.map(loadMap)).then(function (texts) {
+                    var maps = {};
+                    MAP_TAGS.forEach(function (t, i) { if (texts[i]) maps[t] = texts[i]; });
+                    var bytes = Object.keys(files).filter(function (k) { return /[.]class$/i.test(k); }).map(function (k) { return files[k]; });
+                    var g = JVM.guessMapVersion(bytes, maps);
+                    if (said && g.score < 3) return { tag: null, said: said };
+                    return { tag: g.score ? g.tag : 'mcp152', said: said, guessed: true };
+                });
+            }
+            J.pre = {};
+            J.preload = function (modId, files, problem) {
+                if (J.pre[modId]) return Promise.resolve(J.pre[modId]);
+                var JVM = null;
+                return loadJvm().then(function (j) { JVM = j; return versionTag(JVM, files); }).then(function (ver) {
+                    if (ver.tag && vm && vm.$tag && vm.$tag !== ver.tag) {
+                        var why = 'made for Minecraft ' + JVM.versionOfTag[ver.tag] + ', but the Java mods already on are for ' + JVM.versionOfTag[vm.$tag] + ' - only one version\'s mods run at a time';
+                        J.reports[modId] = JVM.javaReport(vm, modId, { loader: '', version: JVM.versionOfTag[ver.tag], cant: why });
+                        problem('', "Can't run: " + why);
+                        return (J.pre[modId] = { skip: true });
                     }
-                    if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
-                    JVM.onGuiOpen = function () { jgOpen(); };
-                    JVM.onGuiClose = function () { jgClose(true); };
-                    var classes = [];
-                    Object.keys(files).forEach(function (k) {
-                        if (/\.class$/i.test(k)) {
-                            var cn = k.slice(0, -6);
-                            if (/(^|[/])(module-info|package-info)$/.test(cn)) return;
-                            vm.addClassFile(cn, files[k], modId);
-                            classes.push(cn);
-                        } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
+                    return loadMap(ver.tag || 'mcp152').then(function (map) {
+                        if (!vm) {
+                            vm = JVM.create({
+                                log: function (level, text) {
+                                    if (level === 'error') errorCount++;
+                                    if (level === 'error') problem('', String(text).split('\n')[0]);
+                                    (level === 'out' ? console.log : console.warn)('[java ' + (vm && vm.currentMod || '') + '] ' + text);
+                                },
+                                install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
+                            });
+                            vm.$tag = ver.tag || 'mcp152';
+                            vm.$legacy = vm.$tag === 'mcp147';
+                            vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
+                                        itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
+                        }
+                        if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
+                        JVM.onGuiOpen = function () { jgOpen(); };
+                        JVM.onGuiClose = function () { jgClose(true); };
+                        var classes = [];
+                        Object.keys(files).forEach(function (k) {
+                            if (/\.class$/i.test(k)) {
+                                var cn = k.slice(0, -6);
+                                if (/(^|[/])(module-info|package-info)$/.test(cn)) return;
+                                vm.addClassFile(cn, files[k], modId);
+                                classes.push(cn);
+                            } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
+                        });
+                        return (J.pre[modId] = { ver: ver, classes: classes });
                     });
+                }).catch(function (e) {
+                    problem('', 'Java mod could not run: ' + (e && e.message || e));
+                    return (J.pre[modId] = { skip: true });
+                });
+            };
+            J.define = function (modId, files, problem) {
+                return J.preload(modId, files, problem).then(function (st) {
+                    if (!st || st.skip) return {};
+                    var JVM = window.JVM, ver = st.ver, classes = st.classes;
                     var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;
                     if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
                     var kind = JVM.javaKind ? JVM.javaKind(vm, classes, files) : { loader: '', version: '', cant: '' };
+                    if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[vm.$tag] || '1.5.2';
+                    if (ver.guessed && ver.said && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[vm.$tag]; }
+                    Object.keys(files).forEach(function (k) {
+                        if (!/(^|[/])lang[/]en_us[.]lang$/i.test(k)) return;
+                        var lr = JVM.mc152.reg(vm).lang;
+                        try { new TextDecoder().decode(files[k]).split(/\r?\n/).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && !/^\s*#/.test(l)) { var key = l.slice(0, i).trim(); if (lr[key] == null) lr[key] = l.slice(i + 1).trim(); } }); } catch (e) { }
+                    });
                     if (kind.cant) {
                         J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: kind.cant });
                         problem('', "Can't run: " + kind.cant);
@@ -2223,8 +2271,29 @@
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
+                    var cuts = [];
+                    var fileOf = function (path) {
+                        var p0 = String(path).replace(/^[/]+/, '');
+                        return files[p0] || files[Object.keys(files).filter(function (f) { return f.toLowerCase() === p0.toLowerCase(); })[0]] || null;
+                    };
+                    var cutCell = function (bytes, cell) {
+                        return createImageBitmap(new Blob([bytes], { type: 'image/png' })).then(function (img) {
+                            var size = Math.max(1, Math.floor(img.width / 16)), cv = document.createElement('canvas');
+                            cv.width = cv.height = size;
+                            var x = cv.getContext('2d');
+                            x.imageSmoothingEnabled = false;
+                            x.drawImage(img, (cell % 16) * size, Math.floor(cell / 16) * size, size, size, 0, 0, size, size);
+                            return new Promise(function (res) { cv.toBlob(function (b) { res(b ? b.arrayBuffer() : null); }, 'image/png'); });
+                        }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
+                    };
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
+                        if (t.sheet != null) {
+                            var sb = fileOf(t.sheet);
+                            if (sb) cuts.push(cutCell(sb, t.cell).then(function (png) { if (png) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png; }));
+                            else problem('', 'no picture ' + t.sheet + ' in the mod');
+                            return;
+                        }
                         var cands = [];
                         if (t.mod) cands.push('mods/' + t.mod + '/textures/' + kind + '/' + t.name + '.png', 'assets/' + t.mod + '/textures/' + kind + '/' + t.name + '.png');
                         cands.push('textures/' + kind + '/' + t.name + '.png');
@@ -2235,7 +2304,7 @@
                     });
                     var lang = Object.keys(c.lang).map(function (k) { return k + '=' + c.lang[k]; }).join('\n');
                     if (lang) add['lang/en_us.lang'] = enc.encode(lang + '\n');
-                    return add;
+                    return Promise.all(cuts).then(function () { return add; });
                 }).catch(function (e) {
                     problem('', 'Java mod could not run: ' + (e && e.message || e));
                     return {};
@@ -2785,6 +2854,13 @@
                 settingDecls = {};
                 on.forEach(function (x) { if (x.m && x.m.settings && x.m.settings.length) settingDecls[cid(x)] = x.m.settings; });
                 if (Module.mcJava) Module.mcJava.begin();
+                var javaPre = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
+                    var id = cid(x);
+                    return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
+                        files = forPlatform(normalise(files));
+                        if (Module.mcJava.hasClasses(files)) return Module.mcJava.preload(id, files, function (file, text) { problem(id, file, text, 'load'); });
+                    }, function () { });
+                }, Promise.resolve());
                 return on.reduce(function (pr, x) {
                     var id = cid(x);
                     return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
@@ -2893,7 +2969,7 @@
                         });
                         return jobs;
                     }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); });
-                }, Promise.resolve()).then(function () {
+                }, javaPre).then(function () {
                     scriptList = scripts;
                     modpeInfo = { scripts: [], maps: {} };
                     var mp = Module.mcModpe && modpeFiles.length ? Module.mcModpe.define(modpeFiles) : Promise.resolve({});

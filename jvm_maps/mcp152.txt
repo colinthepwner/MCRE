@@ -1546,7 +1546,21 @@ F	aab	t	field_73011_w	provider
 F	aab	v	field_73020_y	chunkProvider
 F	aab	x	field_72986_A	worldInfo
 F	aab	z	field_72988_C	mapStorage
+F	aav	A	field_76752_A	topBlock
+F	aav	B	field_76753_B	fillerBlock
+F	aav	D	field_76748_D	minHeight
+F	aav	E	field_76749_E	maxHeight
+F	aav	F	field_76750_F	temperature
+F	aav	G	field_76751_G	rainfall
+F	aav	H	field_76759_H	waterColorMultiplier
+F	aav	I	field_76760_I	theBiomeDecorator
+F	aav	J	field_76761_J	spawnableMonsterList
+F	aav	K	field_76762_K	spawnableCreatureList
+F	aav	L	field_76755_L	spawnableWaterCreatureList
+F	aav	M	field_82914_M	spawnableCaveCreatureList
 F	aav	N	field_76756_M	biomeID
+F	aav	S	field_76766_R	enableSnow
+F	aav	T	field_76765_S	enableRain
 F	aav	a	field_76773_a	biomeList
 F	aav	b	field_76771_b	ocean
 F	aav	c	field_76772_c	plains
@@ -2087,6 +2101,15 @@ F	mp	q	field_70170_p	worldObj
 F	mp	u	field_70165_t	posX
 F	mp	v	field_70163_u	posY
 F	mp	w	field_70161_v	posZ
+F	mv	a	field_75627_a	entityEggs
+F	mv	b	field_75625_b	stringToClassMapping
+F	mv	c	field_75626_c	classToStringMapping
+F	mv	d	field_75623_d	IDtoClassMapping
+F	mv	e	field_75624_e	classToIDMapping
+F	mv	f	field_75622_f	stringToIDMapping
+F	mw	a	field_75613_a	spawnedID
+F	mw	b	field_75611_b	primaryColor
+F	mw	c	field_75612_c	secondaryColor
 F	net/minecraft/client/Minecraft	K	field_71425_J	running
 F	net/minecraft/client/Minecraft	V	field_71428_T	timer
 F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
@@ -2429,12 +2452,17 @@ M	aak	c	(III)Z	func_72799_c	isAirBlock
 M	aak	g	(III)Laif;	func_72803_f	getBlockMaterial
 M	aak	h	(III)I	func_72805_g	getBlockMetadata
 M	aak	r	(III)Laqp;	func_72796_p	getBlockTileEntity
+M	aav	a	(FF)Laav;	func_76732_a	setTemperatureRainfall
 M	aav	a	(Ljava/lang/String;)Laav;	func_76735_a	setBiomeName
 M	aav	a	(Lnn;)Ljava/util/List;	func_76747_a	getSpawnableList
+M	aav	b	()Laav;	func_76742_b	setEnableSnow
+M	aav	b	(FF)Laav;	func_76725_b	setMinMaxHeight
+M	aav	b	(I)Laav;	func_76739_b	setColor
 M	aav	c	()Z	func_76746_c	getEnableSnow
 M	aav	d	()Z	func_76738_d	canSpawnLightningBolt
 M	aav	i	()F	func_76727_i	getFloatRainfall
 M	aav	j	()F	func_76743_j	getFloatTemperature
+M	aav	m	()Laav;	func_76745_m	setDisableRain
 M	acn	d	()Z	func_76569_d	isSurfaceWorld
 M	acn	i	()I	func_76557_i	getAverageGroundLevel
 M	acn	l	()Ljava/lang/String;	func_80007_l	getDimensionName
@@ -3002,6 +3030,8 @@ M	mp	w	()V	func_70106_y	setDead
 M	mv	a	(Ljava/lang/Class;Ljava/lang/String;I)V	func_75618_a	addMapping
 M	mv	a	(Ljava/lang/Class;Ljava/lang/String;III)V	func_75614_a	addMapping
 M	mv	a	(Ljava/lang/String;Laab;)Lmp;	func_75620_a	createEntityByName
+M	mv	a	(Lmp;)I	func_75619_a	getEntityID
+M	mv	b	(I)Ljava/lang/String;	func_75617_a	getStringFromID
 M	mv	b	(Lmp;)Ljava/lang/String;	func_75621_b	getEntityString
 M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
 M	net/minecraft/client/Minecraft	a	(Laxr;)V	func_71373_a	displayGuiScreen
@@ -3210,6 +3240,7 @@ M	wk	n_	()Z	func_77662_d	isFull3D
 M	wk	o	()Z	func_77645_m	isDamageable
 M	wk	p	()Lwk;	func_77664_n	setFull3D
 M	wk	s	()Lwk;	func_77668_q	getContainerItem
+M	wk	u	()Ljava/lang/String;	func_77635_s	getStatName
 M	wl	a	()I	func_77997_a	getMaxUses
 M	wl	b	()F	func_77998_b	getEfficiencyOnProperMaterial
 M	wl	c	()I	func_78000_c	getDamageVsEntity
@@ -3228,6 +3259,7 @@ M	wm	b	(I)V	func_77964_b	setItemDamage
 M	wm	b	(Lapa;)Z	func_77987_b	canHarvestBlock
 M	wm	b	(Lbs;)Lbs;	func_77955_b	writeToNBT
 M	wm	c	(Lbs;)V	func_77963_c	readFromNBT
+M	wm	c	(Ljava/lang/String;)V	func_82834_c	setItemName
 M	wm	d	(Lbs;)V	func_77982_d	setTagCompound
 M	wm	e	()I	func_77976_d	getMaxStackSize
 M	wm	f	()Z	func_77985_e	isStackable
@@ -3239,6 +3271,7 @@ M	wm	p	()Z	func_77942_o	hasTagCompound
 M	wm	q	()Lbs;	func_77978_p	getTagCompound
 M	wm	r	()Lca;	func_77986_q	getEnchantmentTagList
 M	wm	s	()Ljava/lang/String;	func_82833_r	getDisplayName
+M	wm	t	()Z	func_82837_s	hasDisplayName
 M	wm	toString	()Ljava/lang/String;	toString	toString
 M	wm	x	()Z	func_77948_v	isItemEnchanted
 M	wu	a	(Lapa;)Z	func_77641_a	canHarvestBlock

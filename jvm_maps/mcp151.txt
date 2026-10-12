@@ -1,0 +1,4499 @@
+C	a	net/minecraft/src/EnumChatFormatting
+C	aa	net/minecraft/src/ICommandManager
+C	aaa	net/minecraft/src/ColorizerGrass
+C	aab	net/minecraft/src/World
+C	aac	net/minecraft/src/CallableLvl1
+C	aad	net/minecraft/src/CallableLvl2
+C	aae	net/minecraft/src/CallableLvl3
+C	aaf	net/minecraft/src/MinecraftException
+C	aag	net/minecraft/src/IWorldAccess
+C	aai	net/minecraft/src/WorldSettings
+C	aaj	net/minecraft/src/EnumGameType
+C	aak	net/minecraft/src/IBlockAccess
+C	aal	net/minecraft/src/WorldType
+C	aam	net/minecraft/src/EnumSkyBlock
+C	aan	net/minecraft/src/SpawnerAnimals
+C	aao	net/minecraft/src/Teleporter
+C	aap	net/minecraft/src/PortalPosition
+C	aaq	net/minecraft/src/ChunkCache
+C	aar	net/minecraft/src/NextTickListEntry
+C	aas	net/minecraft/src/BlockEventData
+C	aat	net/minecraft/src/ChunkPosition
+C	aau	net/minecraft/src/BiomeGenBeach
+C	aav	net/minecraft/src/BiomeGenBase
+C	aaw	net/minecraft/src/SpawnListEntry
+C	aax	net/minecraft/src/BiomeCache
+C	aay	net/minecraft/src/BiomeCacheBlock
+C	aaz	net/minecraft/src/BiomeDecorator
+C	ab	net/minecraft/src/ICommandSender
+C	aba	net/minecraft/src/WorldChunkManager
+C	abb	net/minecraft/src/BiomeGenDesert
+C	abc	net/minecraft/src/BiomeGenHills
+C	abd	net/minecraft/src/WorldChunkManagerHell
+C	abe	net/minecraft/src/BiomeGenForest
+C	abf	net/minecraft/src/BiomeGenHell
+C	abg	net/minecraft/src/BiomeGenSnow
+C	abh	net/minecraft/src/BiomeGenJungle
+C	abi	net/minecraft/src/BiomeGenMushroomIsland
+C	abj	net/minecraft/src/BiomeGenOcean
+C	abk	net/minecraft/src/BiomeGenPlains
+C	abm	net/minecraft/src/BiomeGenRiver
+C	abn	net/minecraft/src/BiomeGenSwamp
+C	abo	net/minecraft/src/BiomeGenTaiga
+C	abp	net/minecraft/src/BiomeGenEnd
+C	abq	net/minecraft/src/BiomeEndDecorator
+C	abr	net/minecraft/src/WorldGenWaterlily
+C	abt	net/minecraft/src/IChunkProvider
+C	abu	net/minecraft/src/NibbleArray
+C	abv	net/minecraft/src/EmptyChunk
+C	abw	net/minecraft/src/Chunk
+C	abx	net/minecraft/src/ExtendedBlockStorage
+C	aby	net/minecraft/src/NibbleArrayReader
+C	ac	net/minecraft/src/PlayerSelector
+C	acb	net/minecraft/src/IChunkLoader
+C	ace	net/minecraft/src/ChunkLoader
+C	acf	net/minecraft/src/AnvilConverterData
+C	acg	net/minecraft/src/RegionFile
+C	ach	net/minecraft/src/RegionFileChunkBuffer
+C	aci	net/minecraft/src/RegionFileCache
+C	acj	net/minecraft/src/AnvilChunkLoader
+C	ack	net/minecraft/src/AnvilChunkLoaderPending
+C	acn	net/minecraft/src/WorldProvider
+C	aco	net/minecraft/src/WorldProviderHell
+C	acp	net/minecraft/src/WorldProviderSurface
+C	acq	net/minecraft/src/WorldProviderEnd
+C	acr	net/minecraft/src/MapGenRavine
+C	act	net/minecraft/src/ChunkProviderFlat
+C	acu	net/minecraft/src/ChunkProviderHell
+C	acv	net/minecraft/src/MapGenCaves
+C	acw	net/minecraft/src/MapGenBase
+C	acx	net/minecraft/src/MapGenCavesHell
+C	acy	net/minecraft/src/ChunkProviderGenerate
+C	acz	net/minecraft/src/ChunkProviderEnd
+C	ad	net/minecraft/src/CommandDefaultGameMode
+C	adb	net/minecraft/src/WorldGenBigTree
+C	adc	net/minecraft/src/WorldGenForest
+C	add	net/minecraft/src/WorldGeneratorBonusChest
+C	ade	net/minecraft/src/WorldGenCactus
+C	adg	net/minecraft/src/WorldGenClay
+C	adh	net/minecraft/src/WorldGenDeadBush
+C	adi	net/minecraft/src/WorldGenDesertWells
+C	adj	net/minecraft/src/WorldGenerator
+C	adk	net/minecraft/src/WorldGenFlowers
+C	adl	net/minecraft/src/WorldGenShrub
+C	adm	net/minecraft/src/WorldGenFire
+C	adn	net/minecraft/src/WorldGenGlowStone2
+C	ado	net/minecraft/src/WorldGenHellLava
+C	adq	net/minecraft/src/WorldGenBigMushroom
+C	adr	net/minecraft/src/WorldGenLakes
+C	ads	net/minecraft/src/WorldGenGlowStone1
+C	adt	net/minecraft/src/WorldGenHugeTrees
+C	adu	net/minecraft/src/WorldGenDungeons
+C	adv	net/minecraft/src/WorldGenMinable
+C	adw	net/minecraft/src/WorldGenTaiga1
+C	adx	net/minecraft/src/WorldGenPumpkin
+C	ady	net/minecraft/src/WorldGenReed
+C	adz	net/minecraft/src/WorldGenSand
+C	ae	net/minecraft/src/CommandEffect
+C	aea	net/minecraft/src/WorldGenSpikes
+C	aeb	net/minecraft/src/WorldGenLiquids
+C	aec	net/minecraft/src/WorldGenTaiga2
+C	aed	net/minecraft/src/WorldGenSwamp
+C	aee	net/minecraft/src/WorldGenTallGrass
+C	aef	net/minecraft/src/WorldGenTrees
+C	aeg	net/minecraft/src/WorldGenVines
+C	aeh	net/minecraft/src/FlatGeneratorInfo
+C	aei	net/minecraft/src/FlatLayerInfo
+C	aek	net/minecraft/src/StructureBoundingBox
+C	ael	net/minecraft/src/MapGenMineshaft
+C	aem	net/minecraft/src/StructureMineshaftPieces
+C	aen	net/minecraft/src/ComponentMineshaftCorridor
+C	aeo	net/minecraft/src/ComponentMineshaftCross
+C	aep	net/minecraft/src/ComponentMineshaftRoom
+C	aeq	net/minecraft/src/ComponentMineshaftStairs
+C	aer	net/minecraft/src/StructureMineshaftStart
+C	aes	net/minecraft/src/MapGenNetherBridge
+C	aet	net/minecraft/src/StructureNetherBridgeStart
+C	aeu	net/minecraft/src/StructureNetherBridgePieces
+C	aev	net/minecraft/src/ComponentNetherBridgeCrossing3
+C	aew	net/minecraft/src/ComponentNetherBridgeEnd
+C	aex	net/minecraft/src/ComponentNetherBridgeStraight
+C	aey	net/minecraft/src/ComponentNetherBridgeCorridor3
+C	aez	net/minecraft/src/ComponentNetherBridgeCorridor4
+C	af	net/minecraft/src/CommandEnchant
+C	afa	net/minecraft/src/ComponentNetherBridgeEntrance
+C	afb	net/minecraft/src/ComponentNetherBridgeCrossing2
+C	afc	net/minecraft/src/ComponentNetherBridgeCorridor
+C	afd	net/minecraft/src/ComponentNetherBridgeCorridor5
+C	afe	net/minecraft/src/ComponentNetherBridgeCorridor2
+C	aff	net/minecraft/src/ComponentNetherBridgeNetherStalkRoom
+C	afg	net/minecraft/src/ComponentNetherBridgeThrone
+C	afh	net/minecraft/src/ComponentNetherBridgePiece
+C	afi	net/minecraft/src/StructureNetherBridgePieceWeight
+C	afj	net/minecraft/src/ComponentNetherBridgeCrossing
+C	afk	net/minecraft/src/ComponentNetherBridgeStairs
+C	afl	net/minecraft/src/ComponentNetherBridgeStartPiece
+C	afm	net/minecraft/src/MapGenScatteredFeature
+C	afn	net/minecraft/src/StructureScatteredFeatureStart
+C	afp	net/minecraft/src/ComponentScatteredFeaturePieces2
+C	afq	net/minecraft/src/ComponentScatteredFeatureDesertPyramid
+C	afr	net/minecraft/src/ComponentScatteredFeatureJunglePyramid
+C	afs	net/minecraft/src/StructureScatteredFeatureStones
+C	aft	net/minecraft/src/ComponentScatteredFeature
+C	afu	net/minecraft/src/ComponentScatteredFeatureSwampHut
+C	afv	net/minecraft/src/MapGenStronghold
+C	afw	net/minecraft/src/StructureStrongholdStart
+C	afx	net/minecraft/src/StructureStrongholdPieces
+C	afy	net/minecraft/src/StructureStrongholdPieceWeight2
+C	afz	net/minecraft/src/StructureStrongholdPieceWeight3
+C	ag	net/minecraft/src/CommandXP
+C	aga	net/minecraft/src/EnumDoorHelper
+C	agb	net/minecraft/src/ComponentStrongholdChestCorridor
+C	agc	net/minecraft/src/ComponentStrongholdCorridor
+C	agd	net/minecraft/src/ComponentStrongholdCrossing
+C	age	net/minecraft/src/ComponentStrongholdLeftTurn
+C	agf	net/minecraft/src/ComponentStrongholdLibrary
+C	agg	net/minecraft/src/StructureStrongholdPieceWeight
+C	agh	net/minecraft/src/ComponentStrongholdPortalRoom
+C	agi	net/minecraft/src/ComponentStrongholdPrison
+C	agj	net/minecraft/src/ComponentStrongholdRightTurn
+C	agk	net/minecraft/src/ComponentStrongholdRoomCrossing
+C	agl	net/minecraft/src/StructureStrongholdStones
+C	agm	net/minecraft/src/ComponentStrongholdStairs
+C	agn	net/minecraft/src/ComponentStrongholdStairs2
+C	ago	net/minecraft/src/ComponentStrongholdStraight
+C	agp	net/minecraft/src/ComponentStrongholdStairsStraight
+C	agq	net/minecraft/src/ComponentStronghold
+C	agr	net/minecraft/src/EnumDoor
+C	ags	net/minecraft/src/MapGenStructure
+C	agt	net/minecraft/src/CallableIsFeatureChunk
+C	agu	net/minecraft/src/CallableChunkPosHash
+C	agv	net/minecraft/src/CallableStructureType
+C	agw	net/minecraft/src/StructureComponent
+C	agx	net/minecraft/src/StructurePieceBlockSelector
+C	agy	net/minecraft/src/StructureStart
+C	agz	net/minecraft/src/MapGenVillage
+C	ah	net/minecraft/src/CommandDifficulty
+C	aha	net/minecraft/src/StructureVillageStart
+C	ahb	net/minecraft/src/StructureVillagePieces
+C	ahc	net/minecraft/src/ComponentVillageHouse1
+C	ahd	net/minecraft/src/ComponentVillageField
+C	ahe	net/minecraft/src/ComponentVillageField2
+C	ahf	net/minecraft/src/ComponentVillageTorch
+C	ahg	net/minecraft/src/StructureVillagePieceWeight
+C	ahh	net/minecraft/src/ComponentVillageHall
+C	ahi	net/minecraft/src/ComponentVillageHouse4_Garden
+C	ahj	net/minecraft/src/ComponentVillageWoodHut
+C	ahk	net/minecraft/src/ComponentVillageChurch
+C	ahl	net/minecraft/src/ComponentVillageHouse2
+C	ahm	net/minecraft/src/ComponentVillageStartPiece
+C	ahn	net/minecraft/src/ComponentVillagePathGen
+C	aho	net/minecraft/src/ComponentVillageHouse3
+C	ahp	net/minecraft/src/ComponentVillage
+C	ahq	net/minecraft/src/ComponentVillageRoadPiece
+C	ahr	net/minecraft/src/ComponentVillageWell
+C	ahv	net/minecraft/src/NoiseGeneratorPerlin
+C	ahw	net/minecraft/src/NoiseGeneratorOctaves
+C	ai	net/minecraft/src/CommandGameMode
+C	aib	net/minecraft/src/NoiseGenerator
+C	aic	net/minecraft/src/MaterialLogic
+C	aid	net/minecraft/src/MaterialTransparent
+C	aie	net/minecraft/src/MaterialLiquid
+C	aif	net/minecraft/src/Material
+C	aig	net/minecraft/src/MaterialWeb
+C	aih	net/minecraft/src/MapColor
+C	aii	net/minecraft/src/MaterialPortal
+C	aij	net/minecraft/src/GenLayerAddIsland
+C	aik	net/minecraft/src/GenLayerAddMushroomIsland
+C	ail	net/minecraft/src/GenLayerAddSnow
+C	aim	net/minecraft/src/GenLayerBiome
+C	aiq	net/minecraft/src/GenLayerFuzzyZoom
+C	air	net/minecraft/src/IntCache
+C	ais	net/minecraft/src/GenLayerIsland
+C	ait	net/minecraft/src/GenLayer
+C	aiu	net/minecraft/src/GenLayerHills
+C	aiv	net/minecraft/src/GenLayerRiverInit
+C	aiw	net/minecraft/src/GenLayerRiver
+C	aix	net/minecraft/src/GenLayerRiverMix
+C	aiy	net/minecraft/src/GenLayerShore
+C	aiz	net/minecraft/src/GenLayerSmooth
+C	aj	net/minecraft/src/CommandGameRule
+C	ajb	net/minecraft/src/GenLayerSwampRivers
+C	aje	net/minecraft/src/GenLayerVoronoiZoom
+C	ajf	net/minecraft/src/GenLayerZoom
+C	ajg	net/minecraft/src/Path
+C	ajh	net/minecraft/src/PathPoint
+C	aji	net/minecraft/src/PathEntity
+C	ajj	net/minecraft/src/PathFinder
+C	ajl	net/minecraft/src/MapData
+C	ajm	net/minecraft/src/MapInfo
+C	ajn	net/minecraft/src/MapCoord
+C	ajo	net/minecraft/src/WorldSavedData
+C	ajp	net/minecraft/src/AnvilSaveHandler
+C	ajq	net/minecraft/src/AnvilSaveConverter
+C	ajr	net/minecraft/src/AnvilSaveConverterFileFilter
+C	ajs	net/minecraft/src/DerivedWorldInfo
+C	ajt	net/minecraft/src/SaveHandler
+C	aju	net/minecraft/src/SaveFormatOld
+C	ajv	net/minecraft/src/WorldInfo
+C	ajw	net/minecraft/src/CallableLevelSeed
+C	ajx	net/minecraft/src/CallableLevelGenerator
+C	ajy	net/minecraft/src/CallableLevelGeneratorOptions
+C	ajz	net/minecraft/src/CallableLevelSpawnLocation
+C	ak	net/minecraft/src/CommandGive
+C	aka	net/minecraft/src/CallableLevelTime
+C	akb	net/minecraft/src/CallableLevelDimension
+C	akc	net/minecraft/src/CallableLevelStorageVersion
+C	akd	net/minecraft/src/CallableLevelWeather
+C	ake	net/minecraft/src/CallableLevelGamemode
+C	akf	net/minecraft/src/ISaveHandler
+C	akg	net/minecraft/src/AnvilConverterException
+C	aki	net/minecraft/src/ISaveFormat
+C	akj	net/minecraft/src/SaveFormatComparator
+C	aks	net/minecraft/src/SaveHandlerMP
+C	akt	net/minecraft/src/IPlayerFileData
+C	aku	net/minecraft/src/MapStorage
+C	akv	net/minecraft/src/ThreadedFileIOBase
+C	akw	net/minecraft/src/IThreadedFileIO
+C	aky	net/minecraft/src/BlockAnvil
+C	akz	net/minecraft/src/BlockContainer
+C	al	net/minecraft/src/CommandHelp
+C	ala	net/minecraft/src/BlockBasePressurePlate
+C	alb	net/minecraft/src/BlockRailBase
+C	alc	net/minecraft/src/BlockBaseRailLogic
+C	ald	net/minecraft/src/BlockBeacon
+C	ale	net/minecraft/src/BlockBed
+C	alf	net/minecraft/src/BlockBookshelf
+C	alg	net/minecraft/src/BlockBrewingStand
+C	alh	net/minecraft/src/BlockFlower
+C	ali	net/minecraft/src/BlockButton
+C	alj	net/minecraft/src/BlockCactus
+C	alk	net/minecraft/src/BlockCake
+C	all	net/minecraft/src/BlockCarrot
+C	alm	net/minecraft/src/BlockCauldron
+C	aln	net/minecraft/src/BlockChest
+C	alo	net/minecraft/src/BlockClay
+C	alp	net/minecraft/src/BlockCloth
+C	alq	net/minecraft/src/BlockCocoa
+C	alr	net/minecraft/src/BlockCommandBlock
+C	als	net/minecraft/src/BlockComparator
+C	alu	net/minecraft/src/BlockCrops
+C	alv	net/minecraft/src/BlockDaylightDetector
+C	alw	net/minecraft/src/BlockDeadBush
+C	alx	net/minecraft/src/BlockDetectorRail
+C	aly	net/minecraft/src/BlockRedstoneLogic
+C	alz	net/minecraft/src/BlockDirectional
+C	am	net/minecraft/src/CommandKill
+C	ama	net/minecraft/src/BlockDirt
+C	amb	net/minecraft/src/BlockDispenser
+C	amc	net/minecraft/src/BlockDoor
+C	amd	net/minecraft/src/BlockDropper
+C	ame	net/minecraft/src/BlockDragonEgg
+C	amf	net/minecraft/src/BlockEnchantmentTable
+C	amg	net/minecraft/src/BlockEnderChest
+C	amh	net/minecraft/src/ITileEntityProvider
+C	ami	net/minecraft/src/BlockFarmland
+C	amj	net/minecraft/src/BlockFenceGate
+C	amk	net/minecraft/src/BlockFence
+C	aml	net/minecraft/src/BlockFire
+C	amm	net/minecraft/src/BlockFlowerPot
+C	amn	net/minecraft/src/BlockFurnace
+C	amo	net/minecraft/src/BlockGlass
+C	amp	net/minecraft/src/BlockGrass
+C	amq	net/minecraft/src/BlockGravel
+C	amr	net/minecraft/src/BlockHalfSlab
+C	ams	net/minecraft/src/BlockBreakable
+C	amt	net/minecraft/src/BlockSand
+C	amu	net/minecraft/src/BlockSoulSand
+C	amv	net/minecraft/src/BlockNetherrack
+C	amw	net/minecraft/src/BlockHopper
+C	amx	net/minecraft/src/BlockMushroomCap
+C	amy	net/minecraft/src/BlockIce
+C	amz	net/minecraft/src/BlockLadder
+C	an	net/minecraft/src/CommandShowSeed
+C	ana	net/minecraft/src/BlockLeaves
+C	anc	net/minecraft/src/BlockLever
+C	and	net/minecraft/src/BlockGlowStone
+C	ane	net/minecraft/src/BlockFluid
+C	anf	net/minecraft/src/BlockFlowing
+C	ang	net/minecraft/src/BlockStationary
+C	anh	net/minecraft/src/BlockLockedChest
+C	ani	net/minecraft/src/BlockMelon
+C	anj	net/minecraft/src/BlockOreStorage
+C	ank	net/minecraft/src/BlockMobSpawner
+C	anl	net/minecraft/src/BlockMushroom
+C	anm	net/minecraft/src/BlockNote
+C	ann	net/minecraft/src/BlockMycelium
+C	ano	net/minecraft/src/BlockNetherStalk
+C	anp	net/minecraft/src/BlockRedstoneTorch
+C	anq	net/minecraft/src/RedstoneUpdateInfo
+C	anr	net/minecraft/src/BlockObsidian
+C	ans	net/minecraft/src/BlockOre
+C	ant	net/minecraft/src/BlockPortal
+C	anu	net/minecraft/src/BlockPotato
+C	anv	net/minecraft/src/BlockPoweredOre
+C	anw	net/minecraft/src/BlockRailPowered
+C	anx	net/minecraft/src/BlockPressurePlate
+C	any	net/minecraft/src/EnumMobType
+C	anz	net/minecraft/src/BlockPumpkin
+C	aoa	net/minecraft/src/BlockQuartz
+C	aob	net/minecraft/src/BlockRail
+C	aoc	net/minecraft/src/BlockJukeBox
+C	aod	net/minecraft/src/TileEntityRecordPlayer
+C	aoe	net/minecraft/src/BlockRedstoneWire
+C	aof	net/minecraft/src/BlockRedstoneOre
+C	aog	net/minecraft/src/BlockRedstoneLight
+C	aoh	net/minecraft/src/BlockReed
+C	aoi	net/minecraft/src/BlockRedstoneRepeater
+C	aoj	net/minecraft/src/BlockSandStone
+C	aok	net/minecraft/src/BlockSapling
+C	aol	net/minecraft/src/BlockSign
+C	aom	net/minecraft/src/BlockSkull
+C	aon	net/minecraft/src/BlockStoneBrick
+C	aoo	net/minecraft/src/BlockSnowBlock
+C	aop	net/minecraft/src/BlockSponge
+C	aoq	net/minecraft/src/BlockStairs
+C	aor	net/minecraft/src/BlockStem
+C	aos	net/minecraft/src/BlockButtonStone
+C	aot	net/minecraft/src/BlockSilverfish
+C	aou	net/minecraft/src/BlockStep
+C	aov	net/minecraft/src/BlockStone
+C	aow	net/minecraft/src/BlockTallGrass
+C	aox	net/minecraft/src/BlockEndPortal
+C	aoy	net/minecraft/src/BlockEndPortalFrame
+C	aoz	net/minecraft/src/BlockPane
+C	ap	net/minecraft/src/CommandTime
+C	apa	net/minecraft/src/Block
+C	apb	net/minecraft/src/StepSoundStone
+C	apc	net/minecraft/src/StepSoundSand
+C	apd	net/minecraft/src/StepSoundAnvil
+C	ape	net/minecraft/src/StepSound
+C	apf	net/minecraft/src/BlockTNT
+C	apg	net/minecraft/src/BlockSnow
+C	aph	net/minecraft/src/BlockTorch
+C	api	net/minecraft/src/BlockLeavesBase
+C	apj	net/minecraft/src/BlockTrapDoor
+C	apk	net/minecraft/src/BlockLog
+C	apl	net/minecraft/src/BlockTripWireSource
+C	apm	net/minecraft/src/BlockTripWire
+C	apn	net/minecraft/src/BlockVine
+C	apo	net/minecraft/src/BlockWall
+C	app	net/minecraft/src/BlockLilyPad
+C	apq	net/minecraft/src/BlockWeb
+C	apr	net/minecraft/src/BlockPressurePlateWeighted
+C	aps	net/minecraft/src/BlockButtonWood
+C	apt	net/minecraft/src/BlockWoodSlab
+C	apu	net/minecraft/src/BlockWood
+C	apv	net/minecraft/src/BlockWorkbench
+C	apw	net/minecraft/src/TileEntityBeacon
+C	apx	net/minecraft/src/TileEntityBrewingStand
+C	apy	net/minecraft/src/TileEntityChest
+C	apz	net/minecraft/src/TileEntityCommandBlock
+C	aq	net/minecraft/src/CommandToggleDownfall
+C	aqa	net/minecraft/src/TileEntityComparator
+C	aqb	net/minecraft/src/TileEntityDaylightDetector
+C	aqc	net/minecraft/src/TileEntityDispenser
+C	aqd	net/minecraft/src/TileEntityDropper
+C	aqe	net/minecraft/src/TileEntityEnchantmentTable
+C	aqf	net/minecraft/src/TileEntityEnderChest
+C	aqg	net/minecraft/src/TileEntityFurnace
+C	aqh	net/minecraft/src/Hopper
+C	aqi	net/minecraft/src/TileEntityHopper
+C	aqj	net/minecraft/src/TileEntityMobSpawner
+C	aqk	net/minecraft/src/TileEntityMobSpawnerLogic
+C	aql	net/minecraft/src/TileEntityNote
+C	aqm	net/minecraft/src/TileEntitySign
+C	aqn	net/minecraft/src/TileEntitySkull
+C	aqo	net/minecraft/src/TileEntityEndPortal
+C	aqp	net/minecraft/src/TileEntity
+C	aqq	net/minecraft/src/CallableTileEntityName
+C	aqr	net/minecraft/src/CallableTileEntityID
+C	aqs	net/minecraft/src/CallableTileEntityData
+C	aqt	net/minecraft/src/BlockPistonBase
+C	aqu	net/minecraft/src/BlockPistonExtension
+C	aqv	net/minecraft/src/BlockPistonMoving
+C	aqw	net/minecraft/src/TileEntityPiston
+C	aqx	net/minecraft/src/AxisAlignedBB
+C	aqy	net/minecraft/src/AABBLocalPool
+C	aqz	net/minecraft/src/AABBPool
+C	ar	net/minecraft/src/CommandWeather
+C	ara	net/minecraft/src/MovingObjectPosition
+C	arb	net/minecraft/src/EnumMovingObjectType
+C	arc	net/minecraft/src/Vec3
+C	ard	net/minecraft/src/Vec3Pool
+C	are	net/minecraft/src/ScoreObjective
+C	arf	net/minecraft/src/ScorePlayerTeam
+C	arg	net/minecraft/src/Score
+C	arh	net/minecraft/src/ScoreComparator
+C	arj	net/minecraft/src/Scoreboard
+C	ark	net/minecraft/src/ScoreboardSaveData
+C	arl	net/minecraft/src/ScoreDummyCriteria
+C	arm	net/minecraft/src/ScoreHealthCriteria
+C	arn	net/minecraft/src/ScoreObjectiveCriteria
+C	aro	org/bouncycastle/asn1/ASN1Encodable
+C	arp	org/bouncycastle/asn1/ASN1Object
+C	arq	org/bouncycastle/asn1/ASN1ObjectIdentifier
+C	arr	org/bouncycastle/asn1/ASN1Primitive
+C	ars	org/bouncycastle/asn1/DERObjectIdentifier
+C	art	org/bouncycastle/asn1/bc/BCObjectIdentifiers
+C	aru	org/bouncycastle/asn1/pkcs/PKCSObjectIdentifiers
+C	arv	org/bouncycastle/crypto/BlockCipher
+C	arw	org/bouncycastle/crypto/BufferedBlockCipher
+C	arx	org/bouncycastle/crypto/CipherKeyGenerator
+C	ary	org/bouncycastle/crypto/CipherParameters
+C	as	net/minecraft/src/CommandException
+C	asa	org/bouncycastle/crypto/DataLengthException
+C	asc	org/bouncycastle/crypto/KeyGenerationParameters
+C	asd	org/bouncycastle/crypto/RuntimeCryptoException
+C	ase	org/bouncycastle/crypto/StreamCipher
+C	asf	org/bouncycastle/crypto/engines/AESFastEngine
+C	asg	org/bouncycastle/crypto/io/CipherInputStream
+C	ash	org/bouncycastle/crypto/io/CipherOutputStream
+C	asi	org/bouncycastle/crypto/modes/CFBBlockCipher
+C	asj	org/bouncycastle/crypto/params/KeyParameter
+C	ask	org/bouncycastle/crypto/params/ParametersWithIV
+C	asl	org/bouncycastle/jcajce/provider/config/ConfigurableProvider
+C	asm	org/bouncycastle/jcajce/provider/config/ProviderConfiguration
+C	asn	org/bouncycastle/jcajce/provider/config/ProviderConfigurationPermission
+C	aso	org/bouncycastle/jcajce/provider/util/AlgorithmProvider
+C	asp	org/bouncycastle/jce/provider/BouncyCastleProvider
+C	asq	org/bouncycastle/jce/provider/BouncyCastleProviderAction
+C	asr	org/bouncycastle/jce/provider/BouncyCastleProviderConfiguration
+C	ass	org/bouncycastle/util/Strings
+C	ast	argo/format/CompactJsonFormatter
+C	asu	argo/format/CompactJsonFormatter_JsonNodeType
+C	asv	argo/format/JsonEscapedString
+C	asw	argo/format/JsonFormatter
+C	asx	argo/jdom/ChainedFunctor
+C	asy	argo/jdom/Functor
+C	asz	argo/jdom/JdomParser
+C	at	net/minecraft/src/NumberInvalidException
+C	ata	argo/jdom/JsonArray
+C	atb	argo/jdom/JsonArray_NodeList
+C	atc	argo/jdom/JsonArrayNodeBuilder
+C	atd	argo/jdom/JsonConstants
+C	ate	argo/jdom/JsonFieldBuilder
+C	atf	argo/jdom/JsonListenerToJdomAdapter
+C	atg	argo/jdom/JsonListenerToJdomAdapter_Array
+C	ath	argo/jdom/JsonListenerToJdomAdapter_Object
+C	ati	argo/jdom/JsonListenerToJdomAdapter_Field
+C	atj	argo/jdom/JsonListenerToJdomAdapter_NodeContainer
+C	atk	argo/jdom/JsonNode
+C	atl	argo/jdom/JsonNodeBuilder
+C	atm	argo/jdom/JsonNodeBuilders
+C	atn	argo/jdom/JsonNodeBuilders_Null
+C	ato	argo/jdom/JsonNodeBuilders_True
+C	atp	argo/jdom/JsonNodeBuilders_False
+C	atq	argo/jdom/JsonNodeDoesNotMatchChainedJsonNodeSelectorException
+C	atr	argo/jdom/JsonNodeDoesNotMatchJsonNodeSelectorException
+C	ats	argo/jdom/JsonNodeDoesNotMatchPathElementsException
+C	att	argo/jdom/JsonNodeFactories
+C	atu	argo/jdom/JsonNodeSelector
+C	atv	argo/jdom/JsonNodeSelectors
+C	atw	argo/jdom/JsonNodeSelectors_String
+C	atx	argo/jdom/JsonNodeSelectors_Object
+C	aty	argo/jdom/JsonNodeSelectors_Field
+C	atz	argo/jdom/JsonNodeSelectors_Element
+C	au	net/minecraft/src/SyntaxErrorException
+C	aua	argo/jdom/JsonNodeSelectors_Number
+C	aub	argo/jdom/JsonNodeSelectors_Boolean
+C	auc	argo/jdom/JsonNodeSelectors_Array
+C	aud	argo/jdom/JsonNodeType
+C	aue	argo/jdom/JsonNumberNode
+C	auf	argo/jdom/JsonNumberNodeBuilder
+C	aug	argo/jdom/JsonObject
+C	auh	argo/jdom/JsonObjectNodeBuilder
+C	aui	argo/jdom/JsonObjectNodeBuilder_List
+C	auj	argo/jdom/JsonRootNode
+C	auk	argo/jdom/JsonStringNode
+C	aul	argo/jdom/JsonStringNodeBuilder
+C	aum	argo/jdom/LeafFunctor
+C	aun	argo/saj/InvalidSyntaxException
+C	auo	argo/saj/JsonListener
+C	aup	argo/saj/PositionTrackingPushbackReader
+C	auq	argo/saj/SajParser
+C	aur	argo/saj/ThingWithPosition
+C	aus	net/minecraft/src/ThreadDownloadResources
+C	aut	net/minecraft/src/ActiveRenderInfo
+C	auv	net/minecraft/src/PanelCrashReport
+C	auw	net/minecraft/src/CanvasCrashReport
+C	aux	net/minecraft/src/CanvasMojangLogo
+C	auz	net/minecraft/src/ChatLine
+C	av	net/minecraft/src/PlayerNotFoundException
+C	ava	net/minecraft/src/KeyBinding
+C	avb	net/minecraft/src/RenderHelper
+C	avc	net/minecraft/src/GLAllocation
+C	avd	net/minecraft/src/ThreadClientSleep
+C	ave	net/minecraft/src/CallableModded
+C	avf	net/minecraft/src/CallableType2
+C	avg	net/minecraft/src/CallableTexturePack
+C	avh	net/minecraft/src/CallableClientProfiler
+C	avi	net/minecraft/src/CallableClientMemoryStats
+C	avj	net/minecraft/src/EnumOSHelper
+C	avk	net/minecraft/src/MinecraftFakeLauncher
+C	avl	net/minecraft/src/StatStringFormatKeyInv
+C	avm	net/minecraft/src/CallableUpdatingScreenName
+C	avn	net/minecraft/src/CallableParticleScreenName
+C	avo	net/minecraft/src/CallableTickingScreenName
+C	avp	net/minecraft/src/GameWindowListener
+C	avq	net/minecraft/src/ThreadShutdown
+C	avr	net/minecraft/src/CallableLWJGLVersion
+C	avs	net/minecraft/src/CallableGLInfo
+C	avt	net/minecraft/src/EnumOS
+C	avu	net/minecraft/src/CanvasMinecraftApplet
+C	avv	net/minecraft/src/MinecraftAppletImpl
+C	avw	net/minecraft/src/MouseHelper
+C	avx	net/minecraft/src/OpenGlCapsChecker
+C	avy	net/minecraft/src/GameSettings
+C	avz	net/minecraft/src/EnumOptionsHelper
+C	aw	net/minecraft/src/CommandNotFoundException
+C	awa	net/minecraft/src/EnumOptions
+C	awb	net/minecraft/src/LoadingScreenRenderer
+C	awc	net/minecraft/src/ScreenShotHelper
+C	awd	net/minecraft/src/MinecraftError
+C	awe	net/minecraft/src/Timer
+C	awf	net/minecraft/src/Session
+C	awg	net/minecraft/src/GuiButton
+C	awh	net/minecraft/src/GuiNewChat
+C	awi	net/minecraft/src/ScreenChatOptions
+C	awj	net/minecraft/src/GuiChat
+C	awk	net/minecraft/src/GuiYesNo
+C	awl	net/minecraft/src/GuiControls
+C	awm	net/minecraft/src/GuiCreateFlatWorld
+C	awn	net/minecraft/src/GuiCreateFlatWorldListSlot
+C	awo	net/minecraft/src/GuiCreateWorld
+C	awp	net/minecraft/src/GuiGameOver
+C	awq	net/minecraft/src/GuiScreenDemo
+C	awr	net/minecraft/src/GuiScreenServerList
+C	aws	net/minecraft/src/GuiTextField
+C	awt	net/minecraft/src/GuiScreenAddServer
+C	awu	net/minecraft/src/GuiErrorScreen
+C	awv	net/minecraft/src/FontRenderer
+C	aww	net/minecraft/src/GuiIngame
+C	awx	net/minecraft/src/Gui
+C	awy	net/minecraft/src/ChatClickData
+C	awz	net/minecraft/src/GuiSleepMP
+C	ax	net/minecraft/src/WrongUsageException
+C	axa	net/minecraft/src/GuiMultiplayer
+C	axb	net/minecraft/src/GuiSlotServer
+C	axc	net/minecraft/src/ThreadPollServers
+C	axd	net/minecraft/src/GuiButtonLanguage
+C	axe	net/minecraft/src/GuiLanguage
+C	axf	net/minecraft/src/GuiSlotLanguage
+C	axh	net/minecraft/src/GuiButtonLink
+C	axi	net/minecraft/src/MapItemRenderer
+C	axj	net/minecraft/src/GuiOptions
+C	axk	net/minecraft/src/GuiMemoryErrorScreen
+C	axl	net/minecraft/src/GuiIngameMenu
+C	axm	net/minecraft/src/GuiFlatPresets
+C	axn	net/minecraft/src/GuiFlatPresetsItem
+C	axo	net/minecraft/src/GuiFlatPresetsListSlot
+C	axp	net/minecraft/src/GuiProgress
+C	axq	net/minecraft/src/GuiRenameWorld
+C	axr	net/minecraft/src/GuiScreen
+C	axs	net/minecraft/src/ScaledResolution
+C	axt	net/minecraft/src/GuiSlot
+C	axu	net/minecraft/src/GuiSelectWorld
+C	axv	net/minecraft/src/GuiWorldSlot
+C	axw	net/minecraft/src/GuiShareToLan
+C	axx	net/minecraft/src/GuiSlider
+C	axy	net/minecraft/src/GuiSmallButton
+C	axz	net/minecraft/src/GuiSnooper
+C	aya	net/minecraft/src/GuiSnooperList
+C	ayb	net/minecraft/src/GuiVideoSettings
+C	ayc	net/minecraft/src/GuiAchievement
+C	ayd	net/minecraft/src/GuiAchievements
+C	aye	net/minecraft/src/GuiStats
+C	ayf	net/minecraft/src/GuiSlotStatsBlock
+C	ayg	net/minecraft/src/SorterStatsBlock
+C	ayh	net/minecraft/src/GuiSlotStatsGeneral
+C	ayi	net/minecraft/src/GuiSlotStatsItem
+C	ayj	net/minecraft/src/SorterStatsItem
+C	ayk	net/minecraft/src/GuiSlotStats
+C	ayl	net/minecraft/src/GuiContainer
+C	aym	net/minecraft/src/GuiBeacon
+C	ayn	net/minecraft/src/GuiBeaconButtonCancel
+C	ayo	net/minecraft/src/GuiBeaconButtonConfirm
+C	ayp	net/minecraft/src/GuiBeaconButtonPower
+C	ayq	net/minecraft/src/GuiBeaconButton
+C	ayr	net/minecraft/src/GuiScreenBook
+C	ays	net/minecraft/src/GuiButtonNextPage
+C	ayt	net/minecraft/src/GuiBrewingStand
+C	ayu	net/minecraft/src/GuiCommandBlock
+C	ayv	net/minecraft/src/GuiChest
+C	ayw	net/minecraft/src/GuiCrafting
+C	ayx	net/minecraft/src/CreativeCrafting
+C	ayy	net/minecraft/src/GuiContainerCreative
+C	ayz	net/minecraft/src/ContainerCreative
+C	az	net/minecraft/src/IBlockSource
+C	aza	net/minecraft/src/SlotCreativeInventory
+C	azb	net/minecraft/src/InventoryEffectRenderer
+C	azc	net/minecraft/src/EnchantmentNameParts
+C	azd	net/minecraft/src/GuiEnchantment
+C	aze	net/minecraft/src/GuiFurnace
+C	azf	net/minecraft/src/GuiHopper
+C	azg	net/minecraft/src/GuiInventory
+C	azh	net/minecraft/src/GuiMerchant
+C	azi	net/minecraft/src/GuiButtonMerchant
+C	azj	net/minecraft/src/GuiRepair
+C	azk	net/minecraft/src/GuiEditSign
+C	azl	net/minecraft/src/GuiDispenser
+C	azm	net/minecraft/src/GuiScreenConfigureWorld
+C	azn	net/minecraft/src/SelectionListInvited
+C	azo	net/minecraft/src/GuiScreenCreateOnlineWorld
+C	azp	net/minecraft/src/ThreadCreateOnlineWorldScreen
+C	azq	net/minecraft/src/TaskWorldCreation
+C	azr	net/minecraft/src/GuiScreenDisconnectedOnline
+C	azs	net/minecraft/src/GuiScreenEditOnlineWorld
+C	azv	net/minecraft/src/GuiScreenInvite
+C	azw	net/minecraft/src/GuiScreenSelectLocation
+C	azx	net/minecraft/src/SelectionListLocation
+C	azy	net/minecraft/src/GuiScreenConfirmation
+C	azz	net/minecraft/src/GuiScreenLongRunningTask
+C	b	net/minecraft/src/CrashReport
+C	ba	net/minecraft/src/BlockSourceImpl
+C	baa	net/minecraft/src/TaskLongRunning
+C	bab	net/minecraft/src/McoServerList
+C	bac	net/minecraft/src/McoServerListINNER1
+C	bad	net/minecraft/src/TimerTaskMcoServerListUpdate
+C	bae	net/minecraft/src/TimerTaskMcoServerListUpdateComparator
+C	baf	net/minecraft/src/SelectionListBase
+C	bag	net/minecraft/src/TaskOnlineConnect
+C	bah	net/minecraft/src/ThreadOnlineConnect
+C	bai	net/minecraft/src/GuiScreenOnlineServers
+C	baj	net/minecraft/src/ThreadOnlineScreen
+C	bak	net/minecraft/src/GuiSlotOnlineServerList
+C	bal	net/minecraft/src/ThreadConnectToOnlineServer
+C	bam	net/minecraft/src/GuiScreenResetWorld
+C	ban	net/minecraft/src/TaskResetWorld
+C	bao	net/minecraft/src/GuiScreenSubscription
+C	bap	net/minecraft/src/Particle
+C	baq	net/minecraft/src/GuiParticle
+C	bar	net/minecraft/src/GuiWinGame
+C	baw	net/minecraft/src/McoClient
+C	bax	net/minecraft/src/ExceptionMcoHttp
+C	bay	net/minecraft/src/Request
+C	baz	net/minecraft/src/RequestDelete
+C	bb	net/minecraft/src/BehaviorDefaultDispenseItem
+C	bba	net/minecraft/src/RequestGet
+C	bbb	net/minecraft/src/RequestPost
+C	bbc	net/minecraft/src/RequestPut
+C	bbd	net/minecraft/src/Location
+C	bbe	net/minecraft/src/Locations
+C	bbf	net/minecraft/src/McoServer
+C	bbg	net/minecraft/src/McoServerAddress
+C	bbh	net/minecraft/src/ValueObjectList
+C	bbi	net/minecraft/src/ExceptionMcoService
+C	bbj	net/minecraft/src/ExceptionRetryCall
+C	bbk	net/minecraft/src/ValueObjectSubscription
+C	bbl	net/minecraft/src/ValueObject
+C	bbm	net/minecraft/src/McoOption
+C	bbn	net/minecraft/src/McoOptionNone
+C	bbo	net/minecraft/src/McoOptionSome
+C	bbp	net/minecraft/src/McoPair
+C	bbq	net/minecraft/src/ModelBat
+C	bbr	net/minecraft/src/ModelBlaze
+C	bbs	net/minecraft/src/ModelBoat
+C	bbt	net/minecraft/src/ModelBook
+C	bbu	net/minecraft/src/ModelChest
+C	bbv	net/minecraft/src/ModelChicken
+C	bbw	net/minecraft/src/ModelCow
+C	bbx	net/minecraft/src/ModelCreeper
+C	bby	net/minecraft/src/ModelEnderman
+C	bbz	net/minecraft/src/ModelGhast
+C	bc	net/minecraft/src/RegistryDefaulted
+C	bca	net/minecraft/src/ModelBiped
+C	bcb	net/minecraft/src/ModelLargeChest
+C	bcc	net/minecraft/src/ModelMagmaCube
+C	bcd	net/minecraft/src/ModelMinecart
+C	bce	net/minecraft/src/ModelBase
+C	bcf	net/minecraft/src/ModelOcelot
+C	bcg	net/minecraft/src/ModelPig
+C	bch	net/minecraft/src/TexturedQuad
+C	bci	net/minecraft/src/ModelQuadruped
+C	bcj	net/minecraft/src/ModelSheep1
+C	bck	net/minecraft/src/ModelSheep2
+C	bcl	net/minecraft/src/ModelSign
+C	bcm	net/minecraft/src/ModelSilverfish
+C	bcn	net/minecraft/src/ModelSkeletonHead
+C	bco	net/minecraft/src/ModelSkeleton
+C	bcq	net/minecraft/src/ModelSlime
+C	bcr	net/minecraft/src/ModelSnowMan
+C	bcs	net/minecraft/src/ModelSpider
+C	bct	net/minecraft/src/ModelSquid
+C	bcu	net/minecraft/src/PositionTextureVertex
+C	bcv	net/minecraft/src/ModelIronGolem
+C	bcw	net/minecraft/src/ModelVillager
+C	bcx	net/minecraft/src/ModelZombieVillager
+C	bcy	net/minecraft/src/ModelWitch
+C	bcz	net/minecraft/src/ModelWither
+C	bd	net/minecraft/src/IBehaviorDispenseItem
+C	bda	net/minecraft/src/ModelWolf
+C	bdb	net/minecraft/src/ModelZombie
+C	bdc	net/minecraft/src/ModelDragon
+C	bdd	net/minecraft/src/ModelEnderCrystal
+C	bde	net/minecraft/src/ModelBox
+C	bdj	net/minecraft/src/ModelRenderer
+C	bdk	net/minecraft/src/TextureOffset
+C	bdl	net/minecraft/src/NetClientHandler
+C	bdm	net/minecraft/src/NetClientWebTextures
+C	bdn	net/minecraft/src/GuiConfirmOpenLink
+C	bdo	net/minecraft/src/GuiConnecting
+C	bdp	net/minecraft/src/ThreadConnectToServer
+C	bdq	net/minecraft/src/GuiDisconnected
+C	bdr	net/minecraft/src/ChunkProviderClient
+C	bds	net/minecraft/src/PlayerControllerMP
+C	bdt	net/minecraft/src/WorldClient
+C	bdu	net/minecraft/src/CallableMPL1
+C	bdv	net/minecraft/src/CallableMPL2
+C	bdw	net/minecraft/src/EntityClientPlayerMP
+C	bdx	net/minecraft/src/GuiPlayerInfo
+C	bdy	net/minecraft/src/GuiDownloadTerrain
+C	bdz	net/minecraft/src/ServerAddress
+C	be	net/minecraft/src/BehaviorDispenseItemProvider
+C	bea	net/minecraft/src/ServerData
+C	beb	net/minecraft/src/ServerList
+C	bec	net/minecraft/src/EntityBreakingFX
+C	bed	net/minecraft/src/EntityBubbleFX
+C	bee	net/minecraft/src/EntityCrit2FX
+C	bef	net/minecraft/src/EntityCritFX
+C	beg	net/minecraft/src/EntityDropParticleFX
+C	beh	net/minecraft/src/EntityEnchantmentTableParticleFX
+C	bei	net/minecraft/src/EntityExplodeFX
+C	bek	net/minecraft/src/EntityFireworkOverlayFX
+C	bel	net/minecraft/src/EntityFireworkSparkFX
+C	bem	net/minecraft/src/EntityFireworkStarterFX
+C	ben	net/minecraft/src/EntityFlameFX
+C	beo	net/minecraft/src/EntityFootStepFX
+C	bep	net/minecraft/src/EntityHeartFX
+C	beq	net/minecraft/src/EntityLargeExplodeFX
+C	ber	net/minecraft/src/EntityHugeExplodeFX
+C	bes	net/minecraft/src/EntityLavaFX
+C	bet	net/minecraft/src/EntityNoteFX
+C	beu	net/minecraft/src/EntityFX
+C	bev	net/minecraft/src/EffectRenderer
+C	bew	net/minecraft/src/EntityCloudFX
+C	bex	net/minecraft/src/EntityPortalFX
+C	bey	net/minecraft/src/EntityReddustFX
+C	bez	net/minecraft/src/EntitySmokeFX
+C	bf	net/minecraft/src/EnumFacing
+C	bfa	net/minecraft/src/EntitySnowShovelFX
+C	bfb	net/minecraft/src/EntitySpellParticleFX
+C	bfc	net/minecraft/src/EntitySplashFX
+C	bfd	net/minecraft/src/EntitySuspendFX
+C	bfe	net/minecraft/src/EntityAuraFX
+C	bff	net/minecraft/src/EntityPickupFX
+C	bfg	net/minecraft/src/EntityDiggingFX
+C	bfh	net/minecraft/src/EntityRainFX
+C	bfi	net/minecraft/src/MovementInput
+C	bfj	net/minecraft/src/MovementInputFromOptions
+C	bfk	net/minecraft/src/EntityPlayerSP
+C	bfl	net/minecraft/src/EntityOtherPlayerMP
+C	bfm	net/minecraft/src/BossStatus
+C	bfn	net/minecraft/src/WorldRenderer
+C	bfo	net/minecraft/src/RenderSorter
+C	bfp	net/minecraft/src/EntitySorter
+C	bfq	net/minecraft/src/ChestItemRenderHelper
+C	bfr	net/minecraft/src/EntityRenderer
+C	bfs	net/minecraft/src/CallableScreenName
+C	bft	net/minecraft/src/CallableMouseLocation
+C	bfu	net/minecraft/src/CallableScreenSize
+C	bfv	net/minecraft/src/ThreadDownloadImageData
+C	bfw	net/minecraft/src/ThreadDownloadImage
+C	bfx	net/minecraft/src/IImageBuffer
+C	bfy	net/minecraft/src/ItemRenderer
+C	bfz	net/minecraft/src/RenderGlobal
+C	bg	net/minecraft/src/ILocatableSource
+C	bga	net/minecraft/src/CallableParticlePositionInfo
+C	bgb	net/minecraft/src/ImageBufferDownload
+C	bgc	net/minecraft/src/RenderList
+C	bgd	net/minecraft/src/Rect2i
+C	bge	net/minecraft/src/Tessellator
+C	bgf	net/minecraft/src/RenderEngine
+C	bgg	net/minecraft/src/RenderBlocks
+C	bgi	net/minecraft/src/ICamera
+C	bgj	net/minecraft/src/ClippingHelperImpl
+C	bgk	net/minecraft/src/Frustrum
+C	bgl	net/minecraft/src/ClippingHelper
+C	bgo	net/minecraft/src/RenderArrow
+C	bgp	net/minecraft/src/RenderBat
+C	bgq	net/minecraft/src/RenderBlaze
+C	bgr	net/minecraft/src/RenderBoat
+C	bgs	net/minecraft/src/RenderChicken
+C	bgt	net/minecraft/src/RenderCow
+C	bgu	net/minecraft/src/RenderCreeper
+C	bgv	net/minecraft/src/RenderEntity
+C	bgw	net/minecraft/src/RenderEnderCrystal
+C	bgx	net/minecraft/src/RenderDragon
+C	bgy	net/minecraft/src/RenderEnderman
+C	bgz	net/minecraft/src/RenderManager
+C	bh	net/minecraft/src/ILocation
+C	bha	net/minecraft/src/Render
+C	bhb	net/minecraft/src/RenderXPOrb
+C	bhc	net/minecraft/src/RenderFallingSand
+C	bhd	net/minecraft/src/RenderFireball
+C	bhe	net/minecraft/src/RenderFish
+C	bhf	net/minecraft/src/RenderGhast
+C	bhg	net/minecraft/src/RenderGiantZombie
+C	bhh	net/minecraft/src/RenderBiped
+C	bhi	net/minecraft/src/RenderItemFrame
+C	bhj	net/minecraft/src/RenderItem
+C	bhk	net/minecraft/src/RenderSnowball
+C	bhl	net/minecraft/src/RenderMagmaCube
+C	bhm	net/minecraft/src/RenderLightningBolt
+C	bhn	net/minecraft/src/RenderMinecart
+C	bho	net/minecraft/src/RenderMinecartMobSpawner
+C	bhp	net/minecraft/src/RenderLiving
+C	bhq	net/minecraft/src/RenderMooshroom
+C	bhr	net/minecraft/src/RenderOcelot
+C	bhs	net/minecraft/src/RenderPainting
+C	bht	net/minecraft/src/RenderPig
+C	bhu	net/minecraft/src/RenderPlayer
+C	bhv	net/minecraft/src/RenderSheep
+C	bhw	net/minecraft/src/RenderSilverfish
+C	bhx	net/minecraft/src/RenderSkeleton
+C	bhy	net/minecraft/src/RenderSlime
+C	bhz	net/minecraft/src/RenderSnowMan
+C	bi	net/minecraft/src/IPosition
+C	bia	net/minecraft/src/RenderSpider
+C	bib	net/minecraft/src/RenderSquid
+C	bic	net/minecraft/src/RenderTntMinecart
+C	bid	net/minecraft/src/RenderTNTPrimed
+C	bie	net/minecraft/src/RenderIronGolem
+C	bif	net/minecraft/src/RenderVillager
+C	big	net/minecraft/src/RenderWitch
+C	bih	net/minecraft/src/RenderWither
+C	bii	net/minecraft/src/RenderWitherSkull
+C	bij	net/minecraft/src/RenderWolf
+C	bik	net/minecraft/src/RenderZombie
+C	bil	net/minecraft/src/StitchSlot
+C	bim	net/minecraft/src/TextureStitched
+C	bin	net/minecraft/src/Stitcher
+C	bio	net/minecraft/src/StitcherException
+C	bip	net/minecraft/src/Texture
+C	biq	net/minecraft/src/StitchHolder
+C	bir	net/minecraft/src/TextureManager
+C	bis	net/minecraft/src/TextureMap
+C	bit	net/minecraft/src/TextureClock
+C	biu	net/minecraft/src/TextureCompass
+C	biv	net/minecraft/src/TileEntityBeaconRenderer
+C	biw	net/minecraft/src/TileEntityChestRenderer
+C	bix	net/minecraft/src/RenderEnchantmentTable
+C	biy	net/minecraft/src/TileEntityEnderChestRenderer
+C	biz	net/minecraft/src/TileEntityMobSpawnerRenderer
+C	bj	net/minecraft/src/PositionImpl
+C	bja	net/minecraft/src/TileEntityRendererPiston
+C	bjb	net/minecraft/src/TileEntitySignRenderer
+C	bjc	net/minecraft/src/TileEntitySkullRenderer
+C	bjd	net/minecraft/src/RenderEndPortal
+C	bje	net/minecraft/src/TileEntityRenderer
+C	bjf	net/minecraft/src/TileEntitySpecialRenderer
+C	bjg	net/minecraft/src/IntegratedPlayerList
+C	bjh	net/minecraft/src/IntegratedServer
+C	bji	net/minecraft/src/CallableType3
+C	bjj	net/minecraft/src/CallableIsModded
+C	bjk	net/minecraft/src/IntegratedServerListenThread
+C	bjm	net/minecraft/src/LanServer
+C	bjn	net/minecraft/src/ThreadLanServerFind
+C	bjo	net/minecraft/src/LanServerList
+C	bjp	net/minecraft/src/ThreadLanServerPing
+C	bjq	net/minecraft/src/TexturePackImplementation
+C	bjr	net/minecraft/src/TexturePackDefault
+C	bjs	net/minecraft/src/TexturePackCustom
+C	bjt	net/minecraft/src/TexturePackFolder
+C	bju	net/minecraft/src/ITexturePack
+C	bjv	net/minecraft/src/TexturePackList
+C	bjw	net/minecraft/src/TexturePackDownloadSuccess
+C	bjx	net/minecraft/src/GuiTexturePacks
+C	bjy	net/minecraft/src/GuiTexturePackSlot
+C	bjz	net/minecraft/src/CodecMus
+C	bk	net/minecraft/src/IRegistry
+C	bka	net/minecraft/src/MusInputStream
+C	bkb	net/minecraft/src/SoundUpdaterMinecart
+C	bkc	net/minecraft/src/SoundPoolEntry
+C	bkd	net/minecraft/src/SoundManager
+C	bke	net/minecraft/src/ScheduledSound
+C	bkf	net/minecraft/src/SoundPool
+C	bkg	net/minecraft/src/GuiMainMenu
+C	bkh	net/minecraft/src/ThreadTitleScreen
+C	bki	net/minecraft/src/StatFileWriter
+C	bkj	net/minecraft/src/StatsSyncher
+C	bkk	net/minecraft/src/ThreadStatSyncherReceive
+C	bkl	net/minecraft/src/ThreadStatSyncherSend
+C	bkn	net/minecraft/src/OpenGlHelper
+C	bl	net/minecraft/src/RegistrySimple
+C	bo	net/minecraft/src/StatCollector
+C	bp	net/minecraft/src/StringTranslate
+C	bq	net/minecraft/src/NBTTagByteArray
+C	br	net/minecraft/src/NBTTagByte
+C	bs	net/minecraft/src/NBTTagCompound
+C	bt	net/minecraft/src/CallableTagCompound1
+C	bu	net/minecraft/src/CallableTagCompound2
+C	bv	net/minecraft/src/NBTTagDouble
+C	bw	net/minecraft/src/NBTTagEnd
+C	bx	net/minecraft/src/NBTTagFloat
+C	by	net/minecraft/src/NBTTagIntArray
+C	bz	net/minecraft/src/NBTTagInt
+C	c	net/minecraft/src/CallableMinecraftVersion
+C	ca	net/minecraft/src/NBTTagList
+C	cb	net/minecraft/src/NBTTagLong
+C	cc	net/minecraft/src/CompressedStreamTools
+C	cd	net/minecraft/src/NBTTagShort
+C	ce	net/minecraft/src/NBTTagString
+C	cf	net/minecraft/src/NBTBase
+C	cg	net/minecraft/src/INetworkManager
+C	ch	net/minecraft/src/MemoryConnection
+C	ci	net/minecraft/src/TcpConnection
+C	cj	net/minecraft/src/TcpReaderThread
+C	ck	net/minecraft/src/TcpWriterThread
+C	cl	net/minecraft/src/TcpMasterThread
+C	cm	net/minecraft/src/TcpMonitorThread
+C	cn	net/minecraft/src/Packet23VehicleSpawn
+C	co	net/minecraft/src/Packet26EntityExpOrb
+C	cp	net/minecraft/src/Packet71Weather
+C	cq	net/minecraft/src/Packet24MobSpawn
+C	cr	net/minecraft/src/Packet25EntityPainting
+C	cs	net/minecraft/src/Packet20NamedEntitySpawn
+C	ct	net/minecraft/src/Packet18Animation
+C	cu	net/minecraft/src/Packet200Statistic
+C	cv	net/minecraft/src/Packet203AutoComplete
+C	cw	net/minecraft/src/Packet3Chat
+C	cx	net/minecraft/src/Packet52MultiBlockChange
+C	cy	net/minecraft/src/Packet205ClientCommand
+C	cz	net/minecraft/src/Packet204ClientInfo
+C	d	net/minecraft/src/CallableOSInfo
+C	da	net/minecraft/src/Packet2ClientProtocol
+C	db	net/minecraft/src/Packet131MapData
+C	dc	net/minecraft/src/Packet106Transaction
+C	dd	net/minecraft/src/Packet108EnchantItem
+C	de	net/minecraft/src/Packet102WindowClick
+C	df	net/minecraft/src/Packet101CloseWindow
+C	dg	net/minecraft/src/Packet100OpenWindow
+C	dh	net/minecraft/src/Packet104WindowItems
+C	di	net/minecraft/src/Packet105UpdateProgressbar
+C	dj	net/minecraft/src/Packet103SetSlot
+C	dk	net/minecraft/src/Packet250CustomPayload
+C	dl	net/minecraft/src/Packet255KickDisconnect
+C	dm	net/minecraft/src/Packet17Sleep
+C	dn	net/minecraft/src/Packet38EntityStatus
+C	do	net/minecraft/src/Packet60Explosion
+C	dp	net/minecraft/src/Packet70GameEvent
+C	dq	net/minecraft/src/Packet254ServerPing
+C	dr	net/minecraft/src/Packet7UseEntity
+C	ds	net/minecraft/src/Packet0KeepAlive
+C	dt	net/minecraft/src/Packet51MapChunk
+C	du	net/minecraft/src/Packet51MapChunkData
+C	dv	net/minecraft/src/Packet56MapChunks
+C	dw	net/minecraft/src/Packet61DoorChange
+C	dx	net/minecraft/src/Packet63WorldParticles
+C	dy	net/minecraft/src/Packet62LevelSound
+C	dz	net/minecraft/src/Packet1Login
+C	e	net/minecraft/src/CallableJavaInfo
+C	ea	net/minecraft/src/Packet30Entity
+C	eb	net/minecraft/src/Packet31RelEntityMove
+C	ec	net/minecraft/src/Packet33RelEntityMoveLook
+C	ed	net/minecraft/src/Packet32EntityLook
+C	ee	net/minecraft/src/Packet10Flying
+C	ef	net/minecraft/src/Packet11PlayerPosition
+C	eg	net/minecraft/src/Packet13PlayerLookMove
+C	eh	net/minecraft/src/Packet12PlayerLook
+C	ei	net/minecraft/src/Packet
+C	ej	net/minecraft/src/NetHandler
+C	ek	net/minecraft/src/Packet202PlayerAbilities
+C	el	net/minecraft/src/Packet14BlockDig
+C	em	net/minecraft/src/Packet19EntityAction
+C	en	net/minecraft/src/Packet201PlayerInfo
+C	ep	net/minecraft/src/Packet29DestroyEntity
+C	eq	net/minecraft/src/Packet42RemoveEntityEffect
+C	er	net/minecraft/src/Packet9Respawn
+C	es	net/minecraft/src/Packet35EntityHeadRotation
+C	et	net/minecraft/src/Packet253ServerAuthData
+C	eu	net/minecraft/src/Packet16BlockItemSwitch
+C	ev	net/minecraft/src/Packet107CreativeSetSlot
+C	ew	net/minecraft/src/Packet208SetDisplayObjective
+C	ex	net/minecraft/src/Packet40EntityMetadata
+C	ey	net/minecraft/src/Packet28EntityVelocity
+C	ez	net/minecraft/src/Packet5PlayerInventory
+C	f	net/minecraft/src/CallableJavaInfo2
+C	fa	net/minecraft/src/Packet43Experience
+C	fb	net/minecraft/src/Packet8UpdateHealth
+C	fc	net/minecraft/src/Packet206SetObjective
+C	fd	net/minecraft/src/Packet209SetPlayerTeam
+C	fe	net/minecraft/src/Packet39AttachEntity
+C	ff	net/minecraft/src/Packet207SetScore
+C	fg	net/minecraft/src/Packet6SpawnPosition
+C	fh	net/minecraft/src/Packet4UpdateTime
+C	fi	net/minecraft/src/Packet252SharedKey
+C	fj	net/minecraft/src/Packet130UpdateSign
+C	fk	net/minecraft/src/Packet22Collect
+C	fl	net/minecraft/src/Packet34EntityTeleport
+C	fm	net/minecraft/src/Packet55BlockDestroy
+C	fn	net/minecraft/src/Packet132TileEntityData
+C	fo	net/minecraft/src/Packet54PlayNoteBlock
+C	fp	net/minecraft/src/Packet53BlockChange
+C	fq	net/minecraft/src/Packet41EntityEffect
+C	fr	net/minecraft/src/Packet15Place
+C	fs	net/minecraft/src/BehaviorProjectileDispense
+C	ft	net/minecraft/src/BanEntry
+C	fu	net/minecraft/src/BanList
+C	fv	net/minecraft/src/ServerCommand
+C	fx	net/minecraft/src/DispenserBehaviors
+C	fy	net/minecraft/src/DispenserBehaviorArrow
+C	fz	net/minecraft/src/DispenserBehaviorFilledBucket
+C	g	net/minecraft/src/CallableMemoryInfo
+C	ga	net/minecraft/src/DispenserBehaviorEmptyBucket
+C	gb	net/minecraft/src/DispenserBehaviorFire
+C	gc	net/minecraft/src/DispenserBehaviorDye
+C	gd	net/minecraft/src/DispenserBehaviorTNT
+C	ge	net/minecraft/src/DispenserBehaviorEgg
+C	gf	net/minecraft/src/DispenserBehaviorSnowball
+C	gg	net/minecraft/src/DispenserBehaviorExperience
+C	gh	net/minecraft/src/DispenserBehaviorPotion
+C	gi	net/minecraft/src/DispenserBehaviorPotionProjectile
+C	gj	net/minecraft/src/DispenserBehaviorMobEgg
+C	gk	net/minecraft/src/DispenserBehaviorFireworks
+C	gl	net/minecraft/src/DispenserBehaviorFireball
+C	gm	net/minecraft/src/DispenserBehaviorBoat
+C	gn	net/minecraft/src/ConvertingProgressUpdate
+C	gp	net/minecraft/src/ThreadMinecraftServer
+C	gq	net/minecraft/src/CallableIsServerModded
+C	gr	net/minecraft/src/CallableServerProfiler
+C	gs	net/minecraft/src/CallableServerMemoryStats
+C	gt	net/minecraft/src/PlayerPositionComparator
+C	gu	net/minecraft/src/ServerConfigurationManager
+C	gv	net/minecraft/src/IServer
+C	gw	net/minecraft/src/ServerScoreboard
+C	gx	net/minecraft/src/PropertyManager
+C	gy	net/minecraft/src/IUpdatePlayerListBox
+C	gz	net/minecraft/src/CommandServerBanIp
+C	h	net/minecraft/src/CallableJVMFlags
+C	ha	net/minecraft/src/CommandServerBan
+C	hb	net/minecraft/src/CommandServerSay
+C	hc	net/minecraft/src/CommandClearInventory
+C	hd	net/minecraft/src/CommandServerDeop
+C	he	net/minecraft/src/CommandDebug
+C	hf	net/minecraft/src/CommandServerEmote
+C	hg	net/minecraft/src/CommandServerKick
+C	hh	net/minecraft/src/CommandServerBanlist
+C	hi	net/minecraft/src/CommandServerList
+C	hj	net/minecraft/src/CommandServerMessage
+C	hk	net/minecraft/src/CommandServerOp
+C	hl	net/minecraft/src/CommandServerPardonIp
+C	hm	net/minecraft/src/CommandServerPardon
+C	hn	net/minecraft/src/CommandServerPublishLocal
+C	ho	net/minecraft/src/CommandServerSaveAll
+C	hp	net/minecraft/src/CommandServerSaveOff
+C	hq	net/minecraft/src/CommandServerSaveOn
+C	hr	net/minecraft/src/ServerCommandScoreboard
+C	hs	net/minecraft/src/ServerCommandManager
+C	ht	net/minecraft/src/CommandSetSpawnpoint
+C	hu	net/minecraft/src/CommandServerStop
+C	hv	net/minecraft/src/CommandServerTp
+C	hw	net/minecraft/src/ServerCommandTestFor
+C	hx	net/minecraft/src/CommandServerWhitelist
+C	hy	net/minecraft/src/DedicatedPlayerList
+C	hz	net/minecraft/src/DedicatedServer
+C	i	net/minecraft/src/CallableCrashMemoryReport
+C	ia	net/minecraft/src/DedicatedServerSleepThread
+C	ib	net/minecraft/src/DedicatedServerCommandThread
+C	ic	net/minecraft/src/CallableType
+C	id	net/minecraft/src/CallableServerType
+C	ie	net/minecraft/src/DedicatedServerListenThread
+C	if	net/minecraft/src/ServerListenThread
+C	ip	net/minecraft/src/DestroyBlockProgress
+C	iq	net/minecraft/src/DemoWorldServer
+C	ir	net/minecraft/src/DemoWorldManager
+C	is	net/minecraft/src/WorldServerMulti
+C	it	net/minecraft/src/EntityTracker
+C	iu	net/minecraft/src/CallableEntityTracker
+C	iv	net/minecraft/src/WorldManager
+C	iw	net/minecraft/src/PlayerManager
+C	ix	net/minecraft/src/PlayerInstance
+C	iy	net/minecraft/src/ChunkProviderServer
+C	iz	net/minecraft/src/WorldServer
+C	j	net/minecraft/src/CallableSuspiciousClasses
+C	ja	net/minecraft/src/ServerBlockEvent
+C	jb	net/minecraft/src/ServerBlockEventList
+C	jc	net/minecraft/src/EntityPlayerMP
+C	jd	net/minecraft/src/ItemInWorldManager
+C	je	net/minecraft/src/EntityTrackerEntry
+C	jf	net/minecraft/src/NetLoginHandler
+C	jg	net/minecraft/src/ThreadLoginVerifier
+C	jh	net/minecraft/src/NetServerHandler
+C	ji	net/minecraft/src/CallablePacketID
+C	jj	net/minecraft/src/CallablePacketClass
+C	jk	net/minecraft/src/NetworkListenThread
+C	jl	net/minecraft/src/RConOutputStream
+C	jm	net/minecraft/src/RConUtils
+C	jn	net/minecraft/src/RConConsoleSource
+C	jo	net/minecraft/src/RConThreadBase
+C	jp	net/minecraft/src/RConThreadQuery
+C	jq	net/minecraft/src/RConThreadQueryAuth
+C	jr	net/minecraft/src/RConThreadClient
+C	jt	net/minecraft/src/RConThreadMain
+C	ju	net/minecraft/src/Achievement
+C	jv	net/minecraft/src/AchievementList
+C	jw	net/minecraft/src/IStatStringFormat
+C	jx	net/minecraft/src/StatBasic
+C	jy	net/minecraft/src/StatCrafting
+C	jz	net/minecraft/src/StatPlaceholder
+C	k	net/minecraft/src/ComparatorClassSorter
+C	ka	net/minecraft/src/StatBase
+C	kb	net/minecraft/src/StatTypeSimple
+C	kc	net/minecraft/src/StatTypeTime
+C	kd	net/minecraft/src/StatTypeDistance
+C	ke	net/minecraft/src/IStatType
+C	kf	net/minecraft/src/StatList
+C	kg	net/minecraft/src/AchievementMap
+C	kh	net/minecraft/src/LogAgent
+C	ki	net/minecraft/src/LogAgentINNER1
+C	kj	net/minecraft/src/LogFormatter
+C	kl	net/minecraft/src/CryptManager
+C	km	net/minecraft/src/MD5String
+C	kn	net/minecraft/src/HttpUtil
+C	ko	net/minecraft/src/HttpUtilRunnable
+C	kp	net/minecraft/src/IDownloadSuccess
+C	kq	net/minecraft/src/LowerStringMap
+C	kr	net/minecraft/src/IntHashMap
+C	ks	net/minecraft/src/IntHashMapEntry
+C	ku	net/minecraft/src/ILogAgent
+C	kv	net/minecraft/src/LongHashMap
+C	kw	net/minecraft/src/LongHashMapEntry
+C	kx	net/minecraft/src/MathHelper
+C	ky	net/minecraft/src/PacketCount
+C	l	net/minecraft/src/CallableIntCache
+C	la	net/minecraft/src/Profiler
+C	lb	net/minecraft/src/ProfilerResult
+C	lc	net/minecraft/src/IProgressUpdate
+C	le	net/minecraft/src/MouseFilter
+C	lf	net/minecraft/src/StringUtils
+C	lm	net/minecraft/src/Tuple
+C	ln	net/minecraft/src/WeightedRandom
+C	lo	net/minecraft/src/WeightedRandomItem
+C	lp	net/minecraft/src/WeightedRandomChestContent
+C	ls	net/minecraft/src/InventoryLargeChest
+C	lt	net/minecraft/src/IInventory
+C	lu	net/minecraft/src/IInvBasic
+C	lw	net/minecraft/src/IconFlipped
+C	lx	net/minecraft/src/Icon
+C	ly	net/minecraft/src/IconRegister
+C	lz	net/minecraft/src/InventoryBasic
+C	m	net/minecraft/src/CrashReportCategory
+C	ma	net/minecraft/src/PlayerUsageSnooper
+C	mb	net/minecraft/src/PlayerUsageSnooperThread
+C	mc	net/minecraft/src/IPlayerUsage
+C	md	net/minecraft/src/ISidedInventory
+C	me	net/minecraft/src/CombatEntry
+C	mf	net/minecraft/src/CombatTracker
+C	mg	net/minecraft/src/DamageSource
+C	mh	net/minecraft/src/EntityDamageSource
+C	mi	net/minecraft/src/EntityDamageSourceIndirect
+C	mj	net/minecraft/src/PotionHealth
+C	mk	net/minecraft/src/Potion
+C	ml	net/minecraft/src/PotionEffect
+C	mm	net/minecraft/src/EntityAgeable
+C	mn	net/minecraft/src/IAnimals
+C	mp	net/minecraft/src/Entity
+C	mq	net/minecraft/src/CallableEntityType
+C	mr	net/minecraft/src/CallableEntityName
+C	ms	net/minecraft/src/EnumEntitySizeHelper
+C	mt	net/minecraft/src/EnumEntitySize
+C	mv	net/minecraft/src/EntityList
+C	mw	net/minecraft/src/EntityEggInfo
+C	my	net/minecraft/src/IEntitySelector
+C	mz	net/minecraft/src/EntitySelectorAlive
+C	n	net/minecraft/src/CallableBlockType
+C	na	net/minecraft/src/EntitySelectorInventory
+C	nb	net/minecraft/src/EntitySelectorArmoredMob
+C	nc	net/minecraft/src/EntityXPOrb
+C	nd	net/minecraft/src/EntityFlying
+C	ne	net/minecraft/src/EntityHanging
+C	nf	net/minecraft/src/EntityItemFrame
+C	ng	net/minecraft/src/EntityLiving
+C	nh	net/minecraft/src/CallableEffectName
+C	ni	net/minecraft/src/CallableEffectID
+C	nj	net/minecraft/src/CallableEffectDuration
+C	nk	net/minecraft/src/CallableEffectAmplifier
+C	nl	net/minecraft/src/CallableEffectIsSplash
+C	nm	net/minecraft/src/CallableEffectIsAmbient
+C	nn	net/minecraft/src/EnumCreatureType
+C	no	net/minecraft/src/EnumCreatureAttribute
+C	np	net/minecraft/src/EntityPainting
+C	nq	net/minecraft/src/EnumArt
+C	nr	net/minecraft/src/EntityCreature
+C	ns	net/minecraft/src/DataWatcher
+C	nt	net/minecraft/src/WatchableObject
+C	nu	net/minecraft/src/EntityTameable
+C	nv	net/minecraft/src/EntityBodyHelper
+C	nx	net/minecraft/src/EntityJumpHelper
+C	ny	net/minecraft/src/EntityLookHelper
+C	nz	net/minecraft/src/EntityMoveHelper
+C	o	net/minecraft/src/CallableBlockDataValue
+C	oa	net/minecraft/src/EntityAIAvoidEntity
+C	ob	net/minecraft/src/EntityAIAvoidEntitySelector
+C	oc	net/minecraft/src/EntityAIBeg
+C	od	net/minecraft/src/EntityAIBreakDoor
+C	oe	net/minecraft/src/EntityAIMate
+C	of	net/minecraft/src/EntityAIControlledByPlayer
+C	og	net/minecraft/src/EntityAIDoorInteract
+C	oh	net/minecraft/src/EntityAIEatGrass
+C	oi	net/minecraft/src/EntityAIFleeSun
+C	oj	net/minecraft/src/EntityAISwimming
+C	ok	net/minecraft/src/EntityAIFollowOwner
+C	ol	net/minecraft/src/EntityAIFollowParent
+C	om	net/minecraft/src/EntityAIBase
+C	on	net/minecraft/src/EntityAITasks
+C	oo	net/minecraft/src/EntityAITaskEntry
+C	op	net/minecraft/src/EntityAIWatchClosest2
+C	oq	net/minecraft/src/EntityAILeapAtTarget
+C	or	net/minecraft/src/EntityAIWatchClosest
+C	os	net/minecraft/src/EntityAILookAtTradePlayer
+C	ot	net/minecraft/src/EntityAIVillagerMate
+C	ou	net/minecraft/src/EntityAIAttackOnCollide
+C	ov	net/minecraft/src/EntityAIMoveIndoors
+C	ow	net/minecraft/src/EntityAIMoveThroughVillage
+C	ox	net/minecraft/src/EntityAIMoveTwardsRestriction
+C	oy	net/minecraft/src/EntityAIMoveTowardsTarget
+C	oz	net/minecraft/src/EntityAIOcelotAttack
+C	p	net/minecraft/src/CallableBlockLocation
+C	pa	net/minecraft/src/EntityAIOcelotSit
+C	pb	net/minecraft/src/EntityAILookAtVillager
+C	pc	net/minecraft/src/EntityAIOpenDoor
+C	pd	net/minecraft/src/EntityAIPanic
+C	pe	net/minecraft/src/EntityAIPlay
+C	pf	net/minecraft/src/EntityAILookIdle
+C	pg	net/minecraft/src/EntityAIWander
+C	ph	net/minecraft/src/EntityAIArrowAttack
+C	pi	net/minecraft/src/EntityAIRestrictOpenDoor
+C	pj	net/minecraft/src/EntityAIRestrictSun
+C	pk	net/minecraft/src/EntityAISit
+C	pl	net/minecraft/src/EntityAICreeperSwell
+C	pm	net/minecraft/src/EntityAIFollowGolem
+C	pn	net/minecraft/src/EntityAITempt
+C	po	net/minecraft/src/EntityAITradePlayer
+C	pp	net/minecraft/src/EntityAIDefendVillage
+C	pq	net/minecraft/src/EntityAIHurtByTarget
+C	pr	net/minecraft/src/EntityAINearestAttackableTarget
+C	ps	net/minecraft/src/EntityAINearestAttackableTargetSorter
+C	pt	net/minecraft/src/EntityAITargetNonTamed
+C	pu	net/minecraft/src/EntityAIOwnerHurtByTarget
+C	pv	net/minecraft/src/EntityAIOwnerHurtTarget
+C	pw	net/minecraft/src/EntityAITarget
+C	px	net/minecraft/src/PathNavigate
+C	py	net/minecraft/src/EntitySenses
+C	pz	net/minecraft/src/RandomPositionGenerator
+C	q	net/minecraft/src/CrashReportCategoryEntry
+C	qa	net/minecraft/src/VillageDoorInfo
+C	qb	net/minecraft/src/Village
+C	qc	net/minecraft/src/VillageAgressor
+C	qd	net/minecraft/src/VillageSiege
+C	qe	net/minecraft/src/VillageCollection
+C	qf	net/minecraft/src/EntityAmbientCreature
+C	qg	net/minecraft/src/EntityBat
+C	qh	net/minecraft/src/EntityAnimal
+C	qi	net/minecraft/src/EntityChicken
+C	qj	net/minecraft/src/EntityCow
+C	qk	net/minecraft/src/EntityGolem
+C	ql	net/minecraft/src/EntityMooshroom
+C	qm	net/minecraft/src/EntityOcelot
+C	qn	net/minecraft/src/EntityPig
+C	qo	net/minecraft/src/EntitySheep
+C	qp	net/minecraft/src/ContainerSheep
+C	qq	net/minecraft/src/EntitySnowman
+C	qr	net/minecraft/src/EntitySquid
+C	qs	net/minecraft/src/EntityIronGolem
+C	qt	net/minecraft/src/EntityWaterMob
+C	qu	net/minecraft/src/EntityWolf
+C	qv	net/minecraft/src/IBossDisplayData
+C	qw	net/minecraft/src/IEntityMultiPart
+C	qx	net/minecraft/src/EntityDragonPart
+C	qy	net/minecraft/src/EntityEnderCrystal
+C	qz	net/minecraft/src/EntityDragon
+C	r	net/minecraft/src/Direction
+C	rb	net/minecraft/src/EntityWither
+C	rc	net/minecraft/src/EntityWitherAttackFilter
+C	rd	net/minecraft/src/EntityWeatherEffect
+C	re	net/minecraft/src/EntityLightningBolt
+C	rf	net/minecraft/src/EntityBoat
+C	rg	net/minecraft/src/EntityFallingSand
+C	rh	net/minecraft/src/EntityItem
+C	ri	net/minecraft/src/EntityMinecart
+C	rj	net/minecraft/src/EntityMinecartChest
+C	rk	net/minecraft/src/EntityMinecartContainer
+C	rl	net/minecraft/src/EntityMinecartFurnace
+C	rm	net/minecraft/src/EntityMinecartHopper
+C	rn	net/minecraft/src/EntityMinecartEmpty
+C	ro	net/minecraft/src/EntityMinecartMobSpawner
+C	rp	net/minecraft/src/EntityMinecartMobSpawnerLogic
+C	rq	net/minecraft/src/EntityMinecartTNT
+C	rr	net/minecraft/src/EntityTNTPrimed
+C	rs	net/minecraft/src/EntityBlaze
+C	rt	net/minecraft/src/EntityCaveSpider
+C	ru	net/minecraft/src/EntityCreeper
+C	rv	net/minecraft/src/EntityEnderman
+C	rw	net/minecraft/src/IMob
+C	rx	net/minecraft/src/FilterIMob
+C	ry	net/minecraft/src/EntityGhast
+C	rz	net/minecraft/src/EntityGiantZombie
+C	s	net/minecraft/src/Facing
+C	sa	net/minecraft/src/EntityMagmaCube
+C	sb	net/minecraft/src/EntityMob
+C	sc	net/minecraft/src/EntityPigZombie
+C	sd	net/minecraft/src/IRangedAttackMob
+C	se	net/minecraft/src/EntitySilverfish
+C	sf	net/minecraft/src/EntitySkeleton
+C	sg	net/minecraft/src/EntitySlime
+C	sh	net/minecraft/src/EntitySpider
+C	si	net/minecraft/src/EntityWitch
+C	sj	net/minecraft/src/EntityZombie
+C	sk	net/minecraft/src/NpcMerchant
+C	sl	net/minecraft/src/INpc
+C	sm	net/minecraft/src/EntityVillager
+C	sn	net/minecraft/src/PlayerCapabilities
+C	so	net/minecraft/src/InventoryPlayer
+C	sp	net/minecraft/src/CallableItemName
+C	sq	net/minecraft/src/EntityPlayer
+C	sr	net/minecraft/src/EnumStatus
+C	ss	net/minecraft/src/EntityArrow
+C	st	net/minecraft/src/EntityEnderEye
+C	su	net/minecraft/src/EntityFireball
+C	sv	net/minecraft/src/EntityFireworkRocket
+C	sw	net/minecraft/src/EntityFishHook
+C	sx	net/minecraft/src/EntityLargeFireball
+C	sy	net/minecraft/src/IProjectile
+C	sz	net/minecraft/src/EntitySmallFireball
+C	t	net/minecraft/src/ChunkCoordinates
+C	ta	net/minecraft/src/EntitySnowball
+C	tb	net/minecraft/src/EntityThrowable
+C	tc	net/minecraft/src/EntityEgg
+C	td	net/minecraft/src/EntityEnderPearl
+C	te	net/minecraft/src/EntityExpBottle
+C	tf	net/minecraft/src/EntityPotion
+C	tg	net/minecraft/src/EntityWitherSkull
+C	ti	net/minecraft/src/FoodStats
+C	tj	net/minecraft/src/Container
+C	tk	net/minecraft/src/ContainerBeacon
+C	tl	net/minecraft/src/SlotBeacon
+C	tm	net/minecraft/src/ContainerBrewingStand
+C	tn	net/minecraft/src/SlotBrewingStandIngredient
+C	to	net/minecraft/src/SlotBrewingStandPotion
+C	tp	net/minecraft/src/ICrafting
+C	tq	net/minecraft/src/ContainerChest
+C	tr	net/minecraft/src/InventoryCrafting
+C	ts	net/minecraft/src/ContainerWorkbench
+C	tt	net/minecraft/src/ContainerEnchantment
+C	tu	net/minecraft/src/SlotEnchantmentTable
+C	tv	net/minecraft/src/SlotEnchantment
+C	tw	net/minecraft/src/ContainerFurnace
+C	tx	net/minecraft/src/SlotFurnace
+C	ty	net/minecraft/src/ContainerHopper
+C	tz	net/minecraft/src/ContainerPlayer
+C	u	net/minecraft/src/ReportedException
+C	ua	net/minecraft/src/SlotArmor
+C	uc	net/minecraft/src/InventoryMerchant
+C	ud	net/minecraft/src/ContainerMerchant
+C	ue	net/minecraft/src/SlotMerchantResult
+C	uf	net/minecraft/src/InventoryEnderChest
+C	ug	net/minecraft/src/ContainerRepair
+C	uh	net/minecraft/src/InventoryRepair
+C	ui	net/minecraft/src/SlotRepair
+C	uj	net/minecraft/src/InventoryCraftResult
+C	uk	net/minecraft/src/SlotCrafting
+C	ul	net/minecraft/src/Slot
+C	um	net/minecraft/src/ContainerDispenser
+C	un	net/minecraft/src/ItemAnvilBlock
+C	uo	net/minecraft/src/ItemArmor
+C	up	net/minecraft/src/BehaviorDispenseArmor
+C	uq	net/minecraft/src/EnumArmorMaterial
+C	ur	net/minecraft/src/ItemBlockWithMetadata
+C	us	net/minecraft/src/ItemBed
+C	ut	net/minecraft/src/ItemBoat
+C	uu	net/minecraft/src/ItemBook
+C	uv	net/minecraft/src/ItemGlassBottle
+C	uw	net/minecraft/src/ItemBow
+C	ux	net/minecraft/src/ItemSoup
+C	uy	net/minecraft/src/ItemBucket
+C	uz	net/minecraft/src/ItemCarrotOnAStick
+C	v	net/minecraft/src/ChatAllowedCharacters
+C	va	net/minecraft/src/ItemCloth
+C	vb	net/minecraft/src/ItemCoal
+C	vc	net/minecraft/src/ItemColored
+C	vd	net/minecraft/src/ItemMapBase
+C	ve	net/minecraft/src/CreativeTabs
+C	vf	net/minecraft/src/CreativeTabBlock
+C	vg	net/minecraft/src/CreativeTabBrewing
+C	vh	net/minecraft/src/CreativeTabMaterial
+C	vi	net/minecraft/src/CreativeTabInventory
+C	vj	net/minecraft/src/CreativeTabDeco
+C	vk	net/minecraft/src/CreativeTabRedstone
+C	vl	net/minecraft/src/CreativeTabTransport
+C	vm	net/minecraft/src/CreativeTabMisc
+C	vn	net/minecraft/src/CreativeTabSearch
+C	vo	net/minecraft/src/CreativeTabFood
+C	vp	net/minecraft/src/CreativeTabTools
+C	vq	net/minecraft/src/CreativeTabCombat
+C	vr	net/minecraft/src/ItemTool
+C	vs	net/minecraft/src/ItemDoor
+C	vt	net/minecraft/src/ItemDye
+C	vu	net/minecraft/src/ItemEgg
+C	vv	net/minecraft/src/ItemEmptyMap
+C	vw	net/minecraft/src/ItemEnchantedBook
+C	vx	net/minecraft/src/ItemEnderEye
+C	vy	net/minecraft/src/ItemEnderPearl
+C	vz	net/minecraft/src/ItemExpBottle
+C	w	net/minecraft/src/IAdminCommand
+C	wa	net/minecraft/src/ItemFireball
+C	wb	net/minecraft/src/ItemFireworkCharge
+C	wc	net/minecraft/src/ItemFirework
+C	wd	net/minecraft/src/ItemFishingRod
+C	we	net/minecraft/src/ItemFlintAndSteel
+C	wf	net/minecraft/src/ItemFood
+C	wg	net/minecraft/src/ItemAppleGold
+C	wh	net/minecraft/src/ItemHangingEntity
+C	wi	net/minecraft/src/ItemAxe
+C	wj	net/minecraft/src/ItemHoe
+C	wk	net/minecraft/src/Item
+C	wl	net/minecraft/src/EnumToolMaterial
+C	wm	net/minecraft/src/ItemStack
+C	wn	net/minecraft/src/ItemLeaves
+C	wo	net/minecraft/src/ItemMap
+C	wp	net/minecraft/src/ItemBucketMilk
+C	wq	net/minecraft/src/ItemMinecart
+C	wr	net/minecraft/src/BehaviorDispenseMinecart
+C	ws	net/minecraft/src/ItemMonsterPlacer
+C	wt	net/minecraft/src/ItemMultiTextureTile
+C	wu	net/minecraft/src/ItemPickaxe
+C	wv	net/minecraft/src/ItemPiston
+C	ww	net/minecraft/src/ItemPotion
+C	wx	net/minecraft/src/EnumRarity
+C	wy	net/minecraft/src/ItemRecord
+C	wz	net/minecraft/src/ItemRedstone
+C	x	net/minecraft/src/CommandBase
+C	xa	net/minecraft/src/ItemSaddle
+C	xc	net/minecraft/src/ItemSeedFood
+C	xd	net/minecraft/src/ItemSeeds
+C	xe	net/minecraft/src/ItemShears
+C	xf	net/minecraft/src/ItemSpade
+C	xg	net/minecraft/src/ItemSign
+C	xh	net/minecraft/src/ItemSimpleFoiled
+C	xi	net/minecraft/src/ItemSkull
+C	xj	net/minecraft/src/ItemSnow
+C	xk	net/minecraft/src/ItemSnowball
+C	xm	net/minecraft/src/ItemSlab
+C	xn	net/minecraft/src/ItemBlock
+C	xo	net/minecraft/src/ItemReed
+C	xp	net/minecraft/src/EnumAction
+C	xq	net/minecraft/src/ItemLilyPad
+C	xr	net/minecraft/src/ItemSword
+C	xs	net/minecraft/src/ItemWritableBook
+C	xt	net/minecraft/src/ItemEditableBook
+C	xu	net/minecraft/src/PotionHelper
+C	y	net/minecraft/src/CommandHandler
+C	yb	net/minecraft/src/RecipesArmorDyes
+C	yc	net/minecraft/src/RecipesArmor
+C	yd	net/minecraft/src/RecipesDyes
+C	ye	net/minecraft/src/RecipeFireworks
+C	yf	net/minecraft/src/RecipesFood
+C	yg	net/minecraft/src/FurnaceRecipes
+C	yh	net/minecraft/src/RecipesMapCloning
+C	yi	net/minecraft/src/RecipesMapExtending
+C	yj	net/minecraft/src/RecipesIngots
+C	yk	net/minecraft/src/CraftingManager
+C	yl	net/minecraft/src/RecipeSorter
+C	ym	net/minecraft/src/IRecipe
+C	yn	net/minecraft/src/ShapedRecipes
+C	yo	net/minecraft/src/ShapelessRecipes
+C	yp	net/minecraft/src/RecipesCrafting
+C	yq	net/minecraft/src/RecipesTools
+C	yr	net/minecraft/src/RecipesWeapons
+C	ys	net/minecraft/src/EnchantmentArrowDamage
+C	yt	net/minecraft/src/EnchantmentArrowFire
+C	yu	net/minecraft/src/EnchantmentArrowInfinite
+C	yv	net/minecraft/src/EnchantmentArrowKnockback
+C	yw	net/minecraft/src/EnchantmentDamage
+C	yx	net/minecraft/src/EnchantmentDurability
+C	yy	net/minecraft/src/EnchantmentDigging
+C	yz	net/minecraft/src/Enchantment
+C	z	net/minecraft/src/ICommand
+C	za	net/minecraft/src/EnumEnchantmentType
+C	zb	net/minecraft/src/EnchantmentHelper
+C	zc	net/minecraft/src/Empty3
+C	zd	net/minecraft/src/IEnchantmentModifier
+C	ze	net/minecraft/src/EnchantmentModifierLiving
+C	zf	net/minecraft/src/EnchantmentModifierDamage
+C	zg	net/minecraft/src/EnchantmentData
+C	zh	net/minecraft/src/EnchantmentFireAspect
+C	zi	net/minecraft/src/EnchantmentKnockback
+C	zj	net/minecraft/src/EnchantmentLootBonus
+C	zk	net/minecraft/src/EnchantmentOxygen
+C	zl	net/minecraft/src/EnchantmentProtection
+C	zm	net/minecraft/src/EnchantmentThorns
+C	zn	net/minecraft/src/EnchantmentUntouching
+C	zo	net/minecraft/src/EnchantmentWaterWorker
+C	zp	net/minecraft/src/IMerchant
+C	zq	net/minecraft/src/MerchantRecipe
+C	zr	net/minecraft/src/MerchantRecipeList
+C	zs	net/minecraft/src/MobSpawnerBaseLogic
+C	zt	net/minecraft/src/WeightedRandomMinecart
+C	zu	net/minecraft/src/ChunkCoordIntPair
+C	zw	net/minecraft/src/Explosion
+C	zx	net/minecraft/src/ColorizerFoliage
+C	zy	net/minecraft/src/GameRules
+C	zz	net/minecraft/src/GameRuleValue
+F	aab	I	field_72995_K	isRemote
+F	aab	e	field_72996_f	loadedEntityList
+F	aab	h	field_73010_i	playerEntities
+F	aab	s	field_73012_v	rand
+F	aab	t	field_73011_w	provider
+F	aab	v	field_73020_y	chunkProvider
+F	aab	x	field_72986_A	worldInfo
+F	aab	z	field_72988_C	mapStorage
+F	aav	A	field_76752_A	topBlock
+F	aav	B	field_76753_B	fillerBlock
+F	aav	D	field_76748_D	minHeight
+F	aav	E	field_76749_E	maxHeight
+F	aav	F	field_76750_F	temperature
+F	aav	G	field_76751_G	rainfall
+F	aav	H	field_76759_H	waterColorMultiplier
+F	aav	I	field_76760_I	theBiomeDecorator
+F	aav	J	field_76761_J	spawnableMonsterList
+F	aav	K	field_76762_K	spawnableCreatureList
+F	aav	L	field_76755_L	spawnableWaterCreatureList
+F	aav	M	field_82914_M	spawnableCaveCreatureList
+F	aav	N	field_76756_M	biomeID
+F	aav	S	field_76766_R	enableSnow
+F	aav	T	field_76765_S	enableRain
+F	aav	a	field_76773_a	biomeList
+F	aav	b	field_76771_b	ocean
+F	aav	c	field_76772_c	plains
+F	aav	d	field_76769_d	desert
+F	aav	e	field_76770_e	extremeHills
+F	aav	f	field_76767_f	forest
+F	aav	g	field_76768_g	taiga
+F	aav	h	field_76780_h	swampland
+F	aav	i	field_76781_i	river
+F	aav	j	field_76778_j	hell
+F	aav	k	field_76779_k	sky
+F	aav	l	field_76776_l	frozenOcean
+F	aav	m	field_76777_m	frozenRiver
+F	aav	n	field_76774_n	icePlains
+F	aav	o	field_76775_o	iceMountains
+F	aav	p	field_76789_p	mushroomIsland
+F	aav	q	field_76788_q	mushroomIslandShore
+F	aav	r	field_76787_r	beach
+F	aav	s	field_76786_s	desertHills
+F	aav	t	field_76785_t	forestHills
+F	aav	u	field_76784_u	taigaHills
+F	aav	v	field_76783_v	extremeHillsEdge
+F	aav	w	field_76782_w	jungle
+F	aav	x	field_76792_x	jungleHills
+F	aav	y	field_76791_y	biomeName
+F	aav	z	field_76790_z	color
+F	acj	d	field_75825_d	chunkSaveLocation
+F	acn	a	field_76579_a	worldObj
+F	acn	e	field_76575_d	isHellWorld
+F	acn	f	field_76576_e	hasNoSky
+F	acn	h	field_76574_g	dimensionId
+F	adj	a	field_76488_a	doBlockNotify
+F	adv	a	field_76542_a	minableBlockId
+F	adv	b	field_76541_b	numberOfBlocks
+F	adv	c	field_94523_c	field_94523_c
+F	aif	A	field_76266_z	pumpkin
+F	aif	B	field_76236_A	dragonEgg
+F	aif	C	field_76237_B	portal
+F	aif	D	field_76238_C	cake
+F	aif	E	field_76232_D	web
+F	aif	F	field_76233_E	piston
+F	aif	a	field_76249_a	air
+F	aif	b	field_76247_b	grass
+F	aif	c	field_76248_c	ground
+F	aif	d	field_76245_d	wood
+F	aif	e	field_76246_e	rock
+F	aif	f	field_76243_f	iron
+F	aif	g	field_82717_g	anvil
+F	aif	h	field_76244_g	water
+F	aif	i	field_76256_h	lava
+F	aif	j	field_76257_i	leaves
+F	aif	k	field_76254_j	plants
+F	aif	l	field_76255_k	vine
+F	aif	m	field_76252_l	sponge
+F	aif	n	field_76253_m	cloth
+F	aif	o	field_76250_n	fire
+F	aif	p	field_76251_o	sand
+F	aif	q	field_76265_p	circuits
+F	aif	r	field_76264_q	glass
+F	aif	s	field_76263_r	redstoneLight
+F	aif	t	field_76262_s	tnt
+F	aif	u	field_76261_t	coral
+F	aif	v	field_76260_u	ice
+F	aif	w	field_76259_v	snow
+F	aif	x	field_76258_w	craftedSnow
+F	aif	y	field_76268_x	cactus
+F	aif	z	field_76267_y	clay
+F	ajo	a	field_76189_a	dirty
+F	ajo	h	field_76190_i	mapName
+F	ajv	l	field_76105_j	dimension
+F	apa	A	field_71978_w	cobblestone
+F	apa	B	field_71988_x	planks
+F	apa	C	field_71987_y	sapling
+F	apa	D	field_71986_z	bedrock
+F	apa	E	field_71942_A	waterMoving
+F	apa	F	field_71943_B	waterStill
+F	apa	G	field_71944_C	lavaMoving
+F	apa	H	field_71938_D	lavaStill
+F	apa	I	field_71939_E	sand
+F	apa	J	field_71940_F	gravel
+F	apa	K	field_71941_G	oreGold
+F	apa	L	field_71949_H	oreIron
+F	apa	M	field_71950_I	oreCoal
+F	apa	N	field_71951_J	wood
+F	apa	O	field_71952_K	leaves
+F	apa	P	field_71945_L	sponge
+F	apa	Q	field_71946_M	glass
+F	apa	R	field_71947_N	oreLapis
+F	apa	S	field_71948_O	blockLapis
+F	apa	T	field_71958_P	dispenser
+F	apa	U	field_71957_Q	sandStone
+F	apa	V	field_71960_R	music
+F	apa	W	field_71959_S	bed
+F	apa	X	field_71954_T	railPowered
+F	apa	Y	field_71953_U	railDetector
+F	apa	Z	field_71956_V	pistonStickyBase
+F	apa	aA	field_72073_aw	oreDiamond
+F	apa	aB	field_72071_ax	blockDiamond
+F	apa	aC	field_72060_ay	workbench
+F	apa	aD	field_72058_az	crops
+F	apa	aE	field_72050_aA	tilledField
+F	apa	aF	field_72051_aB	furnaceIdle
+F	apa	aG	field_72052_aC	furnaceBurning
+F	apa	aH	field_72053_aD	signPost
+F	apa	aI	field_72054_aE	doorWood
+F	apa	aJ	field_72055_aF	ladder
+F	apa	aK	field_72056_aG	rail
+F	apa	aL	field_72057_aH	stairsCobblestone
+F	apa	aM	field_72042_aI	signWall
+F	apa	aN	field_72043_aJ	lever
+F	apa	aO	field_72044_aK	pressurePlateStone
+F	apa	aQ	field_72046_aM	pressurePlatePlanks
+F	apa	aR	field_72047_aN	oreRedstone
+F	apa	aS	field_72048_aO	oreRedstoneGlowing
+F	apa	aT	field_72049_aP	torchRedstoneIdle
+F	apa	aU	field_72035_aQ	torchRedstoneActive
+F	apa	aV	field_72034_aR	stoneButton
+F	apa	aW	field_72037_aS	snow
+F	apa	aX	field_72036_aT	ice
+F	apa	aY	field_72039_aU	blockSnow
+F	apa	aZ	field_72038_aV	cactus
+F	apa	aa	field_71955_W	web
+F	apa	ab	field_71962_X	tallGrass
+F	apa	ac	field_71961_Y	deadBush
+F	apa	ad	field_71963_Z	pistonBase
+F	apa	ae	field_72099_aa	pistonExtension
+F	apa	af	field_72101_ab	cloth
+F	apa	ag	field_72095_ac	pistonMoving
+F	apa	ah	field_72097_ad	plantYellow
+F	apa	ai	field_72107_ae	plantRed
+F	apa	aj	field_72109_af	mushroomBrown
+F	apa	ak	field_72103_ag	mushroomRed
+F	apa	al	field_72105_ah	blockGold
+F	apa	an	field_72085_aj	stoneDoubleSlab
+F	apa	ao	field_72079_ak	stoneSingleSlab
+F	apa	ap	field_72081_al	brick
+F	apa	aq	field_72091_am	tnt
+F	apa	ar	field_72093_an	bookShelf
+F	apa	as	field_72087_ao	cobblestoneMossy
+F	apa	at	field_72089_ap	obsidian
+F	apa	au	field_72069_aq	torchWood
+F	apa	av	field_72067_ar	fire
+F	apa	aw	field_72065_as	mobSpawner
+F	apa	ax	field_72063_at	stairsWoodOak
+F	apa	ay	field_72077_au	chest
+F	apa	az	field_72075_av	redstoneWire
+F	apa	b	field_71968_b	unlocalizedName
+F	apa	bA	field_71992_bw	stairsBrick
+F	apa	bB	field_71995_bx	stairsStoneBrick
+F	apa	bC	field_71994_by	mycelium
+F	apa	bD	field_71991_bz	waterlily
+F	apa	bE	field_72033_bA	netherBrick
+F	apa	bF	field_72098_bB	netherFence
+F	apa	bG	field_72100_bC	stairsNetherBrick
+F	apa	bH	field_72094_bD	netherStalk
+F	apa	bI	field_72096_bE	enchantmentTable
+F	apa	bJ	field_72106_bF	brewingStand
+F	apa	bK	field_72108_bG	cauldron
+F	apa	bL	field_72102_bH	endPortal
+F	apa	bM	field_72104_bI	endPortalFrame
+F	apa	bN	field_72082_bJ	whiteStone
+F	apa	bO	field_72084_bK	dragonEgg
+F	apa	bP	field_72078_bL	redstoneLampIdle
+F	apa	bQ	field_72080_bM	redstoneLampActive
+F	apa	bR	field_72090_bN	woodDoubleSlab
+F	apa	bS	field_72092_bO	woodSingleSlab
+F	apa	bT	field_72086_bP	cocoaPlant
+F	apa	bU	field_72088_bQ	stairsSandStone
+F	apa	bV	field_72068_bR	oreEmerald
+F	apa	bW	field_72066_bS	enderChest
+F	apa	bX	field_72064_bT	tripWireSource
+F	apa	bY	field_72062_bU	tripWire
+F	apa	bZ	field_72076_bV	blockEmerald
+F	apa	ba	field_72041_aW	blockClay
+F	apa	bb	field_72040_aX	reed
+F	apa	bc	field_72032_aY	jukebox
+F	apa	bd	field_72031_aZ	fence
+F	apa	be	field_72061_ba	pumpkin
+F	apa	bf	field_72012_bb	netherrack
+F	apa	bg	field_72013_bc	slowSand
+F	apa	bh	field_72014_bd	glowStone
+F	apa	bi	field_72015_be	portal
+F	apa	bj	field_72008_bf	pumpkinLantern
+F	apa	bk	field_72009_bg	cake
+F	apa	bl	field_72010_bh	redstoneRepeaterIdle
+F	apa	bm	field_72011_bi	redstoneRepeaterActive
+F	apa	bn	field_72004_bj	lockedChest
+F	apa	bo	field_72005_bk	trapdoor
+F	apa	bp	field_72006_bl	silverfish
+F	apa	bq	field_72007_bm	stoneBrick
+F	apa	br	field_72000_bn	mushroomCapBrown
+F	apa	bs	field_72001_bo	mushroomCapRed
+F	apa	bt	field_72002_bp	fenceIron
+F	apa	bu	field_72003_bq	thinGlass
+F	apa	bv	field_71997_br	melon
+F	apa	bw	field_71996_bs	pumpkinStem
+F	apa	bx	field_71999_bt	melonStem
+F	apa	by	field_71998_bu	vine
+F	apa	bz	field_71993_bv	fenceGate
+F	apa	cA	field_71989_cb	blockHardness
+F	apa	cB	field_72029_cc	blockResistance
+F	apa	cD	field_72027_ce	enableStats
+F	apa	cE	field_72028_cf	needsRandomTick
+F	apa	cF	field_72025_cg	isBlockContainer
+F	apa	cG	field_72026_ch	minX
+F	apa	cH	field_72023_ci	minY
+F	apa	cI	field_72024_cj	minZ
+F	apa	cJ	field_72021_ck	maxX
+F	apa	cK	field_72022_cl	maxY
+F	apa	cL	field_72019_cm	maxZ
+F	apa	cM	field_72020_cn	stepSound
+F	apa	cN	field_72017_co	blockParticleGravity
+F	apa	cO	field_72018_cp	blockMaterial
+F	apa	cP	field_72016_cq	slipperiness
+F	apa	cQ	field_94336_cN	blockIcon
+F	apa	ca	field_72074_bW	stairsWoodSpruce
+F	apa	cb	field_72072_bX	stairsWoodBirch
+F	apa	cc	field_72070_bY	stairsWoodJungle
+F	apa	cd	field_82517_cc	commandBlock
+F	apa	ce	field_82518_cd	beacon
+F	apa	cf	field_82515_ce	cobblestoneWall
+F	apa	cg	field_82516_cf	flowerPot
+F	apa	ch	field_82513_cg	carrot
+F	apa	ci	field_82514_ch	potato
+F	apa	cj	field_82511_ci	woodenButton
+F	apa	ck	field_82512_cj	skull
+F	apa	cl	field_82510_ck	anvil
+F	apa	cm	field_94347_ck	chestTrapped
+F	apa	cn	field_94348_cl	pressurePlateGold
+F	apa	co	field_94345_cm	pressurePlateIron
+F	apa	cp	field_94346_cn	redstoneComparatorIdle
+F	apa	cq	field_94343_co	redstoneComparatorActive
+F	apa	cr	field_94344_cp	daylightSensor
+F	apa	cs	field_94341_cq	blockRedstone
+F	apa	ct	field_94342_cr	oreNetherQuartz
+F	apa	cu	field_94340_cs	hopperBlock
+F	apa	cv	field_94339_ct	blockNetherQuartz
+F	apa	cx	field_94337_cv	railActivator
+F	apa	cy	field_96469_cy	dropper
+F	apa	cz	field_71990_ca	blockID
+F	apa	f	field_71966_d	soundPowderFootstep
+F	apa	g	field_71967_e	soundWoodFootstep
+F	apa	h	field_71964_f	soundGravelFootstep
+F	apa	i	field_71965_g	soundGrassFootstep
+F	apa	j	field_71976_h	soundStoneFootstep
+F	apa	k	field_71977_i	soundMetalFootstep
+F	apa	l	field_71974_j	soundGlassFootstep
+F	apa	m	field_71975_k	soundClothFootstep
+F	apa	n	field_71972_l	soundSandFootstep
+F	apa	o	field_82509_m	soundSnowFootstep
+F	apa	p	field_82507_n	soundLadderFootstep
+F	apa	q	field_82508_o	soundAnvilFootstep
+F	apa	r	field_71973_m	blocksList
+F	apa	s	field_71970_n	opaqueCubeLookup
+F	apa	t	field_71971_o	lightOpacity
+F	apa	u	field_71985_p	canBlockGrass
+F	apa	v	field_71984_q	lightValue
+F	apa	w	field_71982_s	useNeighborBrightness
+F	apa	x	field_71981_t	stone
+F	apa	y	field_71980_u	grass
+F	apa	z	field_71979_v	dirt
+F	ape	a	field_72681_a	stepSoundName
+F	ape	b	field_72679_b	stepSoundVolume
+F	ape	c	field_72680_c	stepSoundPitch
+F	aqp	k	field_70331_k	worldObj
+F	aqp	l	field_70329_l	xCoord
+F	aqp	m	field_70330_m	yCoord
+F	aqp	n	field_70327_n	zCoord
+F	aqp	o	field_70328_o	tileEntityInvalid
+F	aqp	p	field_70325_p	blockMetadata
+F	aqp	q	field_70324_q	blockType
+F	aqt	a	field_72119_a	isSticky
+F	aqx	a	field_72340_a	minX
+F	aqx	b	field_72338_b	minY
+F	aqx	c	field_72339_c	minZ
+F	aqx	d	field_72336_d	maxX
+F	aqx	e	field_72337_e	maxY
+F	aqx	f	field_72334_f	maxZ
+F	arc	c	field_72450_a	xCoord
+F	arc	d	field_72448_b	yCoord
+F	arc	e	field_72449_c	zCoord
+F	ava	a	field_74516_a	keybindArray
+F	ava	b	field_74514_b	hash
+F	ava	c	field_74515_c	keyDescription
+F	ava	d	field_74512_d	keyCode
+F	ava	e	field_74513_e	pressed
+F	avy	I	field_74351_w	keyBindForward
+F	avy	J	field_74370_x	keyBindLeft
+F	avy	K	field_74368_y	keyBindBack
+F	avy	L	field_74366_z	keyBindRight
+F	avy	M	field_74314_A	keyBindJump
+F	avy	N	field_74315_B	keyBindInventory
+F	avy	O	field_74316_C	keyBindDrop
+F	avy	P	field_74310_D	keyBindChat
+F	avy	Q	field_74311_E	keyBindSneak
+F	avy	R	field_74312_F	keyBindAttack
+F	avy	S	field_74313_G	keyBindUseItem
+F	avy	W	field_74324_K	keyBindings
+F	avy	X	field_74317_L	mc
+F	avy	al	field_74335_Z	guiScale
+F	avy	an	field_74363_ab	language
+F	avy	j	field_74347_j	fancyGraphics
+F	awg	a	field_73747_a	width
+F	awg	b	field_73745_b	height
+F	awg	c	field_73746_c	xPosition
+F	awg	d	field_73743_d	yPosition
+F	awg	e	field_73744_e	displayString
+F	awg	f	field_73741_f	id
+F	awg	g	field_73742_g	enabled
+F	awg	h	field_73748_h	drawButton
+F	awg	i	field_82253_i	field_82253_i
+F	aws	a	field_73815_a	fontRenderer
+F	aws	b	field_73813_b	xPos
+F	aws	c	field_73814_c	yPos
+F	aws	d	field_73811_d	width
+F	aws	e	field_73812_e	height
+F	aws	f	field_73809_f	text
+F	aws	l	field_73818_l	isFocused
+F	awv	a	field_78288_b	FONT_HEIGHT
+F	awv	g	field_78298_i	renderEngine
+F	awv	h	field_78295_j	posX
+F	awv	i	field_78296_k	posY
+F	awx	j	field_73735_i	zLevel
+F	axr	f	field_73882_e	mc
+F	axr	g	field_73880_f	width
+F	axr	h	field_73881_g	height
+F	axr	i	field_73887_h	buttonList
+F	axr	k	field_73885_j	allowUserInput
+F	axr	l	field_73886_k	fontRenderer
+F	ayl	b	field_74194_b	xSize
+F	ayl	c	field_74195_c	ySize
+F	ayl	d	field_74193_d	inventorySlots
+F	ayl	n	field_74198_m	guiLeft
+F	ayl	o	field_74197_n	guiTop
+F	bbq	a	field_82895_a	batHead
+F	bbq	b	field_82893_b	batBody
+F	bbq	c	field_82894_c	batRightWing
+F	bbq	d	field_82891_d	batLeftWing
+F	bbq	e	field_82892_e	batOuterRightWing
+F	bbq	f	field_82890_f	batOuterLeftWing
+F	bbr	a	field_78106_a	blazeSticks
+F	bbr	b	field_78105_b	blazeHead
+F	bbs	a	field_78103_a	boatSides
+F	bbt	a	field_78102_a	coverRight
+F	bbt	b	field_78100_b	coverLeft
+F	bbt	c	field_78101_c	pagesRight
+F	bbt	d	field_78098_d	pagesLeft
+F	bbt	e	field_78099_e	flippingPageRight
+F	bbt	f	field_78096_f	flippingPageLeft
+F	bbt	g	field_78097_g	bookSpine
+F	bbu	a	field_78234_a	chestLid
+F	bbu	b	field_78232_b	chestBelow
+F	bbu	c	field_78233_c	chestKnob
+F	bbv	a	field_78142_a	head
+F	bbv	b	field_78140_b	body
+F	bbv	c	field_78141_c	rightLeg
+F	bbv	d	field_78138_d	leftLeg
+F	bbv	e	field_78139_e	rightWing
+F	bbv	f	field_78136_f	leftWing
+F	bbv	g	field_78137_g	bill
+F	bbv	h	field_78143_h	chin
+F	bbx	a	field_78135_a	head
+F	bbx	b	field_78133_b	field_78133_b
+F	bbx	c	field_78134_c	body
+F	bbx	d	field_78131_d	leg1
+F	bbx	e	field_78132_e	leg2
+F	bbx	f	field_78129_f	leg3
+F	bbx	g	field_78130_g	leg4
+F	bbz	a	field_78128_a	body
+F	bbz	b	field_78127_b	tentacles
+F	bca	c	field_78116_c	bipedHead
+F	bca	d	field_78114_d	bipedHeadwear
+F	bca	e	field_78115_e	bipedBody
+F	bca	f	field_78112_f	bipedRightArm
+F	bca	g	field_78113_g	bipedLeftArm
+F	bca	h	field_78123_h	bipedRightLeg
+F	bca	i	field_78124_i	bipedLeftLeg
+F	bca	j	field_78121_j	bipedEars
+F	bca	k	field_78122_k	bipedCloak
+F	bcc	a	field_78109_a	field_78109_a
+F	bcc	b	field_78108_b	field_78108_b
+F	bcd	a	field_78154_a	sideModels
+F	bce	p	field_78095_p	onGround
+F	bce	q	field_78093_q	isRiding
+F	bce	r	field_78092_r	boxList
+F	bce	s	field_78091_s	isChild
+F	bce	t	field_78090_t	textureWidth
+F	bce	u	field_78089_u	textureHeight
+F	bcf	a	field_78161_a	ocelotBackLeftLeg
+F	bcf	b	field_78159_b	ocelotBackRightLeg
+F	bcf	c	field_78160_c	ocelotFrontLeftLeg
+F	bcf	d	field_78157_d	ocelotFrontRightLeg
+F	bcf	e	field_78158_e	ocelotTail
+F	bcf	f	field_78155_f	ocelotTail2
+F	bcf	g	field_78156_g	ocelotHead
+F	bcf	h	field_78162_h	ocelotBody
+F	bcf	i	field_78163_i	field_78163_i
+F	bci	a	field_78150_a	head
+F	bci	b	field_78148_b	body
+F	bci	c	field_78149_c	leg1
+F	bci	d	field_78146_d	leg2
+F	bci	e	field_78147_e	leg3
+F	bci	f	field_78144_f	leg4
+F	bci	g	field_78145_g	field_78145_g
+F	bci	h	field_78151_h	field_78151_h
+F	bcl	a	field_78166_a	signBoard
+F	bcl	b	field_78165_b	signStick
+F	bcm	a	field_78171_a	silverfishBodyParts
+F	bcm	b	field_78169_b	silverfishWings
+F	bcn	a	field_82896_a	skeletonHead
+F	bcq	a	field_78200_a	slimeBodies
+F	bcr	a	field_78196_a	body
+F	bcr	b	field_78194_b	bottomBody
+F	bcr	c	field_78195_c	head
+F	bcr	d	field_78192_d	rightHand
+F	bcr	e	field_78193_e	leftHand
+F	bcs	a	field_78209_a	spiderHead
+F	bcs	b	field_78207_b	spiderNeck
+F	bcs	c	field_78208_c	spiderBody
+F	bcs	d	field_78205_d	spiderLeg1
+F	bcs	e	field_78206_e	spiderLeg2
+F	bcs	f	field_78203_f	spiderLeg3
+F	bcs	g	field_78204_g	spiderLeg4
+F	bcs	h	field_78212_h	spiderLeg5
+F	bcs	i	field_78213_i	spiderLeg6
+F	bcs	j	field_78210_j	spiderLeg7
+F	bcs	k	field_78211_k	spiderLeg8
+F	bct	a	field_78202_a	squidBody
+F	bct	b	field_78201_b	squidTentacles
+F	bcv	a	field_78178_a	ironGolemHead
+F	bcv	b	field_78176_b	ironGolemBody
+F	bcv	c	field_78177_c	ironGolemRightArm
+F	bcv	d	field_78174_d	ironGolemLeftArm
+F	bcv	e	field_78175_e	ironGolemLeftLeg
+F	bcv	f	field_78173_f	ironGolemRightLeg
+F	bcw	a	field_78191_a	villagerHead
+F	bcw	b	field_78189_b	villagerBody
+F	bcw	c	field_78190_c	villagerArms
+F	bcw	d	field_78187_d	rightVillagerLeg
+F	bcw	e	field_78188_e	leftVillagerLeg
+F	bcw	f	field_82898_f	field_82898_f
+F	bcy	h	field_82901_h	field_82901_h
+F	bcy	i	field_82902_i	witchHat
+F	bcz	a	field_82905_a	field_82905_a
+F	bcz	b	field_82904_b	field_82904_b
+F	bda	a	field_78185_a	wolfHeadMain
+F	bda	b	field_78183_b	wolfBody
+F	bda	c	field_78184_c	wolfLeg1
+F	bda	d	field_78181_d	wolfLeg2
+F	bda	e	field_78182_e	wolfLeg3
+F	bda	f	field_78179_f	wolfLeg4
+F	bda	g	field_78180_g	wolfTail
+F	bda	h	field_78186_h	wolfMane
+F	bdc	a	field_78221_a	head
+F	bdc	b	field_78219_b	neck
+F	bdc	c	field_78220_c	jaw
+F	bdc	d	field_78217_d	body
+F	bdc	e	field_78218_e	rearLeg
+F	bdc	f	field_78215_f	frontLeg
+F	bdc	g	field_78216_g	rearLegTip
+F	bdc	h	field_78226_h	frontLegTip
+F	bdc	i	field_78227_i	rearFoot
+F	bdc	j	field_78224_j	frontFoot
+F	bdc	k	field_78225_k	wing
+F	bdc	l	field_78222_l	wingTip
+F	bdc	m	field_78223_m	partialTicks
+F	bdd	a	field_78230_a	cube
+F	bdd	b	field_78228_b	glass
+F	bdd	c	field_78229_c	base
+F	bde	a	field_78252_a	posX1
+F	bde	b	field_78250_b	posY1
+F	bde	c	field_78251_c	posZ1
+F	bde	d	field_78248_d	posX2
+F	bde	e	field_78249_e	posY2
+F	bde	f	field_78246_f	posZ2
+F	bde	g	field_78247_g	field_78247_g
+F	bdj	a	field_78801_a	textureWidth
+F	bdj	b	field_78799_b	textureHeight
+F	bdj	c	field_78800_c	rotationPointX
+F	bdj	d	field_78797_d	rotationPointY
+F	bdj	e	field_78798_e	rotationPointZ
+F	bdj	f	field_78795_f	rotateAngleX
+F	bdj	g	field_78796_g	rotateAngleY
+F	bdj	h	field_78808_h	rotateAngleZ
+F	bdj	i	field_78809_i	mirror
+F	bdj	j	field_78806_j	showModel
+F	bdj	k	field_78807_k	isHidden
+F	bdj	l	field_78804_l	cubeList
+F	bdj	m	field_78805_m	childModels
+F	bdj	n	field_78802_n	boxName
+F	bdj	r	field_78803_o	textureOffsetX
+F	bdj	s	field_78813_p	textureOffsetY
+F	bdj	v	field_78810_s	baseModel
+F	bdk	a	field_78783_a	textureOffsetX
+F	bdk	b	field_78782_b	textureOffsetY
+F	bfk	c	field_71159_c	mc
+F	bgf	f	field_78365_j	options
+F	bgy	f	field_77077_b	rnd
+F	bha	d	field_76989_e	shadowSize
+F	bhh	a	field_77071_a	modelBipedMain
+F	bhj	f	field_77023_b	zLevel
+F	bhj	i	field_77025_h	random
+F	bhp	i	field_77045_g	mainModel
+F	bhp	j	field_77046_h	renderPassModel
+F	bp	a	field_74817_a	instance
+F	bp	f	field_74814_e	isUnicode
+F	br	a	field_74756_a	data
+F	bv	a	field_74755_a	data
+F	bx	a	field_74750_a	data
+F	bz	a	field_74748_a	data
+F	cb	a	field_74753_a	data
+F	cd	a	field_74752_a	data
+F	ce	a	field_74751_a	data
+F	cf	a	field_74741_a	name
+F	gu	a	field_72404_b	playerEntityList
+F	gu	e	field_72400_f	mcServer
+F	gu	h	field_72414_i	ops
+F	iz	a	field_73061_a	mcServer
+F	jc	b	field_71133_b	mcServer
+F	kx	a	field_76144_a	SIN_TABLE
+F	mp	A	field_70177_z	rotationYaw
+F	mp	B	field_70125_A	rotationPitch
+F	mp	E	field_70121_D	boundingBox
+F	mp	F	field_70122_E	onGround
+F	mp	N	field_70129_M	yOffset
+F	mp	O	field_70130_N	width
+F	mp	P	field_70131_O	height
+F	mp	X	field_70139_V	ySize
+F	mp	ab	field_70146_Z	rand
+F	mp	ag	field_70178_ae	isImmuneToFire
+F	mp	ar	field_71093_bK	dimension
+F	mp	d	field_70151_c	fire
+F	mp	k	field_70157_k	entityId
+F	mp	q	field_70170_p	worldObj
+F	mp	u	field_70165_t	posX
+F	mp	v	field_70163_u	posY
+F	mp	w	field_70161_v	posZ
+F	mv	a	field_75627_a	entityEggs
+F	mv	b	field_75625_b	stringToClassMapping
+F	mv	c	field_75626_c	classToStringMapping
+F	mv	d	field_75623_d	IDtoClassMapping
+F	mv	e	field_75624_e	classToIDMapping
+F	mv	f	field_75622_f	stringToIDMapping
+F	mw	a	field_75613_a	spawnedID
+F	mw	b	field_75611_b	primaryColor
+F	mw	c	field_75612_c	secondaryColor
+F	net/minecraft/client/Minecraft	K	field_71425_J	running
+F	net/minecraft/client/Minecraft	V	field_71428_T	timer
+F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
+F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
+F	net/minecraft/client/Minecraft	e	field_71441_e	theWorld
+F	net/minecraft/client/Minecraft	g	field_71439_g	thePlayer
+F	net/minecraft/client/Minecraft	p	field_71446_o	renderEngine
+F	net/minecraft/client/Minecraft	q	field_71466_p	fontRenderer
+F	net/minecraft/client/Minecraft	s	field_71462_r	currentScreen
+F	net/minecraft/client/Minecraft	z	field_71474_y	gameSettings
+F	net/minecraft/server/MinecraftServer	b	field_71305_c	worldServers
+F	net/minecraft/server/MinecraftServer	k	field_71309_l	mcServer
+F	net/minecraft/server/MinecraftServer	u	field_71316_v	serverStopped
+F	ng	aH	field_70750_az	texture
+F	ng	aO	field_70746_aG	landMovementFactor
+F	ng	aS	field_70734_aK	health
+F	ng	bI	field_70697_bw	moveSpeed
+F	ng	bK	field_70765_h	moveHelper
+F	ng	bL	field_70767_i	jumpHelper
+F	ng	bN	field_70699_by	navigator
+F	ng	bP	field_70723_bA	senses
+F	ng	be	field_70728_aV	experienceValue
+F	ng	bo	field_70714_bg	tasks
+F	ng	bp	field_70715_bh	targetTasks
+F	ng	j	field_70749_g	lookHelper
+F	nn	a	monster	monster
+F	nn	b	creature	creature
+F	nn	c	ambient	ambient
+F	nn	d	waterCreature	waterCreature
+F	rh	d	field_70291_e	health
+F	s	b	field_71586_b	offsetsXForSide
+F	s	c	field_71587_c	offsetsYForSide
+F	s	d	field_71585_d	offsetsZForSide
+F	s	e	field_82374_e	facings
+F	sn	b	field_75100_b	isFlying
+F	sn	c	field_75101_c	allowFlying
+F	sn	d	field_75098_d	isCreativeMode
+F	so	a	field_70462_a	mainInventory
+F	so	b	field_70460_b	armorInventory
+F	so	c	field_70461_c	currentItem
+F	so	d	field_70458_d	player
+F	sq	bK	field_71071_by	inventory
+F	sq	bM	field_71070_bA	openContainer
+F	sq	bS	field_71092_bJ	username
+F	sq	ce	field_71075_bZ	capabilities
+F	t	a	field_71574_a	posX
+F	t	b	field_71572_b	posY
+F	t	c	field_71573_c	posZ
+F	tj	b	field_75153_a	inventoryItemStacks
+F	tj	c	field_75151_b	inventorySlots
+F	tj	d	field_75152_c	windowId
+F	tj	e	field_75149_d	crafters
+F	tx	a	field_75229_a	thePlayer
+F	ul	a	field_75225_a	slotIndex
+F	ul	f	field_75224_c	inventory
+F	ul	g	field_75222_d	slotNumber
+F	ul	h	field_75223_e	xDisplayPosition
+F	ul	i	field_75221_f	yDisplayPosition
+F	uo	b	field_77881_a	armorType
+F	uo	c	field_77879_b	damageReduceAmount
+F	uo	cx	field_77878_bZ	material
+F	uo	d	field_77880_c	renderIndex
+F	uq	a	CLOTH	CLOTH
+F	uq	b	CHAIN	CHAIN
+F	uq	c	IRON	IRON
+F	uq	d	GOLD	GOLD
+F	uq	e	DIAMOND	DIAMOND
+F	uq	h	field_78055_h	enchantability
+F	ve	a	field_78032_a	creativeTabArray
+F	ve	b	field_78030_b	tabBlock
+F	ve	c	field_78031_c	tabDecorations
+F	ve	d	field_78028_d	tabRedstone
+F	ve	e	field_78029_e	tabTransport
+F	ve	f	field_78026_f	tabMisc
+F	ve	g	field_78027_g	tabAllSearch
+F	ve	h	field_78039_h	tabFood
+F	ve	i	field_78040_i	tabTools
+F	ve	j	field_78037_j	tabCombat
+F	ve	k	field_78038_k	tabBrewing
+F	ve	l	field_78035_l	tabMaterials
+F	ve	m	field_78036_m	tabInventory
+F	vr	b	field_77862_b	toolMaterial
+F	wf	b	field_77853_b	healAmount
+F	wf	c	field_77854_c	saturationModifier
+F	wf	cu	field_77852_bZ	alwaysEdible
+F	wf	d	field_77856_bY	isWolfsFavoriteMeat
+F	wk	A	field_77718_z	swordDiamond
+F	wk	B	field_77673_A	shovelDiamond
+F	wk	C	field_77674_B	pickaxeDiamond
+F	wk	D	field_77675_C	axeDiamond
+F	wk	E	field_77669_D	stick
+F	wk	F	field_77670_E	bowlEmpty
+F	wk	G	field_77671_F	bowlSoup
+F	wk	H	field_77672_G	swordGold
+F	wk	I	field_77680_H	shovelGold
+F	wk	J	field_77681_I	pickaxeGold
+F	wk	K	field_77682_J	axeGold
+F	wk	L	field_77683_K	silk
+F	wk	M	field_77676_L	feather
+F	wk	N	field_77677_M	gunpowder
+F	wk	O	field_77678_N	hoeWood
+F	wk	P	field_77679_O	hoeStone
+F	wk	R	field_77688_Q	hoeDiamond
+F	wk	S	field_77691_R	hoeGold
+F	wk	T	field_77690_S	seeds
+F	wk	U	field_77685_T	wheat
+F	wk	V	field_77684_U	bread
+F	wk	W	field_77687_V	helmetLeather
+F	wk	X	field_77686_W	plateLeather
+F	wk	Y	field_77693_X	legsLeather
+F	wk	Z	field_77692_Y	bootsLeather
+F	wk	aA	field_77773_az	minecartEmpty
+F	wk	aB	field_77765_aA	saddle
+F	wk	aD	field_77767_aC	redstone
+F	wk	aE	field_77768_aD	snowball
+F	wk	aF	field_77769_aE	boat
+F	wk	aG	field_77770_aF	leather
+F	wk	aH	field_77771_aG	bucketMilk
+F	wk	aI	field_77772_aH	brick
+F	wk	aJ	field_77757_aI	clay
+F	wk	aK	field_77758_aJ	reed
+F	wk	aL	field_77759_aK	paper
+F	wk	aM	field_77760_aL	book
+F	wk	aN	field_77761_aM	slimeBall
+F	wk	aO	field_77762_aN	minecartCrate
+F	wk	aP	field_77763_aO	minecartPowered
+F	wk	aQ	field_77764_aP	egg
+F	wk	aR	field_77750_aQ	compass
+F	wk	aS	field_77749_aR	fishingRod
+F	wk	aT	field_77752_aS	pocketSundial
+F	wk	aU	field_77751_aT	lightStoneDust
+F	wk	aV	field_77754_aU	fishRaw
+F	wk	aW	field_77753_aV	fishCooked
+F	wk	aX	field_77756_aW	dyePowder
+F	wk	aY	field_77755_aX	bone
+F	wk	aZ	field_77747_aY	sugar
+F	wk	aa	field_77694_Z	helmetChain
+F	wk	ab	field_77814_aa	plateChain
+F	wk	ac	field_77816_ab	legsChain
+F	wk	ad	field_77810_ac	bootsChain
+F	wk	ai	field_77820_ah	helmetDiamond
+F	wk	aj	field_77798_ai	plateDiamond
+F	wk	ak	field_77800_aj	legsDiamond
+F	wk	al	field_77794_ak	bootsDiamond
+F	wk	am	field_77796_al	helmetGold
+F	wk	an	field_77806_am	plateGold
+F	wk	ao	field_77808_an	legsGold
+F	wk	ap	field_77802_ao	bootsGold
+F	wk	aq	field_77804_ap	flint
+F	wk	ar	field_77784_aq	porkRaw
+F	wk	as	field_77782_ar	porkCooked
+F	wk	at	field_77780_as	painting
+F	wk	au	field_77778_at	appleGold
+F	wk	av	field_77792_au	sign
+F	wk	aw	field_77790_av	doorWood
+F	wk	ax	field_77788_aw	bucketEmpty
+F	wk	ay	field_77786_ax	bucketWater
+F	wk	az	field_77775_ay	bucketLava
+F	wk	b	field_77699_b	maxDamage
+F	wk	bA	field_77721_bz	cauldron
+F	wk	bB	field_77748_bA	eyeOfEnder
+F	wk	bC	field_77813_bB	speckledMelon
+F	wk	bD	field_77815_bC	monsterPlacer
+F	wk	bE	field_77809_bD	expBottle
+F	wk	bF	field_77811_bE	fireballCharge
+F	wk	bG	field_77821_bF	writableBook
+F	wk	bH	field_77823_bG	writtenBook
+F	wk	bI	field_77817_bH	emerald
+F	wk	bJ	field_82802_bI	itemFrame
+F	wk	bK	field_82796_bJ	flowerPot
+F	wk	bL	field_82797_bK	carrot
+F	wk	bM	field_82794_bL	potato
+F	wk	bN	field_82795_bM	bakedPotato
+F	wk	bO	field_82800_bN	poisonousPotato
+F	wk	bP	field_82801_bO	emptyMap
+F	wk	bQ	field_82798_bP	goldenCarrot
+F	wk	bR	field_82799_bQ	skull
+F	wk	bS	field_82793_bR	carrotOnAStick
+F	wk	bT	field_82792_bS	netherStar
+F	wk	bU	field_82791_bT	pumpkinPie
+F	wk	bV	field_92104_bU	firework
+F	wk	bW	field_92106_bV	fireworkCharge
+F	wk	bX	field_92105_bW	enchantedBook
+F	wk	ba	field_77746_aZ	cake
+F	wk	bb	field_77776_ba	bed
+F	wk	bc	field_77742_bb	redstoneRepeater
+F	wk	bd	field_77743_bc	cookie
+F	wk	be	field_77744_bd	map
+F	wk	bf	field_77745_be	shears
+F	wk	bg	field_77738_bf	melon
+F	wk	bh	field_77739_bg	pumpkinSeeds
+F	wk	bi	field_77740_bh	melonSeeds
+F	wk	bj	field_77741_bi	beefRaw
+F	wk	bk	field_77734_bj	beefCooked
+F	wk	bl	field_77735_bk	chickenRaw
+F	wk	bm	field_77736_bl	chickenCooked
+F	wk	bn	field_77737_bm	rottenFlesh
+F	wk	bo	field_77730_bn	enderPearl
+F	wk	bp	field_77731_bo	blazeRod
+F	wk	bq	field_77732_bp	ghastTear
+F	wk	br	field_77733_bq	goldNugget
+F	wk	bs	field_77727_br	netherStalkSeeds
+F	wk	bt	field_77726_bs	potion
+F	wk	bu	field_77729_bt	glassBottle
+F	wk	bv	field_77728_bu	spiderEye
+F	wk	bw	field_77723_bv	fermentedSpiderEye
+F	wk	bx	field_77722_bw	blazePowder
+F	wk	by	field_77725_bx	magmaCream
+F	wk	bz	field_77724_by	brewingStand
+F	wk	c	field_77700_c	containerItem
+F	wk	cb	field_94582_cb	tntMinecart
+F	wk	cc	field_96600_cc	hopperMinecart
+F	wk	cd	field_77819_bI	record13
+F	wk	ce	field_77797_bJ	recordCat
+F	wk	cf	field_77799_bK	recordBlocks
+F	wk	cg	field_77793_bL	recordChirp
+F	wk	ch	field_77795_bM	recordFar
+F	wk	ci	field_77805_bN	recordMall
+F	wk	cj	field_77807_bO	recordMellohi
+F	wk	ck	field_77801_bP	recordStal
+F	wk	cl	field_77803_bQ	recordStrad
+F	wk	cm	field_77783_bR	recordWard
+F	wk	cn	field_77781_bS	record11
+F	wk	co	field_85180_cf	recordWait
+F	wk	cp	field_77779_bT	itemID
+F	wk	cq	field_77777_bU	maxStackSize
+F	wk	cr	field_77789_bW	bFull3D
+F	wk	cs	field_77787_bX	hasSubtypes
+F	wk	ct	field_77791_bV	iconIndex
+F	wk	cu	field_77774_bZ	unlocalizedName
+F	wk	e	field_77697_d	itemRand
+F	wk	f	field_77698_e	itemsList
+F	wk	j	field_77709_i	flintAndSteel
+F	wk	k	field_77706_j	appleRed
+F	wk	l	field_77707_k	bow
+F	wk	m	field_77704_l	arrow
+F	wk	n	field_77705_m	coal
+F	wk	o	field_77702_n	diamond
+F	wk	p	field_77703_o	ingotIron
+F	wk	q	field_77717_p	ingotGold
+F	wk	s	field_77715_r	swordWood
+F	wk	t	field_77714_s	shovelWood
+F	wk	u	field_77713_t	pickaxeWood
+F	wk	v	field_77712_u	axeWood
+F	wk	w	field_77711_v	swordStone
+F	wk	x	field_77710_w	shovelStone
+F	wk	y	field_77720_x	pickaxeStone
+F	wk	z	field_77719_y	axeStone
+F	wl	a	WOOD	WOOD
+F	wl	b	STONE	STONE
+F	wl	c	IRON	IRON
+F	wl	d	EMERALD	EMERALD
+F	wl	e	GOLD	GOLD
+F	wl	j	field_78008_j	enchantability
+F	wm	a	field_77994_a	stackSize
+F	wm	c	field_77993_c	itemID
+F	wm	d	field_77990_d	stackTagCompound
+F	wm	e	field_77991_e	itemDamage
+F	wm	f	field_82843_f	itemFrame
+F	xn	a	field_77885_a	blockID
+F	xr	b	field_77826_b	toolMaterial
+M	aab	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
+M	aab	E	()V	func_72906_B	checkSessionLock
+M	aab	F	()J	func_72905_C	getSeed
+M	aab	F	(III)Z	func_72951_B	canLightningStrikeAt
+M	aab	G	()J	func_82737_E	getTotalWorldTime
+M	aab	H	()J	func_72820_D	getWorldTime
+M	aab	I	()Lt;	func_72861_E	getSpawnPoint
+M	aab	K	()Lakf;	func_72860_G	getSaveHandler
+M	aab	L	()Lajv;	func_72912_H	getWorldInfo
+M	aab	N	()Z	func_72911_I	isThundering
+M	aab	O	()Z	func_72896_J	isRaining
+M	aab	P	()I	func_72800_K	getHeight
+M	aab	Q	()I	func_72940_L	getActualHeight
+M	aab	T	()Lard;	func_82732_R	getWorldVec3Pool
+M	aab	a	(DDDD)Lsq;	func_72977_a	getClosestPlayer
+M	aab	a	(DDDLjava/lang/String;FF)V	func_72908_a	playSoundEffect
+M	aab	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
+M	aab	a	(III)I	func_72798_a	getBlockId
+M	aab	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
+M	aab	a	(IIILaqp;)V	func_72837_a	setBlockTileEntity
+M	aab	a	(IIIZ)Z	func_94578_a	destroyBlock
+M	aab	a	(Ljava/lang/Class;Laqx;)Ljava/util/List;	func_72872_a	getEntitiesWithinAABB
+M	aab	a	(Ljava/lang/Class;Laqx;Lmy;)Ljava/util/List;	func_82733_a	selectEntitiesWithinAABB
+M	aab	a	(Ljava/lang/String;)Lsq;	func_72924_a	getPlayerEntityByName
+M	aab	a	(Ljava/lang/String;DDDDDD)V	func_72869_a	spawnParticle
+M	aab	a	(Lmp;D)Lsq;	func_72890_a	getClosestPlayerToEntity
+M	aab	a	(Lmp;DDDFZ)Lzw;	func_72876_a	createExplosion
+M	aab	a	(Lmp;Laqx;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
+M	aab	a	(Lmp;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
+M	aab	b	(DDDD)Lsq;	func_72846_b	getClosestVulnerablePlayer
+M	aab	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
+M	aab	b	(IIIII)Z	func_72921_c	setBlockMetadataWithNotify
+M	aab	b	(IIILaqp;)V	func_72944_b	updateTileEntityChunkAndDoNothing
+M	aab	b	(J)V	func_72877_b	setWorldTime
+M	aab	b	(Ljava/lang/String;)I	func_72841_b	getUniqueDataId
+M	aab	b	(Lmp;Laqx;)Ljava/util/List;	func_72839_b	getEntitiesWithinAABBExcludingEntity
+M	aab	c	(III)Z	func_72799_c	isAirBlock
+M	aab	c	(IIII)Z	func_94575_c	setBlock
+M	aab	c	(Lmp;)Z	func_72942_c	addWeatherEffect
+M	aab	d	(IIIIII)V	func_72965_b	addBlockEvent
+M	aab	d	(Lmp;)Z	func_72838_d	spawnEntityInWorld
+M	aab	e	(IIIIII)Z	func_72904_c	checkChunksExist
+M	aab	f	(II)I	func_72976_f	getHeightValue
+M	aab	f	(III)Z	func_72899_e	blockExists
+M	aab	f	(IIII)V	func_72898_h	notifyBlocksOfNeighborChange
+M	aab	f	(IIIIII)Z	func_72832_d	setBlock
+M	aab	g	(III)Laif;	func_72803_f	getBlockMaterial
+M	aab	h	(II)I	func_72874_g	getPrecipitationHeight
+M	aab	h	(III)I	func_72805_g	getBlockMetadata
+M	aab	i	(F)F	func_72867_j	getRainStrength
+M	aab	i	(II)I	func_72825_h	getTopSolidOrLiquidBlock
+M	aab	i	(III)Z	func_94571_i	setBlockToAir
+M	aab	j	(III)V	func_72845_h	markBlockForUpdate
+M	aab	l	(III)Z	func_72937_j	canBlockSeeTheSky
+M	aab	m	(III)I	func_72883_k	getFullBlockLightValue
+M	aab	n	(III)I	func_72957_l	getBlockLightValue
+M	aab	r	(III)Laqp;	func_72796_p	getBlockTileEntity
+M	aab	s	(III)V	func_72932_q	removeBlockTileEntity
+M	aab	u	()Z	func_72935_r	isDaytime
+M	aak	P	()I	func_72800_K	getHeight
+M	aak	T	()Lard;	func_82732_R	getWorldVec3Pool
+M	aak	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
+M	aak	a	(III)I	func_72798_a	getBlockId
+M	aak	c	(III)Z	func_72799_c	isAirBlock
+M	aak	g	(III)Laif;	func_72803_f	getBlockMaterial
+M	aak	h	(III)I	func_72805_g	getBlockMetadata
+M	aak	r	(III)Laqp;	func_72796_p	getBlockTileEntity
+M	aav	a	(FF)Laav;	func_76732_a	setTemperatureRainfall
+M	aav	a	(Ljava/lang/String;)Laav;	func_76735_a	setBiomeName
+M	aav	a	(Lnn;)Ljava/util/List;	func_76747_a	getSpawnableList
+M	aav	b	()Laav;	func_76742_b	setEnableSnow
+M	aav	b	(FF)Laav;	func_76725_b	setMinMaxHeight
+M	aav	b	(I)Laav;	func_76739_b	setColor
+M	aav	c	()Z	func_76746_c	getEnableSnow
+M	aav	d	()Z	func_76738_d	canSpawnLightningBolt
+M	aav	i	()F	func_76727_i	getFloatRainfall
+M	aav	j	()F	func_76743_j	getFloatTemperature
+M	aav	m	()Laav;	func_76745_m	setDisableRain
+M	acn	d	()Z	func_76569_d	isSurfaceWorld
+M	acn	i	()I	func_76557_i	getAverageGroundLevel
+M	acn	l	()Ljava/lang/String;	func_80007_l	getDimensionName
+M	adj	a	(DDD)V	func_76487_a	setScale
+M	adj	a	(Laab;IIII)V	func_76486_a	setBlock
+M	adj	a	(Laab;IIIII)V	func_76485_a	setBlockAndMetadata
+M	adj	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
+M	adv	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
+M	aif	a	()Z	func_76220_a	isSolid
+M	aif	d	()Z	func_76224_d	isLiquid
+M	aif	f	()Laif;	func_76221_f	setRequiresTool
+M	aif	h	()Z	func_76217_h	getCanBurn
+M	aif	k	()Z	func_76218_k	isOpaque
+M	aif	l	()Z	func_76229_l	isToolNotRequired
+M	ajo	a	(Lbs;)V	func_76184_a	readFromNBT
+M	ajo	a	(Z)V	func_76186_a	setDirty
+M	ajo	b	(Lbs;)V	func_76187_b	writeToNBT
+M	ajo	c	()V	func_76185_a	markDirty
+M	ajo	d	()Z	func_76188_b	isDirty
+M	ajt	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
+M	ajt	b	()Ljava/io/File;	func_75765_b	getWorldDirectory
+M	ajt	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
+M	ajt	c	()V	func_75762_c	checkSessionLock
+M	ajt	g	()Ljava/lang/String;	func_75760_g	getSaveDirectoryName
+M	ajv	b	()J	func_76063_b	getSeed
+M	ajv	c	()I	func_76079_c	getSpawnX
+M	ajv	c	(J)V	func_76068_b	setWorldTime
+M	ajv	d	()I	func_76075_d	getSpawnY
+M	ajv	e	()I	func_76074_e	getSpawnZ
+M	ajv	f	()J	func_82573_f	getWorldTotalTime
+M	ajv	g	()J	func_76073_f	getWorldTime
+M	ajv	j	()I	func_76076_i	getDimension
+M	ajv	k	()Ljava/lang/String;	func_76065_j	getWorldName
+M	ajv	n	()Z	func_76061_m	isThundering
+M	ajv	p	()Z	func_76059_o	isRaining
+M	ajv	r	()Laaj;	func_76077_q	getGameType
+M	ajv	t	()Z	func_76093_s	isHardcoreModeEnabled
+M	ajv	u	()Laal;	func_76067_t	getTerrainType
+M	ajv	v	()Z	func_76086_u	areCommandsAllowed
+M	akf	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
+M	akf	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
+M	akf	c	()V	func_75762_c	checkSessionLock
+M	akf	g	()Ljava/lang/String;	func_75760_g	getSaveDirectoryName
+M	aku	a	()V	func_75744_a	saveAllData
+M	aku	a	(Ljava/lang/Class;Ljava/lang/String;)Lajo;	func_75742_a	loadData
+M	aku	a	(Ljava/lang/String;)I	func_75743_a	getUniqueDataId
+M	aku	a	(Ljava/lang/String;Lajo;)V	func_75745_a	setData
+M	akz	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	akz	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	akz	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived
+M	amh	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	apa	A	()Ljava/lang/String;	func_71931_t	getLocalizedName
+M	apa	C	()Z	func_71876_u	getEnableStats
+M	apa	D	()Lapa;	func_71896_v	disableStats
+M	apa	a	()Ljava/lang/String;	func_71917_a	getUnlocalizedName
+M	apa	a	(F)Lapa;	func_71900_a	setLightValue
+M	apa	a	(FFFFFF)V	func_71905_a	setBlockBounds
+M	apa	a	(I)I	func_71899_b	damageDropped
+M	apa	a	(ILjava/util/Random;)I	func_71910_a	quantityDroppedWithBonus
+M	apa	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	apa	a	(Laab;)I	func_71859_p_	tickRate
+M	apa	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	apa	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	apa	a	(Laab;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
+M	apa	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	apa	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	apa	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
+M	apa	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	apa	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
+M	apa	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	apa	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
+M	apa	a	(Lape;)Lapa;	func_71884_a	setStepSound
+M	apa	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	apa	a	(Lly;)V	func_94332_a	registerIcons
+M	apa	a	(Lve;)Lapa;	func_71849_a	setCreativeTab
+M	apa	b	()Z	func_71886_c	renderAsNormalBlock
+M	apa	b	(F)Lapa;	func_71894_b	setResistance
+M	apa	b	(I)I	func_71889_f_	getRenderColor
+M	apa	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	apa	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived
+M	apa	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	apa	b	(Laab;IIILmp;)V	func_71891_b	onEntityWalking
+M	apa	b	(Laab;IIILwm;)V	func_71929_a	dropBlockAsItem_do
+M	apa	b	(Z)Lapa;	func_71907_b	setTickRandomly
+M	apa	c	()Z	func_71926_d	isOpaqueCube
+M	apa	c	(F)Lapa;	func_71848_c	setHardness
+M	apa	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	apa	c	(Laab;IIIII)V	func_71897_c	dropBlockAsItem
+M	apa	c	(Laak;III)I	func_71920_b	colorMultiplier
+M	apa	d	()I	func_71857_b	getRenderType
+M	apa	g	()V	func_71919_f	setBlockBoundsForItemRender
+M	apa	g	(Laab;IIII)V	func_71898_d	onBlockDestroyedByPlayer
+M	apa	h	()I	func_71915_e	getMobilityFlag
+M	apa	k	(I)Lapa;	func_71868_h	setLightOpacity
+M	apa	l	(Laab;III)F	func_71934_m	getBlockHardness
+M	apa	m	()Z	func_71935_l	isCollidable
+M	apa	m	(I)Llx;	func_71851_a	getBlockTextureFromSide
+M	apa	n	()I	func_71856_s_	getRenderBlockPass
+M	apa	o	()I	func_71933_m	getBlockColor
+M	apa	r	()Lapa;	func_71875_q	setBlockUnbreakable
+M	apa	t	()Z	func_71887_s	hasTileEntity
+M	ape	a	()Ljava/lang/String;	func_72676_a	getBreakSound
+M	ape	c	()F	func_72677_b	getVolume
+M	ape	d	()F	func_72678_c	getPitch
+M	ape	e	()Ljava/lang/String;	func_72675_d	getStepSound
+M	aqp	a	(DDD)D	func_70318_a	getDistanceFrom
+M	aqp	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aqp	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
+M	aqp	az	()Laab;	func_70314_l	getWorldObj
+M	aqp	b	(II)Z	func_70315_b	receiveClientEvent
+M	aqp	b	(Laab;)V	func_70308_a	setWorldObj
+M	aqp	b	(Lbs;)V	func_70310_b	writeToNBT
+M	aqp	c	(Lbs;)Laqp;	func_70317_c	createAndLoadEntity
+M	aqp	h	()V	func_70316_g	updateEntity
+M	aqp	i	()V	func_70321_h	updateContainingBlockInfo
+M	aqp	k_	()V	func_70296_d	onInventoryChanged
+M	aqp	m	()Lei;	func_70319_e	getDescriptionPacket
+M	aqp	p	()I	func_70322_n	getBlockMetadata
+M	aqp	q	()Lapa;	func_70311_o	getBlockType
+M	aqp	r	()Z	func_70320_p	isInvalid
+M	aqp	s	()V	func_70312_q	validate
+M	aqp	w_	()V	func_70313_j	invalidate
+M	aqt	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	aqt	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	aqt	a	(Laab;IIILng;)I	func_72116_b	determineOrientation
+M	aqt	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	aqt	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aqt	a	(Lly;)V	func_94332_a	registerIcons
+M	aqt	b	()Z	func_71886_c	renderAsNormalBlock
+M	aqt	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aqt	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived
+M	aqt	c	()Z	func_71926_d	isOpaqueCube
+M	aqt	d	()I	func_71857_b	getRenderType
+M	aqt	d	(I)I	func_72117_e	getOrientation
+M	aqt	e	(I)Z	func_72114_f	isExtended
+M	aqt	g	()V	func_71919_f	setBlockBoundsForItemRender
+M	aqx	a	()Laqz;	func_72332_a	getAABBPool
+M	aqx	a	(DDD)Laqx;	func_72321_a	addCoord
+M	aqx	a	(DDDDDD)Laqx;	func_72330_a	getBoundingBox
+M	aqx	a	(Laqx;)Z	func_72326_a	intersectsWith
+M	aqx	a	(Larc;)Z	func_72318_a	isVecInside
+M	aqx	b	()D	func_72320_b	getAverageEdgeLength
+M	aqx	b	(DDD)Laqx;	func_72314_b	expand
+M	aqx	b	(DDDDDD)Laqx;	func_72324_b	setBounds
+M	aqx	c	()Laqx;	func_72329_c	copy
+M	aqx	c	(DDD)Laqx;	func_72325_c	getOffsetBoundingBox
+M	aqx	c	(Laqx;)V	func_72328_c	setBB
+M	aqx	d	(DDD)Laqx;	func_72317_d	offset
+M	aqx	e	(DDD)Laqx;	func_72331_e	contract
+M	aqx	toString	()Ljava/lang/String;	toString	toString
+M	aqz	a	()V	func_72298_a	cleanPool
+M	aqz	a	(DDDDDD)Laqx;	func_72299_a	getAABB
+M	aqz	b	()V	func_72300_b	clearPool
+M	arc	a	()Larc;	func_72432_b	normalize
+M	arc	a	(DDD)Larc;	func_72443_a	createVectorHelper
+M	arc	a	(Larc;)Larc;	func_72444_a	subtract
+M	arc	b	()D	func_72433_c	lengthVector
+M	arc	b	(Larc;)D	func_72430_b	dotProduct
+M	arc	c	(DDD)Larc;	func_72441_c	addVector
+M	arc	d	(Larc;)D	func_72438_d	distanceTo
+M	arc	e	(Larc;)D	func_72436_e	squareDistanceTo
+M	arc	toString	()Ljava/lang/String;	toString	toString
+M	ard	a	()V	func_72343_a	clear
+M	ard	a	(DDD)Larc;	func_72345_a	getVecFromPool
+M	ava	a	()V	func_74506_a	unPressAllKeys
+M	ava	a	(I)V	func_74507_a	onTick
+M	ava	a	(IZ)V	func_74510_a	setKeyBindState
+M	ava	b	()V	func_74508_b	resetKeyBindingArrayAndHash
+M	ava	c	()Z	func_74509_c	isPressed
+M	ava	d	()V	func_74505_d	unpressKey
+M	avb	a	()V	func_74518_a	disableStandardItemLighting
+M	avb	b	()V	func_74519_b	enableStandardItemLighting
+M	avb	c	()V	func_74520_c	enableGUIStandardItemLighting
+M	awg	a	()Z	func_82252_a	func_82252_a
+M	awg	a	(II)V	func_73740_a	mouseReleased
+M	awg	a	(Lnet/minecraft/client/Minecraft;II)V	func_73737_a	drawButton
+M	awg	a	(Z)I	func_73738_a	getHoverState
+M	awg	b	(Lnet/minecraft/client/Minecraft;II)V	func_73739_b	mouseDragged
+M	awg	c	(Lnet/minecraft/client/Minecraft;II)Z	func_73736_c	mousePressed
+M	aws	a	()V	func_73780_a	updateCursorCounter
+M	aws	a	(CI)Z	func_73802_a	textboxKeyTyped
+M	aws	a	(III)V	func_73793_a	mouseClicked
+M	aws	a	(Ljava/lang/String;)V	func_73782_a	setText
+M	aws	a	(Z)V	func_73786_a	setEnableBackgroundDrawing
+M	aws	b	()Ljava/lang/String;	func_73781_b	getText
+M	aws	b	(Z)V	func_73796_b	setFocused
+M	aws	d	(Z)V	func_73805_d	setCanLoseFocus
+M	aws	f	()V	func_73795_f	drawTextBox
+M	aws	f	(I)V	func_73804_f	setMaxStringLength
+M	aws	g	(I)V	func_73794_g	setTextColor
+M	aws	l	()Z	func_73806_l	isFocused
+M	awv	a	(C)I	func_78263_a	getCharWidth
+M	awv	a	(Ljava/lang/String;)I	func_78256_a	getStringWidth
+M	awv	a	(Ljava/lang/String;I)Ljava/lang/String;	func_78269_a	trimStringToWidth
+M	awv	a	(Ljava/lang/String;III)I	func_78261_a	drawStringWithShadow
+M	awv	a	(Ljava/lang/String;IIII)V	func_78279_b	drawSplitString
+M	awv	a	(Ljava/lang/String;IIIZ)I	func_85187_a	drawString
+M	awv	a	(Z)V	func_78264_a	setUnicodeFlag
+M	awv	b	()Z	func_82883_a	getUnicodeFlag
+M	awv	b	(Ljava/lang/String;I)I	func_78267_b	splitStringWidth
+M	awv	b	(Ljava/lang/String;III)I	func_78276_b	drawString
+M	awv	c	(Ljava/lang/String;I)Ljava/util/List;	func_78271_c	listFormattedStringToWidth
+M	awx	a	(IIII)V	func_73730_a	drawHorizontalLine
+M	awx	a	(IIIII)V	func_73734_a	drawRect
+M	awx	a	(IIIIII)V	func_73733_a	drawGradientRect
+M	awx	a	(IILlx;II)V	func_94065_a	drawTexturedModelRectFromIcon
+M	awx	a	(Lawv;Ljava/lang/String;III)V	func_73732_a	drawCenteredString
+M	awx	b	(IIII)V	func_73728_b	drawVerticalLine
+M	awx	b	(IIIIII)V	func_73729_b	drawTexturedModalRect
+M	awx	b	(Lawv;Ljava/lang/String;III)V	func_73731_b	drawString
+M	axr	A_	()V	func_73866_w_	initGui
+M	axr	a	(CI)V	func_73869_a	keyTyped
+M	axr	a	(IIF)V	func_73863_a	drawScreen
+M	axr	a	(III)V	func_73864_a	mouseClicked
+M	axr	a	(Lawg;)V	func_73875_a	actionPerformed
+M	axr	a	(Lnet/minecraft/client/Minecraft;II)V	func_73872_a	setWorldAndResolution
+M	axr	a	(ZI)V	func_73878_a	confirmClicked
+M	axr	b	()V	func_73874_b	onGuiClosed
+M	axr	b	(I)V	func_73859_b	drawWorldBackground
+M	axr	b	(III)V	func_73879_b	mouseMovedOrUp
+M	axr	c	()V	func_73876_c	updateScreen
+M	axr	c	(I)V	func_73871_c	drawBackground
+M	axr	d	(Ljava/lang/String;)V	func_73865_d	setClipboardString
+M	axr	e	()V	func_73873_v_	drawDefaultBackground
+M	axr	f	()Z	func_73868_f	doesGuiPauseGame
+M	axr	l	()Ljava/lang/String;	func_73870_l	getClipboardString
+M	axr	m	()V	func_73862_m	handleInput
+M	axr	o	()Z	func_73861_o	isCtrlKeyDown
+M	axr	p	()Z	func_73877_p	isShiftKeyDown
+M	ayl	A_	()V	func_73866_w_	initGui
+M	ayl	a	(CI)V	func_73869_a	keyTyped
+M	ayl	a	(FII)V	func_74185_a	drawGuiContainerBackgroundLayer
+M	ayl	a	(IIF)V	func_73863_a	drawScreen
+M	ayl	a	(III)V	func_73864_a	mouseClicked
+M	ayl	a	(Lul;III)V	func_74191_a	handleMouseClick
+M	ayl	b	()V	func_73874_b	onGuiClosed
+M	ayl	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
+M	ayl	b	(III)V	func_73879_b	mouseMovedOrUp
+M	ayl	c	()V	func_73876_c	updateScreen
+M	ayl	f	()Z	func_73868_f	doesGuiPauseGame
+M	bbq	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbr	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbr	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbs	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbt	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbt	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbv	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbv	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbx	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbx	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bby	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbz	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbz	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bca	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bca	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcc	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcc	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcd	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bce	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bce	a	(Ljava/lang/String;)Lbdk;	func_78084_a	getTextureOffset
+M	bce	a	(Ljava/lang/String;II)V	func_78085_a	setTextureOffset
+M	bce	a	(Ljava/util/Random;)Lbdj;	func_85181_a	getRandomModelBox
+M	bce	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bce	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcf	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcf	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcf	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bci	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bci	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcj	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcj	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bck	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bck	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcm	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcm	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcn	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcn	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bco	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bco	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcq	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcr	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcr	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcs	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcs	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bct	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bct	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcv	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcv	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcv	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcw	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcw	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcx	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcy	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcz	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcz	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcz	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bda	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bda	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bda	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bdb	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bdc	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bdc	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bdd	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bde	a	(Lbge;F)V	func_78245_a	render
+M	bdj	a	(F)V	func_78785_a	render
+M	bdj	a	(FFF)V	func_78793_a	setRotationPoint
+M	bdj	a	(FFFIII)Lbdj;	func_78789_a	addBox
+M	bdj	a	(FFFIIIF)V	func_78790_a	addBox
+M	bdj	a	(II)Lbdj;	func_78784_a	setTextureOffset
+M	bdj	a	(Lbdj;)V	func_78792_a	addChild
+M	bdj	a	(Ljava/lang/String;FFFIII)Lbdj;	func_78786_a	addBox
+M	bdj	b	(F)V	func_78791_b	renderWithRotation
+M	bdj	b	(II)Lbdj;	func_78787_b	setTextureSize
+M	bdj	c	(F)V	func_78794_c	postRender
+M	bdw	h	()V	func_71053_j	closeScreen
+M	bdw	j	(I)V	func_70691_i	heal
+M	bfk	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	bfk	a	(Llt;)V	func_71007_a	displayGUIChest
+M	bfk	ag	()Z	func_70093_af	isSneaking
+M	bfk	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	bfk	bG	()Lwm;	func_70694_bm	getHeldItem
+M	bfk	h	()V	func_71053_j	closeScreen
+M	bgf	a	()V	func_98185_a	resetBoundTexture
+M	bgf	a	(Ljava/lang/String;Ljava/lang/String;)I	func_78350_a	getTextureForDownloadableImage
+M	bgf	b	(Ljava/lang/String;)V	func_98187_b	bindTexture
+M	bgf	c	(I)V	func_78342_b	bindTexture
+M	bgf	f	(Ljava/lang/String;)I	func_78341_b	getTexture
+M	bgp	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bgq	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bgs	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bgt	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bgy	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bha	a	(Lbgz;)V	func_76976_a	setRenderManager
+M	bha	a	(Ljava/lang/String;)V	func_76985_a	loadTexture
+M	bha	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhh	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhj	a	(Lawv;Lbgf;Lwm;II)V	func_77015_a	renderItemIntoGUI
+M	bhj	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhj	b	(Lawv;Lbgf;Lwm;II)V	func_82406_b	renderItemAndEffectIntoGUI
+M	bhj	c	(Lawv;Lbgf;Lwm;II)V	func_77021_b	renderItemOverlayIntoGUI
+M	bhl	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhp	a	(Lbce;)V	func_77042_a	setRenderPassModel
+M	bhp	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhq	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhr	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bht	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhw	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bib	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bie	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bif	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	big	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bik	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bo	a	(Ljava/lang/String;)Ljava/lang/String;	func_74838_a	translateToLocal
+M	bo	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74837_a	translateToLocalFormatted
+M	bp	a	()Lbp;	func_74808_a	getInstance
+M	bp	a	(Ljava/lang/String;)Ljava/lang/String;	func_74805_b	translateKey
+M	bp	a	(Ljava/lang/String;Z)V	func_74810_a	setLanguage
+M	bp	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74803_a	translateKeyFormat
+M	bp	b	()Ljava/util/TreeMap;	func_74806_b	getLanguageList
+M	bp	c	()Ljava/lang/String;	func_74811_c	getCurrentLanguage
+M	bp	c	(Ljava/lang/String;)Ljava/lang/String;	func_74809_c	translateNamedKey
+M	bp	d	()Z	func_74804_d	isUnicode
+M	bp	e	(Ljava/lang/String;)Z	func_74802_e	isBidirectional
+M	bq	a	()B	func_74732_a	getId
+M	bq	b	()Lcf;	func_74737_b	copy
+M	bq	equals	(Ljava/lang/Object;)Z	equals	equals
+M	bq	hashCode	()I	hashCode	hashCode
+M	bq	toString	()Ljava/lang/String;	toString	toString
+M	br	a	()B	func_74732_a	getId
+M	br	b	()Lcf;	func_74737_b	copy
+M	br	equals	(Ljava/lang/Object;)Z	equals	equals
+M	br	hashCode	()I	hashCode	hashCode
+M	br	toString	()Ljava/lang/String;	toString	toString
+M	bs	a	()B	func_74732_a	getId
+M	bs	a	(Ljava/lang/String;)Lcf;	func_74781_a	getTag
+M	bs	a	(Ljava/lang/String;B)V	func_74774_a	setByte
+M	bs	a	(Ljava/lang/String;D)V	func_74780_a	setDouble
+M	bs	a	(Ljava/lang/String;F)V	func_74776_a	setFloat
+M	bs	a	(Ljava/lang/String;I)V	func_74768_a	setInteger
+M	bs	a	(Ljava/lang/String;J)V	func_74772_a	setLong
+M	bs	a	(Ljava/lang/String;Lbs;)V	func_74766_a	setCompoundTag
+M	bs	a	(Ljava/lang/String;Lcf;)V	func_74782_a	setTag
+M	bs	a	(Ljava/lang/String;Ljava/lang/String;)V	func_74778_a	setString
+M	bs	a	(Ljava/lang/String;S)V	func_74777_a	setShort
+M	bs	a	(Ljava/lang/String;Z)V	func_74757_a	setBoolean
+M	bs	a	(Ljava/lang/String;[B)V	func_74773_a	setByteArray
+M	bs	a	(Ljava/lang/String;[I)V	func_74783_a	setIntArray
+M	bs	b	()Lcf;	func_74737_b	copy
+M	bs	b	(Ljava/lang/String;)Z	func_74764_b	hasKey
+M	bs	c	()Ljava/util/Collection;	func_74758_c	getTags
+M	bs	c	(Ljava/lang/String;)B	func_74771_c	getByte
+M	bs	d	()Z	func_82582_d	hasNoTags
+M	bs	d	(Ljava/lang/String;)S	func_74765_d	getShort
+M	bs	e	(Ljava/lang/String;)I	func_74762_e	getInteger
+M	bs	equals	(Ljava/lang/Object;)Z	equals	equals
+M	bs	f	(Ljava/lang/String;)J	func_74763_f	getLong
+M	bs	g	(Ljava/lang/String;)F	func_74760_g	getFloat
+M	bs	h	(Ljava/lang/String;)D	func_74769_h	getDouble
+M	bs	hashCode	()I	hashCode	hashCode
+M	bs	i	(Ljava/lang/String;)Ljava/lang/String;	func_74779_i	getString
+M	bs	j	(Ljava/lang/String;)[B	func_74770_j	getByteArray
+M	bs	k	(Ljava/lang/String;)[I	func_74759_k	getIntArray
+M	bs	l	(Ljava/lang/String;)Lbs;	func_74775_l	getCompoundTag
+M	bs	m	(Ljava/lang/String;)Lca;	func_74761_m	getTagList
+M	bs	n	(Ljava/lang/String;)Z	func_74767_n	getBoolean
+M	bs	o	(Ljava/lang/String;)V	func_82580_o	removeTag
+M	bs	toString	()Ljava/lang/String;	toString	toString
+M	bv	a	()B	func_74732_a	getId
+M	bv	b	()Lcf;	func_74737_b	copy
+M	bv	equals	(Ljava/lang/Object;)Z	equals	equals
+M	bv	hashCode	()I	hashCode	hashCode
+M	bv	toString	()Ljava/lang/String;	toString	toString
+M	bx	a	()B	func_74732_a	getId
+M	bx	b	()Lcf;	func_74737_b	copy
+M	bx	equals	(Ljava/lang/Object;)Z	equals	equals
+M	bx	hashCode	()I	hashCode	hashCode
+M	bx	toString	()Ljava/lang/String;	toString	toString
+M	by	a	()B	func_74732_a	getId
+M	by	b	()Lcf;	func_74737_b	copy
+M	by	equals	(Ljava/lang/Object;)Z	equals	equals
+M	by	hashCode	()I	hashCode	hashCode
+M	by	toString	()Ljava/lang/String;	toString	toString
+M	bz	a	()B	func_74732_a	getId
+M	bz	b	()Lcf;	func_74737_b	copy
+M	bz	equals	(Ljava/lang/Object;)Z	equals	equals
+M	bz	hashCode	()I	hashCode	hashCode
+M	bz	toString	()Ljava/lang/String;	toString	toString
+M	ca	a	()B	func_74732_a	getId
+M	ca	a	(I)Lcf;	func_74744_a	removeTag
+M	ca	a	(Lcf;)V	func_74742_a	appendTag
+M	ca	b	()Lcf;	func_74737_b	copy
+M	ca	b	(I)Lcf;	func_74743_b	tagAt
+M	ca	c	()I	func_74745_c	tagCount
+M	ca	equals	(Ljava/lang/Object;)Z	equals	equals
+M	ca	hashCode	()I	hashCode	hashCode
+M	ca	toString	()Ljava/lang/String;	toString	toString
+M	cb	a	()B	func_74732_a	getId
+M	cb	b	()Lcf;	func_74737_b	copy
+M	cb	equals	(Ljava/lang/Object;)Z	equals	equals
+M	cb	hashCode	()I	hashCode	hashCode
+M	cb	toString	()Ljava/lang/String;	toString	toString
+M	cd	a	()B	func_74732_a	getId
+M	cd	b	()Lcf;	func_74737_b	copy
+M	cd	equals	(Ljava/lang/Object;)Z	equals	equals
+M	cd	hashCode	()I	hashCode	hashCode
+M	cd	toString	()Ljava/lang/String;	toString	toString
+M	ce	a	()B	func_74732_a	getId
+M	ce	b	()Lcf;	func_74737_b	copy
+M	ce	equals	(Ljava/lang/Object;)Z	equals	equals
+M	ce	hashCode	()I	hashCode	hashCode
+M	ce	toString	()Ljava/lang/String;	toString	toString
+M	cf	a	()B	func_74732_a	getId
+M	cf	b	()Lcf;	func_74737_b	copy
+M	cf	e	()Ljava/lang/String;	func_74740_e	getName
+M	cf	equals	(Ljava/lang/Object;)Z	equals	equals
+M	cf	hashCode	()I	hashCode	hashCode
+M	cf	p	(Ljava/lang/String;)Lcf;	func_74738_o	setName
+M	gu	a	(Lei;)V	func_72384_a	sendPacketToAllPlayers
+M	gu	a	(Lei;I)V	func_72396_a	sendPacketToAllPlayersInDimension
+M	gu	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
+M	gu	e	(Ljava/lang/String;)Z	func_72353_e	areCommandsAllowed
+M	gu	i	()Ljava/util/Set;	func_72376_i	getOps
+M	gu	k	()I	func_72394_k	getCurrentPlayerCount
+M	gu	k	(Ljava/lang/String;)V	func_92062_k	sendChatMsg
+M	gu	l	()I	func_72352_l	getMaxPlayers
+M	iz	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
+M	iz	c	(Lmp;)Z	func_72942_c	addWeatherEffect
+M	iz	d	(IIIIII)V	func_72965_b	addBlockEvent
+M	iz	o	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
+M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	jc	a	(Llt;)V	func_71007_a	displayGUIChest
+M	jc	a	(Ltj;II)V	func_71112_a	sendProgressBarUpdate
+M	jc	a	(Ltj;ILwm;)V	func_71111_a	sendSlotContents
+M	jc	b	(I)V	func_70606_j	setEntityHealth
+M	jc	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	jc	e	()F	func_70047_e	getEyeHeight
+M	jc	h	()V	func_71053_j	closeScreen
+M	kx	a	(D)F	func_76133_a	sqrt_double
+M	kx	a	(DD)D	func_76132_a	abs_max
+M	kx	a	(F)F	func_76126_a	sin
+M	kx	a	(FFF)F	func_76131_a	clamp_float
+M	kx	a	(II)I	func_76137_a	bucketInt
+M	kx	a	(III)I	func_76125_a	clamp_int
+M	kx	a	(Ljava/util/Random;II)I	func_76136_a	getRandomIntegerInRange
+M	kx	b	(D)I	func_76140_b	truncateDoubleToInt
+M	kx	b	(F)F	func_76134_b	cos
+M	kx	c	(D)I	func_76128_c	floor_double
+M	kx	c	(F)F	func_76129_c	sqrt_float
+M	kx	d	(D)J	func_76124_d	floor_double_long
+M	kx	d	(F)I	func_76141_d	floor_float
+M	kx	e	(F)F	func_76135_e	abs
+M	kx	f	(D)I	func_76143_f	ceiling_double_int
+M	kx	f	(F)I	func_76123_f	ceiling_float_int
+M	kx	g	(D)D	func_76138_g	wrapAngleTo180_double
+M	kx	g	(F)F	func_76142_g	wrapAngleTo180_float
+M	lt	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	lt	a	(II)Lwm;	func_70298_a	decrStackSize
+M	lt	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	lt	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	lt	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	lt	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	lt	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	lt	c	()Z	func_94042_c	isInvNameLocalized
+M	lt	d	()I	func_70297_j_	getInventoryStackLimit
+M	lt	f	()V	func_70295_k_	openChest
+M	lt	g	()V	func_70305_f	closeChest
+M	lt	j_	()I	func_70302_i_	getSizeInventory
+M	lt	k_	()V	func_70296_d	onInventoryChanged
+M	lx	a	()I	func_94211_a	getOriginX
+M	lx	a	(D)F	func_94214_a	getInterpolatedU
+M	lx	b	()I	func_94216_b	getOriginY
+M	lx	b	(D)F	func_94207_b	getInterpolatedV
+M	lx	e	()F	func_94209_e	getMinU
+M	lx	f	()F	func_94212_f	getMaxU
+M	lx	g	()F	func_94206_g	getMinV
+M	lx	h	()F	func_94210_h	getMaxV
+M	lx	i	()Ljava/lang/String;	func_94215_i	getIconName
+M	lx	j	()I	func_94213_j	getSheetWidth
+M	lx	k	()I	func_94208_k	getSheetHeight
+M	ly	a	(Ljava/lang/String;)Llx;	func_94245_a	registerIcon
+M	lz	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	lz	a	(II)Lwm;	func_70298_a	decrStackSize
+M	lz	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	lz	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	lz	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	lz	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	lz	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	lz	c	()Z	func_94042_c	isInvNameLocalized
+M	lz	d	()I	func_70297_j_	getInventoryStackLimit
+M	lz	f	()V	func_70295_k_	openChest
+M	lz	g	()V	func_70305_f	closeChest
+M	lz	j_	()I	func_70302_i_	getSizeInventory
+M	lz	k_	()V	func_70296_d	onInventoryChanged
+M	mp	A	()V	func_70066_B	extinguish
+M	mp	E	()Z	func_70045_F	isImmuneToFire
+M	mp	F	()Z	func_70026_G	isWet
+M	mp	G	()Z	func_70090_H	isInWater
+M	mp	N	()Ljava/lang/String;	func_70073_O	getTexture
+M	mp	R	()Z	func_70089_S	isEntityAlive
+M	mp	a	(FF)V	func_70105_a	setSize
+M	mp	ae	()Z	func_70027_ad	isBurning
+M	mp	ag	()Z	func_70093_af	isSneaking
+M	mp	am	()Ljava/lang/String;	func_70023_ak	getEntityName
+M	mp	b	(DDD)V	func_70107_b	setPosition
+M	mp	b	(DDDFF)V	func_70012_b	setLocationAndAngles
+M	mp	b	(FF)V	func_70101_b	setRotation
+M	mp	c	(F)F	func_70013_c	getBrightness
+M	mp	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
+M	mp	d	(I)V	func_70015_d	setFire
+M	mp	d	(Lmp;)F	func_70032_d	getDistanceToEntity
+M	mp	e	()F	func_70047_e	getEyeHeight
+M	mp	e	(Lbs;)V	func_70109_d	writeToNBT
+M	mp	equals	(Ljava/lang/Object;)Z	equals	equals
+M	mp	f	(DDD)D	func_70011_f	getDistance
+M	mp	f	(Lbs;)V	func_70020_e	readFromNBT
+M	mp	hashCode	()I	hashCode	hashCode
+M	mp	toString	()Ljava/lang/String;	toString	toString
+M	mp	w	()V	func_70106_y	setDead
+M	mv	a	(Ljava/lang/Class;Ljava/lang/String;I)V	func_75618_a	addMapping
+M	mv	a	(Ljava/lang/Class;Ljava/lang/String;III)V	func_75614_a	addMapping
+M	mv	a	(Ljava/lang/String;Laab;)Lmp;	func_75620_a	createEntityByName
+M	mv	a	(Lmp;)I	func_75619_a	getEntityID
+M	mv	b	(I)Ljava/lang/String;	func_75617_a	getStringFromID
+M	mv	b	(Lmp;)Ljava/lang/String;	func_75621_b	getEntityString
+M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
+M	net/minecraft/client/Minecraft	a	(Laxr;)V	func_71373_a	displayGuiScreen
+M	net/minecraft/server/MinecraftServer	A	()[Ljava/lang/String;	func_71213_z	getAllUsernames
+M	net/minecraft/server/MinecraftServer	D	()Lnet/minecraft/server/MinecraftServer;	func_71276_C	getServer
+M	net/minecraft/server/MinecraftServer	E	()Laa;	func_71187_D	getCommandManager
+M	net/minecraft/server/MinecraftServer	H	()Ljava/lang/String;	func_71214_G	getServerOwner
+M	net/minecraft/server/MinecraftServer	I	()Z	func_71264_H	isSinglePlayer
+M	net/minecraft/server/MinecraftServer	J	()Ljava/lang/String;	func_71270_I	getFolderName
+M	net/minecraft/server/MinecraftServer	K	()Ljava/lang/String;	func_71221_J	getWorldName
+M	net/minecraft/server/MinecraftServer	T	()Z	func_71262_S	isDedicatedServer
+M	net/minecraft/server/MinecraftServer	X	()Z	func_71219_W	isPVPEnabled
+M	net/minecraft/server/MinecraftServer	a	(I)Liz;	func_71218_a	worldServerForDimension
+M	net/minecraft/server/MinecraftServer	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	net/minecraft/server/MinecraftServer	aa	()Ljava/lang/String;	func_71273_Y	getMOTD
+M	net/minecraft/server/MinecraftServer	ad	()Lgu;	func_71203_ab	getConfigurationManager
+M	net/minecraft/server/MinecraftServer	ah	()I	func_71259_af	getTickCounter
+M	net/minecraft/server/MinecraftServer	c_	()Ljava/lang/String;	func_70005_c_	getCommandSenderName
+M	net/minecraft/server/MinecraftServer	f	()Z	func_71225_e	canStructuresSpawn
+M	net/minecraft/server/MinecraftServer	f	(Ljava/lang/String;)V	func_71244_g	logInfo
+M	net/minecraft/server/MinecraftServer	g	()Laaj;	func_71265_f	getGameType
+M	net/minecraft/server/MinecraftServer	g	(Ljava/lang/String;)V	func_71236_h	logWarning
+M	net/minecraft/server/MinecraftServer	h	()I	func_71232_g	getDifficulty
+M	net/minecraft/server/MinecraftServer	i	(Ljava/lang/String;)V	func_71201_j	logSevere
+M	net/minecraft/server/MinecraftServer	x	()Ljava/lang/String;	func_71249_w	getMinecraftVersion
+M	net/minecraft/server/MinecraftServer	y	()I	func_71233_x	getCurrentPlayerCount
+M	net/minecraft/server/MinecraftServer	z	()I	func_71275_y	getMaxPlayers
+M	ng	N	()Ljava/lang/String;	func_70073_O	getTexture
+M	ng	R	()Z	func_70089_S	isEntityAlive
+M	ng	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	ng	aA	()Lnz;	func_70605_aq	getMoveHelper
+M	ng	aB	()Lnx;	func_70683_ar	getJumpHelper
+M	ng	aC	()Lpx;	func_70661_as	getNavigator
+M	ng	aD	()Lpy;	func_70635_at	getEntitySenses
+M	ng	aI	()F	func_70689_ay	getAIMoveSpeed
+M	ng	aQ	()I	func_70627_aG	getTalkInterval
+M	ng	aW	()I	func_70667_aM	getMaxHealth
+M	ng	aX	()I	func_70630_aN	getHealth
+M	ng	aZ	()I	func_70658_aO	getTotalArmorValue
+M	ng	am	()Ljava/lang/String;	func_70023_ak	getEntityName
+M	ng	az	()Lny;	func_70671_ap	getLookHelper
+M	ng	b	(I)V	func_70606_j	setEntityHealth
+M	ng	bF	()Lno;	func_70668_bt	getCreatureAttribute
+M	ng	bG	()Lwm;	func_70694_bm	getHeldItem
+M	ng	ba	()F	func_70599_aP	getSoundVolume
+M	ng	bb	()Ljava/lang/String;	func_70639_aQ	getLivingSound
+M	ng	bc	()Ljava/lang/String;	func_70621_aR	getHurtSound
+M	ng	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
+M	ng	be	()I	func_70633_aT	getDropItemId
+M	ng	bh	()Z	func_70650_aV	isAIEnabled
+M	ng	bm	()Z	func_70692_ba	canDespawn
+M	ng	bz	()Z	func_70608_bn	isPlayerSleeping
+M	ng	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
+M	ng	e	()F	func_70047_e	getEyeHeight
+M	ng	e	(F)V	func_70659_e	setAIMoveSpeed
+M	ng	h_	()Z	func_70631_g_	isChild
+M	ng	j	(I)V	func_70691_i	heal
+M	ng	q	(I)Lwm;	func_82169_q	getCurrentArmor
+M	nn	values	()[Lnn;	values	values
+M	on	a	()V	func_75774_a	onUpdateTasks
+M	on	a	(ILom;)V	func_75776_a	addTask
+M	on	a	(Lom;)V	func_85156_a	removeTask
+M	qh	aQ	()I	func_70627_aG	getTalkInterval
+M	qh	bm	()Z	func_70692_ba	canDespawn
+M	rh	am	()Ljava/lang/String;	func_70023_ak	getEntityName
+M	rh	d	()Lwm;	func_92059_d	getEntityItem
+M	sb	c	(Lmp;)I	func_82193_c	getAttackStrength
+M	so	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	so	a	(II)Lwm;	func_70298_a	decrStackSize
+M	so	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	so	a	(Lmp;)I	func_70444_a	getDamageVsEntity
+M	so	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	so	a	(Lwm;)Z	func_70441_a	addItemStackToInventory
+M	so	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	so	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	so	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	so	b	(Lapa;)Z	func_70454_b	canHarvestBlock
+M	so	b	(Lwm;)V	func_70437_b	setItemStack
+M	so	c	()Z	func_94042_c	isInvNameLocalized
+M	so	c	(Lwm;)Z	func_70431_c	hasItemStack
+M	so	d	()I	func_70297_j_	getInventoryStackLimit
+M	so	d	(I)Z	func_70435_d	consumeInventoryItem
+M	so	e	(I)Z	func_70450_e	hasItem
+M	so	f	()V	func_70295_k_	openChest
+M	so	f	(I)Lwm;	func_70440_f	armorItemInSlot
+M	so	g	()V	func_70305_f	closeChest
+M	so	h	()Lwm;	func_70448_g	getCurrentItem
+M	so	j	()I	func_70447_i	getFirstEmptyStack
+M	so	j_	()I	func_70302_i_	getSizeInventory
+M	so	k_	()V	func_70296_d	onInventoryChanged
+M	so	l	()I	func_70430_l	getTotalArmorValue
+M	so	o	()Lwm;	func_70445_o	getItemStack
+M	sq	a	(IIIILwm;)Z	func_82247_a	canPlayerEdit
+M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
+M	sq	a	(Llt;)V	func_71007_a	displayGUIChest
+M	sq	aW	()I	func_70667_aM	getMaxHealth
+M	sq	aZ	()I	func_70658_aO	getTotalArmorValue
+M	sq	am	()Ljava/lang/String;	func_70023_ak	getEntityName
+M	sq	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
+M	sq	bG	()Lwm;	func_70694_bm	getHeldItem
+M	sq	bV	()Z	func_71039_bw	isUsingItem
+M	sq	bz	()Z	func_70608_bn	isPlayerSleeping
+M	sq	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
+M	sq	c	(Lwm;)Lrh;	func_71021_b	dropPlayerItem
+M	sq	c_	()Ljava/lang/String;	func_70005_c_	getCommandSenderName
+M	sq	cb	()Lwm;	func_71045_bC	getCurrentEquippedItem
+M	sq	ci	()Lt;	func_70997_bJ	getBedLocation
+M	sq	cl	()Lti;	func_71024_bL	getFoodStats
+M	sq	e	()F	func_70047_e	getEyeHeight
+M	sq	h	()V	func_71053_j	closeScreen
+M	sq	q	(I)Lwm;	func_82169_q	getCurrentArmor
+M	sq	w	()V	func_70106_y	setDead
+M	sq	w	(I)V	func_71023_q	addExperience
+M	t	b	(III)V	func_71571_b	set
+M	t	e	(III)F	func_71569_e	getDistanceSquared
+M	t	equals	(Ljava/lang/Object;)Z	equals	equals
+M	t	hashCode	()I	hashCode	hashCode
+M	ti	a	()I	func_75116_a	getFoodLevel
+M	ti	a	(IF)V	func_75122_a	addStats
+M	tj	a	()Ljava/util/List;	func_75138_a	getInventory
+M	tj	a	(I)Lul;	func_75139_a	getSlot
+M	tj	a	(IIILsq;)Lwm;	func_75144_a	slotClick
+M	tj	a	(ILwm;)V	func_75141_a	putStackInSlot
+M	tj	a	(Llt;)V	func_75130_a	onCraftMatrixChanged
+M	tj	a	(Llt;I)Lul;	func_75147_a	getSlotFromInventory
+M	tj	a	(Lsq;)Z	func_75145_c	canInteractWith
+M	tj	a	(Lul;)Lul;	func_75146_a	addSlotToContainer
+M	tj	a	(Lwm;IIZ)Z	func_75135_a	mergeItemStack
+M	tj	b	()V	func_75142_b	detectAndSendChanges
+M	tj	b	(II)V	func_75137_b	updateProgressBar
+M	tj	b	(Lsq;)V	func_75134_a	onCraftGuiClosed
+M	tj	b	(Lsq;I)Lwm;	func_82846_b	transferStackInSlot
+M	tj	b	(Ltp;)V	func_82847_b	removeCraftingFromCrafters
+M	tp	a	(Ltj;II)V	func_71112_a	sendProgressBarUpdate
+M	tp	a	(Ltj;ILwm;)V	func_71111_a	sendSlotContents
+M	tx	a	(I)Lwm;	func_75209_a	decrStackSize
+M	tx	a	(Lsq;Lwm;)V	func_82870_a	onPickupFromSlot
+M	tx	a	(Lwm;)Z	func_75214_a	isItemValid
+M	ul	a	()I	func_75219_a	getSlotStackLimit
+M	ul	a	(I)Lwm;	func_75209_a	decrStackSize
+M	ul	a	(Lsq;)Z	func_82869_a	canTakeStack
+M	ul	a	(Lsq;Lwm;)V	func_82870_a	onPickupFromSlot
+M	ul	a	(Lwm;)Z	func_75214_a	isItemValid
+M	ul	a	(Lwm;Lwm;)V	func_75220_a	onSlotChange
+M	ul	b	()Llx;	func_75212_b	getBackgroundIconIndex
+M	ul	c	()Lwm;	func_75211_c	getStack
+M	ul	c	(Lwm;)V	func_75215_d	putStack
+M	ul	d	()Z	func_75216_d	getHasStack
+M	ul	e	()V	func_75218_e	onSlotChanged
+M	uo	a	(Lwm;I)I	func_82790_a	getColorFromItemStack
+M	uo	a	(Lwm;Laab;Lsq;)Lwm;	func_77659_a	onItemRightClick
+M	uo	c	()I	func_77619_b	getItemEnchantability
+M	uq	a	()I	func_78045_a	getEnchantability
+M	uq	a	(I)I	func_78046_a	getDurability
+M	uq	b	(I)I	func_78044_b	getDamageReductionAmount
+M	ve	b	()Ljava/lang/String;	func_78013_b	getTabLabel
+M	ve	e	()I	func_78012_e	getTabIconItemIndex
+M	vr	a	(Lmp;)I	func_77649_a	getDamageVsEntity
+M	vr	a	(Lwm;Laab;IIIILng;)Z	func_77660_a	onBlockDestroyed
+M	vr	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
+M	vr	a	(Lwm;Lng;Lng;)Z	func_77644_a	hitEntity
+M	vr	c	()I	func_77619_b	getItemEnchantability
+M	vr	n_	()Z	func_77662_d	isFull3D
+M	wf	a	(IIIF)Lwf;	func_77844_a	setPotionEffect
+M	wf	a	(Lwm;Laab;Lsq;)Lwm;	func_77659_a	onItemRightClick
+M	wf	b	(Lwm;Laab;Lsq;)Lwm;	func_77654_b	onEaten
+M	wf	c_	(Lwm;)I	func_77626_a	getMaxItemUseDuration
+M	wf	g	()I	func_77847_f	getHealAmount
+M	wf	h	()F	func_77846_g	getSaturationModifier
+M	wf	j	()Lwf;	func_77848_i	setAlwaysEdible
+M	wi	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
+M	wj	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
+M	wj	n_	()Z	func_77662_d	isFull3D
+M	wk	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	wk	a	(Lapa;)Z	func_77641_a	canHarvestBlock
+M	wk	a	(Lmp;)I	func_77649_a	getDamageVsEntity
+M	wk	a	(Lve;)Lwk;	func_77637_a	setCreativeTab
+M	wk	a	(Lwk;)Lwk;	func_77642_a	setContainerItem
+M	wk	a	(Lwm;I)I	func_82790_a	getColorFromItemStack
+M	wk	a	(Lwm;Laab;IIIILng;)Z	func_77660_a	onBlockDestroyed
+M	wk	a	(Lwm;Laab;Lmp;IZ)V	func_77663_a	onUpdate
+M	wk	a	(Lwm;Laab;Lsq;)Lwm;	func_77659_a	onItemRightClick
+M	wk	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
+M	wk	a	(Lwm;Lng;Lng;)Z	func_77644_a	hitEntity
+M	wk	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
+M	wk	a	(Z)Lwk;	func_77627_a	setHasSubtypes
+M	wk	a_	(I)Llx;	func_77617_a	getIconFromDamage
+M	wk	b	(Ljava/lang/String;)Lwk;	func_77655_b	setUnlocalizedName
+M	wk	b	(Lwm;Laab;Lsq;)Lwm;	func_77654_b	onEaten
+M	wk	c	()I	func_77619_b	getItemEnchantability
+M	wk	c	(Ljava/lang/String;)Lwk;	func_77631_c	setPotionEffect
+M	wk	c_	(Lwm;)I	func_77626_a	getMaxItemUseDuration
+M	wk	d	(I)Lwk;	func_77625_d	setMaxStackSize
+M	wk	d	(Lwm;)Ljava/lang/String;	func_77667_c	getUnlocalizedName
+M	wk	d	(Lwm;Laab;Lsq;)V	func_77622_d	onCreated
+M	wk	e	(I)Lwk;	func_77656_e	setMaxDamage
+M	wk	e	(Lwm;)Z	func_77636_d	hasEffect
+M	wk	h	(Lwm;)Llx;	func_77650_f	getIconIndex
+M	wk	l	()I	func_77639_j	getItemStackLimit
+M	wk	l	(Lwm;)Ljava/lang/String;	func_77628_j	getItemDisplayName
+M	wk	m	()Z	func_77614_k	getHasSubtypes
+M	wk	n	()I	func_77612_l	getMaxDamage
+M	wk	n_	()Z	func_77662_d	isFull3D
+M	wk	o	()Z	func_77645_m	isDamageable
+M	wk	p	()Lwk;	func_77664_n	setFull3D
+M	wk	s	()Lwk;	func_77668_q	getContainerItem
+M	wk	u	()Ljava/lang/String;	func_77635_s	getStatName
+M	wl	a	()I	func_77997_a	getMaxUses
+M	wl	b	()F	func_77998_b	getEfficiencyOnProperMaterial
+M	wl	c	()I	func_78000_c	getDamageVsEntity
+M	wl	d	()I	func_77996_d	getHarvestLevel
+M	wl	e	()I	func_77995_e	getEnchantability
+M	wl	f	()I	func_82844_f	getToolCraftingMaterial
+M	wl	values	()[Lwl;	values	values
+M	wm	a	()Ljava/lang/String;	func_77977_a	getItemName
+M	wm	a	(I)Lwm;	func_77979_a	splitStack
+M	wm	a	(ILng;)V	func_77972_a	damageItem
+M	wm	a	(Lbs;)Lwm;	func_77949_a	loadItemStackFromNBT
+M	wm	a	(Lmp;)I	func_77971_a	getDamageVsEntity
+M	wm	a	(Lwm;)Z	func_77969_a	isItemEqual
+M	wm	b	()Lwk;	func_77973_b	getItem
+M	wm	b	(I)V	func_77964_b	setItemDamage
+M	wm	b	(Lapa;)Z	func_77987_b	canHarvestBlock
+M	wm	b	(Lbs;)Lbs;	func_77955_b	writeToNBT
+M	wm	c	(Lbs;)V	func_77963_c	readFromNBT
+M	wm	c	(Ljava/lang/String;)V	func_82834_c	setItemName
+M	wm	d	(Lbs;)V	func_77982_d	setTagCompound
+M	wm	e	()I	func_77976_d	getMaxStackSize
+M	wm	f	()Z	func_77985_e	isStackable
+M	wm	h	()Z	func_77981_g	getHasSubtypes
+M	wm	k	()I	func_77960_j	getItemDamage
+M	wm	l	()I	func_77958_k	getMaxDamage
+M	wm	m	()Lwm;	func_77946_l	copy
+M	wm	p	()Z	func_77942_o	hasTagCompound
+M	wm	q	()Lbs;	func_77978_p	getTagCompound
+M	wm	r	()Lca;	func_77986_q	getEnchantmentTagList
+M	wm	s	()Ljava/lang/String;	func_82833_r	getDisplayName
+M	wm	t	()Z	func_82837_s	hasDisplayName
+M	wm	toString	()Ljava/lang/String;	toString	toString
+M	wm	x	()Z	func_77948_v	isItemEnchanted
+M	wu	a	(Lapa;)Z	func_77641_a	canHarvestBlock
+M	wu	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
+M	xf	a	(Lapa;)Z	func_77641_a	canHarvestBlock
+M	xn	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	xn	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
+M	xn	a_	(I)Llx;	func_77617_a	getIconFromDamage
+M	xn	d	(Lwm;)Ljava/lang/String;	func_77667_c	getUnlocalizedName
+M	xn	g	()I	func_77883_f	getBlockID
+M	xr	a	(Lapa;)Z	func_77641_a	canHarvestBlock
+M	xr	a	(Lmp;)I	func_77649_a	getDamageVsEntity
+M	xr	a	(Lwm;Laab;IIIILng;)Z	func_77660_a	onBlockDestroyed
+M	xr	a	(Lwm;Laab;Lsq;)Lwm;	func_77659_a	onItemRightClick
+M	xr	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
+M	xr	a	(Lwm;Lng;Lng;)Z	func_77644_a	hitEntity
+M	xr	c	()I	func_77619_b	getItemEnchantability
+M	xr	c_	(Lwm;)I	func_77626_a	getMaxItemUseDuration
+M	xr	n_	()Z	func_77662_d	isFull3D
+S	aus	java/lang/Thread	
+S	avk	java/applet/Applet	java/applet/AppletStub
+S	awd	java/lang/Error	
+S	avo	java/lang/Object	java/util/concurrent/Callable
+S	avi	java/lang/Object	java/util/concurrent/Callable
+S	awb	java/lang/Object	lc
+S	avg	java/lang/Object	java/util/concurrent/Callable
+S	avq	java/lang/Thread	
+S	avr	java/lang/Object	java/util/concurrent/Callable
+S	auw	java/awt/Canvas	
+S	avh	java/lang/Object	java/util/concurrent/Callable
+S	avn	java/lang/Object	java/util/concurrent/Callable
+S	avm	java/lang/Object	java/util/concurrent/Callable
+S	auv	java/awt/Panel	
+S	awa	java/lang/Enum	
+S	avs	java/lang/Object	java/util/concurrent/Callable
+S	avv	net/minecraft/client/Minecraft	
+S	aux	java/awt/Canvas	
+S	avp	java/awt/event/WindowAdapter	
+S	ave	java/lang/Object	java/util/concurrent/Callable
+S	avl	java/lang/Object	jw
+S	avd	java/lang/Thread	
+S	net/minecraft/client/MinecraftApplet	java/applet/Applet	
+S	avu	java/awt/Canvas	
+S	net/minecraft/client/Minecraft	java/lang/Object	java/lang/Runnable,mc
+S	avt	java/lang/Enum	
+S	avf	java/lang/Object	java/util/concurrent/Callable
+S	bjw	java/lang/Object	kp
+S	bjy	axt	
+S	bjr	bjq	
+S	bjq	java/lang/Object	bju
+S	bjt	bjq	
+S	bjx	axr	
+S	bjs	bjq	
+S	axm	axr	
+S	awl	axr	
+S	axe	axr	
+S	ayb	axr	
+S	awj	axr	
+S	axo	axt	
+S	awo	axr	
+S	aww	awx	
+S	axd	awg	
+S	axx	awg	
+S	axc	java/lang/Thread	
+S	axz	axr	
+S	axj	axr	
+S	awh	awx	
+S	awq	axr	
+S	awi	axr	
+S	awz	awj	
+S	axu	axr	
+S	awk	axr	
+S	awt	axr	
+S	awu	axr	
+S	aws	awx	
+S	axb	axt	
+S	axq	axr	
+S	axk	axr	
+S	axw	axr	
+S	awg	awx	
+S	axy	awg	
+S	axf	axt	
+S	axv	axt	
+S	axr	awx	
+S	axa	axr	
+S	awr	axr	
+S	axl	axr	
+S	axp	axr	lc
+S	awm	axr	
+S	awp	axr	
+S	awn	axt	
+S	axh	awg	
+S	aya	axt	
+S	baa	java/lang/Object	java/lang/Runnable
+S	bao	axr	
+S	azx	axt	
+S	bam	axr	
+S	bak	axt	
+S	azw	axr	
+S	bai	axr	
+S	azz	axr	
+S	bal	java/lang/Thread	
+S	azn	baf	
+S	azo	axr	
+S	azr	axr	
+S	ban	baa	
+S	azp	java/lang/Thread	
+S	azs	axr	
+S	bae	java/lang/Object	java/util/Comparator
+S	azm	axr	
+S	bag	baa	
+S	azv	axr	
+S	azq	baa	
+S	bad	java/util/TimerTask	
+S	baj	java/lang/Thread	
+S	bah	java/lang/Thread	
+S	azy	awk	
+S	ayc	awx	
+S	ayd	axr	
+S	ayk	axt	
+S	aye	axr	
+S	ayj	java/lang/Object	java/util/Comparator
+S	ayf	ayk	
+S	ayg	java/lang/Object	java/util/Comparator
+S	ayh	axt	
+S	ayi	ayk	
+S	ayv	ayl	
+S	ayl	axr	
+S	azj	ayl	tp
+S	azk	axr	
+S	ayp	ayq	
+S	azg	azb	
+S	ayz	tj	
+S	ayx	java/lang/Object	tp
+S	ayy	azb	
+S	azb	ayl	
+S	ayu	axr	
+S	ayr	axr	
+S	azi	awg	
+S	ayn	ayq	
+S	ays	awg	
+S	ayo	ayq	
+S	aza	ul	
+S	aym	ayl	
+S	azd	ayl	
+S	ayq	awg	
+S	ayw	ayl	
+S	azl	ayl	
+S	ayt	ayl	
+S	azf	ayl	
+S	azh	ayl	
+S	aze	ayl	
+S	baq	awx	
+S	bar	axr	
+S	bdv	java/lang/Object	java/util/concurrent/Callable
+S	bdu	java/lang/Object	java/util/concurrent/Callable
+S	bdm	axr	
+S	bdy	axr	
+S	bdw	bfk	
+S	bdn	awk	
+S	bdl	ej	
+S	bdo	axr	
+S	bdt	aab	
+S	bdp	java/lang/Thread	
+S	bdr	java/lang/Object	abt
+S	bdq	axr	
+S	bbb	bay	
+S	bbc	bay	
+S	bba	bay	
+S	baz	bay	
+S	bax	java/lang/RuntimeException	
+S	bbh	bbl	
+S	bbf	bbl	
+S	bbd	bbl	
+S	bbj	bbi	
+S	bbg	bbl	
+S	bbk	bbl	
+S	bbi	java/lang/Exception	
+S	bbo	bbm	
+S	bbn	bbm	
+S	bfj	bfi	
+S	bfk	sq	
+S	bfl	sq	
+S	bjh	net/minecraft/server/MinecraftServer	
+S	bji	java/lang/Object	java/util/concurrent/Callable
+S	bjk	jk	
+S	bjn	java/lang/Thread	
+S	bjj	java/lang/Object	java/util/concurrent/Callable
+S	bjp	java/lang/Thread	
+S	bjg	gu	
+S	bjz	paulscode/sound/codecs/CodecJOrbis	
+S	bka	java/io/InputStream	
+S	bkb	java/lang/Object	gy
+S	bkh	java/lang/Thread	
+S	bkg	axr	
+S	bbw	bci	
+S	bcn	bce	
+S	bbz	bce	
+S	bct	bce	
+S	bcq	bce	
+S	bci	bce	
+S	bda	bce	
+S	bcv	bce	
+S	bbq	bce	
+S	bco	bdb	
+S	bcg	bci	
+S	bcj	bci	
+S	bbv	bce	
+S	bcd	bce	
+S	bbr	bce	
+S	bbx	bce	
+S	bcz	bce	
+S	bcb	bbu	
+S	bcf	bce	
+S	bdb	bca	
+S	bcc	bce	
+S	bcy	bcw	
+S	bby	bca	
+S	bcx	bca	
+S	bcl	bce	
+S	bcm	bce	
+S	bbs	bce	
+S	bca	bce	
+S	bcs	bce	
+S	bbu	bce	
+S	bbt	bce	
+S	bcw	bce	
+S	bck	bci	
+S	bcr	bce	
+S	bdc	bce	
+S	bdd	bce	
+S	ben	beu	
+S	beg	beu	
+S	bez	beu	
+S	beu	mp	
+S	beh	beu	
+S	bfb	beu	
+S	bfh	beu	
+S	bem	beu	
+S	bet	beu	
+S	bel	beu	
+S	bfa	beu	
+S	bed	beu	
+S	bfc	bfh	
+S	bec	beu	
+S	bfe	beu	
+S	bfd	beu	
+S	beo	beu	
+S	bek	beu	
+S	bes	beu	
+S	bee	beu	
+S	bew	beu	
+S	bep	beu	
+S	bff	beu	
+S	bex	beu	
+S	bey	beu	
+S	bei	beu	
+S	beq	beu	
+S	bef	beu	
+S	ber	beu	
+S	bfg	beu	
+S	bga	java/lang/Object	java/util/concurrent/Callable
+S	bfp	java/lang/Object	java/util/Comparator
+S	bfu	java/lang/Object	java/util/concurrent/Callable
+S	bgb	java/lang/Object	bfx
+S	bfo	java/lang/Object	java/util/Comparator
+S	bft	java/lang/Object	java/util/concurrent/Callable
+S	bfw	java/lang/Thread	
+S	bfs	java/lang/Object	java/util/concurrent/Callable
+S	bfz	java/lang/Object	aag
+S	bjc	bjf	
+S	biw	bjf	
+S	bix	bjf	
+S	biy	bjf	
+S	bja	bjf	
+S	bjd	bjf	
+S	biv	bjf	
+S	biz	bjf	
+S	bjb	bjf	
+S	bht	bhp	
+S	bgv	bha	
+S	bhu	bhp	
+S	bhi	bha	
+S	bhy	bhp	
+S	bhm	bha	
+S	bgo	bha	
+S	bhp	bha	
+S	bgs	bhp	
+S	bgx	bhp	
+S	bie	bhp	
+S	bhf	bhp	
+S	bgy	bhp	
+S	bhj	bha	
+S	bgp	bhp	
+S	bib	bhp	
+S	bhr	bhp	
+S	bhz	bhp	
+S	bhh	bhp	
+S	bhd	bha	
+S	bgu	bhp	
+S	bhg	bhp	
+S	bhq	bhp	
+S	bhk	bha	
+S	bhw	bhp	
+S	bhc	bha	
+S	bhv	bhp	
+S	bho	bhn	
+S	bgt	bhp	
+S	bid	bha	
+S	bhl	bhp	
+S	bhs	bha	
+S	bgw	bha	
+S	bgq	bhp	
+S	bih	bhp	
+S	bij	bhp	
+S	bhb	bha	
+S	bik	bhh	
+S	bif	bhp	
+S	bhe	bha	
+S	bhx	bhh	
+S	big	bhp	
+S	bia	bhp	
+S	bic	bhn	
+S	bgr	bha	
+S	bhn	bha	
+S	bii	bha	
+S	bio	java/lang/RuntimeException	
+S	bis	java/lang/Object	ly
+S	bim	java/lang/Object	lx
+S	biq	java/lang/Object	java/lang/Comparable
+S	biu	bim	
+S	bit	bim	
+S	bgj	bgl	
+S	bgk	java/lang/Object	bgi
+S	bkl	java/lang/Thread	
+S	bkk	java/lang/Thread	
+S	ast	java/lang/Object	asw
+S	asx	java/lang/Object	asy
+S	atb	java/util/ArrayList	
+S	ata	auj	
+S	atc	java/lang/Object	atl
+S	atd	atk	
+S	atg	java/lang/Object	atj
+S	ath	java/lang/Object	atj
+S	ati	java/lang/Object	atj
+S	atf	java/lang/Object	auo
+S	atn	java/lang/Object	atl
+S	ato	java/lang/Object	atl
+S	atp	java/lang/Object	atl
+S	atq	atr	
+S	atr	java/lang/IllegalArgumentException	
+S	ats	atr	
+S	atw	aum	
+S	atx	aum	
+S	aty	aum	
+S	atz	aum	
+S	aua	aum	
+S	aub	aum	
+S	auc	aum	
+S	aud	java/lang/Enum	
+S	aue	atk	
+S	auf	java/lang/Object	atl
+S	aug	auj	
+S	aui	java/util/HashMap	
+S	auh	java/lang/Object	atl
+S	auj	atk	
+S	auk	atk	java/lang/Comparable
+S	aul	java/lang/Object	atl
+S	aum	java/lang/Object	asy
+S	aun	java/lang/Exception	
+S	aup	java/lang/Object	aur
+S	a	java/lang/Enum	
+S	c	java/lang/Object	java/util/concurrent/Callable
+S	d	java/lang/Object	java/util/concurrent/Callable
+S	e	java/lang/Object	java/util/concurrent/Callable
+S	f	java/lang/Object	java/util/concurrent/Callable
+S	g	java/lang/Object	java/util/concurrent/Callable
+S	h	java/lang/Object	java/util/concurrent/Callable
+S	i	java/lang/Object	java/util/concurrent/Callable
+S	k	java/lang/Object	java/util/Comparator
+S	j	java/lang/Object	java/util/concurrent/Callable
+S	l	java/lang/Object	java/util/concurrent/Callable
+S	n	java/lang/Object	java/util/concurrent/Callable
+S	o	java/lang/Object	java/util/concurrent/Callable
+S	p	java/lang/Object	java/util/concurrent/Callable
+S	t	java/lang/Object	java/lang/Comparable
+S	u	java/lang/RuntimeException	
+S	x	java/lang/Object	z
+S	y	java/lang/Object	aa
+S	z	java/lang/Object	java/lang/Comparable
+S	ad	ai	
+S	ae	x	
+S	af	x	
+S	ag	x	
+S	ah	x	
+S	ai	x	
+S	aj	x	
+S	ak	x	
+S	al	x	
+S	am	x	
+S	an	x	
+S	ap	x	
+S	aq	x	
+S	ar	x	
+S	as	java/lang/RuntimeException	
+S	at	as	
+S	au	as	
+S	av	as	
+S	aw	as	
+S	ax	au	
+S	az	java/lang/Object	bg
+S	ba	java/lang/Object	az
+S	bb	java/lang/Object	bd
+S	bc	bl	
+S	be	java/lang/Object	bd
+S	bf	java/lang/Enum	
+S	bg	java/lang/Object	bh
+S	bh	java/lang/Object	bi
+S	bj	java/lang/Object	bi
+S	bl	java/lang/Object	bk
+S	bq	cf	
+S	br	cf	
+S	bt	java/lang/Object	java/util/concurrent/Callable
+S	bu	java/lang/Object	java/util/concurrent/Callable
+S	bs	cf	
+S	bv	cf	
+S	bw	cf	
+S	bx	cf	
+S	by	cf	
+S	bz	cf	
+S	ca	cf	
+S	cb	cf	
+S	cd	cf	
+S	ce	cf	
+S	ch	java/lang/Object	cg
+S	cj	java/lang/Thread	
+S	ck	java/lang/Thread	
+S	cl	java/lang/Thread	
+S	cm	java/lang/Thread	
+S	ci	java/lang/Object	cg
+S	cn	ei	
+S	co	ei	
+S	cp	ei	
+S	cq	ei	
+S	cr	ei	
+S	cs	ei	
+S	ct	ei	
+S	cu	ei	
+S	cv	ei	
+S	cw	ei	
+S	cx	ei	
+S	cy	ei	
+S	cz	ei	
+S	da	ei	
+S	db	ei	
+S	dc	ei	
+S	dd	ei	
+S	de	ei	
+S	df	ei	
+S	dg	ei	
+S	dh	ei	
+S	di	ei	
+S	dj	ei	
+S	dk	ei	
+S	dl	ei	
+S	dm	ei	
+S	dn	ei	
+S	do	ei	
+S	dp	ei	
+S	dq	ei	
+S	dr	ei	
+S	ds	ei	
+S	dt	ei	
+S	dv	ei	
+S	dw	ei	
+S	dx	ei	
+S	dy	ei	
+S	dz	ei	
+S	eb	ea	
+S	ec	ea	
+S	ed	ea	
+S	ea	ei	
+S	ef	ee	
+S	eg	ee	
+S	eh	ee	
+S	ee	ei	
+S	ek	ei	
+S	el	ei	
+S	em	ei	
+S	en	ei	
+S	ep	ei	
+S	eq	ei	
+S	er	ei	
+S	es	ei	
+S	et	ei	
+S	eu	ei	
+S	ev	ei	
+S	ew	ei	
+S	ex	ei	
+S	ey	ei	
+S	ez	ei	
+S	fa	ei	
+S	fb	ei	
+S	fc	ei	
+S	fd	ei	
+S	fe	ei	
+S	ff	ei	
+S	fg	ei	
+S	fh	ei	
+S	fi	ei	
+S	fj	ei	
+S	fk	ei	
+S	fl	ei	
+S	fm	ei	
+S	fn	ei	
+S	fo	ei	
+S	fp	ei	
+S	fq	ei	
+S	fr	ei	
+S	fs	bb	
+S	fy	fs	
+S	fz	bb	
+S	ga	bb	
+S	gb	bb	
+S	gc	bb	
+S	gd	bb	
+S	ge	fs	
+S	gf	fs	
+S	gg	fs	
+S	gi	fs	
+S	gh	java/lang/Object	bd
+S	gj	bb	
+S	gk	bb	
+S	gl	bb	
+S	gm	bb	
+S	gn	java/lang/Object	lc
+S	gp	java/lang/Thread	
+S	gq	java/lang/Object	java/util/concurrent/Callable
+S	gr	java/lang/Object	java/util/concurrent/Callable
+S	gs	java/lang/Object	java/util/concurrent/Callable
+S	gt	java/lang/Object	java/util/Comparator
+S	gw	arj	
+S	gz	x	
+S	ha	x	
+S	hb	x	
+S	hc	x	
+S	hd	x	
+S	he	x	
+S	hf	x	
+S	hg	x	
+S	hh	x	
+S	hi	x	
+S	hj	x	
+S	hk	x	
+S	hl	x	
+S	hm	x	
+S	hn	x	
+S	ho	x	
+S	hp	x	
+S	hq	x	
+S	hr	x	
+S	hs	y	w
+S	ht	x	
+S	hu	x	
+S	hv	x	
+S	hw	x	
+S	hx	x	
+S	hy	gu	
+S	ia	java/lang/Thread	
+S	ib	java/lang/Thread	
+S	ic	java/lang/Object	java/util/concurrent/Callable
+S	id	java/lang/Object	java/util/concurrent/Callable
+S	hz	net/minecraft/server/MinecraftServer	gv
+S	ie	jk	
+S	if	java/lang/Thread	
+S	iq	iz	
+S	ir	jd	
+S	is	iz	
+S	iu	java/lang/Object	java/util/concurrent/Callable
+S	iv	java/lang/Object	aag
+S	iy	java/lang/Object	abt
+S	jb	java/util/ArrayList	
+S	iz	aab	
+S	jc	sq	tp
+S	jg	java/lang/Thread	
+S	jf	ej	
+S	ji	java/lang/Object	java/util/concurrent/Callable
+S	jj	java/lang/Object	java/util/concurrent/Callable
+S	jh	ej	
+S	jn	java/lang/Object	ab
+S	jo	java/lang/Object	java/lang/Runnable
+S	jp	jo	
+S	jr	jo	
+S	jt	jo	
+S	ju	ka	
+S	jx	ka	
+S	jy	ka	
+S	jz	ka	
+S	kb	java/lang/Object	ke
+S	kc	java/lang/Object	ke
+S	kd	java/lang/Object	ke
+S	kj	java/util/logging/Formatter	
+S	kh	java/lang/Object	ku
+S	ko	java/lang/Object	java/lang/Runnable
+S	kq	java/lang/Object	java/util/Map
+S	lb	java/lang/Object	java/lang/Comparable
+S	lp	lo	
+S	ls	java/lang/Object	lt
+S	lw	java/lang/Object	lx
+S	lz	java/lang/Object	lt
+S	mb	java/util/TimerTask	
+S	md	java/lang/Object	lt
+S	mh	mg	
+S	mi	mh	
+S	mj	mk	
+S	mm	nr	
+S	mq	java/lang/Object	java/util/concurrent/Callable
+S	mr	java/lang/Object	java/util/concurrent/Callable
+S	mt	java/lang/Enum	
+S	mz	java/lang/Object	my
+S	na	java/lang/Object	my
+S	nb	java/lang/Object	my
+S	nc	mp	
+S	nd	ng	
+S	ne	mp	
+S	nf	ne	
+S	nh	java/lang/Object	java/util/concurrent/Callable
+S	ni	java/lang/Object	java/util/concurrent/Callable
+S	nj	java/lang/Object	java/util/concurrent/Callable
+S	nk	java/lang/Object	java/util/concurrent/Callable
+S	nl	java/lang/Object	java/util/concurrent/Callable
+S	nm	java/lang/Object	java/util/concurrent/Callable
+S	ng	mp	
+S	nn	java/lang/Enum	
+S	no	java/lang/Enum	
+S	nq	java/lang/Enum	
+S	np	ne	
+S	nr	ng	
+S	nu	qh	
+S	ob	java/lang/Object	my
+S	oa	om	
+S	oc	om	
+S	od	og	
+S	oe	om	
+S	of	om	
+S	og	om	
+S	oh	om	
+S	oi	om	
+S	oj	om	
+S	ok	om	
+S	ol	om	
+S	op	or	
+S	oq	om	
+S	or	om	
+S	os	or	
+S	ot	om	
+S	ou	om	
+S	ov	om	
+S	ow	om	
+S	ox	om	
+S	oy	om	
+S	oz	om	
+S	pa	om	
+S	pb	om	
+S	pc	og	
+S	pd	om	
+S	pe	om	
+S	pf	om	
+S	pg	om	
+S	ph	om	
+S	pi	om	
+S	pj	om	
+S	pk	om	
+S	pl	om	
+S	pm	om	
+S	pn	om	
+S	po	om	
+S	pp	pw	
+S	pq	pw	
+S	ps	java/lang/Object	java/util/Comparator
+S	pr	pw	
+S	pt	pr	
+S	pu	pw	
+S	pv	pw	
+S	pw	om	
+S	qe	ajo	
+S	qf	ng	mn
+S	qg	qf	
+S	qh	mm	mn
+S	qi	qh	
+S	qj	qh	
+S	qk	nr	mn
+S	ql	qj	
+S	qm	nu	
+S	qn	qh	
+S	qp	tj	
+S	qo	qh	
+S	qq	qk	sd
+S	qr	qt	
+S	qs	qk	
+S	qt	nr	mn
+S	qu	nu	
+S	qx	mp	
+S	qy	mp	
+S	qz	ng	qv,qw
+S	rc	java/lang/Object	my
+S	rb	sb	qv,sd
+S	rd	mp	
+S	re	rd	
+S	rf	mp	
+S	rg	mp	
+S	rh	mp	
+S	ri	mp	
+S	rj	rk	
+S	rk	ri	lt
+S	rl	ri	
+S	rm	rk	aqh
+S	rn	ri	
+S	rp	zs	
+S	ro	ri	
+S	rq	ri	
+S	rr	mp	
+S	rs	sb	
+S	rt	sh	
+S	ru	sb	
+S	rv	sb	
+S	rx	java/lang/Object	my
+S	rw	java/lang/Object	mn
+S	ry	nd	rw
+S	rz	sb	
+S	sa	sg	
+S	sb	nr	rw
+S	sc	sj	
+S	se	sb	
+S	sf	sb	sd
+S	sg	ng	rw
+S	sh	sb	
+S	si	sb	sd
+S	sj	sb	
+S	sk	java/lang/Object	zp
+S	sl	java/lang/Object	mn
+S	sm	mm	sl,zp
+S	sp	java/lang/Object	java/util/concurrent/Callable
+S	so	java/lang/Object	lt
+S	sr	java/lang/Enum	
+S	sq	ng	ab
+S	ss	mp	sy
+S	st	mp	
+S	su	mp	
+S	sv	mp	
+S	sw	mp	
+S	sx	su	
+S	sz	su	
+S	ta	tb	
+S	tb	mp	sy
+S	tc	tb	
+S	td	tb	
+S	te	tb	
+S	tf	tb	
+S	tg	su	
+S	tl	ul	
+S	tk	tj	
+S	tn	ul	
+S	to	ul	
+S	tm	tj	
+S	tq	tj	
+S	tr	java/lang/Object	lt
+S	ts	tj	
+S	tu	lz	
+S	tv	ul	
+S	tt	tj	
+S	tw	tj	
+S	tx	ul	
+S	ty	tj	
+S	ua	ul	
+S	tz	tj	
+S	uc	java/lang/Object	lt
+S	ud	tj	
+S	ue	ul	
+S	uf	lz	
+S	uh	lz	
+S	ui	ul	
+S	ug	tj	
+S	uj	java/lang/Object	lt
+S	uk	ul	
+S	um	tj	
+S	un	wt	
+S	up	bb	
+S	uq	java/lang/Enum	
+S	uo	wk	
+S	ur	xn	
+S	us	wk	
+S	ut	wk	
+S	uu	wk	
+S	uv	wk	
+S	uw	wk	
+S	ux	wf	
+S	uy	wk	
+S	uz	wk	
+S	va	xn	
+S	vb	wk	
+S	vc	xn	
+S	vd	wk	
+S	vf	ve	
+S	vg	ve	
+S	vh	ve	
+S	vi	ve	
+S	vj	ve	
+S	vk	ve	
+S	vl	ve	
+S	vm	ve	
+S	vn	ve	
+S	vo	ve	
+S	vp	ve	
+S	vq	ve	
+S	vr	wk	
+S	vs	wk	
+S	vt	wk	
+S	vu	wk	
+S	vv	vd	
+S	vw	wk	
+S	vx	wk	
+S	vy	wk	
+S	vz	wk	
+S	wa	wk	
+S	wb	wk	
+S	wc	wk	
+S	wd	wk	
+S	we	wk	
+S	wf	wk	
+S	wg	wf	
+S	wh	wk	
+S	wi	vr	
+S	wj	wk	
+S	wl	java/lang/Enum	
+S	wn	xn	
+S	wo	vd	
+S	wp	wk	
+S	wr	bb	
+S	wq	wk	
+S	ws	wk	
+S	wt	xn	
+S	wu	vr	
+S	wv	xn	
+S	ww	wk	
+S	wx	java/lang/Enum	
+S	wy	wk	
+S	wz	wk	
+S	xa	wk	
+S	xc	wf	
+S	xd	wk	
+S	xe	wk	
+S	xf	vr	
+S	xg	wk	
+S	xh	wk	
+S	xi	wk	
+S	xj	ur	
+S	xk	wk	
+S	xm	xn	
+S	xn	wk	
+S	xo	wk	
+S	xp	java/lang/Enum	
+S	xq	vc	
+S	xr	wk	
+S	xs	wk	
+S	xt	wk	
+S	yb	java/lang/Object	ym
+S	ye	java/lang/Object	ym
+S	yh	java/lang/Object	ym
+S	yi	yn	
+S	yl	java/lang/Object	java/util/Comparator
+S	yn	java/lang/Object	ym
+S	yo	java/lang/Object	ym
+S	ys	yz	
+S	yt	yz	
+S	yu	yz	
+S	yv	yz	
+S	yw	yz	
+S	yx	yz	
+S	yy	yz	
+S	za	java/lang/Enum	
+S	ze	java/lang/Object	zd
+S	zf	java/lang/Object	zd
+S	zg	lo	
+S	zh	yz	
+S	zi	yz	
+S	zj	yz	
+S	zk	yz	
+S	zl	yz	
+S	zm	yz	
+S	zn	yz	
+S	zo	yz	
+S	zr	java/util/ArrayList	
+S	zt	lo	
+S	aac	java/lang/Object	java/util/concurrent/Callable
+S	aad	java/lang/Object	java/util/concurrent/Callable
+S	aae	java/lang/Object	java/util/concurrent/Callable
+S	aab	java/lang/Object	aak
+S	aaf	java/lang/Exception	
+S	aaj	java/lang/Enum	
+S	aam	java/lang/Enum	
+S	aap	t	
+S	aaq	java/lang/Object	aak
+S	aar	java/lang/Object	java/lang/Comparable
+S	aau	aav	
+S	aaw	lo	
+S	abb	aav	
+S	abc	aav	
+S	abd	aba	
+S	abe	aav	
+S	abf	aav	
+S	abg	aav	
+S	abh	aav	
+S	abi	aav	
+S	abj	aav	
+S	abk	aav	
+S	abm	aav	
+S	abn	aav	
+S	abo	aav	
+S	abp	aav	
+S	abq	aaz	
+S	abr	adj	
+S	abv	abw	
+S	ach	java/io/ByteArrayOutputStream	
+S	acj	java/lang/Object	acb,akw
+S	aco	acn	
+S	acp	acn	
+S	acq	acn	
+S	acr	acw	
+S	act	java/lang/Object	abt
+S	acu	java/lang/Object	abt
+S	acv	acw	
+S	acx	acw	
+S	acy	java/lang/Object	abt
+S	acz	java/lang/Object	abt
+S	adb	adj	
+S	adc	adj	
+S	add	adj	
+S	ade	adj	
+S	adg	adj	
+S	adh	adj	
+S	adi	adj	
+S	adk	adj	
+S	adl	adj	
+S	adm	adj	
+S	adn	adj	
+S	ado	adj	
+S	adq	adj	
+S	adr	adj	
+S	ads	adj	
+S	adt	adj	
+S	adu	adj	
+S	adv	adj	
+S	adw	adj	
+S	adx	adj	
+S	ady	adj	
+S	adz	adj	
+S	aea	adj	
+S	aeb	adj	
+S	aec	adj	
+S	aed	adj	
+S	aee	adj	
+S	aef	adj	
+S	aeg	adj	
+S	ael	ags	
+S	aen	agw	
+S	aeo	agw	
+S	aep	agw	
+S	aeq	agw	
+S	aer	agy	
+S	aet	agy	
+S	aes	ags	
+S	aev	afh	
+S	aew	afh	
+S	aex	afh	
+S	aey	afh	
+S	aez	afh	
+S	afa	afh	
+S	afb	afh	
+S	afc	afh	
+S	afd	afh	
+S	afe	afh	
+S	aff	afh	
+S	afg	afh	
+S	afh	agw	
+S	afj	afh	
+S	afk	afh	
+S	afl	aev	
+S	afn	agy	
+S	afm	ags	
+S	afq	aft	
+S	afs	agx	
+S	afr	aft	
+S	aft	agw	
+S	afu	aft	
+S	afw	agy	
+S	afv	ags	
+S	afy	agg	
+S	afz	agg	
+S	agb	agq	
+S	agc	agq	
+S	agd	agq	
+S	age	agq	
+S	agf	agq	
+S	agh	agq	
+S	agi	agq	
+S	agj	age	
+S	agk	agq	
+S	agl	agx	
+S	agm	agq	
+S	agn	agm	
+S	ago	agq	
+S	agp	agq	
+S	agr	java/lang/Enum	
+S	agq	agw	
+S	agt	java/lang/Object	java/util/concurrent/Callable
+S	agu	java/lang/Object	java/util/concurrent/Callable
+S	agv	java/lang/Object	java/util/concurrent/Callable
+S	ags	acw	
+S	aha	agy	
+S	agz	ags	
+S	ahc	ahp	
+S	ahd	ahp	
+S	ahe	ahp	
+S	ahf	ahp	
+S	ahh	ahp	
+S	ahi	ahp	
+S	ahj	ahp	
+S	ahk	ahp	
+S	ahl	ahp	
+S	ahm	ahr	
+S	ahn	ahq	
+S	aho	ahp	
+S	ahp	agw	
+S	ahq	ahp	
+S	ahr	ahp	
+S	ahv	aib	
+S	ahw	aib	
+S	aic	aif	
+S	aid	aif	
+S	aie	aif	
+S	aig	aif	
+S	aii	aif	
+S	aij	ait	
+S	aik	ait	
+S	ail	ait	
+S	aim	ait	
+S	aiq	ait	
+S	ais	ait	
+S	aiu	ait	
+S	aiv	ait	
+S	aiw	ait	
+S	aix	ait	
+S	aiy	ait	
+S	aiz	ait	
+S	ajb	ait	
+S	aje	ait	
+S	ajf	ait	
+S	ajl	ajo	
+S	ajp	ajt	
+S	ajr	java/lang/Object	java/io/FilenameFilter
+S	ajq	aju	
+S	ajs	ajv	
+S	ajt	java/lang/Object	akf,akt
+S	aju	java/lang/Object	aki
+S	ajw	java/lang/Object	java/util/concurrent/Callable
+S	ajx	java/lang/Object	java/util/concurrent/Callable
+S	ajy	java/lang/Object	java/util/concurrent/Callable
+S	ajz	java/lang/Object	java/util/concurrent/Callable
+S	aka	java/lang/Object	java/util/concurrent/Callable
+S	akb	java/lang/Object	java/util/concurrent/Callable
+S	akc	java/lang/Object	java/util/concurrent/Callable
+S	akd	java/lang/Object	java/util/concurrent/Callable
+S	ake	java/lang/Object	java/util/concurrent/Callable
+S	akg	java/lang/Exception	
+S	akj	java/lang/Object	java/lang/Comparable
+S	aks	java/lang/Object	akf
+S	akv	java/lang/Object	java/lang/Runnable
+S	aky	amt	
+S	akz	apa	amh
+S	ala	apa	
+S	alb	apa	
+S	ald	akz	
+S	ale	alz	
+S	alf	apa	
+S	alg	akz	
+S	alh	apa	
+S	ali	apa	
+S	alj	apa	
+S	alk	apa	
+S	all	alu	
+S	alm	apa	
+S	aln	akz	
+S	alo	apa	
+S	alp	apa	
+S	alq	alz	
+S	alr	akz	
+S	als	aly	amh
+S	alu	alh	
+S	alv	akz	
+S	alw	alh	
+S	alx	alb	
+S	aly	alz	
+S	alz	apa	
+S	ama	apa	
+S	amb	akz	
+S	amc	apa	
+S	amd	amb	
+S	ame	apa	
+S	amf	akz	
+S	amg	akz	
+S	ami	apa	
+S	amj	alz	
+S	amk	apa	
+S	aml	apa	
+S	amm	apa	
+S	amn	akz	
+S	amo	ams	
+S	amp	apa	
+S	amq	amt	
+S	amr	apa	
+S	ams	apa	
+S	amt	apa	
+S	amu	apa	
+S	amv	apa	
+S	amw	akz	
+S	amx	apa	
+S	amy	ams	
+S	amz	apa	
+S	ana	api	
+S	anc	apa	
+S	and	apa	
+S	ane	apa	
+S	anf	ane	
+S	ang	ane	
+S	anh	apa	
+S	ani	apa	
+S	anj	apa	
+S	ank	akz	
+S	anl	alh	
+S	anm	akz	
+S	ann	apa	
+S	ano	alh	
+S	anp	aph	
+S	anr	aov	
+S	ans	apa	
+S	ant	ams	
+S	anu	alu	
+S	anv	anj	
+S	anw	alb	
+S	any	java/lang/Enum	
+S	anx	ala	
+S	anz	alz	
+S	aoa	apa	
+S	aob	alb	
+S	aod	aqp	
+S	aoc	akz	
+S	aoe	apa	
+S	aof	apa	
+S	aog	apa	
+S	aoh	apa	
+S	aoi	aly	
+S	aoj	apa	
+S	aok	alh	
+S	aol	akz	
+S	aom	akz	
+S	aon	apa	
+S	aoo	apa	
+S	aop	apa	
+S	aoq	apa	
+S	aor	alh	
+S	aos	ali	
+S	aot	apa	
+S	aou	amr	
+S	aov	apa	
+S	aow	alh	
+S	aox	akz	
+S	aoy	apa	
+S	aoz	apa	
+S	apb	ape	
+S	apc	ape	
+S	apd	ape	
+S	apf	apa	
+S	apg	apa	
+S	aph	apa	
+S	api	apa	
+S	apj	apa	
+S	apk	apa	
+S	apl	apa	
+S	apm	apa	
+S	apn	apa	
+S	apo	apa	
+S	app	alh	
+S	apq	apa	
+S	apr	ala	
+S	aps	ali	
+S	apt	amr	
+S	apu	apa	
+S	apv	apa	
+S	apw	aqp	lt
+S	apx	aqp	md
+S	apy	aqp	lt
+S	apz	aqp	ab
+S	aqa	aqp	
+S	aqb	aqp	
+S	aqc	aqp	lt
+S	aqd	aqc	
+S	aqe	aqp	
+S	aqf	aqp	
+S	aqg	aqp	md
+S	aqh	java/lang/Object	lt
+S	aqi	aqp	aqh
+S	aqk	zs	
+S	aqj	aqp	
+S	aql	aqp	
+S	aqm	aqp	
+S	aqn	aqp	
+S	aqo	aqp	
+S	aqq	java/lang/Object	java/util/concurrent/Callable
+S	aqr	java/lang/Object	java/util/concurrent/Callable
+S	aqs	java/lang/Object	java/util/concurrent/Callable
+S	aqt	apa	
+S	aqu	apa	
+S	aqv	akz	
+S	aqw	aqp	
+S	aqy	java/lang/ThreadLocal	
+S	arb	java/lang/Enum	
+S	arh	java/lang/Object	java/util/Comparator
+S	ark	ajo	
+S	arl	java/lang/Object	arn
+S	arm	arl	
+S	arp	java/lang/Object	aro
+S	arq	ars	
+S	arr	arp	
+S	ars	arr	
+S	asa	asd	
+S	asd	java/lang/RuntimeException	
+S	asf	java/lang/Object	arv
+S	asg	java/io/FilterInputStream	
+S	ash	java/io/FilterOutputStream	
+S	asi	java/lang/Object	arv
+S	asj	java/lang/Object	ary
+S	ask	java/lang/Object	ary
+S	asn	java/security/BasicPermission	
+S	asq	java/lang/Object	java/security/PrivilegedAction
+S	asp	java/security/Provider	asl
+S	asr	java/lang/Object	asm
