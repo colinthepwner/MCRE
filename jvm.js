@@ -5285,24 +5285,33 @@ JVM.collectContent = function (vm, modId) {
 	vm.initClass(bc); vm.initClass(ic);
 	var icons = vm.newObject(vm.loadClass('mcre/IconRegister'));
 	var safe = function (fn, dflt) { var res = JVM.run(vm, fn); return res.ok ? res.value : dflt; };
-	var langOf = function (o) {
+	var langOf = function (o, meta) {
+		meta = meta | 0;
 		var k = safe(function () { return vm.callVirtual(o, 'getUnlocalizedName', '()Ljava/lang/String;', []); }, null);
 		var isBlock = vm.isInstance(o, bc);
 		var holder = isBlock ? o.$itemBlock : o;
 		var shown = null;
+		var ks = JVM.langKeys(k);
+		for (var ki = 0; meta && ki < ks.length; ki++) if (r.lang[ks[ki] + meta + '.name'] != null) return r.lang[ks[ki] + meta + '.name'];
 		if (holder) {
-			var st = JVM.mc152.newStack(vm, isBlock ? o[':blockID'] : o[':itemID'], 1, 0);
+			var st = JVM.mc152.newStack(vm, isBlock ? o[':blockID'] : o[':itemID'], 1, meta);
 			shown = safe(function () { return vm.callVirtual(holder, 'getItemDisplayName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [st]); }, null);
 		} else if (isBlock) shown = safe(function () { return vm.callVirtual(o, 'getLocalizedName', '()Ljava/lang/String;', []); }, null);
 		if (shown && typeof shown === 'string' && !/^(tile|item)\.[^ ]*$/.test(shown.trim())) return shown.trim();
-		return k ? (r.lang[k + '.name'] || null) : null;
+		for (var kj = 0; kj < ks.length; kj++) { var v = (!meta && r.lang[ks[kj] + '.name']) || r.lang[ks[kj] + meta + '.name']; if (v) return v; }
+		if (o.$stId && !meta) {
+			var ip = String(o.$stId).split(':'), ik = (isBlock ? 'tile.' : 'item.') + ip[0] + '.' + ip[1] + '.name';
+			if (r.lang[ik]) return r.lang[ik];
+			return ip[1].replace(/[_/]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+		}
+		return null;
 	};
 	var betaAlt = {};
 	if (vm.$tag === 'babric' && JVM.STATION_BETA) JVM.STATION_BETA.block.concat(JVM.STATION_BETA.item).forEach(function (f) { betaAlt[f[0]] = f[1]; });
 	var overrides = function (o, keys) { return keys.some(function (k) { var m = o.cls.findMethod(k); if (!(m && !m.cls.native) && betaAlt[k]) m = o.cls.findMethod(betaAlt[k]); return m && !m.cls.native; }); };
 	var ref = function (id, data) {
 		var o = r.blocks[id] ? r.blocks[id] : r.items[id];
-		if (o) return (o.$mod === modId ? '' : o.$mod + ':') + JVM.contentName(vm, id);
+		if (o) return (o.$mod === modId ? '' : o.$mod + ':') + JVM.contentName(vm, id, data);
 		return 'minecraft:' + id + (data ? ':' + data : '');
 	};
 	var tex = function (icon) {
@@ -5310,12 +5319,12 @@ JVM.collectContent = function (vm, modId) {
 		var n = icon.$name, p = n.indexOf(':');
 		return p >= 0 ? { mod: n.substring(0, p), name: n.substring(p + 1) } : { mod: null, name: n };
 	};
-	var legacy = function (o, side) {
+	var legacy = function (o, side, meta) {
 		if (!(vm.$legacy || vm.$tag === 'babric') || !JVM.legacyTexture) return null;
-		var lt = JVM.legacyTexture(vm, o, side);
+		var lt = JVM.legacyTexture(vm, o, side, meta | 0);
 		if (lt && lt.cell >= 4096) return null;
 		if (lt && /^[/]?(terrain|gui[/]items)[.]png$/i.test(lt.sheet)) {
-			var vn = JVM.vanillaCellName ? JVM.vanillaCellName(lt.sheet, lt.cell) : null;
+			var vn = JVM.vanillaCellName ? JVM.vanillaCellName(lt.sheet, lt.cell, vm) : null;
 			return vn ? { mod: null, name: vn, vanilla: true } : null;
 		}
 		if (!lt) return null;
@@ -5323,7 +5332,7 @@ JVM.collectContent = function (vm, modId) {
 		return { mod: null, name: base + '_' + lt.cell, sheet: lt.sheet, cell: lt.cell };
 	};
 	var stFiles = vm.$stFiles && vm.$stFiles[modId];
-	var stationTex = function (o, side) { return stFiles && JVM.stationTexture ? JVM.stationTexture(vm, o, side, stFiles) : null; };
+	var stationTex = function (o, side, meta) { return stFiles && JVM.stationTexture ? JVM.stationTexture(vm, o, side, stFiles, meta | 0) : null; };
 	var BLOCK_SCRIPTED = ['onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z',
 		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V', 'onEntityWalking(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V',
 		'onBlockAdded(Lnet/minecraft/src/World;III)V', 'breakBlock(Lnet/minecraft/src/World;IIIII)V',
@@ -5338,17 +5347,31 @@ JVM.collectContent = function (vm, modId) {
 		var b = r.blocks[idS], id = +idS;
 		if (b.$mod !== modId || b.$override) return;
 		safe(function () { vm.callVirtual(b, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [icons]); });
+		JVM.variantsOf(vm, b).forEach(function (meta) { blockEntry(b, id, meta); });
+	});
+	function blockEntry(b, id, meta) {
 		var faces = {}, FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
 		for (var s = 0; s < 6; s++) {
-			var sx = stationTex(b, s);
+			var sx = stationTex(b, s, meta);
 			if (sx) { faces[FACE[s]] = sx.name; if (sx.file) out.textures['blocks/' + sx.name] = sx; continue; }
-			var lt = legacy(b, s);
+			var lt = legacy(b, s, meta);
 			if (lt) { faces[FACE[s]] = lt.name; if (!lt.vanilla) out.textures['blocks/' + lt.name] = lt; continue; }
-			var t = tex(safe(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [s, 0]); }, null));
+			var t = tex(safe(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [s, meta]); }, null));
 			if (t) { faces[FACE[s]] = t.name; out.textures['blocks/' + t.name] = t; }
 		}
+		var rc = overrides(b, ['getRenderColor(I)I']) ? safe(function () { return vm.callVirtual(b, 'getRenderColor', '(I)I', [meta]); }, 0xffffff) : 0xffffff;
+		if (typeof rc === 'number' && (rc & 0xffffff) !== 0xffffff) {
+			var hex = ('00000' + (rc & 0xffffff).toString(16)).slice(-6);
+			Object.keys(faces).forEach(function (f) {
+				var t0 = out.textures['blocks/' + faces[f]];
+				if (!t0 || t0.tint != null) return;
+				var nt = Object.assign({}, t0, { name: t0.name + '_t' + hex, tint: rc & 0xffffff });
+				out.textures['blocks/' + nt.name] = nt;
+				faces[f] = nt.name;
+			});
+		}
 		var uniq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-		var json = { name: langOf(b) || ('Block ' + id), texture: uniq.length === 1 ? uniq[0] : faces };
+		var json = { name: langOf(b, meta) || ('Block ' + id + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
 		json.hardness = b[':blockHardness'];
 		var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
 		json.tool = TOOL_OF[mat] || 'none';
@@ -5359,26 +5382,38 @@ JVM.collectContent = function (vm, modId) {
 		var opaque = safe(function () { return vm.callVirtual(b, 'isOpaqueCube', '()Z', []); }, 1);
 		if (!opaque) json.transparent = true;
 		var rnd = vm.newObject(vm.loadClass('java/util/Random')); vm.callVirtual(rnd, '<init>', '(J)V', [0n]);
-		var drop = safe(function () { return vm.callVirtual(b, 'idDropped', '(ILjava/util/Random;I)I', [0, rnd, 0]); }, id);
+		var drop = safe(function () { return vm.callVirtual(b, 'idDropped', '(ILjava/util/Random;I)I', [meta, rnd, 0]); }, id);
 		var cnt = safe(function () { return vm.callVirtual(b, 'quantityDropped', '(Ljava/util/Random;)I', [rnd]); }, 1);
+		var ddmg = safe(function () { return vm.callVirtual(b, 'damageDropped', '(I)I', [meta]); }, 0);
 		if (drop <= 0) json.drops = 'none';
-		else if (drop !== id) json.drops = ref(drop, safe(function () { return vm.callVirtual(b, 'damageDropped', '(I)I', [0]); }, 0));
+		else if (drop !== id || ddmg !== meta) json.drops = ref(drop, ddmg);
 		if (cnt !== 1 && drop > 0) json.drop_count = cnt;
 		var box = ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].map(function (k) { return Math.round(b[':' + k] * 16); });
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
+		if (stFiles && JVM.stationModel) {
+			var sm = safe(function () { return JVM.stationModel(vm, b, stFiles); }, null);
+			if (sm) {
+				json.model = sm.model;
+				if (sm.rotate) json.rotate = 'horizontal';
+				sm.textures.forEach(function (t) { out.textures['blocks/' + t.name] = t; });
+			}
+		}
 		if (overrides(b, BLOCK_SCRIPTED)) out.scripted.blocks[id] = true;
 		if (overrides(b, BLOCK_SCRIPTED.slice(0, 3)) || b[':needsRandomTick'] || overrides(b, [BLOCK_SCRIPTED[7]])) json.scripted = true;
-		out.blocks[JVM.contentName(vm, id)] = json;
-	});
+		out.blocks[JVM.contentName(vm, id, meta)] = json;
+	}
 	Object.keys(r.items).forEach(function (idS) {
 		var it = r.items[idS], id = +idS;
 		if (it.$mod !== modId || it.$override) return;
 		safe(function () { vm.callVirtual(it, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [icons]); });
-		var t = stationTex(it, -1) || legacy(it, 0) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [0]); }, null));
+		JVM.variantsOf(vm, it).forEach(function (meta) { itemEntry(it, id, meta); });
+	});
+	function itemEntry(it, id, meta) {
+		var t = stationTex(it, -1, meta) || legacy(it, 0, meta) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [meta]); }, null));
 		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
-		var json = { name: langOf(it) || ('Item ' + id), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
+		var json = { name: langOf(it, meta) || ('Item ' + id + (meta ? ':' + meta : '')), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
 		if (it.$food) json.food = { hunger: it.$food[0], saturation: it.$food[1] };
 		if (it.$food && it.$foodEffect && JVM.effectName && JVM.effectName(it.$foodEffect.id))
 			json.food.effects = [{ effect: JVM.effectName(it.$foodEffect.id), seconds: it.$foodEffect.seconds, level: it.$foodEffect.level, chance: it.$foodEffect.chance }];
@@ -5386,8 +5421,8 @@ JVM.collectContent = function (vm, modId) {
 		if (it.$tool && it.$toolMat) json.tool = { type: it.$tool, level: it.$toolMat.$m[0], uses: it.$toolMat.$m[1], speed: it.$toolMat.$m[2], damage: it.$toolMat.$m[3] };
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED) || it.$scriptedUse) { json.scripted = true; out.scripted.items[id] = true; }
-		out.items[JVM.contentName(vm, id)] = json;
-	});
+		out.items[JVM.contentName(vm, id, meta)] = json;
+	}
 	var stackRef = function (o) {
 		if (!o) return null;
 		if (typeof o === 'string') { var ore = JVM.forgeOre && JVM.forgeOre(vm, o); return ore ? stackRef(ore) : null; }
@@ -5475,20 +5510,70 @@ JVM.soundManagerObj = function (vm) {
 	return vm.$sndMgr;
 };
 
-JVM.contentName = function (vm, id) {
+JVM.langValue = function (v) {
+	return String(v).trim().replace(/\\u([0-9a-fA-F]{4})/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); });
+};
+JVM.langKeys = function (k) {
+	if (!k) return [];
+	var out = [k], m = /^(tile|item)[.][^.]+[.](.+)$/.exec(k);
+	if (m) out.push(m[1] + '.' + m[2]);
+	return out;
+};
+JVM.contentName = function (vm, id, meta) {
 	var r = reg(vm), o = r.blocks[id] || r.items[id];
 	var isBlock = !!r.blocks[id];
 	var st = o && o.$stId;
 	var n = st ? String(st).split(':').pop().toLowerCase().replace(/[^a-z0-9_]+/g, '_') : (isBlock ? 'b' : 'i') + id;
+	meta = meta | 0;
+	if (meta && o && JVM.variantsOf(vm, o).indexOf(meta) >= 0) n += '_' + meta;
+	else meta = 0;
 	var map = vm.$cnames || (vm.$cnames = Object.create(null));
-	if (o) map[(o.$mod || '') + ':' + n] = id;
+	if (o) map[(o.$mod || '') + ':' + n] = { id: id, meta: meta };
 	return n;
 };
 JVM.contentId = function (vm, mod, name) {
-	var m = /^[bi](\d+)$/.exec(name);
-	if (m) return +m[1];
-	var map = vm.$cnames;
-	return map && map[mod + ':' + name] != null ? map[mod + ':' + name] : null;
+	var m = /^[bi](\d+)(?:_\d+)?$/.exec(name);
+	var e = vm.$cnames && vm.$cnames[mod + ':' + name];
+	if (e) return e.id;
+	return m ? +m[1] : null;
+};
+JVM.contentMeta = function (vm, mod, name) {
+	var e = vm.$cnames && vm.$cnames[mod + ':' + name];
+	if (e) return e.meta;
+	var m = /_(\d+)$/.exec(name);
+	return m ? +m[1] : 0;
+};
+JVM.variantsOf = function (vm, o) {
+	if (o.$variants) return o.$variants;
+	var out = [0];
+	o.$variants = out;
+	var isBlock = vm.isInstance(o, vm.loadClass(SRC + 'Block'));
+	var key = isBlock ? 'getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V' : 'getSubItems(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V';
+	var m = o.cls.findMethod(key);
+	var metas = [];
+	if (m && !m.cls.native) {
+		JVM.run(vm, function () {
+			var l = JVM.newList(vm, []);
+			vm.invoke(m, o, [isBlock ? o[':blockID'] : o[':itemID'], null, l]);
+			JVM.iterate(vm, l).forEach(function (st) { if (st && st[':itemDamage'] != null && metas.indexOf(st[':itemDamage']) < 0) metas.push(st[':itemDamage'] | 0); });
+		});
+	}
+	if (metas.length < 2) {
+		metas = [];
+		var k0 = null;
+		JVM.run(vm, function () { k0 = vm.callVirtual(o, 'getUnlocalizedName', '()Ljava/lang/String;', []); });
+		var lang = reg(vm).lang;
+		JVM.langKeys(k0).forEach(function (k) {
+			if (metas.length || lang[k + '0.name'] == null || lang[k + '1.name'] == null) return;
+			for (var d = 0; d < (isBlock ? 16 : 64) && lang[k + d + '.name'] != null; d++) metas.push(d);
+		});
+	}
+	if (metas.length > 1) {
+		metas = metas.filter(function (d) { return d >= 0 && d < (isBlock ? 16 : 32000); }).sort(function (a, b) { return a - b; });
+		if (metas[0] !== 0) metas.unshift(0);
+		o.$variants = metas.slice(0, isBlock ? 16 : 64);
+	}
+	return o.$variants;
 };
 JVM.installMc152 = installMc152;
 JVM.mc152 = { worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
@@ -9072,10 +9157,10 @@ function installLegacy(vm) {
 	} });
 }
 
-JVM.legacyTexture = function (vm, o, side) {
+JVM.legacyTexture = function (vm, o, side, meta) {
 	var isBlock = vm.isInstance(o, vm.loadClass(SRC + 'Block'));
 	var r = JVM.run(vm, function () {
-		var cell = isBlock ? vm.callVirtual(o, 'getBlockTextureFromSideAndMetadata', '(II)I', [side | 0, 0]) : vm.callVirtual(o, 'getIconFromDamage', '(I)I', [0]);
+		var cell = isBlock ? vm.callVirtual(o, 'getBlockTextureFromSideAndMetadata', '(II)I', [side | 0, meta | 0]) : vm.callVirtual(o, 'getIconFromDamage', '(I)I', [meta | 0]);
 		var file = vm.callVirtual(o, 'getTextureFile', '()Ljava/lang/String;', []) || (isBlock ? '/terrain.png' : '/gui/items.png');
 		return { sheet: String(file), cell: cell | 0 };
 	});
@@ -9539,6 +9624,18 @@ function installStation(vm) {
 		},
 	});
 
+	var BETA_CELLS = { 1: 1, 2: 3, 3: 2, 4: 16, 5: 4, 6: 15, 7: 17, 8: 205, 9: 205, 10: 237, 11: 237, 12: 18, 13: 19, 14: 32, 15: 33, 16: 34,
+		17: 20, 18: 52, 19: 48, 20: 49, 21: 160, 22: 144, 23: 45, 24: 192, 25: 74, 26: 134, 27: 179, 28: 195, 29: 106, 30: 11, 31: 39, 32: 55,
+		33: 107, 34: 107, 35: 64, 37: 13, 38: 12, 39: 29, 40: 28, 41: 23, 42: 22, 43: 6, 44: 6, 45: 7, 46: 8, 47: 35, 48: 36, 49: 37, 50: 80,
+		51: 31, 52: 65, 53: 4, 54: 26, 55: 164, 56: 50, 57: 24, 58: 59, 59: 88, 60: 87, 61: 44, 62: 61, 63: 4, 64: 97, 65: 83, 66: 128, 67: 16,
+		68: 4, 69: 96, 70: 1, 71: 98, 72: 4, 73: 51, 74: 51, 75: 115, 76: 99, 77: 1, 78: 66, 79: 67, 80: 66, 81: 70, 82: 72, 83: 73, 84: 74,
+		85: 4, 86: 102, 87: 103, 88: 104, 89: 105, 90: 14, 91: 102, 92: 121, 93: 131, 94: 147, 95: 26, 96: 84 };
+	var bClinit = B.clinit;
+	B.clinit = function (vm, c) {
+		bClinit(vm, c);
+		var list = c.statics.blocksList.a;
+		Object.keys(BETA_CELLS).forEach(function (id) { if (list[id] && !list[id][':blockIndexInTexture']) list[id][':blockIndexInTexture'] = BETA_CELLS[id]; });
+	};
 	var W = 'Lnet/minecraft/src/World;', EP = 'Lnet/minecraft/src/EntityPlayer;', EL = 'Lnet/minecraft/src/EntityLiving;', IS = 'Lnet/minecraft/src/ItemStack;', RND = 'Ljava/util/Random;';
 	var BETA = JVM.STATION_BETA = {
 		block: [
@@ -10158,7 +10255,7 @@ function stationAssets(vm, modId, fabricId, files) {
 				var i = l.indexOf('=');
 				if (i <= 0 || /^\s*#/.test(l)) return;
 				var key = l.slice(0, i).trim().replace(/(^|[.])@([.]|$)/g, '$1' + m[1] + '$2');
-				r.lang[key] = l.slice(i + 1).trim();
+				r.lang[key] = JVM.langValue(l.slice(i + 1));
 			});
 			return;
 		}
@@ -10204,7 +10301,7 @@ function texFile(id) {
 }
 function texRef(files, id) {
 	var t = texFile(id);
-	if (t.ns === 'minecraft') return { mod: null, name: t.path.replace(/^(block|item)s?[/]/, '') };
+	if (t.ns === 'minecraft') return { mod: null, name: vanillaTexName(/^items?[/]/.test(t.path) ? 'items' : 'blocks', t.path.replace(/^(block|item)s?[/]/, '')) };
 	if (!files[t.file]) return null;
 	return { mod: null, name: (t.ns + '_' + t.path).toLowerCase().replace(/[^a-z0-9]+/g, '_'), file: t.file };
 }
@@ -10249,9 +10346,10 @@ function blockModelFaces(files, id) {
 	FACE.forEach(function (k) { if (!f[k] && any) f[k] = any; });
 	return Object.keys(f).length ? f : null;
 }
-JVM.stationTexture = function (vm, o, side, files) {
+JVM.stationTexture = function (vm, o, side, files, meta) {
 	if (!files) return null;
-	var t = stationTex0(vm, o, side, files);
+	LASTVM = vm;
+	var t = stationTex0(vm, o, side, files, meta | 0);
 	var prov = side >= 0 ? o.$stTint : o.$stItemTint;
 	if (t && t.file && prov) {
 		var col = null;
@@ -10267,14 +10365,14 @@ JVM.stationTexture = function (vm, o, side, files) {
 	return t;
 };
 function posAt(vm) { var p = vm.newObject(vm.loadClass(SRC + 'ChunkPosition')); p[':x'] = 0; p[':y'] = 64; p[':z'] = 0; return p; }
-function stationTex0(vm, o, side, files) {
+function stationTex0(vm, o, side, files, meta) {
 	var s = st(vm), isBlock = side >= 0;
 	if (o.$stTex) return texRef(files, o.$stTex);
 	var id = o.$stId;
 	if (isBlock) {
 		if (id) { var f = blockModelFaces(files, id); if (f) return texRef(files, f[FACE[side]]); }
 		var cell = o[':blockIndexInTexture'];
-		var lt = JVM.legacyTexture ? JVM.legacyTexture(vm, o, side) : null;
+		var lt = JVM.legacyTexture ? JVM.legacyTexture(vm, o, side, meta) : null;
 		if (lt && lt.cell >= 4096) cell = lt.cell;
 		if (cell >= 4096 && s.sprites[cell]) return texRef(files, s.sprites[cell]);
 		return null;
@@ -10287,17 +10385,66 @@ function stationTex0(vm, o, side, files) {
 		if (bl) { var bf = blockModelFaces(files, id); if (bf) return texRef(files, bf.north || bf.up); }
 	}
 	var ic = o[':iconIndex'];
-	var li = JVM.legacyTexture ? JVM.legacyTexture(vm, o, 0) : null;
+	var li = JVM.legacyTexture ? JVM.legacyTexture(vm, o, 0, meta) : null;
 	if (li && li.cell >= 4096) ic = li.cell;
 	if (ic >= 4096 && s.sprites[ic]) return texRef(files, s.sprites[ic]);
 	return null;
 }
-JVM.vanillaCellName = function (sheet, cell) {
-	var d = D();
-	if (/^[/]?terrain[.]png$/i.test(sheet)) return d.terrain[cell] || null;
-	if (/^[/]?gui[/]items[.]png$/i.test(sheet)) return d.sheet[cell] || null;
-	return null;
+var SHAPED_PARENTS = /^(minecraft:)?block[/](slab|slab_top|cross|carpet)$/;
+JVM.stationModel = function (vm, o, files) {
+	LASTVM = vm;
+	var id = o && o.$stId;
+	if (!id || !files) return null;
+	var p = String(id).split(':');
+	var bs = json(files, 'assets/' + p[0] + '/stationapi/blockstates/' + p[1] + '.json');
+	var ref = null, facing = false;
+	if (bs && bs.variants) {
+		var vk = Object.keys(bs.variants);
+		var pick = vk.filter(function (k) { return /facing=north/.test(k); })[0] || vk[0];
+		var v = bs.variants[pick];
+		if (Array.isArray(v)) v = v[0];
+		ref = v && v.model;
+		facing = vk.some(function (k) { return /facing=(east|south|west)/.test(k); });
+	} else if (bs && Array.isArray(bs.multipart) && bs.multipart[0]) {
+		var ap = bs.multipart[0].apply;
+		if (Array.isArray(ap)) ap = ap[0];
+		ref = ap && ap.model;
+	}
+	if (!ref) return null;
+	var t = modelTextures(files, ref, 0);
+	var parent = t.$parent || '';
+	if (!t.$elements && !SHAPED_PARENTS.test(parent)) return null;
+	var textures = {}, entries = [];
+	Object.keys(t).forEach(function (k) {
+		if (k[0] === '$') return;
+		var v = t[k];
+		if (typeof v !== 'string' || v[0] === '#') { textures[k] = v; return; }
+		var r = texRef(files, v);
+		if (!r) return;
+		textures[k] = r.name;
+		if (r.file) entries.push(r);
+	});
+	var model = { textures: textures };
+	if (t.$elements) model.elements = t.$elements;
+	else model.parent = 'minecraft:' + parent.replace(/^minecraft:/, '');
+	return { model: model, rotate: facing, textures: entries };
 };
+
+JVM.vanillaCellName = function (sheet, cell, vm) {
+	var d = D(), kind = /^[/]?terrain[.]png$/i.test(sheet) ? 'blocks' : /^[/]?gui[/]items[.]png$/i.test(sheet) ? 'items' : null;
+	if (!kind) return null;
+	var n = (kind === 'blocks' ? d.terrain : d.sheet)[cell];
+	if (n && (!vm || !vm.gameTexture || vm.gameTexture(kind, n))) return n;
+	return 'cell_' + cell;
+};
+function vanillaTexName(kind, n) {
+	var vm = LASTVM;
+	if (!vm || !vm.gameTexture || vm.gameTexture(kind, n)) return n;
+	var t = kind === 'blocks' ? D().terrain : D().sheet;
+	for (var c in t) if (t[c] === n) return 'cell_' + c;
+	return n;
+}
+var LASTVM = null;
 
 JVM.stationWantsGen = function (vm) {
 	var feats = false;

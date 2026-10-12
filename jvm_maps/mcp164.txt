@@ -1780,6 +1780,7 @@ F	aqz	bw	field_71997_br	melon
 F	aqz	bx	field_71996_bs	pumpkinStem
 F	aqz	by	field_71999_bt	melonStem
 F	aqz	bz	field_71998_bu	vine
+F	aqz	cC	field_111031_cC	carpet
 F	aqz	cF	field_71990_ca	blockID
 F	aqz	cG	field_71989_cb	blockHardness
 F	aqz	cH	field_72029_cc	blockResistance
@@ -2534,6 +2535,7 @@ M	aqz	a	(I)I	func_71899_b	damageDropped
 M	aqz	a	(II)Lms;	func_71858_a	getIcon
 M	aqz	a	(ILjava/util/Random;)I	func_71910_a	quantityDroppedWithBonus
 M	aqz	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	aqz	a	(ILww;Ljava/util/List;)V	func_71879_a	getSubBlocks
 M	aqz	a	(Labw;)I	func_71859_p_	tickRate
 M	aqz	a	(Labw;III)V	func_71861_g	onBlockAdded
 M	aqz	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
@@ -3146,6 +3148,7 @@ M	ya	a	(Lye;Laqz;)F	func_77638_a	getStrVsBlock
 M	yb	a	(Lye;Luf;Labw;IIIIFFF)Z	func_77648_a	onItemUse
 M	yb	n_	()Z	func_77662_d	isFull3D
 M	yc	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	yc	a	(ILww;Ljava/util/List;)V	func_77633_a	getSubItems
 M	yc	a	(Laqz;)Z	func_77641_a	canHarvestBlock
 M	yc	a	(Lmt;)V	func_94581_a	registerIcons
 M	yc	a	(Lww;)Lyc;	func_77637_a	setCreativeTab
@@ -3212,6 +3215,7 @@ M	yn	a	(Laqz;)Z	func_77641_a	canHarvestBlock
 M	yn	a	(Lye;Laqz;)F	func_77638_a	getStrVsBlock
 M	yy	a	(Laqz;)Z	func_77641_a	canHarvestBlock
 M	zh	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	zh	a	(ILww;Ljava/util/List;)V	func_77633_a	getSubItems
 M	zh	a	(Lmt;)V	func_94581_a	registerIcons
 M	zh	a	(Lye;Luf;Labw;IIIIFFF)Z	func_77648_a	onItemUse
 M	zh	b_	(I)Lms;	func_77617_a	getIconFromDamage

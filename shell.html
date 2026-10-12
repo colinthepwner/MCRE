@@ -1595,15 +1595,21 @@
             }
             function clean(s) { return String(s).replace(/[\t\r\n]+/g, ' '); }
             function reg() { return vm && vm.mcReg; }
-            function blockRef(id) {
+            function blockRef(id, data) {
                 var r = reg(), b = r && r.blocks[id];
-                return b && !b.$override ? 'mod:' + b.$mod + ':' + window.JVM.contentName(vm, id) : 'id:' + id;
+                return b && !b.$override ? 'mod:' + b.$mod + ':' + window.JVM.contentName(vm, id, data) : 'id:' + id;
             }
-            function itemRef(id) {
+            function itemRef(id, data) {
                 var r = reg();
-                if (id < 4096) return blockRef(id);
+                if (id < 4096) return blockRef(id, data);
                 var it = r && r.items[id];
-                return it && !it.$override ? 'mod:' + it.$mod + ':' + window.JVM.contentName(vm, id) : 'id:' + id;
+                return it && !it.$override ? 'mod:' + it.$mod + ':' + window.JVM.contentName(vm, id, data) : 'id:' + id;
+            }
+            function variantRef(ref) { return /^mod:[^:]+:.+_\d+$/.test(ref || ''); }
+            function javaOf(ref, data) {
+                var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
+                if (m && javaMods[m[1]]) return { id: refToJava(ref), data: window.JVM.contentMeta(vm, m[1], m[2]) };
+                return { id: refToJava(ref), data: data | 0 };
             }
             function refToJava(ref) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
@@ -1628,13 +1634,13 @@
                         var tk = (a[0] | 0) + ',' + (a[1] | 0) + ',' + (a[2] | 0), hit = tiles && tiles[tk];
                         if (hit) return { id: hit.id, data: hit.data };
                         var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
-                        var tv = t ? { id: refToJava(t[0]), data: t[1] | 0 } : { id: 0, data: 0 };
+                        var tv = t ? javaOf(t[0], t[1]) : { id: 0, data: 0 };
                         if (tiles) tiles[tk] = { id: tv.id, data: tv.data };
                         return tv;
                     }
                     case 'settile': {
                         forget(a[0], a[1], a[2]);
-                        var sref = a[3] ? blockRef(a[3]) : 'id:0';
+                        var sref = a[3] ? blockRef(a[3], a[4]) : 'id:0';
                         return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : a[4] | 0].join('\t'));
                     }
                     case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
@@ -1649,11 +1655,12 @@
                     }
                     case 'held': {
                         if (actor) return actor.held || null;
-                        var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; return { id: refToJava(hp.carried[0]), count: hp.carried[1], data: hp.carried[2] }; }
+                        var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data }; }
                     case 'give':
-                        if (actor) { toActor({ t: 'give', ref: itemRef(a[0]) + (a[2] ? ':' + (a[2] | 0) : ''), n: a[1] | 0 }); return 1; }
-                        return mp(['give', itemRef(a[0]), a[1] | 0, a[2] | 0].join('\t'));
-                    case 'drop': return mp(['drop', +a[0], +a[1], +a[2], itemRef(a[3]), a[4] | 0, a[5] | 0].join('\t'));
+                        var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
+                        if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : ''), n: a[1] | 0 }); return 1; }
+                        return mp(['give', gref, a[1] | 0, gd].join('\t'));
+                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : a[5] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
                         return mp('msg\t' + clean(a[0]));
@@ -1676,11 +1683,14 @@
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
                     case 'setslot':
                         if (actor) { actorOnly('inventory'); return 0; }
-                        return mp(['setslot', a[0] | 0, a[1] ? itemRef(a[1]) : 'id:0', a[2] | 0, a[3] | 0].join('\t'));
+                        var sref2 = a[1] ? itemRef(a[1], a[3]) : 'id:0';
+                        return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sref2) ? 0 : a[3] | 0].join('\t'));
                     case 'slot': {
                         if (actor) { actorOnly('inventory'); return null; }
                         var sl = mp('slot\t' + (a[0] | 0));
-                        return sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0 ? { id: refToJava(sl[0]), count: sl[1], data: sl[2] | 0 } : null;
+                        if (!(sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0)) return null;
+                        var sj = javaOf(sl[0], sl[2]);
+                        return { id: sj.id, count: sl[1], data: sj.data };
                     }
                     case 'world': return mp('world');
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
@@ -1737,17 +1747,18 @@
                 var v = genRefs[raw];
                 if (!v) {
                     var p = UTF8ToString(Module._mcJavaRefOf(raw & 255, raw >> 8)).split('\t');
-                    v = genRefs[raw] = { id: refToJava(p[0]), data: p[1] | 0, mod: /^mod:/.test(p[0]) };
+                    var gj = javaOf(p[0], p[1]);
+                    v = genRefs[raw] = { id: gj.id, data: gj.data, mod: /^mod:/.test(p[0]) };
                 }
                 return v;
             }
-            function genGame(jid) {
-                var v = genIds[jid];
+            function genGame(jid, jdata) {
+                var gk = jid + ':' + (jdata | 0), v = genIds[gk];
                 if (v === undefined) {
-                    var ref = blockRef(jid);
+                    var ref = blockRef(jid, jdata);
                     if (/^id:/.test(ref)) v = { id: jid, aux: 0, mod: false };
                     else { var n = Module.ccall('mcJavaResolve', 'number', ['string'], [ref]); v = n < 0 ? null : { id: n & 255, aux: n >> 8, mod: true }; }
-                    genIds[jid] = v;
+                    genIds[gk] = v;
                 }
                 return v;
             }
@@ -1760,7 +1771,7 @@
                     case 'tile': { var t = genJava(Module._mcJavaGenTile(x, y, z)); return { id: t.id, data: t.data }; }
                     case 'settile': {
                         if (!b) { Module._mcJavaGenSet(x, y, z, 0, 0); return 0; }
-                        var gg = genGame(b | 0);
+                        var gg = genGame(b | 0, d | 0);
                         if (gg) Module._mcJavaGenSet(x, y, z, gg.id, gg.mod ? gg.aux : d | 0);
                         return 0;
                     }
@@ -1884,21 +1895,21 @@
                 }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
-                    var bid = refToJava(e.block), blk = r.blocks[bid];
+                    var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
                     if (!blk || !javaMods[blk.$mod]) return;
                     var pl = M.playerObj(vm, null);
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
                     else if (e.t === 'place') { if (JV.tilePlaced) JV.tilePlaced(vm, x, y, z); call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]); }
-                    else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, e.data | 0]); call(blk, SIG.destroyedBy, [world, x, y, z, e.data | 0]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
+                    else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, bdata]); call(blk, SIG.destroyedBy, [world, x, y, z, bdata]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
                     else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
                     else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
                     return;
                 }
                 if (e.item && (e.t === 'useItem' || e.t === 'useItemOn')) {
-                    var iid = refToJava(e.item), it = r.items[iid];
+                    var ij = javaOf(e.item, e.data), iid = ij.id, it = r.items[iid];
                     if (!it || !javaMods[it.$mod]) return;
                     var pl2 = M.playerObj(vm, null), slot = pl2.$info ? pl2.$info.slot : 0;
-                    var count = e.count != null ? e.count | 0 : 1, dmg = e.data | 0;
+                    var count = e.count != null ? e.count | 0 : 1, dmg = ij.data;
                     var stack = M.newStack(vm, iid, count, dmg);
                     var res = e.t === 'useItem' ? call(it, SIG.rightClick, [stack, world, pl2]) : call(it, SIG.itemUse, [stack, pl2, world, x, y, z, e.face | 0, 0.5, 0.5, 0.5]);
                     var out = e.t === 'useItem' && res.ok ? res.value : stack;
@@ -2210,6 +2221,7 @@
                                 },
                                 install: function (v) { if (map) JVM.loadMap(v, map); JVM.installMc152(v); },
                             });
+                            vm.gameTexture = function (kind, n) { return Module.mcMods && Module.mcMods.hasTexture ? Module.mcMods.hasTexture(kind, n) : true; };
                             vm.$tag = ver.tag || 'mcp152';
                             vm.$legacy = vm.$tag === 'mcp147';
                             vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
@@ -2247,7 +2259,7 @@
                     Object.keys(files).forEach(function (k) {
                         if (!/(^|[/])lang[/]en_us[.]lang$/i.test(k)) return;
                         var lr = JVM.mc152.reg(vm).lang;
-                        try { new TextDecoder().decode(files[k]).split(/\r?\n/).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && !/^\s*#/.test(l)) { var key = l.slice(0, i).trim(); if (lr[key] == null) lr[key] = l.slice(i + 1).trim(); } }); } catch (e) { }
+                        try { new TextDecoder().decode(files[k]).split(/\r?\n/).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && !/^\s*#/.test(l)) { var key = l.slice(0, i).trim(); if (lr[key] == null) lr[key] = window.JVM.langValue ? window.JVM.langValue(l.slice(i + 1)) : l.slice(i + 1).trim(); } }); } catch (e) { }
                     });
                     if (kind.cant) {
                         J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: kind.cant });
@@ -2322,7 +2334,7 @@
                         var t = c.textures[k], kind = k.split('/')[0];
                         if (t.sheet != null) {
                             var sb = fileOf(t.sheet);
-                            if (sb) cuts.push(cutCell(sb, t.cell).then(function (png) { if (png) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png; }));
+                            if (sb) cuts.push(cutCell(sb, t.cell).then(function (png) { return png && t.tint != null ? tintPng(png, t.tint) : png; }).then(function (png) { if (png) add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = png; }));
                             else problem('', 'no picture ' + t.sheet + ' in the mod');
                             return;
                         }
@@ -4256,6 +4268,7 @@
             var failed = false;
             var applied = 0;
 
+            api.hasTexture = function (kind, n) { return !!names && cellsFor(kind, String(n || '').toLowerCase()).length > 0; };
             api.startup = function (done) {
                 var finished = false;
                 var go = function () { if (!finished) { finished = true; done(); } };

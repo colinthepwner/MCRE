@@ -2518,6 +2518,7 @@ M	apa	a	(FFFFFF)V	func_71905_a	setBlockBounds
 M	apa	a	(I)I	func_71899_b	damageDropped
 M	apa	a	(ILjava/util/Random;)I	func_71910_a	quantityDroppedWithBonus
 M	apa	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	apa	a	(ILve;Ljava/util/List;)V	func_71879_a	getSubBlocks
 M	apa	a	(Laab;)I	func_71859_p_	tickRate
 M	apa	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	apa	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -3205,6 +3206,7 @@ M	wi	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
 M	wj	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	wj	n_	()Z	func_77662_d	isFull3D
 M	wk	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	wk	a	(ILve;Ljava/util/List;)V	func_77633_a	getSubItems
 M	wk	a	(Lapa;)Z	func_77641_a	canHarvestBlock
 M	wk	a	(Lmp;)I	func_77649_a	getDamageVsEntity
 M	wk	a	(Lve;)Lwk;	func_77637_a	setCreativeTab
@@ -3275,6 +3277,7 @@ M	wu	a	(Lapa;)Z	func_77641_a	canHarvestBlock
 M	wu	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
 M	xf	a	(Lapa;)Z	func_77641_a	canHarvestBlock
 M	xn	a	()Ljava/lang/String;	func_77658_a	getUnlocalizedName
+M	xn	a	(ILve;Ljava/util/List;)V	func_77633_a	getSubItems
 M	xn	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	xn	a_	(I)Llx;	func_77617_a	getIconFromDamage
 M	xn	d	(Lwm;)Ljava/lang/String;	func_77667_c	getUnlocalizedName

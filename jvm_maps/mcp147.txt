@@ -2279,6 +2279,7 @@ M	amq	a	(I)I	func_71851_a	getBlockTextureFromSide
 M	amq	a	(II)I	func_71858_a	getBlockTextureFromSideAndMetadata
 M	amq	a	(ILjava/util/Random;)I	func_71910_a	quantityDroppedWithBonus
 M	amq	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	amq	a	(ILtj;Ljava/util/List;)V	func_71879_a	getSubBlocks
 M	amq	a	(Lamu;)Lamq;	func_71884_a	setStepSound
 M	amq	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
 M	amq	a	(Ltj;)Lamq;	func_71849_a	setCreativeTab
@@ -2937,6 +2938,7 @@ M	uo	a	(Lur;Lqx;Lyc;IIIIFFF)Z	func_77648_a	onItemUse
 M	uo	n_	()Z	func_77662_d	isFull3D
 M	up	a	()Ljava/lang/String;	func_77658_a	getItemName
 M	up	a	(II)I	func_77618_c	getIconFromDamageForRenderPass
+M	up	a	(ILtj;Ljava/util/List;)V	func_77633_a	getSubItems
 M	up	a	(Lamq;)Z	func_77641_a	canHarvestBlock
 M	up	a	(Llq;)I	func_77649_a	getDamageVsEntity
 M	up	a	(Ltj;)Lup;	func_77637_a	setCreativeTab
@@ -3009,6 +3011,7 @@ M	uy	a	(Lamq;)Z	func_77641_a	canHarvestBlock
 M	uy	a	(Lur;Lamq;)F	func_77638_a	getStrVsBlock
 M	vj	a	(Lamq;)Z	func_77641_a	canHarvestBlock
 M	vq	a	()Ljava/lang/String;	func_77658_a	getItemName
+M	vq	a	(ILtj;Ljava/util/List;)V	func_77633_a	getSubItems
 M	vq	a	(Lur;Lqx;Lyc;IIIIFFF)Z	func_77648_a	onItemUse
 M	vq	d	(Lur;)Ljava/lang/String;	func_77667_c	getItemNameIS
 M	vq	g	()I	func_77883_f	getBlockID
