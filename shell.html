@@ -1555,9 +1555,15 @@
                 return fetch('jvm_maps/' + name + '.txt').then(function (r) { return r.ok ? r.text() : ''; }, function () { return ''; })
                     .then(function (t) { maps[name] = t; return t; });
             }
+            var worldDir = null;
+            function safeName(s) { return String(s).replace(/[^\w.-]/g, '_'); }
             function folderFs(modId) {
-                var base = '/games/java/' + String(modId).replace(/[^\w.-]/g, '_');
-                var abs = function (p) { return base + (p ? '/' + p : ''); };
+                var base = '/games/java/' + safeName(modId);
+                var abs = function (p) {
+                    p = String(p || '').replace(/^\/+/, '');
+                    if (p === 'world' || p.indexOf('world/') === 0) return (worldDir ? worldDir + '/java/' + safeName(modId) : base + '/world') + p.substring(5);
+                    return base + (p ? '/' + p : '');
+                };
                 var stat = function (p) { try { return FS.stat(abs(p)); } catch (e) { return null; } };
                 return {
                     read: function (p) { try { var st = stat(p); return st && !FS.isDir(st.mode) ? FS.readFile(abs(p)) : null; } catch (e) { return null; } },
@@ -1568,6 +1574,18 @@
                     mkdirs: function (p) { try { FS.mkdirTree(abs(p)); } catch (e) { } },
                     remove: function (p) { try { FS.unlink(abs(p)); } catch (e) { try { FS.rmdir(abs(p)); } catch (e2) { } } },
                 };
+            }
+            var fsCache = {};
+            function runningMod() {
+                var fr = vm && vm.frames;
+                if (fr) for (var i = fr.length - 1; i >= 0; i--) { var s = fr[i].m.cls.source; if (s && s !== 'client') return s; }
+                return vm && vm.currentMod || '_';
+            }
+            function modFs() {
+                var at = function () { var id = runningMod(); return fsCache[id] || (fsCache[id] = folderFs(id)); };
+                var o = {};
+                ['read', 'write', 'exists', 'isDir', 'list', 'mkdirs', 'remove'].forEach(function (k) { o[k] = function (a, b) { return at()[k](a, b); }; });
+                return o;
             }
             J.hasClasses = function (files) { return Object.keys(files).some(function (k) { return /\.class$/i.test(k); }); };
 
@@ -1637,6 +1655,13 @@
                     case 'sethealth': { var sh = player(); return sh ? mp(['sethealth', sh.id, a[0] | 0].join('\t')) : null; }
                     case 'heal': { var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
                     case 'setslot': return mp(['setslot', a[0] | 0, a[1] ? itemRef(a[1]) : 'id:0', a[2] | 0, a[3] | 0].join('\t'));
+                    case 'slot': {
+                        var sl = mp('slot\t' + (a[0] | 0));
+                        return sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0 ? { id: refToJava(sl[0]), count: sl[1], data: sl[2] | 0 } : null;
+                    }
+                    case 'world': return mp('world');
+                    case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                    case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
                         var want = itemRef(a[0]);
                         for (var s = 0; s < 36; s++) {
@@ -1660,14 +1685,17 @@
             J.worldStart = function () {
                 running = false;
                 var r = reg();
-                if (!vm || !r || !r.mods.length) return null;
+                if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length))) return null;
+                var wi = mp('world');
+                worldDir = wi && wi.dir ? '/games/com.mojang/minecraftWorlds/' + wi.dir : null;
                 javaMods = {};
                 Object.keys(r.blocks).forEach(function (k) { javaMods[r.blocks[k].$mod] = true; });
                 Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
                 vm.game = bridge;
-                vm.mcPlayer = null; vm.mcWorld = null;
+                vm.mcPlayer = null; vm.mcWorld = null; vm.mcTicks = 0;
                 running = true;
-                return r.tickMods.length ? ['subscribe\tgametick'] : [];
+                if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
+                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {};
             function genJava(raw) {
@@ -1722,15 +1750,16 @@
             J.genCheck = function () {
                 var r = reg();
                 genRefs = {}; genIds = {};
-                var on = !!(vm && r && genMods(r).length);
+                var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm))));
                 if (Module._mcJavaGenOn) Module._mcJavaGenOn(on ? 1 : 0);
                 return on;
             };
             J.populate = function (cx, cz, dim, seed) {
                 var r = reg();
-                if (!vm || !r || (dim !== 0 && dim !== -1)) return;
-                var gm = genMods(r);
-                if (!gm.length) return;
+                if (!vm || !r) return;
+                var gm = dim === 0 || dim === -1 ? genMods(r) : [];
+                var fg = !!(window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm));
+                if (!gm.length && !fg) return;
                 var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim;
                 if (!running) {
                     javaMods = {};
@@ -1753,10 +1782,13 @@
                                 else vm.callVirtual(m, 'generateNether', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, rnd, cx * 16, cz * 16]);
                             });
                         });
+                        if (fg) JV.forgeGenerate(vm, cx, cz);
                     });
                 } finally { vm.game = prev; vm.mcDim = prevDim; }
             };
             J.worldStop = function () {
+                if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
+                worldDir = null;
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
             };
@@ -1786,9 +1818,12 @@
                 vm.steps = 0;
                 var world = M.worldObj(vm);
                 if (e.t === 'gametick') {
-                    if (!r.tickMods.length) return;
-                    var mc = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
-                    r.tickMods.forEach(function (m) { call(m, SIG.tick, [0, mc]); });
+                    vm.mcTicks = (vm.mcTicks | 0) + 1;
+                    if (r.tickMods.length) {
+                        var mc = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
+                        r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
+                    }
+                    if (JV.forgeTick) JV.forgeTick(vm);
                     return;
                 }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
@@ -1831,7 +1866,7 @@
                         vm.game = { mode: 'define', blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
                                     itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
                     }
-                    vm.fs = folderFs(modId);
+                    if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
                     var classes = [];
                     Object.keys(files).forEach(function (k) {
                         if (/\.class$/i.test(k)) {
@@ -1842,11 +1877,12 @@
                         } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
                     });
                     var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
-                    if (!entry.length) {
-                        problem('', 'Java mod without a ModLoader mod_ class - Forge and Fabric mods are not supported yet');
+                    vm.currentMod = modId;
+                    var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
+                    if (!entry.length && !forgeMods.length) {
+                        problem('', 'Java mod without a ModLoader mod_ class or a Forge @Mod class - Fabric mods are not supported yet');
                         return {};
                     }
-                    vm.currentMod = modId;
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
                             var o = vm.newObject(vm.loadClass(cn));
@@ -1854,6 +1890,12 @@
                             vm.callVirtual(o, 'load', '()V', []);
                         });
                     });
+                    if (forgeMods.length) {
+                        var info = null;
+                        try { var mi = files['mcmod.info']; if (mi) info = JSON.parse(new TextDecoder().decode(mi).replace(/^﻿/, '')); } catch (e) { info = null; }
+                        if (info && !Array.isArray(info)) info = info.modList || info.modlist || [info];
+                        JVM.forgeLoad(vm, forgeMods, classes, info);
+                    }
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
                     var add = {}, enc = new TextEncoder();

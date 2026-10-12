@@ -1539,8 +1539,13 @@ C	zx	net/minecraft/src/ColorizerFoliage
 C	zy	net/minecraft/src/GameRules
 C	zz	net/minecraft/src/GameRuleValue
 F	aab	I	field_72995_K	isRemote
+F	aab	e	field_72996_f	loadedEntityList
+F	aab	h	field_73010_i	playerEntities
 F	aab	s	field_73012_v	rand
 F	aab	t	field_73011_w	provider
+F	aab	v	field_73020_y	chunkProvider
+F	aab	x	field_72986_A	worldInfo
+F	acj	d	field_75825_d	chunkSaveLocation
 F	acn	a	field_76579_a	worldObj
 F	acn	e	field_76575_d	isHellWorld
 F	acn	f	field_76576_e	hasNoSky
@@ -1581,6 +1586,7 @@ F	aif	w	field_76259_v	snow
 F	aif	x	field_76258_w	craftedSnow
 F	aif	y	field_76268_x	cactus
 F	aif	z	field_76267_y	clay
+F	ajv	l	field_76105_j	dimension
 F	apa	A	field_71978_w	cobblestone
 F	apa	B	field_71988_x	planks
 F	apa	C	field_71987_y	sapling
@@ -1778,11 +1784,191 @@ F	apa	z	field_71979_v	dirt
 F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
+F	aqt	a	field_72119_a	isSticky
+F	aqx	a	field_72340_a	minX
+F	aqx	b	field_72338_b	minY
+F	aqx	c	field_72339_c	minZ
+F	aqx	d	field_72336_d	maxX
+F	aqx	e	field_72337_e	maxY
+F	aqx	f	field_72334_f	maxZ
+F	arc	c	field_72450_a	xCoord
+F	arc	d	field_72448_b	yCoord
+F	arc	e	field_72449_c	zCoord
+F	bbp	a	field_82895_a	batHead
+F	bbp	b	field_82893_b	batBody
+F	bbp	c	field_82894_c	batRightWing
+F	bbp	d	field_82891_d	batLeftWing
+F	bbp	e	field_82892_e	batOuterRightWing
+F	bbp	f	field_82890_f	batOuterLeftWing
+F	bbq	a	field_78106_a	blazeSticks
+F	bbq	b	field_78105_b	blazeHead
+F	bbr	a	field_78103_a	boatSides
+F	bbs	a	field_78102_a	coverRight
+F	bbs	b	field_78100_b	coverLeft
+F	bbs	c	field_78101_c	pagesRight
+F	bbs	d	field_78098_d	pagesLeft
+F	bbs	e	field_78099_e	flippingPageRight
+F	bbs	f	field_78096_f	flippingPageLeft
+F	bbs	g	field_78097_g	bookSpine
+F	bbt	a	field_78234_a	chestLid
+F	bbt	b	field_78232_b	chestBelow
+F	bbt	c	field_78233_c	chestKnob
+F	bbu	a	field_78142_a	head
+F	bbu	b	field_78140_b	body
+F	bbu	c	field_78141_c	rightLeg
+F	bbu	d	field_78138_d	leftLeg
+F	bbu	e	field_78139_e	rightWing
+F	bbu	f	field_78136_f	leftWing
+F	bbu	g	field_78137_g	bill
+F	bbu	h	field_78143_h	chin
+F	bbw	a	field_78135_a	head
+F	bbw	b	field_78133_b	field_78133_b
+F	bbw	c	field_78134_c	body
+F	bbw	d	field_78131_d	leg1
+F	bbw	e	field_78132_e	leg2
+F	bbw	f	field_78129_f	leg3
+F	bbw	g	field_78130_g	leg4
+F	bby	a	field_78128_a	body
+F	bby	b	field_78127_b	tentacles
+F	bbz	c	field_78116_c	bipedHead
+F	bbz	d	field_78114_d	bipedHeadwear
+F	bbz	e	field_78115_e	bipedBody
+F	bbz	f	field_78112_f	bipedRightArm
+F	bbz	g	field_78113_g	bipedLeftArm
+F	bbz	h	field_78123_h	bipedRightLeg
+F	bbz	i	field_78124_i	bipedLeftLeg
+F	bbz	j	field_78121_j	bipedEars
+F	bbz	k	field_78122_k	bipedCloak
+F	bcb	a	field_78109_a	field_78109_a
+F	bcb	b	field_78108_b	field_78108_b
+F	bcc	a	field_78154_a	sideModels
+F	bcd	p	field_78095_p	onGround
+F	bcd	q	field_78093_q	isRiding
+F	bcd	r	field_78092_r	boxList
+F	bcd	s	field_78091_s	isChild
+F	bcd	t	field_78090_t	textureWidth
+F	bcd	u	field_78089_u	textureHeight
+F	bce	a	field_78161_a	ocelotBackLeftLeg
+F	bce	b	field_78159_b	ocelotBackRightLeg
+F	bce	c	field_78160_c	ocelotFrontLeftLeg
+F	bce	d	field_78157_d	ocelotFrontRightLeg
+F	bce	e	field_78158_e	ocelotTail
+F	bce	f	field_78155_f	ocelotTail2
+F	bce	g	field_78156_g	ocelotHead
+F	bce	h	field_78162_h	ocelotBody
+F	bce	i	field_78163_i	field_78163_i
+F	bch	a	field_78150_a	head
+F	bch	b	field_78148_b	body
+F	bch	c	field_78149_c	leg1
+F	bch	d	field_78146_d	leg2
+F	bch	e	field_78147_e	leg3
+F	bch	f	field_78144_f	leg4
+F	bch	g	field_78145_g	field_78145_g
+F	bch	h	field_78151_h	field_78151_h
+F	bck	a	field_78166_a	signBoard
+F	bck	b	field_78165_b	signStick
+F	bcl	a	field_78171_a	silverfishBodyParts
+F	bcl	b	field_78169_b	silverfishWings
+F	bcm	a	field_82896_a	skeletonHead
+F	bcp	a	field_78200_a	slimeBodies
+F	bcq	a	field_78196_a	body
+F	bcq	b	field_78194_b	bottomBody
+F	bcq	c	field_78195_c	head
+F	bcq	d	field_78192_d	rightHand
+F	bcq	e	field_78193_e	leftHand
+F	bcr	a	field_78209_a	spiderHead
+F	bcr	b	field_78207_b	spiderNeck
+F	bcr	c	field_78208_c	spiderBody
+F	bcr	d	field_78205_d	spiderLeg1
+F	bcr	e	field_78206_e	spiderLeg2
+F	bcr	f	field_78203_f	spiderLeg3
+F	bcr	g	field_78204_g	spiderLeg4
+F	bcr	h	field_78212_h	spiderLeg5
+F	bcr	i	field_78213_i	spiderLeg6
+F	bcr	j	field_78210_j	spiderLeg7
+F	bcr	k	field_78211_k	spiderLeg8
+F	bcs	a	field_78202_a	squidBody
+F	bcs	b	field_78201_b	squidTentacles
+F	bcu	a	field_78178_a	ironGolemHead
+F	bcu	b	field_78176_b	ironGolemBody
+F	bcu	c	field_78177_c	ironGolemRightArm
+F	bcu	d	field_78174_d	ironGolemLeftArm
+F	bcu	e	field_78175_e	ironGolemLeftLeg
+F	bcu	f	field_78173_f	ironGolemRightLeg
+F	bcv	a	field_78191_a	villagerHead
+F	bcv	b	field_78189_b	villagerBody
+F	bcv	c	field_78190_c	villagerArms
+F	bcv	d	field_78187_d	rightVillagerLeg
+F	bcv	e	field_78188_e	leftVillagerLeg
+F	bcv	f	field_82898_f	field_82898_f
+F	bcx	h	field_82901_h	field_82901_h
+F	bcx	i	field_82902_i	witchHat
+F	bcy	a	field_82905_a	field_82905_a
+F	bcy	b	field_82904_b	field_82904_b
+F	bcz	a	field_78185_a	wolfHeadMain
+F	bcz	b	field_78183_b	wolfBody
+F	bcz	c	field_78184_c	wolfLeg1
+F	bcz	d	field_78181_d	wolfLeg2
+F	bcz	e	field_78182_e	wolfLeg3
+F	bcz	f	field_78179_f	wolfLeg4
+F	bcz	g	field_78180_g	wolfTail
+F	bcz	h	field_78186_h	wolfMane
+F	bdb	a	field_78221_a	head
+F	bdb	b	field_78219_b	neck
+F	bdb	c	field_78220_c	jaw
+F	bdb	d	field_78217_d	body
+F	bdb	e	field_78218_e	rearLeg
+F	bdb	f	field_78215_f	frontLeg
+F	bdb	g	field_78216_g	rearLegTip
+F	bdb	h	field_78226_h	frontLegTip
+F	bdb	i	field_78227_i	rearFoot
+F	bdb	j	field_78224_j	frontFoot
+F	bdb	k	field_78225_k	wing
+F	bdb	l	field_78222_l	wingTip
+F	bdc	a	field_78230_a	cube
+F	bdc	b	field_78228_b	glass
+F	bdc	c	field_78229_c	base
+F	bdd	a	field_78252_a	posX1
+F	bdd	b	field_78250_b	posY1
+F	bdd	c	field_78251_c	posZ1
+F	bdd	d	field_78248_d	posX2
+F	bdd	e	field_78249_e	posY2
+F	bdd	f	field_78246_f	posZ2
+F	bdd	g	field_78247_g	field_78247_g
+F	bdi	a	field_78801_a	textureWidth
+F	bdi	b	field_78799_b	textureHeight
+F	bdi	c	field_78800_c	rotationPointX
+F	bdi	d	field_78797_d	rotationPointY
+F	bdi	e	field_78798_e	rotationPointZ
+F	bdi	f	field_78795_f	rotateAngleX
+F	bdi	g	field_78796_g	rotateAngleY
+F	bdi	h	field_78808_h	rotateAngleZ
+F	bdi	i	field_78809_i	mirror
+F	bdi	j	field_78806_j	showModel
+F	bdi	k	field_78807_k	isHidden
+F	bdi	l	field_78804_l	cubeList
+F	bdi	m	field_78805_m	childModels
+F	bdi	n	field_78802_n	boxName
+F	bdi	r	field_78803_o	textureOffsetX
+F	bdi	s	field_78813_p	textureOffsetY
+F	bdi	v	field_78810_s	baseModel
+F	bdj	a	field_78783_a	textureOffsetX
+F	bdj	b	field_78782_b	textureOffsetY
 F	bfj	c	field_71159_c	mc
+F	bp	a	field_74817_a	instance
+F	bp	f	field_74814_e	isUnicode
+F	gu	a	field_72404_b	playerEntityList
+F	gu	e	field_72400_f	mcServer
+F	gu	h	field_72414_i	ops
+F	iz	a	field_73061_a	mcServer
+F	jc	b	field_71133_b	mcServer
 F	kx	a	field_76144_a	SIN_TABLE
 F	mp	A	field_70177_z	rotationYaw
 F	mp	B	field_70125_A	rotationPitch
+F	mp	E	field_70121_D	boundingBox
 F	mp	F	field_70122_E	onGround
+F	mp	N	field_70129_M	yOffset
+F	mp	O	field_70130_N	width
 F	mp	P	field_70131_O	height
 F	mp	ab	field_70146_Z	rand
 F	mp	ar	field_71093_bK	dimension
@@ -1791,18 +1977,33 @@ F	mp	q	field_70170_p	worldObj
 F	mp	u	field_70165_t	posX
 F	mp	v	field_70163_u	posY
 F	mp	w	field_70161_v	posZ
+F	net/minecraft/client/Minecraft	K	field_71425_J	running
 F	net/minecraft/client/Minecraft	e	field_71441_e	theWorld
 F	net/minecraft/client/Minecraft	g	field_71439_g	thePlayer
+F	net/minecraft/server/MinecraftServer	b	field_71305_c	worldServers
+F	net/minecraft/server/MinecraftServer	k	field_71309_l	mcServer
+F	net/minecraft/server/MinecraftServer	u	field_71316_v	serverStopped
 F	ng	aH	field_70750_az	texture
 F	ng	aS	field_70734_aK	health
 F	rh	d	field_70291_e	health
+F	s	a	field_71588_a	oppositeSide
+F	s	b	field_71586_b	offsetsXForSide
+F	s	c	field_71587_c	offsetsYForSide
+F	s	d	field_71585_d	offsetsZForSide
+F	s	e	field_82374_e	facings
 F	sn	b	field_75100_b	isFlying
 F	sn	c	field_75101_c	allowFlying
 F	sn	d	field_75098_d	isCreativeMode
+F	so	a	field_70462_a	mainInventory
+F	so	b	field_70460_b	armorInventory
+F	so	c	field_70461_c	currentItem
 F	so	d	field_70458_d	player
 F	sq	bK	field_71071_by	inventory
 F	sq	bS	field_71092_bJ	username
 F	sq	ce	field_71075_bZ	capabilities
+F	t	a	field_71574_a	posX
+F	t	b	field_71572_b	posY
+F	t	c	field_71573_c	posZ
 F	uo	b	field_77881_a	armorType
 F	uo	c	field_77879_b	damageReduceAmount
 F	uo	cx	field_77878_bZ	material
@@ -2019,25 +2220,41 @@ F	wm	f	field_82843_f	itemFrame
 F	xn	a	field_77885_a	blockID
 F	xr	b	field_77826_b	toolMaterial
 M	aab	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
+M	aab	F	()V	func_72906_B	checkSessionLock
+M	aab	F	(III)Z	func_72951_B	canLightningStrikeAt
 M	aab	G	()J	func_72905_C	getSeed
 M	aab	H	()J	func_82737_E	getTotalWorldTime
 M	aab	I	()J	func_72820_D	getWorldTime
+M	aab	J	()Lt;	func_72861_E	getSpawnPoint
+M	aab	L	()Lakf;	func_72860_G	getSaveHandler
+M	aab	M	()Lajv;	func_72912_H	getWorldInfo
+M	aab	O	()Z	func_72911_I	isThundering
+M	aab	P	()Z	func_72896_J	isRaining
 M	aab	Q	()I	func_72800_K	getHeight
 M	aab	R	()I	func_72940_L	getActualHeight
+M	aab	U	()Lard;	func_82732_R	getWorldVec3Pool
 M	aab	a	(DDDD)Lsq;	func_72977_a	getClosestPlayer
 M	aab	a	(DDDLjava/lang/String;FF)V	func_72908_a	playSoundEffect
+M	aab	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
 M	aab	a	(III)I	func_72798_a	getBlockId
 M	aab	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
 M	aab	a	(IIIZ)Z	func_94578_a	destroyBlock
+M	aab	a	(Ljava/lang/Class;Laqx;)Ljava/util/List;	func_72872_a	getEntitiesWithinAABB
+M	aab	a	(Ljava/lang/Class;Laqx;Lmy;)Ljava/util/List;	func_82733_a	selectEntitiesWithinAABB
+M	aab	a	(Ljava/lang/String;)Lsq;	func_72924_a	getPlayerEntityByName
 M	aab	a	(Ljava/lang/String;DDDDDD)V	func_72869_a	spawnParticle
 M	aab	a	(Lmp;D)Lsq;	func_72890_a	getClosestPlayerToEntity
 M	aab	a	(Lmp;DDDFZ)Lzw;	func_72876_a	createExplosion
+M	aab	a	(Lmp;Laqx;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	aab	a	(Lmp;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
+M	aab	b	(DDDD)Lsq;	func_72846_b	getClosestVulnerablePlayer
 M	aab	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
 M	aab	b	(IIIII)Z	func_72921_c	setBlockMetadata
 M	aab	b	(J)V	func_72877_b	setWorldTime
+M	aab	b	(Lmp;Laqx;)Ljava/util/List;	func_72839_b	getEntitiesWithinAABBExcludingEntity
 M	aab	c	(III)Z	func_72799_c	isAirBlock
 M	aab	c	(IIII)Z	func_94575_c	setBlock
+M	aab	c	(Lmp;)Z	func_72942_c	addWeatherEffect
 M	aab	d	(Lmp;)Z	func_72838_d	spawnEntityInWorld
 M	aab	e	(IIIIII)Z	func_72904_c	checkChunksExist
 M	aab	f	(II)I	func_72976_f	getHeightValue
@@ -2047,11 +2264,17 @@ M	aab	f	(IIIIII)Z	func_72832_d	setBlock
 M	aab	g	(III)Laif;	func_72803_f	getBlockMaterial
 M	aab	h	(II)I	func_72874_g	getPrecipitationHeight
 M	aab	h	(III)I	func_72805_g	getBlockMetadata
+M	aab	i	(F)F	func_72867_j	getRainStrength
 M	aab	i	(II)I	func_72825_h	getTopSolidOrLiquidBlock
 M	aab	i	(III)Z	func_94571_i	setBlockToAir
 M	aab	j	(III)V	func_72845_h	markBlockForUpdate
+M	aab	l	(III)Z	func_72937_j	canBlockSeeTheSky
+M	aab	m	(III)I	func_72883_k	getFullBlockLightValue
+M	aab	n	(III)I	func_72957_l	getBlockLightValue
 M	aab	v	()Z	func_72935_r	isDaytime
 M	aak	Q	()I	func_72800_K	getHeight
+M	aak	U	()Lard;	func_82732_R	getWorldVec3Pool
+M	aak	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
 M	aak	a	(III)I	func_72798_a	getBlockId
 M	aak	c	(III)Z	func_72799_c	isAirBlock
 M	aak	g	(III)Laif;	func_72803_f	getBlockMaterial
@@ -2070,6 +2293,30 @@ M	aif	f	()Laif;	func_76221_f	setRequiresTool
 M	aif	h	()Z	func_76217_h	getCanBurn
 M	aif	k	()Z	func_76218_k	isOpaque
 M	aif	l	()Z	func_76229_l	isToolNotRequired
+M	ajt	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
+M	ajt	b	()Ljava/io/File;	func_75765_b	getWorldDirectory
+M	ajt	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
+M	ajt	c	()V	func_75762_c	checkSessionLock
+M	ajt	g	()Ljava/lang/String;	func_75760_g	getWorldDirectoryName
+M	ajv	b	()J	func_76063_b	getSeed
+M	ajv	c	()I	func_76079_c	getSpawnX
+M	ajv	c	(J)V	func_76068_b	setWorldTime
+M	ajv	d	()I	func_76075_d	getSpawnY
+M	ajv	e	()I	func_76074_e	getSpawnZ
+M	ajv	f	()J	func_82573_f	getWorldTotalTime
+M	ajv	g	()J	func_76073_f	getWorldTime
+M	ajv	j	()I	func_76076_i	getDimension
+M	ajv	k	()Ljava/lang/String;	func_76065_j	getWorldName
+M	ajv	n	()Z	func_76061_m	isThundering
+M	ajv	p	()Z	func_76059_o	isRaining
+M	ajv	r	()Laaj;	func_76077_q	getGameType
+M	ajv	t	()Z	func_76093_s	isHardcoreModeEnabled
+M	ajv	u	()Laal;	func_76067_t	getTerrainType
+M	ajv	v	()Z	func_76086_u	areCommandsAllowed
+M	akf	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
+M	akf	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
+M	akf	c	()V	func_75762_c	checkSessionLock
+M	akf	g	()Ljava/lang/String;	func_75760_g	getWorldDirectoryName
 M	apa	A	()Ljava/lang/String;	func_71931_t	getLocalizedName
 M	apa	C	()Z	func_71876_u	getEnableStats
 M	apa	D	()Lapa;	func_71896_v	disableStats
@@ -2125,11 +2372,148 @@ M	ape	a	()Ljava/lang/String;	func_72676_a	getBreakSound
 M	ape	c	()F	func_72677_b	getVolume
 M	ape	d	()F	func_72678_c	getPitch
 M	ape	e	()Ljava/lang/String;	func_72675_d	getStepSound
+M	aqt	a	(II)Llx;	func_71858_a	getIcon
+M	aqt	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	aqt	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	aqt	a	(Laab;IIILng;)I	func_72116_b	determineOrientation
+M	aqt	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	aqt	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aqt	a	(Lly;)V	func_94332_a	registerIcons
+M	aqt	b	()Z	func_71886_c	renderAsNormalBlock
+M	aqt	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aqt	c	()Z	func_71926_d	isOpaqueCube
+M	aqt	d	()I	func_71857_b	getRenderType
+M	aqt	d	(I)I	func_72117_e	getOrientation
+M	aqt	e	(I)Z	func_72114_f	isExtended
+M	aqt	g	()V	func_71919_f	setBlockBoundsForItemRender
+M	aqx	a	()Laqz;	func_72332_a	getAABBPool
+M	aqx	a	(DDD)Laqx;	func_72321_a	addCoord
+M	aqx	a	(DDDDDD)Laqx;	func_72330_a	getBoundingBox
+M	aqx	a	(Laqx;)Z	func_72326_a	intersectsWith
+M	aqx	a	(Larc;)Z	func_72318_a	isVecInside
+M	aqx	b	()D	func_72320_b	getAverageEdgeLength
+M	aqx	b	(DDD)Laqx;	func_72314_b	expand
+M	aqx	b	(DDDDDD)Laqx;	func_72324_b	setBounds
+M	aqx	c	()Laqx;	func_72329_c	copy
+M	aqx	c	(DDD)Laqx;	func_72325_c	getOffsetBoundingBox
+M	aqx	c	(Laqx;)V	func_72328_c	setBB
+M	aqx	d	(DDD)Laqx;	func_72317_d	offset
+M	aqx	e	(DDD)Laqx;	func_72331_e	contract
+M	aqx	toString	()Ljava/lang/String;	toString	toString
+M	aqz	a	()V	func_72298_a	cleanPool
+M	aqz	a	(DDDDDD)Laqx;	func_72299_a	getAABB
+M	aqz	b	()V	func_72300_b	clearPool
+M	arc	a	()Larc;	func_72432_b	normalize
+M	arc	a	(DDD)Larc;	func_72443_a	createVectorHelper
+M	arc	a	(Larc;)Larc;	func_72444_a	subtract
+M	arc	b	()D	func_72433_c	lengthVector
+M	arc	b	(Larc;)D	func_72430_b	dotProduct
+M	arc	c	(DDD)Larc;	func_72441_c	addVector
+M	arc	d	(Larc;)D	func_72438_d	distanceTo
+M	arc	e	(Larc;)D	func_72436_e	squareDistanceTo
+M	arc	toString	()Ljava/lang/String;	toString	toString
+M	ard	a	(DDD)Larc;	func_72345_a	getVecFromPool
+M	bbp	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbq	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbq	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbr	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbs	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbs	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbu	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbu	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbw	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbw	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbx	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bby	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bby	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bbz	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bbz	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcb	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcb	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcc	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcd	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcd	a	(Ljava/lang/String;)Lbdj;	func_78084_a	getTextureOffset
+M	bcd	a	(Ljava/lang/String;II)V	func_78085_a	setTextureOffset
+M	bcd	a	(Ljava/util/Random;)Lbdi;	func_85181_a	getRandomModelBox
+M	bcd	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcd	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bce	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bce	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bce	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bch	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bch	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bci	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bci	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcj	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcj	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcl	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcl	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcm	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcm	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcn	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcn	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcp	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcq	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcq	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcr	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcr	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcs	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcs	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcu	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcu	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcu	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcv	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcv	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcw	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcx	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcy	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcy	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcy	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bcz	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bcz	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bcz	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bda	a	(FFFFFFLmp;)V	func_78087_a	setRotationAngles
+M	bdb	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bdb	a	(Lng;FFF)V	func_78086_a	setLivingAnimations
+M	bdc	a	(Lmp;FFFFFF)V	func_78088_a	render
+M	bdd	a	(Lbgd;F)V	func_78245_a	render
+M	bdi	a	(F)V	func_78785_a	render
+M	bdi	a	(FFF)V	func_78793_a	setRotationPoint
+M	bdi	a	(FFFIII)Lbdi;	func_78789_a	addBox
+M	bdi	a	(FFFIIIF)V	func_78790_a	addBox
+M	bdi	a	(II)Lbdi;	func_78784_a	setTextureOffset
+M	bdi	a	(Lbdi;)V	func_78792_a	addChild
+M	bdi	a	(Ljava/lang/String;FFFIII)Lbdi;	func_78786_a	addBox
+M	bdi	b	(F)V	func_78791_b	renderWithRotation
+M	bdi	b	(II)Lbdi;	func_78787_b	setTextureSize
+M	bdi	c	(F)V	func_78794_c	postRender
 M	bdv	j	(I)V	func_70691_i	heal
 M	bfj	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	bfj	ag	()Z	func_70093_af	isSneaking
 M	bfj	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	bfj	bG	()Lwm;	func_70694_bm	getHeldItem
+M	bo	a	(Ljava/lang/String;)Ljava/lang/String;	func_74838_a	translateToLocal
+M	bo	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74837_a	translateToLocalFormatted
+M	bp	a	()Lbp;	func_74808_a	getInstance
+M	bp	a	(Ljava/lang/String;)Ljava/lang/String;	func_74805_b	translateKey
+M	bp	a	(Ljava/lang/String;Z)V	func_74810_a	setLanguage
+M	bp	a	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	func_74803_a	translateKeyFormat
+M	bp	b	()Ljava/util/TreeMap;	func_74806_b	getLanguageList
+M	bp	c	()Ljava/lang/String;	func_74811_c	getCurrentLanguage
+M	bp	c	(Ljava/lang/String;)Ljava/lang/String;	func_74809_c	translateNamedKey
+M	bp	d	()Z	func_74804_d	isUnicode
+M	bp	e	(Ljava/lang/String;)Z	func_74802_e	isBidirectional
+M	gu	a	(Lei;)V	func_72384_a	sendPacketToAllPlayers
+M	gu	a	(Lei;I)V	func_72396_a	sendPacketToAllPlayersInDimension
+M	gu	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
+M	gu	e	(Ljava/lang/String;)Z	func_72353_e	areCommandsAllowed
+M	gu	i	()Ljava/util/Set;	func_72376_i	getOps
+M	gu	k	()I	func_72394_k	getCurrentPlayerCount
+M	gu	k	(Ljava/lang/String;)V	func_92062_k	sendChatMsg
+M	gu	l	()I	func_72352_l	getMaxPlayers
+M	iz	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
+M	iz	c	(Lmp;)Z	func_72942_c	addWeatherEffect
+M	iz	p	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	jc	b	(I)V	func_70606_j	setEntityHealth
@@ -2165,40 +2549,91 @@ M	lx	i	()Ljava/lang/String;	func_94215_i	getIconName
 M	lx	j	()I	func_94213_j	getSheetWidth
 M	lx	k	()I	func_94208_k	getSheetHeight
 M	ly	a	(Ljava/lang/String;)Llx;	func_94245_a	registerIcon
+M	mp	R	()Z	func_70089_S	isEntityAlive
 M	mp	ag	()Z	func_70093_af	isSneaking
 M	mp	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	mp	b	(DDD)V	func_70107_b	setPosition
 M	mp	b	(DDDFF)V	func_70012_b	setLocationAndAngles
 M	mp	d	(Lmp;)F	func_70032_d	getDistanceToEntity
+M	mp	equals	(Ljava/lang/Object;)Z	equals	equals
 M	mp	f	(DDD)D	func_70011_f	getDistance
+M	mp	hashCode	()I	hashCode	hashCode
 M	mp	toString	()Ljava/lang/String;	toString	toString
 M	mp	w	()V	func_70106_y	setDead
 M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
+M	net/minecraft/server/MinecraftServer	A	()[Ljava/lang/String;	func_71213_z	getAllUsernames
+M	net/minecraft/server/MinecraftServer	D	()Lnet/minecraft/server/MinecraftServer;	func_71276_C	getServer
+M	net/minecraft/server/MinecraftServer	E	()Laa;	func_71187_D	getCommandManager
+M	net/minecraft/server/MinecraftServer	H	()Ljava/lang/String;	func_71214_G	getServerOwner
+M	net/minecraft/server/MinecraftServer	I	()Z	func_71264_H	isSinglePlayer
+M	net/minecraft/server/MinecraftServer	J	()Ljava/lang/String;	func_71270_I	getFolderName
+M	net/minecraft/server/MinecraftServer	K	()Ljava/lang/String;	func_71221_J	getWorldName
+M	net/minecraft/server/MinecraftServer	T	()Z	func_71262_S	isDedicatedServer
+M	net/minecraft/server/MinecraftServer	X	()Z	func_71219_W	isPVPEnabled
+M	net/minecraft/server/MinecraftServer	a	(I)Liz;	func_71218_a	worldServerForDimension
+M	net/minecraft/server/MinecraftServer	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
+M	net/minecraft/server/MinecraftServer	aa	()Ljava/lang/String;	func_71273_Y	getMOTD
+M	net/minecraft/server/MinecraftServer	ad	()Lgu;	func_71203_ab	getConfigurationManager
+M	net/minecraft/server/MinecraftServer	ah	()I	func_71259_af	getTickCounter
+M	net/minecraft/server/MinecraftServer	c_	()Ljava/lang/String;	func_70005_c_	getCommandSenderName
+M	net/minecraft/server/MinecraftServer	f	()Z	func_71225_e	canStructuresSpawn
+M	net/minecraft/server/MinecraftServer	f	(Ljava/lang/String;)V	func_71244_g	logInfo
+M	net/minecraft/server/MinecraftServer	g	()Laaj;	func_71265_f	getGameType
+M	net/minecraft/server/MinecraftServer	g	(Ljava/lang/String;)V	func_71236_h	logWarning
+M	net/minecraft/server/MinecraftServer	h	()I	func_71232_g	getDifficulty
+M	net/minecraft/server/MinecraftServer	i	(Ljava/lang/String;)V	func_71201_j	logSevere
+M	net/minecraft/server/MinecraftServer	x	()Ljava/lang/String;	func_71249_w	getMinecraftVersion
+M	net/minecraft/server/MinecraftServer	y	()I	func_71233_x	getCurrentPlayerCount
+M	net/minecraft/server/MinecraftServer	z	()I	func_71275_y	getMaxPlayers
+M	ng	R	()Z	func_70089_S	isEntityAlive
 M	ng	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	ng	aX	()I	func_70630_aN	getHealth
+M	ng	aZ	()I	func_70658_aO	getTotalArmorValue
 M	ng	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	ng	b	(I)V	func_70606_j	setEntityHealth
 M	ng	bG	()Lwm;	func_70694_bm	getHeldItem
+M	ng	bz	()Z	func_70608_bn	isPlayerSleeping
+M	ng	h_	()Z	func_70631_g_	isChild
 M	ng	j	(I)V	func_70691_i	heal
+M	ng	q	(I)Lwm;	func_82169_q	getCurrentArmor
 M	rh	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	rh	d	()Lwm;	func_92059_d	getEntityItem
+M	so	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	so	a	(II)Lwm;	func_70298_a	decrStackSize
+M	so	a	(ILwm;)V	func_70299_a	setInventorySlotContents
 M	so	a	(Lmp;)I	func_70444_a	getDamageVsEntity
 M	so	a	(Lwm;)Z	func_70441_a	addItemStackToInventory
 M	so	b	(Lapa;)Z	func_70454_b	canHarvestBlock
+M	so	c	(Lwm;)Z	func_70431_c	hasItemStack
+M	so	d	()I	func_70297_j_	getInventoryStackLimit
 M	so	d	(I)Z	func_70435_d	consumeInventoryItem
 M	so	e	(I)Z	func_70450_e	hasItem
+M	so	f	(I)Lwm;	func_70440_f	armorItemInSlot
 M	so	h	()Lwm;	func_70448_g	getCurrentItem
+M	so	j	()I	func_70447_i	getFirstEmptyStack
+M	so	j_	()I	func_70302_i_	getSizeInventory
+M	so	k_	()V	func_70296_d	onInventoryChanged
+M	so	l	()I	func_70430_l	getTotalArmorValue
 M	sq	a	(IIIILwm;)Z	func_82247_a	canPlayerEdit
 M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
+M	sq	aZ	()I	func_70658_aO	getTotalArmorValue
 M	sq	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	sq	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	sq	bG	()Lwm;	func_70694_bm	getHeldItem
+M	sq	bX	()Z	func_71039_bw	isUsingItem
+M	sq	bz	()Z	func_70608_bn	isPlayerSleeping
 M	sq	c	(Lwm;)Lrh;	func_71021_b	dropPlayerItem
 M	sq	c_	()Ljava/lang/String;	func_70005_c_	getCommandSenderName
 M	sq	cd	()Lwm;	func_71045_bC	getCurrentEquippedItem
+M	sq	ck	()Lt;	func_70997_bJ	getBedLocation
 M	sq	cn	()Lti;	func_71024_bL	getFoodStats
+M	sq	q	(I)Lwm;	func_82169_q	getCurrentArmor
 M	sq	w	()V	func_70106_y	setDead
 M	sq	w	(I)V	func_71023_q	addExperience
+M	t	b	(III)V	func_71571_b	set
+M	t	e	(III)F	func_71569_e	getDistanceSquared
+M	t	equals	(Ljava/lang/Object;)Z	equals	equals
+M	t	hashCode	()I	hashCode	hashCode
 M	ti	a	()I	func_75116_a	getFoodLevel
 M	ti	a	(IF)V	func_75122_a	addStats
 M	uo	a	(Lly;)V	func_94581_a	registerIcons

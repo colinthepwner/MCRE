@@ -102,6 +102,9 @@ JClass.prototype.findField = function (name) {
 	return null;
 };
 JClass.prototype.isSubclassOf = function (other) {
+	return this.isSubclassStrict(other) || other.absent || this.absent;
+};
+JClass.prototype.isSubclassStrict = function (other) {
 	if (this === other) return true;
 	if (other.name === 'java/lang/Object') return true;
 	if (this.name[0] === '[') {
@@ -115,9 +118,9 @@ JClass.prototype.isSubclassOf = function (other) {
 	}
 	for (var c = this; c; c = c.superClass) {
 		if (c === other) return true;
-		for (var i = 0; i < c.interfaces.length; i++) if (c.interfaces[i].isSubclassOf(other)) return true;
+		for (var i = 0; i < c.interfaces.length; i++) if (c.interfaces[i].isSubclassStrict(other)) return true;
 	}
-	return other.absent || this.absent;
+	return false;
 };
 
 function JMethod(cls, name, desc, access) {
@@ -151,6 +154,7 @@ function VM(opts) {
 	JVM.installLang(this);
 	JVM.installUtil(this);
 	JVM.installIo(this);
+	JVM.installReflect(this);
 	if (opts.install) opts.install(this);
 }
 
@@ -183,7 +187,7 @@ VM.prototype.loadClass = function (name) {
 	var src = this.sources[name];
 	if (src) {
 		delete this.sources[name];
-		return this.defineFromBytes(name, src.bytes, src.source);
+		return this.defineFromBytes(name, src.bytes, src.source, src.parsed);
 	}
 	var spec = this.natives[name];
 	if (spec) return this.defineNativeClass(name, spec);
@@ -268,8 +272,8 @@ VM.prototype.addClassFile = function (name, bytes, source) {
 	this.sources[name] = { bytes: bytes, source: source || '' };
 };
 
-VM.prototype.defineFromBytes = function (expectName, bytes, source) {
-	var cf = JVM.parseClassFile(bytes);
+VM.prototype.defineFromBytes = function (expectName, bytes, source, parsed) {
+	var cf = parsed || JVM.parseClassFile(bytes);
 	if (this.mapClass || this.mapMember) JVM.remapClassFile(this, cf);
 	var name = cf.name;
 	var c = new JClass(this, name);
@@ -283,13 +287,15 @@ VM.prototype.defineFromBytes = function (expectName, bytes, source) {
 	for (var i = 0; i < cf.fields.length; i++) {
 		var f = cf.fields[i];
 		var st = (f.access & ACC_STATIC) !== 0;
-		c.fields[f.name] = { name: f.name, desc: f.desc, access: f.access, static: st };
+		c.fields[f.name] = { name: f.name, desc: f.desc, access: f.access, static: st, annotations: f.annotations || null };
 		if (st) c.statics[f.name] = f.constant !== undefined ? f.constant : defaultOf(f.desc);
 	}
 	for (var j = 0; j < cf.methods.length; j++) {
 		var mi = cf.methods[j];
 		var m = new JMethod(c, mi.name, mi.desc, mi.access);
 		m.code = mi.code;
+		m.annotations = mi.annotations || null;
+		if (mi.annotationDefault) m.annotationDefault = mi.annotationDefault;
 		c.methods[m.key] = m;
 	}
 	return c;
@@ -388,9 +394,9 @@ VM.prototype.invoke = function (m, self, args) {
 		if (m.access & ACC_ABSTRACT) this.throwNew('java/lang/AbstractMethodError', m.cls.name + '.' + m.key);
 		if (m.access & ACC_NATIVE) {
 			this.warnOnce('native:' + m.cls.name + m.key, 'native method left unplugged: ' + m.cls.name.replace(/[/]/g, '.') + '.' + m.name);
-			return defaultOf(m.sig.ret);
+			return this.unpluggedValue(m.sig.ret);
 		}
-		return defaultOf(m.sig.ret);
+		return this.unpluggedValue(m.sig.ret);
 	}
 	return JVM.interpret(this, m, self, args);
 };
@@ -411,7 +417,20 @@ VM.prototype.callStatic = function (cname, name, desc, args) {
 };
 VM.prototype.missingMethod = function (c, name, desc) {
 	this.warnOnce('m:' + c.name + '.' + name + desc, 'not available here: ' + c.name.replace(/[/]/g, '.') + '.' + name + desc + ' (left unplugged)');
-	return defaultOf(parseDesc(desc).ret);
+	return this.unpluggedValue(parseDesc(desc).ret);
+};
+var EMPTY_OF = {
+	'Ljava/util/List;': 'java/util/ArrayList', 'Ljava/util/ArrayList;': 'java/util/ArrayList', 'Ljava/util/Collection;': 'java/util/ArrayList',
+	'Ljava/lang/Iterable;': 'java/util/ArrayList', 'Ljava/util/LinkedList;': 'java/util/LinkedList',
+	'Ljava/util/Set;': 'java/util/HashSet', 'Ljava/util/HashSet;': 'java/util/HashSet',
+	'Ljava/util/Map;': 'java/util/HashMap', 'Ljava/util/HashMap;': 'java/util/HashMap',
+};
+VM.prototype.unpluggedValue = function (t) {
+	if (t === 'Ljava/lang/String;') return '';
+	if (t[0] === '[') return this.newArray(t.substring(1), 0);
+	var cn = EMPTY_OF[t];
+	if (cn) { var o = this.newObject(this.loadClass(cn)); this.callVirtual(o, '<init>', '()V', []); return o; }
+	return defaultOf(t);
 };
 
 VM.prototype.toJavaString = function (v) {
@@ -548,6 +567,7 @@ function parseClassFile(bytes) {
 				if (fld.desc === 'F') fld.constant = Math.fround(fld.constant);
 				return true;
 			}
+			if (aname === 'RuntimeVisibleAnnotations') { fld.annotations = readAnnotations(r, cp); return true; }
 			return false;
 		});
 		cf.fields.push(fld);
@@ -557,6 +577,8 @@ function parseClassFile(bytes) {
 	for (var mc = r.u2(); mc > 0; mc--) {
 		var mt = { access: r.u2(), name: utf(r.u2()), desc: utf(r.u2()), code: null };
 		readAttributes(r, cp, function (aname, len) {
+			if (aname === 'RuntimeVisibleAnnotations') { mt.annotations = readAnnotations(r, cp); return true; }
+			if (aname === 'AnnotationDefault') { mt.annotationDefault = readElement(r, cp); return true; }
 			if (aname !== 'Code') return false;
 			var code = { maxStack: r.u2(), maxLocals: r.u2() };
 			code.bytes = r.bytes(r.u4());
@@ -589,9 +611,31 @@ function parseClassFile(bytes) {
 			return true;
 		}
 		if (aname === 'SourceFile') { cf.sourceFile = utf(r.u2()); return true; }
+		if (aname === 'RuntimeVisibleAnnotations') { cf.annotations = readAnnotations(r, cp); return true; }
 		return false;
 	});
 	return cf;
+}
+
+function readAnnotations(r, cp) {
+	var out = [];
+	for (var n = r.u2(); n > 0; n--) out.push(readAnnotation(r, cp));
+	return out;
+}
+function readAnnotation(r, cp) {
+	var a = { type: cp[r.u2()].v, values: {} };
+	for (var k = r.u2(); k > 0; k--) { var name = cp[r.u2()].v; a.values[name] = readElement(r, cp); }
+	return a;
+}
+function readElement(r, cp) {
+	var t = String.fromCharCode(r.u1());
+	switch (t) {
+	case 'e': return { t: t, type: cp[r.u2()].v, name: cp[r.u2()].v };
+	case 'c': return { t: t, desc: cp[r.u2()].v };
+	case '@': return { t: t, ann: readAnnotation(r, cp) };
+	case '[': { var items = []; for (var n = r.u2(); n > 0; n--) items.push(readElement(r, cp)); return { t: t, items: items }; }
+	default: { var v = cp[r.u2()].v; if (t === 'F') v = Math.fround(v); return { t: t, v: v }; }
+	}
 }
 
 function readAttributes(r, cp, fn) {
@@ -626,7 +670,26 @@ function remapClassFile(vm, cf) {
 	cf.name = mc(cf.name);
 	if (cf.superName) cf.superName = mc(cf.superName);
 	cf.interfaces = cf.interfaces.map(mc);
-	cf.fields.forEach(function (f) { f.desc = mapDesc(f.desc); });
+	var mapAnn = function (list) {
+		(list || []).forEach(function (a) {
+			a.type = mapDesc(a.type);
+			Object.keys(a.values).forEach(function (k) { mapEl(a.values[k]); });
+		});
+	};
+	var mapEl = function (e) {
+		if (e.t === 'e') e.type = mapDesc(e.type);
+		else if (e.t === 'c') e.desc = mapDesc(e.desc);
+		else if (e.t === '@') mapAnn([e.ann]);
+		else if (e.t === '[') e.items.forEach(mapEl);
+	};
+	mapAnn(cf.annotations);
+	cf.origFields = cf.fields.map(function (f) { return f.name; });
+	var vanilla = vm.nameMap && vm.nameMap.cls[selfOrig] !== undefined;
+	cf.fields.forEach(function (f) {
+		if (vanilla) { var mf = vm.nameMap.fld[selfOrig + '.' + f.name]; if (mf) f.name = mf; }
+		f.desc = mapDesc(f.desc); mapAnn(f.annotations);
+	});
+	cf.methods.forEach(function (m) { mapAnn(m.annotations); if (m.annotationDefault) mapEl(m.annotationDefault); });
 	cf.methods.forEach(function (m) {
 		if (vm.mapMember && m.name[0] !== '<') m.name = vm.mapMember(selfOrig, m.name, m.desc, true, true) || m.name;
 		m.desc = mapDesc(m.desc);
@@ -902,7 +965,7 @@ function interpret(vm, m, self, args) {
 						target = rc.findMethod(e.name + e.desc) || missing(vm, rc, e);
 					}
 				}
-				v = target === MISSING ? defaultOf(sig.ret) : vm.invoke(target, recv, cargs);
+				v = target === MISSING ? vm.unpluggedValue(sig.ret) : vm.invoke(target, recv, cargs);
 				if (op === 0xb7 && recv !== null && typeof recv === 'object' && recv.$str !== undefined && recv.cls && recv.cls.name === 'java/lang/String') {
 					var sv = recv.$str;
 					for (var si = 0; si < stack.length; si++) if (stack[si] === recv) stack[si] = sv;
@@ -2106,6 +2169,381 @@ JVM.installLang = installLang;
 (function () {
 'use strict';
 
+var JObject = JVM.JObject;
+var PRIM = { I: 1, J: 1, F: 1, D: 1, Z: 1, C: 1, S: 1, B: 1 };
+
+function descOf(c) {
+	if (c.primitive) return c.name;
+	if (c.name[0] === '[') return c.name;
+	return 'L' + c.name + ';';
+}
+function typeClass(vm, desc) {
+	if (!desc || desc === '?') return vm.loadClass('java/lang/Object');
+	if (desc.length === 1) return vm.loadClass(desc);
+	return vm.classFor(desc);
+}
+function boxAs(vm, v, t) {
+	if (t === 'V') return null;
+	if (PRIM[t]) return JVM.box(vm, t === 'J' ? BigInt(v || 0) : v, t);
+	return v === undefined ? null : v;
+}
+function unboxAs(v, t) {
+	var u = JVM.unbox(v);
+	switch (t) {
+	case 'J': return typeof u === 'bigint' ? u : BigInt(Math.trunc(+u || 0));
+	case 'Z': return u ? 1 : 0;
+	case 'F': return Math.fround(typeof u === 'bigint' ? Number(u) : +u || 0);
+	case 'D': return typeof u === 'bigint' ? Number(u) : +u || 0;
+	case 'I': case 'S': case 'B': case 'C': return typeof u === 'bigint' ? Number(BigInt.asIntN(32, u)) : (u | 0);
+	default: return v;
+	}
+}
+
+function elementValue(vm, el, desc) {
+	if (el === undefined || el === null) {
+		if (desc === 'Ljava/lang/String;') return '';
+		if (desc[0] === '[') return vm.newArray(desc.substring(1), 0);
+		return JVM.defaultOf(desc);
+	}
+	if (desc[0] === '[' && el.t !== '[') el = { t: '[', items: [el] };
+	switch (el.t) {
+	case '[': {
+		var comp = desc[0] === '[' ? desc.substring(1) : 'Ljava/lang/Object;';
+		var arr = vm.newArray(comp, el.items.length);
+		for (var i = 0; i < el.items.length; i++) arr.a[i] = elementValue(vm, el.items[i], comp);
+		return arr;
+	}
+	case 'e': {
+		var ec = vm.classFor(el.type);
+		vm.initClass(ec);
+		var v = ec.statics[el.name];
+		if (v === undefined) {
+			var vals = vm.callVirtual(vm.classObject(ec), 'getEnumConstants', '()[Ljava/lang/Object;', []);
+			v = vals ? Array.prototype.slice.call(vals.a).filter(function (x) { return x && x.$name === el.name; })[0] || null : null;
+		}
+		return v;
+	}
+	case 'c': return vm.classObject(typeClass(vm, el.desc));
+	case '@': return annotationObject(vm, el.ann);
+	case 's': return String(el.v);
+	case 'Z': return el.v ? 1 : 0;
+	case 'J': return BigInt(el.v);
+	default:
+		if (PRIM[desc]) return desc === 'J' ? BigInt(el.v) : el.v;
+		return boxAs(vm, el.v, el.t);
+	}
+}
+
+function annotationClass(vm, type) {
+	var cache = vm.annClasses || (vm.annClasses = Object.create(null));
+	if (cache[type]) return cache[type];
+	var iface = typeClass(vm, type);
+	var c = new JVM.JClass(vm, 'mcre/annotation/' + JVM.typeToClassName(type));
+	c.native = true;
+	c.initState = 2;
+	c.access = JVM.ACC_PUBLIC | JVM.ACC_FINAL;
+	c.superClass = vm.loadClass('java/lang/Object');
+	c.interfaces = [vm.loadClass('java/lang/annotation/Annotation'), iface];
+	var base = JVM.JClass.prototype.findMethod;
+	var mk = function (key, fn) {
+		var p = key.indexOf('(');
+		var m = new JVM.JMethod(c, key.substring(0, p), key.substring(p), JVM.ACC_PUBLIC);
+		m.fn = fn;
+		return m;
+	};
+	c.findMethod = function (key) {
+		var hit = this.vcache[key];
+		if (hit !== undefined) return hit;
+		var m = null;
+		if (key === 'annotationType()Ljava/lang/Class;') m = mk(key, function (vm) { return vm.classObject(iface); });
+		else if (key === 'toString()Ljava/lang/String;') m = mk(key, function (vm, self) {
+			var vs = self.$ann.values;
+			return '@' + iface.name.replace(/[/]/g, '.') + '(' + Object.keys(vs).map(function (k) { return k + '=' + (vs[k].v !== undefined ? vs[k].v : vs[k].name || '...'); }).join(', ') + ')';
+		});
+		else if (key === 'hashCode()I') m = mk(key, function (vm, self) { return vm.identityHash(self); });
+		else if (key === 'equals(Ljava/lang/Object;)Z') m = mk(key, function (vm, self, a) { return a[0] === self || (a[0] && a[0].$ann === self.$ann) ? 1 : 0; });
+		else {
+			var g = /^(\w+)\(\)(.+)$/.exec(key), found = g && base.call(this, key);
+			if (g && (!found || (found.access & JVM.ACC_ABSTRACT))) {
+				var name = g[1], ret = g[2], dflt = found ? found.annotationDefault : undefined;
+				m = mk(key, function (vm, self) { var v = self.$ann.values[name]; return elementValue(vm, v !== undefined ? v : dflt, ret); });
+			}
+		}
+		if (!m) m = base.call(this, key);
+		return (this.vcache[key] = m);
+	};
+	return (cache[type] = c);
+}
+function annotationObject(vm, ann) {
+	var o = new JObject(annotationClass(vm, ann.type));
+	o.$ann = ann;
+	return o;
+}
+function annotationArray(vm, list) {
+	return JVM.javaArray(vm, 'Ljava/lang/annotation/Annotation;', (list || []).map(function (a) { return annotationObject(vm, a); }));
+}
+function findAnnotation(vm, list, annCls) {
+	if (!list || !annCls) return null;
+	for (var i = 0; i < list.length; i++) if (typeClass(vm, list[i].type) === annCls) return list[i];
+	return null;
+}
+function classAnnotations(c) { return c.cf && c.cf.annotations || null; }
+JVM.annotation = function (vm, list, typeName) {
+	if (!list) return null;
+	for (var i = 0; i < list.length; i++) {
+		var t = list[i].type;
+		if (t === 'L' + typeName + ';' || typeClass(vm, t).name === typeName) return list[i];
+	}
+	return null;
+};
+JVM.classAnnotations = classAnnotations;
+JVM.annotationObject = annotationObject;
+JVM.elementValue = elementValue;
+
+function fieldObj(vm, owner, f) {
+	var cache = owner.fieldObjs || (owner.fieldObjs = Object.create(null));
+	if (cache[f.name]) return cache[f.name];
+	var o = new JObject(vm.loadClass('java/lang/reflect/Field'));
+	o.$owner = owner; o.$f = f;
+	return (cache[f.name] = o);
+}
+function methodObj(vm, m) {
+	if (m.reflObj) return m.reflObj;
+	var o = new JObject(vm.loadClass(m.name === '<init>' ? 'java/lang/reflect/Constructor' : 'java/lang/reflect/Method'));
+	o.$m = m;
+	return (m.reflObj = o);
+}
+function declaredFields(c) { return Object.keys(c.fields).map(function (k) { return c.fields[k]; }); }
+function declaredMethods(c, ctors) {
+	return Object.keys(c.methods).map(function (k) { return c.methods[k]; }).filter(function (m) {
+		return ctors ? m.name === '<init>' : m.name[0] !== '<';
+	});
+}
+function paramsMatch(vm, m, classes) {
+	var want = classes ? Array.prototype.slice.call(classes.a) : [];
+	if (want.length !== m.sig.args.length) return false;
+	for (var i = 0; i < want.length; i++) if (!want[i] || descOf(want[i].$cls) !== m.sig.args[i]) {
+		if (!want[i] || typeClass(vm, m.sig.args[i]) !== want[i].$cls) return false;
+	}
+	return true;
+}
+function allPublicFields(c) {
+	var out = [], seen = Object.create(null);
+	(function walk(k) {
+		if (!k) return;
+		declaredFields(k).forEach(function (f) { if ((f.access & JVM.ACC_PUBLIC) && !seen[f.name]) { seen[f.name] = 1; out.push({ owner: k, f: f }); } });
+		k.interfaces.forEach(walk);
+		walk(k.superClass);
+	})(c);
+	return out;
+}
+function allPublicMethods(c) {
+	var out = [], seen = Object.create(null);
+	(function walk(k) {
+		if (!k) return;
+		declaredMethods(k).forEach(function (m) { if ((m.access & JVM.ACC_PUBLIC) && !seen[m.key]) { seen[m.key] = 1; out.push(m); } });
+		walk(k.superClass);
+		k.interfaces.forEach(walk);
+	})(c);
+	return out;
+}
+function staticOwner(vm, owner) { if (owner.initState !== 2) vm.initClass(owner); return owner; }
+function fieldGet(vm, self, obj) {
+	var f = self.$f;
+	if (f.static) return staticOwner(vm, self.$owner).statics[f.name];
+	if (obj === null || obj === undefined) vm.throwNew('java/lang/NullPointerException', f.name);
+	var v = obj[':' + f.name];
+	return v === undefined ? JVM.defaultOf(f.desc === '?' ? 'L;' : f.desc) : v;
+}
+function fieldSet(vm, self, obj, v) {
+	var f = self.$f;
+	if (f.static) staticOwner(vm, self.$owner).statics[f.name] = v;
+	else {
+		if (obj === null || obj === undefined) vm.throwNew('java/lang/NullPointerException', f.name);
+		obj[':' + f.name] = v;
+	}
+}
+function reflectInvoke(vm, m, recv, argArr) {
+	var args = argArr ? Array.prototype.slice.call(argArr.a) : [];
+	var cargs = m.sig.args.map(function (t, i) { return unboxAs(args[i], t); });
+	var target = m;
+	if (m.isStatic) staticOwner(vm, m.cls);
+	else {
+		if (recv === null || recv === undefined) vm.throwNew('java/lang/NullPointerException', m.name);
+		if (m.name !== '<init>') target = vm.classOf(recv).findMethod(m.key) || m;
+	}
+	try {
+		return vm.invoke(target, recv, cargs);
+	} catch (e) {
+		if (e instanceof JVM.JavaThrow) {
+			var w = vm.makeThrowable('java/lang/reflect/InvocationTargetException', null);
+			w.$cause = e.obj; w[':target'] = e.obj;
+			throw new JVM.JavaThrow(w);
+		}
+		throw e;
+	}
+}
+
+function installReflect(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	var add = function (name, methods, statics) {
+		var spec = vm.natives[name];
+		spec.methods = Object.assign({}, spec.methods || {}, methods || {});
+		spec.staticMethods = Object.assign({}, spec.staticMethods || {}, statics || {});
+	};
+	def('java/lang/annotation/Annotation', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def('java/lang/reflect/AccessibleObject', { methods: {
+		'setAccessible(Z)V': function () {},
+		'isAccessible()Z': function () { return 1; },
+		'trySetAccessible()Z': function () { return 1; },
+	} });
+	def('java/lang/reflect/InvocationTargetException', { super: 'java/lang/ReflectiveOperationException', methods: {
+		'getTargetException()Ljava/lang/Throwable;': function (vm, self) { return self.$cause || null; },
+		'getCause()Ljava/lang/Throwable;': function (vm, self) { return self.$cause || null; },
+	} });
+	var annMethods = function (listOf) {
+		return {
+			'getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;': function (vm, self, a) { var r = findAnnotation(vm, listOf(self), a[0] && a[0].$cls); return r ? annotationObject(vm, r) : null; },
+			'isAnnotationPresent(Ljava/lang/Class;)Z': function (vm, self, a) { return findAnnotation(vm, listOf(self), a[0] && a[0].$cls) ? 1 : 0; },
+			'getAnnotations()[Ljava/lang/annotation/Annotation;': function (vm, self) { return annotationArray(vm, listOf(self)); },
+			'getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;': function (vm, self) { return annotationArray(vm, listOf(self)); },
+		};
+	};
+	def('java/lang/reflect/Field', { super: 'java/lang/reflect/AccessibleObject', methods: Object.assign(annMethods(function (s) { return s.$f.annotations; }), {
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$f.name; },
+		'getType()Ljava/lang/Class;': function (vm, self) { return vm.classObject(typeClass(vm, self.$f.desc)); },
+		'getGenericType()Ljava/lang/reflect/Type;': function (vm, self) { return vm.classObject(typeClass(vm, self.$f.desc)); },
+		'getModifiers()I': function (vm, self) { return self.$f.access | (self.$f.static ? JVM.ACC_STATIC : 0); },
+		'getDeclaringClass()Ljava/lang/Class;': function (vm, self) { return vm.classObject(self.$owner); },
+		'isEnumConstant()Z': function (vm, self) { return self.$f.access & 0x4000 ? 1 : 0; },
+		'isSynthetic()Z': function (vm, self) { return self.$f.access & 0x1000 ? 1 : 0; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$owner.name.replace(/[/]/g, '.') + '.' + self.$f.name; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$owner.name) ^ JVM.stringHash(self.$f.name); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] === self ? 1 : 0; },
+		'get(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return boxAs(vm, fieldGet(vm, self, a[0]), self.$f.desc); },
+		'set(Ljava/lang/Object;Ljava/lang/Object;)V': function (vm, self, a) { fieldSet(vm, self, a[0], unboxAs(a[1], self.$f.desc)); },
+	}, (function () {
+		var m = {};
+		[['Int', 'I'], ['Boolean', 'Z'], ['Float', 'F'], ['Double', 'D'], ['Long', 'J'], ['Short', 'S'], ['Byte', 'B'], ['Char', 'C']].forEach(function (p) {
+			m['get' + p[0] + '(Ljava/lang/Object;)' + p[1]] = function (vm, self, a) { return unboxAs(fieldGet(vm, self, a[0]), p[1]); };
+			m['set' + p[0] + '(Ljava/lang/Object;' + p[1] + ')V'] = function (vm, self, a) { fieldSet(vm, self, a[0], unboxAs(a[1], self.$f.desc === '?' ? p[1] : self.$f.desc)); };
+		});
+		return m;
+	})()) });
+	var execMethods = Object.assign(annMethods(function (s) { return s.$m.annotations; }), {
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$m.name === '<init>' ? self.$m.cls.name.replace(/[/]/g, '.') : self.$m.name; },
+		'getModifiers()I': function (vm, self) { return self.$m.access; },
+		'getDeclaringClass()Ljava/lang/Class;': function (vm, self) { return vm.classObject(self.$m.cls); },
+		'getParameterTypes()[Ljava/lang/Class;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/Class;', self.$m.sig.args.map(function (t) { return vm.classObject(typeClass(vm, t)); })); },
+		'getGenericParameterTypes()[Ljava/lang/reflect/Type;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Type;', self.$m.sig.args.map(function (t) { return vm.classObject(typeClass(vm, t)); })); },
+		'getParameterCount()I': function (vm, self) { return self.$m.sig.args.length; },
+		'getExceptionTypes()[Ljava/lang/Class;': function (vm) { return vm.newArray('Ljava/lang/Class;', 0); },
+		'getParameterAnnotations()[[Ljava/lang/annotation/Annotation;': function (vm, self) {
+			var n = self.$m.sig.args.length, arr = vm.newArray('[Ljava/lang/annotation/Annotation;', n);
+			for (var i = 0; i < n; i++) arr.a[i] = vm.newArray('Ljava/lang/annotation/Annotation;', 0);
+			return arr;
+		},
+		'isVarArgs()Z': function (vm, self) { return self.$m.access & 0x80 ? 1 : 0; },
+		'isSynthetic()Z': function (vm, self) { return self.$m.access & 0x1000 ? 1 : 0; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$m.cls.name.replace(/[/]/g, '.') + '.' + self.$m.name + self.$m.desc; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$m.cls.name) ^ JVM.stringHash(self.$m.key); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] === self ? 1 : 0; },
+	});
+	def('java/lang/reflect/Method', { super: 'java/lang/reflect/AccessibleObject', methods: Object.assign({}, execMethods, {
+		'getReturnType()Ljava/lang/Class;': function (vm, self) { return vm.classObject(typeClass(vm, self.$m.sig.ret)); },
+		'getGenericReturnType()Ljava/lang/reflect/Type;': function (vm, self) { return vm.classObject(typeClass(vm, self.$m.sig.ret)); },
+		'invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return boxAs(vm, reflectInvoke(vm, self.$m, a[0], a[1]), self.$m.sig.ret); },
+		'isDefault()Z': function () { return 0; },
+	}) });
+	def('java/lang/reflect/Constructor', { super: 'java/lang/reflect/AccessibleObject', methods: Object.assign({}, execMethods, {
+		'newInstance([Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) {
+			var o = vm.newObject(self.$m.cls);
+			reflectInvoke(vm, self.$m, o, a[0]);
+			return o;
+		},
+	}) });
+	def('java/lang/reflect/Modifier', { staticMethods: (function () {
+		var m = {};
+		[['isPublic', 0x1], ['isPrivate', 0x2], ['isProtected', 0x4], ['isStatic', 0x8], ['isFinal', 0x10], ['isSynchronized', 0x20],
+		 ['isVolatile', 0x40], ['isTransient', 0x80], ['isNative', 0x100], ['isInterface', 0x200], ['isAbstract', 0x400]].forEach(function (p) {
+			m[p[0] + '(I)Z'] = function (vm, n, a) { return a[0] & p[1] ? 1 : 0; };
+		});
+		m['toString(I)Ljava/lang/String;'] = function (vm, n, a) { return [[1, 'public'], [2, 'private'], [4, 'protected'], [8, 'static'], [16, 'final']].filter(function (p) { return a[0] & p[0]; }).map(function (p) { return p[1]; }).join(' '); };
+		return m;
+	})(), statics: { PUBLIC: 1, PRIVATE: 2, PROTECTED: 4, STATIC: 8, FINAL: 16, SYNCHRONIZED: 32, VOLATILE: 64, TRANSIENT: 128, NATIVE: 256, INTERFACE: 512, ABSTRACT: 1024 } });
+
+	var PNAME = { I: 'int', J: 'long', F: 'float', D: 'double', Z: 'boolean', C: 'char', S: 'short', B: 'byte', V: 'void' };
+	[['java/lang/Integer', 'I'], ['java/lang/Long', 'J'], ['java/lang/Float', 'F'], ['java/lang/Double', 'D'], ['java/lang/Boolean', 'Z'],
+	 ['java/lang/Character', 'C'], ['java/lang/Short', 'S'], ['java/lang/Byte', 'B'], ['java/lang/Void', 'V']].forEach(function (p) {
+		var spec = vm.natives[p[0]];
+		if (!spec) { def(p[0], {}); spec = vm.natives[p[0]]; }
+		spec.statics = Object.assign({}, spec.statics || {}, { TYPE: null });
+		var prev = spec.clinit;
+		spec.clinit = function (vm, c) { if (prev) prev(vm, c); c.statics.TYPE = vm.classObject(vm.loadClass(p[1])); };
+	});
+	var jname = function (c) { return c.primitive ? PNAME[c.name] : c.name.replace(/[/]/g, '.'); };
+	var noSuch = function (vm, kind, c, name) { vm.throwNew('java/lang/NoSuch' + kind + 'Exception', c.name.replace(/[/]/g, '.') + '.' + name); };
+	add('java/lang/Class', Object.assign(annMethods(function (s) { return classAnnotations(s.$cls); }), {
+		'getName()Ljava/lang/String;': function (vm, self) { return jname(self.$cls); },
+		'getSimpleName()Ljava/lang/String;': function (vm, self) {
+			if (self.$cls.primitive) return PNAME[self.$cls.name];
+			if (self.$cls.name[0] === '[') return vm.callVirtual(vm.classObject(vm.classFor(self.$cls.component)), 'getSimpleName', '()Ljava/lang/String;', []) + '[]';
+			var n = self.$cls.name; n = n.substring(n.lastIndexOf('/') + 1); return n.substring(n.lastIndexOf('$') + 1);
+		},
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$cls.primitive ? PNAME[self.$cls.name] : (self.$cls.isInterface() ? 'interface ' : 'class ') + jname(self.$cls); },
+		'getDeclaredFields()[Ljava/lang/reflect/Field;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Field;', declaredFields(self.$cls).map(function (f) { return fieldObj(vm, self.$cls, f); })); },
+		'getFields()[Ljava/lang/reflect/Field;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Field;', allPublicFields(self.$cls).map(function (p) { return fieldObj(vm, p.owner, p.f); })); },
+		'getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;': function (vm, self, a) {
+			var f = self.$cls.fields[a[0]];
+			if (!f) noSuch(vm, 'Field', self.$cls, a[0]);
+			return fieldObj(vm, self.$cls, f);
+		},
+		'getField(Ljava/lang/String;)Ljava/lang/reflect/Field;': function (vm, self, a) {
+			var r = self.$cls.findField(a[0]);
+			if (!r) noSuch(vm, 'Field', self.$cls, a[0]);
+			return fieldObj(vm, r.owner, r.f);
+		},
+		'getDeclaredMethods()[Ljava/lang/reflect/Method;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Method;', declaredMethods(self.$cls).map(function (m) { return methodObj(vm, m); })); },
+		'getMethods()[Ljava/lang/reflect/Method;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Method;', allPublicMethods(self.$cls).map(function (m) { return methodObj(vm, m); })); },
+		'getDeclaredMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;': function (vm, self, a) {
+			var m = declaredMethods(self.$cls).filter(function (m) { return m.name === a[0] && paramsMatch(vm, m, a[1]); })[0];
+			if (!m) noSuch(vm, 'Method', self.$cls, a[0]);
+			return methodObj(vm, m);
+		},
+		'getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;': function (vm, self, a) {
+			var m = allPublicMethods(self.$cls).filter(function (m) { return m.name === a[0] && paramsMatch(vm, m, a[1]); })[0];
+			if (!m) noSuch(vm, 'Method', self.$cls, a[0]);
+			return methodObj(vm, m);
+		},
+		'getDeclaredConstructors()[Ljava/lang/reflect/Constructor;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Constructor;', declaredMethods(self.$cls, true).map(function (m) { return methodObj(vm, m); })); },
+		'getConstructors()[Ljava/lang/reflect/Constructor;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Constructor;', declaredMethods(self.$cls, true).filter(function (m) { return m.access & JVM.ACC_PUBLIC; }).map(function (m) { return methodObj(vm, m); })); },
+		'getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;': function (vm, self, a) {
+			var m = declaredMethods(self.$cls, true).filter(function (m) { return paramsMatch(vm, m, a[0]); })[0];
+			if (!m) noSuch(vm, 'Method', self.$cls, '<init>');
+			return methodObj(vm, m);
+		},
+		'getConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;': function (vm, self, a) {
+			var m = declaredMethods(self.$cls, true).filter(function (m) { return paramsMatch(vm, m, a[0]); })[0];
+			if (!m) noSuch(vm, 'Method', self.$cls, '<init>');
+			return methodObj(vm, m);
+		},
+		'getDeclaredClasses()[Ljava/lang/Class;': function (vm) { return vm.newArray('Ljava/lang/Class;', 0); },
+		'getClasses()[Ljava/lang/Class;': function (vm) { return vm.newArray('Ljava/lang/Class;', 0); },
+		'getEnclosingClass()Ljava/lang/Class;': function (vm, self) { var n = self.$cls.name, i = n.lastIndexOf('$'); return i > 0 ? vm.classObject(vm.loadClass(n.substring(0, i))) : null; },
+		'getDeclaringClass()Ljava/lang/Class;': function (vm, self) { var n = self.$cls.name, i = n.lastIndexOf('$'); return i > 0 ? vm.classObject(vm.loadClass(n.substring(0, i))) : null; },
+		'isAnnotation()Z': function (vm, self) { return self.$cls.access & 0x2000 ? 1 : 0; },
+		'isMemberClass()Z': function (vm, self) { return self.$cls.name.indexOf('$') > 0 ? 1 : 0; },
+		'isAnonymousClass()Z': function (vm, self) { return /\$\d+$/.test(self.$cls.name) ? 1 : 0; },
+	}));
+}
+
+JVM.installReflect = installReflect;
+JVM.reflect = { fieldObj: fieldObj, methodObj: methodObj, boxAs: boxAs, unboxAs: unboxAs, typeClass: typeClass };
+})();
+
+(function () {
+'use strict';
+
 var JObject = JVM.JObject, JArray = JVM.JArray;
 var OBJ = 'Ljava/lang/Object;', COL = 'Ljava/util/Collection;';
 
@@ -3171,6 +3609,7 @@ function installIo(vm) {
 		},
 	});
 	function fileObj(vm, path) { var f = vm.newObject(vm.loadClass('java/io/File')); f.$path = norm(path); return f; }
+	JVM.fileObj = fileObj;
 }
 
 JVM.installIo = installIo;
@@ -3263,6 +3702,7 @@ function loadMap(vm, text) {
 			var c = q.shift();
 			if (!c || seen[c]) continue;
 			seen[c] = true;
+			if (!isMethod && !cls[c] && declaresField(vm, c, name)) return name;
 			var key = c + '.' + name + (isMethod ? desc : '');
 			var r = isMethod ? mth[key] : fld[key];
 			if (r) return r;
@@ -3272,6 +3712,23 @@ function loadMap(vm, text) {
 		return name;
 	};
 	return map;
+}
+
+function declaresField(vm, name, field) {
+	var cache = vm.declFields || (vm.declFields = Object.create(null));
+	var set = cache[name];
+	if (!set) {
+		set = Object.create(null);
+		var src = vm.sources[name];
+		if (src) {
+			if (!src.parsed) src.parsed = JVM.parseClassFile(src.bytes);
+			src.parsed.fields.forEach(function (f) { set[f.name] = true; });
+		} else if (vm.classes[name] && vm.classes[name].cf && vm.classes[name].cf.origFields) {
+			vm.classes[name].cf.origFields.forEach(function (f) { set[f] = true; });
+		} else return false;
+		cache[name] = set;
+	}
+	return !!set[field];
 }
 
 function parentsOf(vm, name) {
@@ -3729,7 +4186,10 @@ function installMc152(vm) {
 	def('ItemBlock', { super: SRC + 'Item', methods: {
 		'<init>(I)V': function (vm, self, a) { self.$blockItem = true; initItem(vm, self, a[0] + 256); self[':blockID'] = a[0] + 256; },
 		'getBlockID()I': function (vm, self) { return self[':blockID']; },
+		'getUnlocalizedName()Ljava/lang/String;': function (vm, self) { var b = blockById(vm, self[':blockID']); return b ? vm.callVirtual(b, 'getUnlocalizedName', '()Ljava/lang/String;', []) : 'tile.null'; },
+		'getUnlocalizedName(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;': function (vm, self) { var b = blockById(vm, self[':blockID']); return b ? vm.callVirtual(b, 'getUnlocalizedName', '()Ljava/lang/String;', []) : 'tile.null'; },
 	} });
+	function blockById(vm, id) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); return c.statics.blocksList.a[id] || null; }
 	def('ItemFood', { super: SRC + 'Item', methods: {
 		'<init>(IIFZ)V': function (vm, self, a) { initItem(vm, self, 256 + a[0]); self.$food = [a[1], a[2]]; self[':healAmount'] = a[1]; self[':saturationModifier'] = a[2]; self[':isWolfsFavoriteMeat'] = a[3]; },
 		'<init>(IIZ)V': function (vm, self, a) { initItem(vm, self, 256 + a[0]); self.$food = [a[1], 0.6]; self[':healAmount'] = a[1]; self[':saturationModifier'] = 0.6; self[':isWolfsFavoriteMeat'] = a[2]; },
@@ -3782,8 +4242,66 @@ function installMc152(vm) {
 	function itemById(vm, id) { var c = vm.loadClass(SRC + 'Item'); vm.initClass(c); return c.statics.itemsList.a[id] || null; }
 	function newStack(vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); stackInit(vm, s, id, n, d); return s; }
 
+	var tr = function (vm, k) { var v = reg(vm).lang[k]; return v != null ? v : k; };
+	def('StringTranslate', { methods: {
+		'getCurrentLanguage()Ljava/lang/String;': function () { return 'en_US'; },
+		'translateKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { return tr(vm, a[0]); },
+		'translateNamedKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { return tr(vm, a[0] + '.name'); },
+		'translateKeyFormat(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { return vm.callStatic('java/lang/String', 'format', '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;', [tr(vm, a[0]), a[1]]); },
+		'isUnicode()Z': function () { return 0; },
+		'getLanguageList()Ljava/util/TreeMap;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/TreeMap')); vm.callVirtual(m, '<init>', '()V', []); vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', ['en_US', 'English (US)']); return m; },
+		'setLanguage(Ljava/lang/String;Z)V': function () {},
+	}, staticMethods: {
+		'getInstance()Lnet/minecraft/src/StringTranslate;': function (vm) { return vm.mcTranslate || (vm.mcTranslate = vm.newObject(vm.loadClass(SRC + 'StringTranslate'))); },
+		'isBidirectional(Ljava/lang/String;)Z': function () { return 0; },
+	} });
+	def('StatCollector', { staticMethods: {
+		'translateToLocal(Ljava/lang/String;)Ljava/lang/String;': function (vm, n, a) { return tr(vm, a[0]); },
+		'translateToLocalFormatted(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;': function (vm, n, a) { return vm.callStatic('java/lang/String', 'format', '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;', [tr(vm, a[0]), a[1]]); },
+		'isTranslationKeyAvailable(Ljava/lang/String;)Z': function (vm, n, a) { return reg(vm).lang[a[0]] != null ? 1 : 0; },
+	} });
+
+	var intArr = function (vm, v) { var r = vm.newArray('I', v.length); v.forEach(function (x, i) { r.a[i] = x; }); return r; };
+	def('Facing', { statics: { oppositeSide: null, offsetsXForSide: null, offsetsYForSide: null, offsetsZForSide: null, facings: null }, clinit: function (vm, c) {
+		c.statics.oppositeSide = intArr(vm, [1, 0, 3, 2, 5, 4]);
+		c.statics.offsetsXForSide = intArr(vm, [0, 0, 0, 0, -1, 1]);
+		c.statics.offsetsYForSide = intArr(vm, [-1, 1, 0, 0, 0, 0]);
+		c.statics.offsetsZForSide = intArr(vm, [0, 0, -1, 1, 0, 0]);
+		c.statics.facings = JVM.javaArray(vm, 'Ljava/lang/String;', ['DOWN', 'UP', 'NORTH', 'SOUTH', 'WEST', 'EAST']);
+	} });
+	def('BlockPistonBase', { super: SRC + 'Block', methods: {
+		'<init>(IZ)V': function (vm, self, a) {
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc);
+			initBlock(vm, self, a[0], mc.statics.piston);
+			self[':isSticky'] = a[1];
+			self[':stepSound'] = bc.statics.soundStoneFootstep;
+			self[':blockHardness'] = 0.5; self[':blockResistance'] = 2.5;
+			var tc = vm.loadClass(SRC + 'CreativeTabs'); vm.initClass(tc); self.$tab = tc.statics.tabRedstone;
+		},
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+		'getRenderType()I': function () { return 16; },
+	}, staticMethods: {
+		'getOrientation(I)I': function (vm, n, a) { return a[0] & 7; },
+		'isExtended(I)Z': function (vm, n, a) { return (a[0] & 8) !== 0 ? 1 : 0; },
+		'determineOrientation(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;)I': function (vm, n, a) {
+			var e = a[4];
+			if (Math.abs(e[':posX'] - a[1]) < 2 && Math.abs(e[':posZ'] - a[3]) < 2) {
+				var d = e[':posY'] + 1.82 - (e[':yOffset'] || 0);
+				if (d - a[2] > 2) return 1;
+				if (a[2] - d > 0) return 0;
+			}
+			var l = Math.floor(Math.fround(e[':rotationYaw'] * 4 / 360) + 0.5) & 3;
+			return l === 0 ? 2 : l === 1 ? 5 : l === 2 ? 3 : l === 3 ? 4 : 0;
+		},
+	} });
+
 	installWorld(vm, def);
 	installWorldGen(vm, def);
+	if (JVM.installModels) JVM.installModels(vm);
+	if (JVM.installServer) JVM.installServer(vm);
+	if (JVM.installForge) JVM.installForge(vm);
 }
 
 var SIN_TABLE = null;
@@ -3894,6 +4412,7 @@ function worldObj(vm) {
 		pv[':worldObj'] = w2;
 		w2[':provider'] = pv;
 	}
+	if (JVM.mc152.onWorld) JVM.mc152.onWorld(vm, w2);
 	return vm.mcWorld;
 }
 function playerObj(vm, info) {
@@ -3911,6 +4430,7 @@ function playerObj(vm, info) {
 	p[':capabilities'][':isCreativeMode'] = i.creative ? 1 : 0;
 	p[':capabilities'][':allowFlying'] = i.creative ? 1 : 0;
 	p[':capabilities'][':isFlying'] = i.flying ? 1 : 0;
+	if (JVM.mc152.onPlayer) JVM.mc152.onPlayer(vm, p);
 	return p;
 }
 function heldStack(vm) {
@@ -4053,6 +4573,14 @@ JVM.collectContent = function (vm, modId) {
 	var safe = function (fn, dflt) { var res = JVM.run(vm, fn); return res.ok ? res.value : dflt; };
 	var langOf = function (o) {
 		var k = safe(function () { return vm.callVirtual(o, 'getUnlocalizedName', '()Ljava/lang/String;', []); }, null);
+		var isBlock = vm.isInstance(o, bc);
+		var holder = isBlock ? o.$itemBlock : o;
+		var shown = null;
+		if (holder) {
+			var st = JVM.mc152.newStack(vm, isBlock ? o[':blockID'] : o[':itemID'], 1, 0);
+			shown = safe(function () { return vm.callVirtual(holder, 'getItemDisplayName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [st]); }, null);
+		} else if (isBlock) shown = safe(function () { return vm.callVirtual(o, 'getLocalizedName', '()Ljava/lang/String;', []); }, null);
+		if (shown && typeof shown === 'string' && !/^(tile|item)\.[^ ]*$/.test(shown.trim())) return shown.trim();
 		return k ? (r.lang[k + '.name'] || null) : null;
 	};
 	var overrides = function (o, keys) { return keys.some(function (k) { var m = o.cls.findMethod(k); return m && !m.cls.native; }); };
@@ -4090,6 +4618,7 @@ JVM.collectContent = function (vm, modId) {
 		json.hardness = b[':blockHardness'];
 		var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
 		json.tool = TOOL_OF[mat] || 'none';
+		if (b.$harvest && /^(pickaxe|axe|shovel|none)$/.test(b.$harvest.tool)) json.tool = b.$harvest.tool;
 		var snd = b[':stepSound'] && b[':stepSound'].$name;
 		if (SOUND_OF[snd]) json.sound = SOUND_OF[snd];
 		if (b.$light) json.light = b.$light;
@@ -4124,6 +4653,8 @@ JVM.collectContent = function (vm, modId) {
 	});
 	var stackRef = function (o) {
 		if (!o) return null;
+		if (typeof o === 'string') { var ore = JVM.forgeOre && JVM.forgeOre(vm, o); return ore ? stackRef(ore) : null; }
+		if (o instanceof JVM.JArray) return o.a.length ? stackRef(o.a[0]) : null;
 		if (vm.isInstance(o, vm.loadClass(SRC + 'ItemStack'))) return ref(o[':itemID'], o[':itemDamage'] === -1 || o[':itemDamage'] === 32767 ? 0 : o[':itemDamage']);
 		if (vm.isInstance(o, vm.loadClass(SRC + 'Block'))) return ref(o[':blockID'], 0);
 		if (vm.isInstance(o, vm.loadClass(SRC + 'Item'))) return ref(o[':itemID'], 0);
@@ -4135,7 +4666,8 @@ JVM.collectContent = function (vm, modId) {
 		if (!res) return;
 		if (rc.shaped) {
 			var rows = [], key = {}, args = rc.args, i = 0;
-			if (args[0] instanceof JVM.JArray) { rows = Array.prototype.slice.call(args[0].a); i = 1; }
+			if (args[0] && args[0].$box !== undefined && args[0].cls.name === 'java/lang/Boolean') i = 1;
+			if (args[i] instanceof JVM.JArray) { rows = Array.prototype.slice.call(args[i].a); i++; }
 			else while (typeof args[i] === 'string') rows.push(args[i++]);
 			for (; i + 1 < args.length; i += 2) {
 				var ch = args[i] && args[i].$box !== undefined ? String.fromCharCode(args[i].$box) : String(args[i]);
@@ -4159,6 +4691,1671 @@ JVM.collectContent = function (vm, modId) {
 
 JVM.installMc152 = installMc152;
 JVM.mc152 = { worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function list(vm, arr) { return JVM.newList(vm, arr || []); }
+function listAdd(vm, l, v) { vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [v]); }
+function listArr(vm, l) { if (!l) return []; var a = vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []); return a ? Array.prototype.slice.call(a.a) : []; }
+
+function initRenderer(vm, self, base, name, u, v) {
+	self[':baseModel'] = base;
+	self[':boxName'] = name;
+	self[':textureWidth'] = base ? base[':textureWidth'] : 64;
+	self[':textureHeight'] = base ? base[':textureHeight'] : 32;
+	self[':textureOffsetX'] = u | 0; self[':textureOffsetY'] = v | 0;
+	self[':showModel'] = 1; self[':isHidden'] = 0; self[':mirror'] = 0;
+	self[':rotationPointX'] = 0; self[':rotationPointY'] = 0; self[':rotationPointZ'] = 0;
+	self[':rotateAngleX'] = 0; self[':rotateAngleY'] = 0; self[':rotateAngleZ'] = 0;
+	self[':offsetX'] = 0; self[':offsetY'] = 0; self[':offsetZ'] = 0;
+	self[':cubeList'] = list(vm, []);
+	self[':childModels'] = null;
+	self.$boxes = [];
+	if (base && base[':boxList']) listAdd(vm, base[':boxList'], self);
+}
+function addBox(vm, self, x, y, z, w, h, d, inflate, u, v, name) {
+	var b = { x: x, y: y, z: z, w: w | 0, h: h | 0, d: d | 0, inflate: inflate || 0,
+		u: u == null ? self[':textureOffsetX'] : u, v: v == null ? self[':textureOffsetY'] : v, mirror: !!self[':mirror'], name: name || null };
+	self.$boxes.push(b);
+	var box = vm.newObject(vm.loadClass(SRC + 'ModelBox'));
+	box.$box = b;
+	box[':posX1'] = x; box[':posY1'] = y; box[':posZ1'] = z;
+	box[':posX2'] = x + w; box[':posY2'] = y + h; box[':posZ2'] = z + d;
+	box[':field_78247_g'] = name;
+	listAdd(vm, self[':cubeList'], box);
+	return self;
+}
+
+function installModels(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var MB = 'Lnet/minecraft/src/ModelBase;', MR = 'Lnet/minecraft/src/ModelRenderer;';
+	def('ModelBase', { methods: {
+		'<init>()V': function (vm, self) { modelInit(vm, self); },
+		'render(Lnet/minecraft/src/Entity;FFFFFF)V': function () {},
+		'setRotationAngles(FFFFFFLnet/minecraft/src/Entity;)V': function () {},
+		'setLivingAnimations(Lnet/minecraft/src/EntityLiving;FFF)V': function () {},
+		'getRandomModelBox(Ljava/util/Random;)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { var l = listArr(vm, self[':boxList']); return l.length ? l[vm.callVirtual(a[0], 'nextInt', '(I)I', [l.length])] : null; },
+		'setTextureOffset(Ljava/lang/String;II)V': function (vm, self, a) { (self.$texOffsets || (self.$texOffsets = {}))[a[0]] = [a[1], a[2]]; },
+		'getTextureOffset(Ljava/lang/String;)Lnet/minecraft/src/TextureOffset;': function (vm, self, a) {
+			var t = self.$texOffsets && self.$texOffsets[a[0]];
+			if (!t) return null;
+			var o = vm.newObject(vm.loadClass(SRC + 'TextureOffset')); o[':textureOffsetX'] = t[0]; o[':textureOffsetY'] = t[1];
+			return o;
+		},
+	}, anyInit: function (vm, self) { modelInit(vm, self); } });
+	function modelInit(vm, self) {
+		if (self.$model) return;
+		self.$model = true;
+		self[':boxList'] = list(vm, []);
+		self[':textureWidth'] = 64; self[':textureHeight'] = 32;
+		self[':onGround'] = 0; self[':isRiding'] = 0; self[':isChild'] = 1;
+		if (self.$vanilla) buildVanilla(vm, self, self.$vanilla.m, self.$vanilla.desc, self.$vanilla.args);
+	}
+	def('TextureOffset', { methods: { '<init>(II)V': function (vm, self, a) { self[':textureOffsetX'] = a[0]; self[':textureOffsetY'] = a[1]; } } });
+	def('ModelRenderer', { methods: {
+		'<init>(Lnet/minecraft/src/ModelBase;Ljava/lang/String;)V': function (vm, self, a) { initRenderer(vm, self, a[0], a[1], 0, 0); },
+		'<init>(Lnet/minecraft/src/ModelBase;)V': function (vm, self, a) { initRenderer(vm, self, a[0], null, 0, 0); },
+		'<init>(Lnet/minecraft/src/ModelBase;II)V': function (vm, self, a) { initRenderer(vm, self, a[0], null, a[1], a[2]); },
+		'addChild(Lnet/minecraft/src/ModelRenderer;)V': function (vm, self, a) { if (!self[':childModels']) self[':childModels'] = list(vm, []); listAdd(vm, self[':childModels'], a[0]); },
+		'setTextureOffset(II)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { self[':textureOffsetX'] = a[0]; self[':textureOffsetY'] = a[1]; return self; },
+		'addBox(Ljava/lang/String;FFFIII)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) {
+			var name = self[':boxName'] + '.' + a[0];
+			var t = self[':baseModel'] && self[':baseModel'].$texOffsets && self[':baseModel'].$texOffsets[name];
+			if (t) { self[':textureOffsetX'] = t[0]; self[':textureOffsetY'] = t[1]; }
+			return addBox(vm, self, a[1], a[2], a[3], a[4], a[5], a[6], 0, null, null, name);
+		},
+		'addBox(FFFIII)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { return addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], 0); },
+		'addBox(FFFIIIF)V': function (vm, self, a) { addBox(vm, self, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'setRotationPoint(FFF)V': function (vm, self, a) { self[':rotationPointX'] = a[0]; self[':rotationPointY'] = a[1]; self[':rotationPointZ'] = a[2]; },
+		'setTextureSize(II)Lnet/minecraft/src/ModelRenderer;': function (vm, self, a) { self[':textureWidth'] = a[0]; self[':textureHeight'] = a[1]; return self; },
+		'render(F)V': function () {}, 'renderWithRotation(F)V': function () {}, 'postRender(F)V': function () {},
+	} });
+	def('ModelBox', { methods: {
+		'<init>(Lnet/minecraft/src/ModelRenderer;IIFFFIIIF)V': function (vm, self, a) {
+			self.$box = { x: a[3], y: a[4], z: a[5], w: a[6], h: a[7], d: a[8], inflate: a[9], u: a[1], v: a[2], mirror: !!(a[0] && a[0][':mirror']) };
+			self[':posX1'] = a[3]; self[':posY1'] = a[4]; self[':posZ1'] = a[5];
+			self[':posX2'] = a[3] + a[6]; self[':posY2'] = a[4] + a[7]; self[':posZ2'] = a[5] + a[8];
+			if (a[0]) a[0].$boxes.push(self.$box);
+		},
+		'render(Lnet/minecraft/src/Tessellator;F)V': function () {},
+	} });
+	Object.keys(JVM.vanillaModels || {}).forEach(function (n) {
+		var vmod = JVM.vanillaModels[n], m = {};
+		Object.keys(vmod.ctors).forEach(function (d) {
+			m['<init>' + d] = function (vm, self, a) {
+				self.$model = false;
+				self.$vanilla = { m: vmod, desc: d, args: a };
+				modelInit(vm, self);
+			};
+		});
+		def(n, { super: SRC + (vmod.super || 'ModelBase'), methods: m });
+	});
+}
+
+function buildVanilla(vm, self, vmod, desc, args) {
+	var c = vmod.ctors[desc];
+	if (!c) return;
+	var rec = JSON.parse(JSON.stringify(c.base));
+	(c.d || []).forEach(function (dl) {
+		var path = dl[0].split('.'), o = rec;
+		for (var i = 0; i < path.length - 1; i++) o = o[path[i]];
+		var v = args[dl[1]];
+		o[path[path.length - 1]] += dl[2] * (typeof v === 'number' ? v : v ? 1 : 0);
+	});
+	vmod = rec;
+	self[':textureWidth'] = vmod.tw; self[':textureHeight'] = vmod.th;
+	Object.keys(vmod.extra || {}).forEach(function (k) { self[':' + k] = vmod.extra[k]; });
+	var made = {};
+	var make = function (name) {
+		if (made[name]) return made[name];
+		var p = vmod.parts[name];
+		var r = vm.newObject(vm.loadClass(SRC + 'ModelRenderer'));
+		initRenderer(vm, r, self, p.boxName || null, p.tex[0], p.tex[1]);
+		r[':textureWidth'] = p.ts ? p.ts[0] : vmod.tw; r[':textureHeight'] = p.ts ? p.ts[1] : vmod.th;
+		r[':rotationPointX'] = p.pivot[0]; r[':rotationPointY'] = p.pivot[1]; r[':rotationPointZ'] = p.pivot[2];
+		if (p.rot) { r[':rotateAngleX'] = p.rot[0]; r[':rotateAngleY'] = p.rot[1]; r[':rotateAngleZ'] = p.rot[2]; }
+		if (p.off) { r[':offsetX'] = p.off[0]; r[':offsetY'] = p.off[1]; r[':offsetZ'] = p.off[2]; }
+		if (p.hidden) r[':showModel'] = 0;
+		p.boxes.forEach(function (b) {
+			r[':mirror'] = b[8] ? 1 : 0;
+			addBox(vm, r, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7][0], b[7][1]);
+		});
+		r[':mirror'] = p.mirror ? 1 : 0;
+		made[name] = r;
+		(p.children || []).forEach(function (c) {
+			var ch = make(c);
+			if (!r[':childModels']) r[':childModels'] = list(vm, []);
+			listAdd(vm, r[':childModels'], ch);
+		});
+		return r;
+	};
+	var arrays = {};
+	Object.keys(vmod.parts).forEach(function (name) {
+		var r = make(name), p = vmod.parts[name];
+		if (p.field) self[':' + p.field] = r;
+		else if (p.arrayField) {
+			var arr = arrays[p.arrayField] || (arrays[p.arrayField] = vm.newArray('Lnet/minecraft/src/ModelRenderer;', p.length));
+			arr.a[p.index] = r;
+		}
+	});
+	Object.keys(arrays).forEach(function (k) { self[':' + k] = arrays[k]; });
+}
+
+JVM.modelData = function (vm, model) {
+	if (!model) return null;
+	var seen = new Set(), childSet = new Set();
+	var all = listArr(vm, model[':boxList']);
+	all.forEach(function (r) { listArr(vm, r[':childModels']).forEach(function (c) { childSet.add(c); }); });
+	var part = function (r) {
+		seen.add(r);
+		return {
+			name: r[':boxName'] || null,
+			pivot: [r[':rotationPointX'], r[':rotationPointY'], r[':rotationPointZ']],
+			rot: [r[':rotateAngleX'], r[':rotateAngleY'], r[':rotateAngleZ']],
+			hidden: !r[':showModel'] || !!r[':isHidden'],
+			tex: [r[':textureWidth'], r[':textureHeight']],
+			boxes: r.$boxes.map(function (b) { return { from: [b.x, b.y, b.z], size: [b.w, b.h, b.d], inflate: b.inflate, uv: [b.u, b.v], mirror: b.mirror }; }),
+			children: listArr(vm, r[':childModels']).map(part),
+		};
+	};
+	return { tw: model[':textureWidth'], th: model[':textureHeight'], parts: all.filter(function (r) { return !childSet.has(r); }).map(part) };
+};
+
+JVM.installModels = installModels;
+})();
+
+JVM.vanillaModels = {"ModelBat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"batHead":{"field":"batHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]],"children":["part0","part1"]},"batBody":{"field":"batBody","tex":[0,34],"pivot":[0,0,0],"boxes":[[-3,4,-3,6,12,6,0,[0,16],0],[-5,16,0,10,6,1,0,[0,34],0]],"children":["batRightWing","batLeftWing"]},"batRightWing":{"field":"batRightWing","tex":[42,0],"pivot":[0,0,0],"boxes":[[-12,1,1.5,10,16,1,0,[42,0],0]],"children":["batOuterRightWing"]},"batLeftWing":{"field":"batLeftWing","tex":[42,0],"pivot":[0,0,0],"mirror":1,"boxes":[[2,1,1.5,10,16,1,0,[42,0],1]],"children":["batOuterLeftWing"]},"batOuterRightWing":{"field":"batOuterRightWing","tex":[24,16],"pivot":[-12,1,1.5],"boxes":[[-8,1,0,8,12,1,0,[24,16],0]]},"batOuterLeftWing":{"field":"batOuterLeftWing","tex":[24,16],"pivot":[12,1,1.5],"mirror":1,"boxes":[[0,1,0,8,12,1,0,[24,16],1]]},"part0":{"tex":[24,0],"pivot":[0,0,0],"boxes":[[-4,-6,-2,3,4,1,0,[24,0],0]]},"part1":{"tex":[24,0],"pivot":[0,0,0],"mirror":1,"boxes":[[1,-6,-2,3,4,1,0,[24,0],1]]}}}}}},"ModelBiped":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedHead.pivot.1",1,1],["parts.bipedHeadwear.pivot.1",1,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["parts.bipedRightLeg.pivot.1",1,1],["parts.bipedLeftLeg.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]}}},"ModelBlaze":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"blazeSticks[0]":{"arrayField":"blazeSticks","index":0,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[1]":{"arrayField":"blazeSticks","index":1,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[2]":{"arrayField":"blazeSticks","index":2,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[3]":{"arrayField":"blazeSticks","index":3,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[4]":{"arrayField":"blazeSticks","index":4,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[5]":{"arrayField":"blazeSticks","index":5,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[6]":{"arrayField":"blazeSticks","index":6,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[7]":{"arrayField":"blazeSticks","index":7,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[8]":{"arrayField":"blazeSticks","index":8,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[9]":{"arrayField":"blazeSticks","index":9,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[10]":{"arrayField":"blazeSticks","index":10,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeSticks[11]":{"arrayField":"blazeSticks","index":11,"length":12,"tex":[0,16],"pivot":[0,0,0],"boxes":[[0,0,0,2,8,2,0,[0,16],0]]},"blazeHead":{"field":"blazeHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelBoat":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"boatSides[0]":{"arrayField":"boatSides","index":0,"length":5,"tex":[0,8],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-12,-8,-3,24,16,4,0,[0,8],0]]},"boatSides[1]":{"arrayField":"boatSides","index":1,"length":5,"tex":[0,0],"pivot":[-11,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[2]":{"arrayField":"boatSides","index":2,"length":5,"tex":[0,0],"pivot":[11,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[3]":{"arrayField":"boatSides","index":3,"length":5,"tex":[0,0],"pivot":[0,4,-9],"rot":[0,3.1415927410125732,0],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]},"boatSides[4]":{"arrayField":"boatSides","index":4,"length":5,"tex":[0,0],"pivot":[0,4,9],"boxes":[[-10,-7,-1,20,6,2,0,[0,0],0]]}}}}}},"ModelBook":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"coverRight":{"field":"coverRight","tex":[0,0],"pivot":[0,0,-1],"boxes":[[-6,-5,0,6,10,0,0,[0,0],0]]},"coverLeft":{"field":"coverLeft","tex":[16,0],"pivot":[0,0,1],"boxes":[[0,-5,0,6,10,0,0,[16,0],0]]},"pagesRight":{"field":"pagesRight","tex":[0,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.9900000095367432,5,8,1,0,[0,10],0]]},"pagesLeft":{"field":"pagesLeft","tex":[12,10],"pivot":[0,0,0],"boxes":[[0,-4,-0.009999999776482582,5,8,1,0,[12,10],0]]},"flippingPageRight":{"field":"flippingPageRight","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"flippingPageLeft":{"field":"flippingPageLeft","tex":[24,10],"pivot":[0,0,0],"boxes":[[0,-4,0,5,8,0,0,[24,10],0]]},"bookSpine":{"field":"bookSpine","tex":[12,0],"pivot":[0,0,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,-5,0,2,10,0,0,[12,0],0]]}}}}}},"ModelChest":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]}}}}}},"ModelChicken":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,15,-4],"boxes":[[-2,-6,-2,4,6,3,0,[0,0],0]]},"body":{"field":"body","tex":[0,9],"pivot":[0,16,0],"boxes":[[-3,-4,-3,6,8,6,0,[0,9],0]]},"rightLeg":{"field":"rightLeg","tex":[26,0],"pivot":[-2,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"leftLeg":{"field":"leftLeg","tex":[26,0],"pivot":[1,19,1],"boxes":[[-1,0,-3,3,5,3,0,[26,0],0]]},"rightWing":{"field":"rightWing","tex":[24,13],"pivot":[-4,13,0],"boxes":[[0,0,-3,1,4,6,0,[24,13],0]]},"leftWing":{"field":"leftWing","tex":[24,13],"pivot":[4,13,0],"boxes":[[-1,0,-3,1,4,6,0,[24,13],0]]},"bill":{"field":"bill","tex":[14,0],"pivot":[0,15,-4],"boxes":[[-2,-4,-4,4,2,2,0,[14,0],0]]},"chin":{"field":"chin","tex":[14,4],"pivot":[0,15,-4],"boxes":[[-1,-2,-3,2,2,2,0,[14,4],0]]}}}}}},"ModelCow":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[22,0],"pivot":[0,4,-8],"boxes":[[-4,-4,-6,8,8,6,0,[0,0],0],[-5,-5,-4,1,3,1,0,[22,0],0],[4,-5,-4,1,3,1,0,[22,0],0]]},"body":{"field":"body","tex":[52,0],"pivot":[0,5,2],"boxes":[[-6,-10,-7,12,18,10,0,[18,4],0],[-2,2,-8,4,6,1,0,[52,0],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[4,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[4,12,-6],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":6}}}}},"ModelCreeper":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"field_78133_b":{"field":"field_78133_b","tex":[32,0],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"body":{"field":"body","tex":[16,16],"pivot":[0,4,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[2,16,4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[2,16,-4],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}}},"d":[["parts.head.boxes.0.6",0,1],["parts.field_78133_b.boxes.0.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}}},"ModelDragon":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":256,"th":256,"parts":{"head":{"field":"head","boxName":"head","tex":[112,0],"pivot":[0,0,0],"boxes":[[-6,-1,-24,12,5,16,0,[176,44],0],[-8,-8,-10,16,16,16,0,[112,30],0],[-5,-12,-4,2,4,6,0,[0,0],1],[-5,-3,-22,2,2,4,0,[112,0],1],[3,-12,-4,2,4,6,0,[0,0],0],[3,-3,-22,2,2,4,0,[112,0],0]],"children":["jaw"]},"neck":{"field":"neck","boxName":"neck","tex":[48,0],"pivot":[0,0,0],"boxes":[[-5,-5,-5,10,10,10,0,[192,104],0],[-1,-9,-3,2,4,6,0,[48,0],0]]},"jaw":{"field":"jaw","boxName":"jaw","tex":[176,65],"pivot":[0,4,-8],"boxes":[[-6,0,-16,12,4,16,0,[176,65],0]]},"body":{"field":"body","boxName":"body","tex":[220,53],"pivot":[0,4,8],"boxes":[[-12,0,-16,24,24,64,0,[0,0],0],[-1,-6,-10,2,6,12,0,[220,53],0],[-1,-6,10,2,6,12,0,[220,53],0],[-1,-6,30,2,6,12,0,[220,53],0]]},"rearLeg":{"field":"rearLeg","boxName":"rearleg","tex":[0,0],"pivot":[-16,16,42],"boxes":[[-8,-4,-8,16,32,16,0,[0,0],0]],"children":["rearLegTip"]},"frontLeg":{"field":"frontLeg","boxName":"frontleg","tex":[112,104],"pivot":[-12,20,2],"boxes":[[-4,-4,-4,8,24,8,0,[112,104],0]],"children":["frontLegTip"]},"rearLegTip":{"field":"rearLegTip","boxName":"rearlegtip","tex":[196,0],"pivot":[0,32,-4],"boxes":[[-6,-2,0,12,32,12,0,[196,0],0]],"children":["rearFoot"]},"frontLegTip":{"field":"frontLegTip","boxName":"frontlegtip","tex":[226,138],"pivot":[0,20,-1],"boxes":[[-3,-1,-3,6,24,6,0,[226,138],0]],"children":["frontFoot"]},"rearFoot":{"field":"rearFoot","boxName":"rearfoot","tex":[112,0],"pivot":[0,31,4],"boxes":[[-9,0,-20,18,6,24,0,[112,0],0]]},"frontFoot":{"field":"frontFoot","boxName":"frontfoot","tex":[144,104],"pivot":[0,23,0],"boxes":[[-4,0,-12,8,4,16,0,[144,104],0]]},"wing":{"field":"wing","boxName":"wing","tex":[-56,88],"pivot":[-12,5,2],"boxes":[[-56,-4,-4,56,8,8,0,[112,88],0],[-56,0,2,56,0,56,0,[-56,88],0]],"children":["wingTip"]},"wingTip":{"field":"wingTip","boxName":"wingtip","tex":[-56,144],"pivot":[-56,0,0],"boxes":[[-56,-2,-2,56,4,4,0,[112,136],0],[-56,0,2,56,0,56,0,[-56,144],0]]}}}}}},"ModelEnderCrystal":{"super":"ModelBase","ctors":{"(FZ)V":{"base":{"tw":64,"th":32,"parts":{"cube":{"field":"cube","boxName":"cube","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[32,0],0]]},"glass":{"field":"glass","boxName":"glass","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelEnderman":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[0,16],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,16],0]]},"bipedBody":{"field":"bipedBody","tex":[32,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[32,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[56,0],"pivot":[-3,-12,0],"boxes":[[-1,-2,-1,2,30,2,0,[56,0],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[56,0],"pivot":[5,-12,0],"mirror":1,"boxes":[[-1,-2,-1,2,30,2,0,[56,0],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[56,0],"pivot":[-2,-2,0],"boxes":[[-1,0,-1,2,30,2,0,[56,0],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[56,0],"pivot":[2,-2,0],"mirror":1,"boxes":[[-1,0,-1,2,30,2,0,[56,0],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[32,0],"pivot":[0,-14,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"part1":{"tex":[16,16],"pivot":[0,-14,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"part2":{"tex":[40,16],"pivot":[-5,-12,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part3":{"tex":[40,16],"pivot":[5,-12,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part4":{"tex":[0,16],"pivot":[-1.899999976158142,-2,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[1.899999976158142,-2,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}}}},"ModelGhast":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,0],"pivot":[0,8,0],"boxes":[[-8,-8,-8,16,16,16,0,[0,0],0]]},"tentacles[0]":{"arrayField":"tentacles","index":0,"length":9,"tex":[0,0],"pivot":[-3.75,15,-5],"boxes":[[-1,0,-1,2,8,2,0,[0,0],0]]},"tentacles[1]":{"arrayField":"tentacles","index":1,"length":9,"tex":[0,0],"pivot":[1.25,15,-5],"boxes":[[-1,0,-1,2,13,2,0,[0,0],0]]},"tentacles[2]":{"arrayField":"tentacles","index":2,"length":9,"tex":[0,0],"pivot":[6.25,15,-5],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[3]":{"arrayField":"tentacles","index":3,"length":9,"tex":[0,0],"pivot":[-6.25,15,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[4]":{"arrayField":"tentacles","index":4,"length":9,"tex":[0,0],"pivot":[-1.25,15,0],"boxes":[[-1,0,-1,2,11,2,0,[0,0],0]]},"tentacles[5]":{"arrayField":"tentacles","index":5,"length":9,"tex":[0,0],"pivot":[3.75,15,0],"boxes":[[-1,0,-1,2,10,2,0,[0,0],0]]},"tentacles[6]":{"arrayField":"tentacles","index":6,"length":9,"tex":[0,0],"pivot":[-3.75,15,5],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]},"tentacles[7]":{"arrayField":"tentacles","index":7,"length":9,"tex":[0,0],"pivot":[1.25,15,5],"boxes":[[-1,0,-1,2,9,2,0,[0,0],0]]},"tentacles[8]":{"arrayField":"tentacles","index":8,"length":9,"tex":[0,0],"pivot":[6.25,15,5],"boxes":[[-1,0,-1,2,12,2,0,[0,0],0]]}}}}}},"ModelIronGolem":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,-7,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,11,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,11,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1]]},"(FF)V":{"base":{"tw":64,"th":32,"parts":{"ironGolemHead":{"field":"ironGolemHead","tex":[24,0],"ts":[128,128],"pivot":[0,0,-2],"boxes":[[-4,-12,-5.5,8,10,8,0,[0,0],0],[-1,-5,-7.5,2,4,2,0,[24,0],0]]},"ironGolemBody":{"field":"ironGolemBody","tex":[0,70],"ts":[128,128],"pivot":[0,0,0],"boxes":[[-9,-2,-6,18,12,11,0,[0,40],0],[-4.5,10,-3,9,5,6,0.5,[0,70],0]]},"ironGolemRightArm":{"field":"ironGolemRightArm","tex":[60,21],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[-13,-2.5,-3,4,30,6,0,[60,21],0]]},"ironGolemLeftArm":{"field":"ironGolemLeftArm","tex":[60,58],"ts":[128,128],"pivot":[0,-7,0],"boxes":[[9,-2.5,-3,4,30,6,0,[60,58],0]]},"ironGolemLeftLeg":{"field":"ironGolemLeftLeg","tex":[37,0],"ts":[128,128],"pivot":[-4,18,0],"boxes":[[-3.5,-3,-3,6,16,5,0,[37,0],0]]},"ironGolemRightLeg":{"field":"ironGolemRightLeg","tex":[60,0],"ts":[128,128],"pivot":[5,18,0],"mirror":1,"boxes":[[-3.5,-3,-3,6,16,5,0,[60,0],1]]}}},"d":[["parts.ironGolemHead.boxes.0.6",0,1],["parts.ironGolemHead.boxes.1.6",0,1],["parts.ironGolemBody.boxes.0.6",0,1],["parts.ironGolemBody.boxes.1.6",0,1],["parts.ironGolemRightArm.boxes.0.6",0,1],["parts.ironGolemLeftArm.boxes.0.6",0,1],["parts.ironGolemLeftLeg.boxes.0.6",0,1],["parts.ironGolemRightLeg.boxes.0.6",0,1],["parts.ironGolemHead.pivot.1",1,1],["parts.ironGolemBody.pivot.1",1,1],["parts.ironGolemLeftLeg.pivot.1",1,1],["parts.ironGolemRightLeg.pivot.1",1,1]]}}},"ModelLargeChest":{"super":"ModelChest","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"chestLid":{"field":"chestLid","tex":[0,0],"ts":[128,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,30,5,14,0,[0,0],0]]},"chestBelow":{"field":"chestBelow","tex":[0,19],"ts":[128,64],"pivot":[1,6,1],"boxes":[[0,0,0,30,10,14,0,[0,19],0]]},"chestKnob":{"field":"chestKnob","tex":[0,0],"ts":[128,64],"pivot":[16,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part0":{"tex":[0,0],"ts":[64,64],"pivot":[1,7,15],"boxes":[[0,-5,-14,14,5,14,0,[0,0],0]]},"part1":{"tex":[0,0],"ts":[64,64],"pivot":[8,7,15],"boxes":[[-1,-2,-15,2,4,1,0,[0,0],0]]},"part2":{"tex":[0,19],"ts":[64,64],"pivot":[1,6,1],"boxes":[[0,0,0,14,10,14,0,[0,19],0]]}}}}}},"ModelMagmaCube":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"field_78109_a[0]":{"arrayField":"field_78109_a","index":0,"length":8,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,1,8,0,[0,0],0]]},"field_78109_a[1]":{"arrayField":"field_78109_a","index":1,"length":8,"tex":[0,1],"pivot":[0,0,0],"boxes":[[-4,17,-4,8,1,8,0,[0,1],0]]},"field_78109_a[2]":{"arrayField":"field_78109_a","index":2,"length":8,"tex":[24,10],"pivot":[0,0,0],"boxes":[[-4,18,-4,8,1,8,0,[24,10],0]]},"field_78109_a[3]":{"arrayField":"field_78109_a","index":3,"length":8,"tex":[24,19],"pivot":[0,0,0],"boxes":[[-4,19,-4,8,1,8,0,[24,19],0]]},"field_78109_a[4]":{"arrayField":"field_78109_a","index":4,"length":8,"tex":[0,4],"pivot":[0,0,0],"boxes":[[-4,20,-4,8,1,8,0,[0,4],0]]},"field_78109_a[5]":{"arrayField":"field_78109_a","index":5,"length":8,"tex":[0,5],"pivot":[0,0,0],"boxes":[[-4,21,-4,8,1,8,0,[0,5],0]]},"field_78109_a[6]":{"arrayField":"field_78109_a","index":6,"length":8,"tex":[0,6],"pivot":[0,0,0],"boxes":[[-4,22,-4,8,1,8,0,[0,6],0]]},"field_78109_a[7]":{"arrayField":"field_78109_a","index":7,"length":8,"tex":[0,7],"pivot":[0,0,0],"boxes":[[-4,23,-4,8,1,8,0,[0,7],0]]},"field_78108_b":{"field":"field_78108_b","tex":[0,16],"pivot":[0,0,0],"boxes":[[-2,18,-2,4,4,4,0,[0,16],0]]}}}}}},"ModelMinecart":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"sideModels[0]":{"arrayField":"sideModels","index":0,"length":7,"tex":[0,10],"pivot":[0,4,0],"rot":[1.5707963705062866,0,0],"boxes":[[-10,-8,-1,20,16,2,0,[0,10],0]]},"sideModels[1]":{"arrayField":"sideModels","index":1,"length":7,"tex":[0,0],"pivot":[-9,4,0],"rot":[0,4.71238899230957,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[2]":{"arrayField":"sideModels","index":2,"length":7,"tex":[0,0],"pivot":[9,4,0],"rot":[0,1.5707963705062866,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[3]":{"arrayField":"sideModels","index":3,"length":7,"tex":[0,0],"pivot":[0,4,-7],"rot":[0,3.1415927410125732,0],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[4]":{"arrayField":"sideModels","index":4,"length":7,"tex":[0,0],"pivot":[0,4,7],"boxes":[[-8,-9,-1,16,8,2,0,[0,0],0]]},"sideModels[5]":{"arrayField":"sideModels","index":5,"length":7,"tex":[44,10],"pivot":[0,4,0],"rot":[-1.5707963705062866,0,0],"boxes":[[-9,-7,-1,18,14,1,0,[44,10],0]]}}}}}},"ModelOcelot":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"ocelotBackLeftLeg":{"field":"ocelotBackLeftLeg","tex":[8,13],"pivot":[1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotBackRightLeg":{"field":"ocelotBackRightLeg","tex":[8,13],"pivot":[-1.100000023841858,18,5],"boxes":[[-1,0,1,2,6,2,0,[8,13],0]]},"ocelotFrontLeftLeg":{"field":"ocelotFrontLeftLeg","tex":[40,0],"pivot":[1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotFrontRightLeg":{"field":"ocelotFrontRightLeg","tex":[40,0],"pivot":[-1.2000000476837158,13.800000190734863,-5],"boxes":[[-1,0,0,2,10,2,0,[40,0],0]]},"ocelotTail":{"field":"ocelotTail","tex":[0,15],"pivot":[0,15,8],"rot":[0.8999999761581421,0,0],"boxes":[[-0.5,0,0,1,8,1,0,[0,15],0]]},"ocelotTail2":{"field":"ocelotTail2","tex":[4,15],"pivot":[0,20,14],"boxes":[[-0.5,0,0,1,8,1,0,[4,15],0]]},"ocelotHead":{"field":"ocelotHead","boxName":"head","tex":[6,10],"pivot":[0,15,-9],"boxes":[[-2.5,-2,-3,5,4,5,0,[0,0],0],[-1.5,0,-4,3,2,2,0,[0,24],0],[-2,-3,0,1,1,2,0,[0,10],0],[1,-3,0,1,1,2,0,[6,10],0]]},"ocelotBody":{"field":"ocelotBody","tex":[20,0],"pivot":[0,12,-10],"boxes":[[-2,3,-8,4,16,6,0,[20,0],0]]}},"extra":{"field_78163_i":1}}}}},"ModelPig":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[16,16],"pivot":[0,12,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0],[-2,0,-9,4,3,1,0,[16,16],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,11,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,18,7],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,18,-5],"boxes":[[-2,0,-2,4,6,4,0,[0,16],0]]}},"extra":{"field_78145_g":4,"field_78151_h":4}},"d":[["parts.head.boxes.0.6",0,1],["parts.head.boxes.1.6",0,1],["parts.body.boxes.0.6",0,1],["parts.leg1.boxes.0.6",0,1],["parts.leg2.boxes.0.6",0,1],["parts.leg3.boxes.0.6",0,1],["parts.leg4.boxes.0.6",0,1]]}}},"ModelQuadruped":{"super":"ModelBase","ctors":{"(IF)V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,18,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,17,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,24,7],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,24,-5],"boxes":[[-2,0,-2,4,0,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}},"d":[["parts.head.pivot.1",0,-1],["parts.body.pivot.1",0,-1],["parts.leg1.pivot.1",0,-1],["parts.leg1.boxes.0.4",0,1],["parts.leg2.pivot.1",0,-1],["parts.leg2.boxes.0.4",0,1],["parts.leg3.pivot.1",0,-1],["parts.leg3.boxes.0.4",0,1],["parts.leg4.pivot.1",0,-1],["parts.leg4.boxes.0.4",0,1],["parts.head.boxes.0.6",1,1],["parts.body.boxes.0.6",1,1],["parts.leg1.boxes.0.6",1,1],["parts.leg2.boxes.0.6",1,1],["parts.leg3.boxes.0.6",1,1],["parts.leg4.boxes.0.6",1,1]]}}},"ModelSheep1":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-4,6,6,6,0.6000000238418579,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"boxes":[[-4,-10,-7,8,16,6,1.75,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,6,4,0.5,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]},"part2":{"tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part4":{"tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part5":{"tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}}},"ModelSheep2":{"super":"ModelQuadruped","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"head":{"field":"head","tex":[0,0],"pivot":[0,6,-8],"boxes":[[-3,-4,-6,6,6,8,0,[0,0],0]]},"body":{"field":"body","tex":[28,8],"pivot":[0,5,2],"boxes":[[-4,-10,-7,8,16,6,0,[28,8],0]]},"leg1":{"field":"leg1","tex":[0,16],"pivot":[-3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg2":{"field":"leg2","tex":[0,16],"pivot":[3,12,7],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg3":{"field":"leg3","tex":[0,16],"pivot":[-3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"leg4":{"field":"leg4","tex":[0,16],"pivot":[3,12,-5],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part0":{"tex":[0,0],"pivot":[0,6,-6],"boxes":[[-4,-4,-8,8,8,8,0,[0,0],0]]},"part1":{"tex":[28,8],"pivot":[0,5,2],"boxes":[[-5,-10,-7,10,16,8,0,[28,8],0]]}},"extra":{"field_78145_g":8,"field_78151_h":4}}}}},"ModelSign":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"signBoard":{"field":"signBoard","tex":[0,0],"pivot":[0,0,0],"boxes":[[-12,-14,-1,24,12,2,0,[0,0],0]]},"signStick":{"field":"signStick","tex":[0,14],"pivot":[0,0,0],"boxes":[[-1,-2,-1,2,14,2,0,[0,14],0]]}}}}}},"ModelSilverfish":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"silverfishBodyParts[0]":{"arrayField":"silverfishBodyParts","index":0,"length":7,"tex":[0,0],"pivot":[0,22,-3.5],"boxes":[[-1.5,0,-1,3,2,2,0,[0,0],0]]},"silverfishBodyParts[1]":{"arrayField":"silverfishBodyParts","index":1,"length":7,"tex":[0,4],"pivot":[0,21,-1.5],"boxes":[[-2,0,-1,4,3,2,0,[0,4],0]]},"silverfishBodyParts[2]":{"arrayField":"silverfishBodyParts","index":2,"length":7,"tex":[0,9],"pivot":[0,20,1],"boxes":[[-3,0,-1.5,6,4,3,0,[0,9],0]]},"silverfishBodyParts[3]":{"arrayField":"silverfishBodyParts","index":3,"length":7,"tex":[0,16],"pivot":[0,21,4],"boxes":[[-1.5,0,-1.5,3,3,3,0,[0,16],0]]},"silverfishBodyParts[4]":{"arrayField":"silverfishBodyParts","index":4,"length":7,"tex":[0,22],"pivot":[0,22,7],"boxes":[[-1,0,-1.5,2,2,3,0,[0,22],0]]},"silverfishBodyParts[5]":{"arrayField":"silverfishBodyParts","index":5,"length":7,"tex":[11,0],"pivot":[0,23,9.5],"boxes":[[-1,0,-1,2,1,2,0,[11,0],0]]},"silverfishBodyParts[6]":{"arrayField":"silverfishBodyParts","index":6,"length":7,"tex":[13,4],"pivot":[0,23,11.5],"boxes":[[-0.5,0,-1,1,1,2,0,[13,4],0]]},"silverfishWings[0]":{"arrayField":"silverfishWings","index":0,"length":3,"tex":[20,0],"pivot":[0,16,1],"boxes":[[-5,0,-1.5,10,8,3,0,[20,0],0]]},"silverfishWings[1]":{"arrayField":"silverfishWings","index":1,"length":3,"tex":[20,11],"pivot":[0,20,7],"boxes":[[-3,0,-1.5,6,4,3,0,[20,11],0]]},"silverfishWings[2]":{"arrayField":"silverfishWings","index":2,"length":3,"tex":[20,18],"pivot":[0,19,-1.5],"boxes":[[-3,0,-1.5,6,5,2,0,[20,18],0]]}}}}}},"ModelSkeleton":{"super":"ModelZombie","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}}},"(F)V":{"base":{"tw":64,"th":32,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-1,-2,-1,2,12,2,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-1,2,12,2,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-2,12,0],"boxes":[[-1,0,-1,2,12,2,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[2,12,0],"mirror":1,"boxes":[[-1,0,-1,2,12,2,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"part1":{"tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"part2":{"tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"part3":{"tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.part0.boxes.0.6",0,1],["parts.part1.boxes.0.6",0,1],["parts.part2.boxes.0.6",0,1],["parts.part3.boxes.0.6",0,1]]}}},"ModelSkeletonHead":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,35],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,35],0]]}}}},"(IIII)V":{"base":{"tw":0,"th":0,"parts":{"skeletonHead":{"field":"skeletonHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}},"d":[["parts.skeletonHead.tex.0",0,1],["parts.skeletonHead.boxes.0.7.0",0,1],["parts.skeletonHead.tex.1",1,1],["parts.skeletonHead.boxes.0.7.1",1,1],["tw",2,1],["parts.skeletonHead.ts.0",2,1],["th",3,1],["parts.skeletonHead.ts.1",3,1]]}}},"ModelSlime":{"super":"ModelBase","ctors":{"(I)V":{"base":{"tw":64,"th":32,"parts":{"slimeBodies":{"field":"slimeBodies","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,16,-4,8,8,8,0,[0,0],0]]}}}}}},"ModelSnowMan":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"body":{"field":"body","tex":[0,16],"ts":[64,64],"pivot":[0,13,0],"boxes":[[-5,-10,-5,10,10,10,-0.5,[0,16],0]]},"bottomBody":{"field":"bottomBody","tex":[0,36],"ts":[64,64],"pivot":[0,24,0],"boxes":[[-6,-12,-6,12,12,12,-0.5,[0,36],0]]},"head":{"field":"head","tex":[0,0],"ts":[64,64],"pivot":[0,4,0],"boxes":[[-4,-8,-4,8,8,8,-0.5,[0,0],0]]},"rightHand":{"field":"rightHand","tex":[32,0],"ts":[64,64],"pivot":[0,6,0],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]},"leftHand":{"field":"leftHand","tex":[32,0],"ts":[64,64],"pivot":[0,6,0],"boxes":[[-1,0,-1,12,2,2,-0.5,[32,0],0]]}}}}}},"ModelSpider":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"spiderHead":{"field":"spiderHead","tex":[32,4],"pivot":[0,15,-3],"boxes":[[-4,-4,-8,8,8,8,0,[32,4],0]]},"spiderNeck":{"field":"spiderNeck","tex":[0,0],"pivot":[0,15,0],"boxes":[[-3,-3,-3,6,6,6,0,[0,0],0]]},"spiderBody":{"field":"spiderBody","tex":[0,12],"pivot":[0,15,9],"boxes":[[-5,-4,-6,10,8,12,0,[0,12],0]]},"spiderLeg1":{"field":"spiderLeg1","tex":[18,0],"pivot":[-4,15,2],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg2":{"field":"spiderLeg2","tex":[18,0],"pivot":[4,15,2],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg3":{"field":"spiderLeg3","tex":[18,0],"pivot":[-4,15,1],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg4":{"field":"spiderLeg4","tex":[18,0],"pivot":[4,15,1],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg5":{"field":"spiderLeg5","tex":[18,0],"pivot":[-4,15,0],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg6":{"field":"spiderLeg6","tex":[18,0],"pivot":[4,15,0],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg7":{"field":"spiderLeg7","tex":[18,0],"pivot":[-4,15,-1],"boxes":[[-15,-1,-1,16,2,2,0,[18,0],0]]},"spiderLeg8":{"field":"spiderLeg8","tex":[18,0],"pivot":[4,15,-1],"boxes":[[-1,-1,-1,16,2,2,0,[18,0],0]]}}}}}},"ModelSquid":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"squidBody":{"field":"squidBody","tex":[0,0],"pivot":[0,8,0],"boxes":[[-6,-8,-6,12,16,12,0,[0,0],0]]},"squidTentacles[0]":{"arrayField":"squidTentacles","index":0,"length":8,"tex":[48,0],"pivot":[5,15,0],"rot":[0,1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[1]":{"arrayField":"squidTentacles","index":1,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,3.535533905029297],"rot":[0,0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[2]":{"arrayField":"squidTentacles","index":2,"length":8,"tex":[48,0],"pivot":[3.0616169991140216e-16,15,5],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[3]":{"arrayField":"squidTentacles","index":3,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,3.535533905029297],"rot":[0,-0.7853981852531433,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[4]":{"arrayField":"squidTentacles","index":4,"length":8,"tex":[48,0],"pivot":[-5,15,6.123233998228043e-16],"rot":[0,-1.5707963705062866,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[5]":{"arrayField":"squidTentacles","index":5,"length":8,"tex":[48,0],"pivot":[-3.535533905029297,15,-3.535533905029297],"rot":[0,-2.356194496154785,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[6]":{"arrayField":"squidTentacles","index":6,"length":8,"tex":[48,0],"pivot":[-9.184850467946473e-16,15,-5],"rot":[0,-3.1415927410125732,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]},"squidTentacles[7]":{"arrayField":"squidTentacles","index":7,"length":8,"tex":[48,0],"pivot":[3.535533905029297,15,-3.535533905029297],"rot":[0,-3.9269907474517822,0],"boxes":[[-1,0,-1,2,18,2,0,[48,0],0]]}}}}}},"ModelVillager":{"super":"ModelBase","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,64],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,64],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,64],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,64],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]},"(FFII)V":{"base":{"tw":64,"th":32,"parts":{"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[0,0],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[0,0],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[0,0],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[0,0],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1],["parts.villagerHead.pivot.1",1,1],["parts.villagerBody.pivot.1",1,1],["parts.villagerArms.pivot.1",1,1],["parts.rightVillagerLeg.pivot.1",1,1],["parts.leftVillagerLeg.pivot.1",1,1],["parts.field_82898_f.pivot.1",1,1],["parts.villagerHead.ts.0",2,1],["parts.villagerBody.ts.0",2,1],["parts.villagerArms.ts.0",2,1],["parts.rightVillagerLeg.ts.0",2,1],["parts.leftVillagerLeg.ts.0",2,1],["parts.field_82898_f.ts.0",2,1],["parts.villagerHead.ts.1",3,1],["parts.villagerBody.ts.1",3,1],["parts.villagerArms.ts.1",3,1],["parts.rightVillagerLeg.ts.1",3,1],["parts.leftVillagerLeg.ts.1",3,1],["parts.field_82898_f.ts.1",3,1]]}}},"ModelWitch":{"super":"ModelVillager","ctors":{"(F)V":{"base":{"tw":64,"th":32,"parts":{"field_82901_h":{"field":"field_82901_h","tex":[0,0],"ts":[64,128],"pivot":[0,-2,0],"boxes":[[0,3,-6.75,1,1,1,-0.25,[0,0],0]]},"witchHat":{"field":"witchHat","tex":[0,64],"ts":[64,128],"pivot":[-5,-10.03125,-5],"boxes":[[0,0,0,10,2,10,0,[0,64],0]],"children":["part0"]},"villagerHead":{"field":"villagerHead","tex":[0,0],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,0],0]],"children":["field_82898_f","witchHat"]},"villagerBody":{"field":"villagerBody","tex":[0,38],"ts":[64,128],"pivot":[0,0,0],"boxes":[[-4,0,-3,8,12,6,0,[16,20],0],[-4,0,-3,8,18,6,0.5,[0,38],0]]},"villagerArms":{"field":"villagerArms","tex":[40,38],"ts":[64,128],"pivot":[0,2,0],"boxes":[[-8,-2,-2,4,8,4,0,[44,22],0],[4,-2,-2,4,8,4,0,[44,22],0],[-4,2,-2,8,4,4,0,[40,38],0]]},"rightVillagerLeg":{"field":"rightVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[-2,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,22],0]]},"leftVillagerLeg":{"field":"leftVillagerLeg","tex":[0,22],"ts":[64,128],"pivot":[2,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,22],1]]},"field_82898_f":{"field":"field_82898_f","tex":[24,0],"ts":[64,128],"pivot":[0,-2,0],"boxes":[[-1,-1,-6,2,4,2,0,[24,0],0]],"children":["field_82901_h"]},"part0":{"tex":[0,76],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.05235987901687622,0,0.02617993950843811],"boxes":[[0,0,0,7,4,7,0,[0,76],0]],"children":["part1"]},"part1":{"tex":[0,87],"ts":[64,128],"pivot":[1.75,-4,2],"rot":[-0.10471975803375244,0,0.05235987901687622],"boxes":[[0,0,0,4,4,4,0,[0,87],0]],"children":["part2"]},"part2":{"tex":[0,95],"ts":[64,128],"pivot":[1.75,-2,2],"rot":[-0.20943951606750488,0,0.10471975803375244],"boxes":[[0,0,0,1,2,1,0.25,[0,95],0]]}}},"d":[["parts.villagerHead.boxes.0.6",0,1],["parts.villagerBody.boxes.0.6",0,1],["parts.villagerBody.boxes.1.6",0,1],["parts.villagerArms.boxes.0.6",0,1],["parts.villagerArms.boxes.1.6",0,1],["parts.villagerArms.boxes.2.6",0,1],["parts.rightVillagerLeg.boxes.0.6",0,1],["parts.leftVillagerLeg.boxes.0.6",0,1],["parts.field_82898_f.boxes.0.6",0,1]]}}},"ModelWither":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"field_82905_a[0]":{"arrayField":"field_82905_a","index":0,"length":3,"tex":[0,16],"pivot":[0,0,0],"boxes":[[-10,3.9000000953674316,-0.5,20,3,3,0,[0,16],0]]},"field_82905_a[1]":{"arrayField":"field_82905_a","index":1,"length":3,"tex":[24,22],"pivot":[-2,6.900000095367432,-0.5],"boxes":[[0,0,0,3,10,3,0,[0,22],0],[-4,1.5,0.5,11,2,2,0,[24,22],0],[-4,4,0.5,11,2,2,0,[24,22],0],[-4,6.5,0.5,11,2,2,0,[24,22],0]]},"field_82905_a[2]":{"arrayField":"field_82905_a","index":2,"length":3,"tex":[12,22],"pivot":[0,0,0],"boxes":[[0,0,0,3,6,3,0,[12,22],0]]},"field_82904_b[0]":{"arrayField":"field_82904_b","index":0,"length":3,"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-4,-4,8,8,8,0,[0,0],0]]},"field_82904_b[1]":{"arrayField":"field_82904_b","index":1,"length":3,"tex":[32,0],"pivot":[-8,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]},"field_82904_b[2]":{"arrayField":"field_82904_b","index":2,"length":3,"tex":[32,0],"pivot":[10,4,0],"boxes":[[-4,-4,-4,6,6,6,0,[32,0],0]]}}}}}},"ModelWolf":{"super":"ModelBase","ctors":{"()V":{"base":{"tw":64,"th":32,"parts":{"wolfHeadMain":{"field":"wolfHeadMain","tex":[0,10],"pivot":[-1,13.5,-7],"boxes":[[-3,-3,-2,6,6,4,0,[0,0],0],[-3,-5,0,2,2,1,0,[16,14],0],[1,-5,0,2,2,1,0,[16,14],0],[-1.5,0,-5,3,3,4,0,[0,10],0]]},"wolfBody":{"field":"wolfBody","tex":[18,14],"pivot":[0,14,2],"boxes":[[-4,-2,-3,6,9,6,0,[18,14],0]]},"wolfLeg1":{"field":"wolfLeg1","tex":[0,18],"pivot":[-2.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg2":{"field":"wolfLeg2","tex":[0,18],"pivot":[0.5,16,7],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg3":{"field":"wolfLeg3","tex":[0,18],"pivot":[-2.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfLeg4":{"field":"wolfLeg4","tex":[0,18],"pivot":[0.5,16,-4],"boxes":[[-1,0,-1,2,8,2,0,[0,18],0]]},"wolfTail":{"field":"wolfTail","tex":[9,18],"pivot":[-1,12,8],"boxes":[[-1,0,-1,2,8,2,0,[9,18],0]]},"wolfMane":{"field":"wolfMane","tex":[21,0],"pivot":[-1,14,2],"boxes":[[-4,-3,-3,8,6,7,0,[21,0],0]]}}}}}},"ModelZombie":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}}},"(FFII)V":{"base":{"tw":0,"th":0,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["parts.bipedHead.pivot.1",1,1],["parts.bipedHeadwear.pivot.1",1,1],["parts.bipedBody.pivot.1",1,1],["parts.bipedRightArm.pivot.1",1,1],["parts.bipedLeftArm.pivot.1",1,1],["parts.bipedRightLeg.pivot.1",1,1],["parts.bipedLeftLeg.pivot.1",1,1],["tw",2,1],["parts.bipedHead.ts.0",2,1],["parts.bipedHeadwear.ts.0",2,1],["parts.bipedBody.ts.0",2,1],["parts.bipedRightArm.ts.0",2,1],["parts.bipedLeftArm.ts.0",2,1],["parts.bipedRightLeg.ts.0",2,1],["parts.bipedLeftLeg.ts.0",2,1],["parts.bipedEars.ts.0",2,1],["parts.bipedCloak.ts.0",2,1],["th",3,1],["parts.bipedHead.ts.1",3,1],["parts.bipedHeadwear.ts.1",3,1],["parts.bipedBody.ts.1",3,1],["parts.bipedRightArm.ts.1",3,1],["parts.bipedLeftArm.ts.1",3,1],["parts.bipedRightLeg.ts.1",3,1],["parts.bipedLeftLeg.ts.1",3,1],["parts.bipedEars.ts.1",3,1],["parts.bipedCloak.ts.1",3,1]]},"(FZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]}}},"d":[["parts.bipedHead.boxes.0.6",0,1],["parts.bipedHeadwear.boxes.0.6",0,1],["parts.bipedBody.boxes.0.6",0,1],["parts.bipedRightArm.boxes.0.6",0,1],["parts.bipedLeftArm.boxes.0.6",0,1],["parts.bipedRightLeg.boxes.0.6",0,1],["parts.bipedLeftLeg.boxes.0.6",0,1],["parts.bipedEars.boxes.0.6",0,1],["parts.bipedCloak.boxes.0.6",0,1],["th",1,-32],["parts.bipedHead.ts.1",1,-32],["parts.bipedHeadwear.ts.1",1,-32],["parts.bipedBody.ts.1",1,-32],["parts.bipedRightArm.ts.1",1,-32],["parts.bipedLeftArm.ts.1",1,-32],["parts.bipedRightLeg.ts.1",1,-32],["parts.bipedLeftLeg.ts.1",1,-32],["parts.bipedEars.ts.1",1,-32],["parts.bipedCloak.ts.1",1,-32]]}}},"ModelZombieVillager":{"super":"ModelBiped","ctors":{"()V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}},"(FFZ)V":{"base":{"tw":64,"th":64,"parts":{"bipedHead":{"field":"bipedHead","tex":[24,32],"pivot":[0,0,0],"boxes":[[-4,-10,-4,8,10,8,0,[0,32],0],[-1,-3,-6,2,4,2,0,[24,32],0]]},"bipedHeadwear":{"field":"bipedHeadwear","tex":[32,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0.5,[32,0],0]]},"bipedBody":{"field":"bipedBody","tex":[16,16],"pivot":[0,0,0],"boxes":[[-4,0,-2,8,12,4,0,[16,16],0]]},"bipedRightArm":{"field":"bipedRightArm","tex":[40,16],"pivot":[-5,2,0],"boxes":[[-3,-2,-2,4,12,4,0,[40,16],0]]},"bipedLeftArm":{"field":"bipedLeftArm","tex":[40,16],"pivot":[5,2,0],"mirror":1,"boxes":[[-1,-2,-2,4,12,4,0,[40,16],1]]},"bipedRightLeg":{"field":"bipedRightLeg","tex":[0,16],"pivot":[-1.899999976158142,12,0],"boxes":[[-2,0,-2,4,12,4,0,[0,16],0]]},"bipedLeftLeg":{"field":"bipedLeftLeg","tex":[0,16],"pivot":[1.899999976158142,12,0],"mirror":1,"boxes":[[-2,0,-2,4,12,4,0,[0,16],1]]},"bipedEars":{"field":"bipedEars","tex":[24,0],"pivot":[0,0,0],"boxes":[[-3,-6,-1,6,6,1,0,[24,0],0]]},"bipedCloak":{"field":"bipedCloak","tex":[0,0],"pivot":[0,0,0],"boxes":[[-5,0,-1,10,16,1,0,[0,0],0]]},"part0":{"tex":[0,0],"pivot":[0,0,0],"boxes":[[-4,-8,-4,8,8,8,0,[0,0],0]]}}}}}}};
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', FML = 'cpw/mods/fml/', FORGE = 'net/minecraftforge/';
+var L = function (n) { return 'L' + n + ';'; };
+var JObject = JVM.JObject;
+
+function reg(vm) { return JVM.mc152.reg(vm); }
+function forge(vm) {
+	var r = reg(vm);
+	return r.forge || (r.forge = {
+		mods: [],
+		worldGens: [],
+		tickHandlers: [],
+		fuel: [], crafting: [], pickup: [], playerTrackers: [], connection: [], guiHandlers: {},
+		entities: [],
+		spawns: [],
+		tileEntities: {},
+		renderers: [], commands: [], ores: {}, oreNames: [], harvest: [],
+		buses: {},
+		markers: {},
+	});
+}
+function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function str(vm, v) { return vm.toJavaString(v); }
+function format(vm, fmt, arr) {
+	try { return vm.callStatic('java/lang/String', 'format', '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;', [String(fmt), arr || vm.newArray('Ljava/lang/Object;', 0)]); }
+	catch (e) { return String(fmt); }
+}
+function enumOf(vm, cname, name) { var c = vm.loadClass(cname); vm.initClass(c); return c.statics[name]; }
+function enumSetOf(vm, values) {
+	var s = vm.callStatic('java/util/EnumSet', 'noneOf', '(Ljava/lang/Class;)Ljava/util/EnumSet;', [null]);
+	values.forEach(function (v) { vm.callVirtual(s, 'add', '(Ljava/lang/Object;)Z', [v]); });
+	return s;
+}
+function listOf(vm, coll) {
+	if (!coll) return [];
+	var arr = vm.callVirtual(coll, 'toArray', '()[Ljava/lang/Object;', []);
+	return arr ? Array.prototype.slice.call(arr.a) : [];
+}
+var enumSpec = function (names, init, extra) {
+	var spec = {
+		super: 'java/lang/Enum',
+		statics: (function () { var s = { $VALUES: null }; names.forEach(function (n) { s[n] = null; }); return s; })(),
+		clinit: function (vm, c) {
+			c.$values = names.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; if (init) init(vm, o, n, i); c.statics[n] = o; return o; });
+		},
+	};
+	var cn = null;
+	spec.staticMethods = {};
+	spec.methods = {};
+	spec.$names = names;
+	Object.assign(spec, extra || {});
+	return spec;
+};
+function enumStatics(vm, cname) {
+	var spec = vm.natives[cname];
+	spec.staticMethods = Object.assign({}, spec.staticMethods);
+	spec.staticMethods['values()[L' + cname + ';'] = function (vm) { var c = vm.loadClass(cname); vm.initClass(c); return JVM.javaArray(vm, L(cname), c.$values.slice()); };
+	spec.staticMethods['valueOf(Ljava/lang/String;)L' + cname + ';'] = function (vm, n, a) {
+		var c = vm.loadClass(cname); vm.initClass(c);
+		var v = c.$values.filter(function (x) { return x.$name === a[0]; })[0];
+		if (!v) vm.throwNew('java/lang/IllegalArgumentException', 'No enum constant ' + cname.replace(/[/]/g, '.') + '.' + a[0]);
+		return v;
+	};
+}
+function classAnn(vm, c, type) {
+	for (var k = c; k; k = k.superClass) {
+		var a = JVM.annotation(vm, JVM.classAnnotations(k), type);
+		if (a) return a;
+		if (k.spec && k.spec.annotations && k.spec.annotations.indexOf(type) >= 0) return { type: L(type), values: {} };
+	}
+	return null;
+}
+function sval(a, name, dflt) { var e = a && a.values[name]; return e && e.v !== undefined ? e.v : dflt; }
+
+function findFieldByNames(vm, cls, names) {
+	var map = vm.nameMap;
+	for (var i = 0; i < names.length; i++) {
+		var n = names[i];
+		if (n == null) continue;
+		var r = cls.findField(n);
+		if (r) return r;
+		if (map) {
+			var m = map.srg[n];
+			if (m && (r = cls.findField(m))) return r;
+			for (var k = cls; k; k = k.superClass) {
+				var ob = map.rev[k.name];
+				var mm = ob !== undefined && map.fld[ob + '.' + n];
+				if (mm && (r = cls.findField(mm))) return r;
+			}
+		}
+	}
+	return null;
+}
+function fieldIndex(cls, idx) {
+	var names = cls.cf ? cls.cf.fields.map(function (f) { return f.name; }) : Object.keys(cls.fields);
+	var n = names[idx];
+	return n != null ? { owner: cls, f: cls.fields[n] } : null;
+}
+function getField(vm, r, obj) { if (r.f.static) { vm.initClass(r.owner); return r.owner.statics[r.f.name]; } return obj ? obj[':' + r.f.name] : null; }
+function setField(vm, r, obj, v) { if (r.f.static) { vm.initClass(r.owner); r.owner.statics[r.f.name] = v; } else if (obj) obj[':' + r.f.name] = v; }
+JVM.findFieldByNames = findFieldByNames;
+
+var CFG_ALLOWED = /^[A-Za-z0-9._-]*$/;
+function cfgState(self) { return self.$cfg || (self.$cfg = { cats: {}, order: [], caseSensitive: false, path: null, children: {} }); }
+function newCat(cfg, name, parent) {
+	var q = parent ? parent.q + '.' + name : name;
+	var c = { name: name, parent: parent, q: q, comment: null, props: {}, children: [] };
+	if (parent) parent.children.push(c);
+	cfg.cats[q] = c;
+	return c;
+}
+function getCategory(cfg, category) {
+	var ret = cfg.cats[category];
+	if (ret) return ret;
+	if (category.indexOf('.') >= 0) {
+		var h = category.split('.'), parent = cfg.cats[h[0]] || newCat(cfg, h[0], null);
+		for (var i = 1; i < h.length; i++) {
+			var q = parent.q + '.' + h[i];
+			ret = cfg.cats[q] || newCat(cfg, h[i], parent);
+			parent = ret;
+		}
+		return ret;
+	}
+	return newCat(cfg, category, null);
+}
+function newProp(vm, name, value, values, type, read) {
+	var p = vm.newObject(vm.loadClass(FORGE + 'common/Property'));
+	p[':name'] = name;
+	p.$type = type;
+	p.$list = values != null;
+	p[':value'] = values != null ? '' : value;
+	p[':valueList'] = values != null ? JVM.javaArray(vm, 'Ljava/lang/String;', values) : null;
+	p.$wasRead = !!read;
+	p.$changed = false;
+	return p;
+}
+function propString(p) { return p[':value'] == null ? '' : String(p[':value']); }
+function propList(p) { return p[':valueList'] ? Array.prototype.slice.call(p[':valueList'].a).map(String) : []; }
+function javaInt(s) { if (!/^[+-]?\d+$/.test(s)) return null; var n = +s; return n >= -2147483648 && n <= 2147483647 ? n : null; }
+function javaDouble(s) { s = String(s).trim(); return /^[+-]?(NaN|Infinity|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?)[dDfF]?$/.test(s) ? parseFloat(s.replace(/[dDfF]$/, '')) : null; }
+function javaBool(s) { return /^(true|false)$/i.test(s); }
+function propSet(p, value) { p[':value'] = value; p.$changed = true; }
+function cfgGet(vm, self, category, key, dflt, comment, type, isList) {
+	var cfg = cfgState(self);
+	if (!cfg.caseSensitive) category = category.toLowerCase();
+	var cat = getCategory(cfg, category);
+	var prop = cat.props[key];
+	if (prop) {
+		if (prop.$type == null) {
+			var np = prop.$list ? newProp(vm, key, null, propList(prop), type) : newProp(vm, key, propString(prop), null, type);
+			cat.props[key] = prop = np;
+		}
+		prop[':comment'] = comment;
+		return prop;
+	}
+	if (dflt == null) return null;
+	prop = isList ? newProp(vm, key, null, dflt, type) : newProp(vm, key, dflt, null, type);
+	if (!isList) propSet(prop, dflt);
+	cat.props[key] = prop;
+	prop[':comment'] = comment;
+	return prop;
+}
+function cfgLoad(vm, self) {
+	var cfg = cfgState(self), fs = vm.fs, path = cfg.path;
+	if (!fs || !path) return;
+	var dir = path.lastIndexOf('/') > 0 ? path.substring(0, path.lastIndexOf('/')) : '';
+	if (dir) fs.mkdirs(dir);
+	var bytes = fs.read(path);
+	if (!bytes) { fs.write(path, new Uint8Array(0)); return; }
+	var text = new TextDecoder('utf-8').decode(bytes).replace(/^﻿/, '');
+	var lines = text.split(/\r\n|\n|\r/);
+	var cur = null, type = null, tmp = null, name = null;
+	for (var ln = 0; ln < lines.length; ln++) {
+		var line = lines[ln];
+		if (/^START: "([^"]+)"$/.test(line) || /^END: "([^"]+)"$/.test(line)) continue;
+		var ns = -1, ne = -1, skip = false, quoted = false;
+		for (var i = 0; i < line.length && !skip; ++i) {
+			var ch = line.charAt(i);
+			if (/[\p{L}\p{N}]/u.test(ch) || '._-'.indexOf(ch) >= 0 || (quoted && ch !== '"')) { if (ns === -1) ns = i; ne = i; }
+			else if (/\s/.test(ch)) {   }
+			else switch (ch) {
+				case '#': skip = true; continue;
+				case '"': if (quoted) quoted = false; if (!quoted && ns === -1) quoted = true; break;
+				case '{': {
+					name = line.substring(ns, ne + 1);
+					var q = cur ? cur.q + '.' + name : name;
+					cur = cfg.cats[q] || newCat(cfg, name, cur);
+					name = null;
+					break;
+				}
+				case '}': if (!cur) throw new Error('config file corrupt (too many closing braces) at line ' + (ln + 1)); cur = cur.parent; break;
+				case '=':
+					name = line.substring(ns, ne + 1);
+					if (!cur) throw new Error("'" + name + "' has no scope at line " + (ln + 1));
+					cur.props[name] = newProp(vm, name, line.substring(i + 1), null, type, true);
+					i = line.length;
+					break;
+				case ':': type = 'SIBD'.indexOf(line.substring(ns, ne + 1).charAt(0)) >= 0 ? line.substring(ns, ne + 1).charAt(0) : null; ns = ne = -1; break;
+				case '<':
+					if (tmp) throw new Error('malformed list at line ' + (ln + 1));
+					name = line.substring(ns, ne + 1);
+					tmp = []; skip = true;
+					break;
+				case '>':
+					if (!tmp) throw new Error('malformed list at line ' + (ln + 1));
+					cur.props[name] = newProp(vm, name, null, tmp, type, true);
+					name = null; tmp = null; type = null;
+					break;
+				default: throw new Error("unknown character '" + ch + "' at line " + (ln + 1));
+			}
+		}
+		if (quoted) throw new Error('unmatched quote at line ' + (ln + 1));
+		else if (tmp && !skip) tmp.push(line.trim());
+	}
+	Object.keys(cfg.cats).forEach(function (k) { Object.keys(cfg.cats[k].props).forEach(function (p) { cfg.cats[k].props[p].$changed = false; }); });
+}
+function cfgSave(vm, self) {
+	var cfg = cfgState(self), fs = vm.fs;
+	if (!fs || !cfg.path) return;
+	var NL = '\n', out = [];
+	var w = function () { out.push(Array.prototype.join.call(arguments, '') + NL); };
+	var pad = function (n) { return new Array(n + 1).join('    '); };
+	var quote = function (n) { return CFG_ALLOWED.test(n) ? n : '"' + n + '"'; };
+	var sortKeys = function (o) { return Object.keys(o).sort(); };
+	var writeCat = function (c, indent) {
+		var p0 = pad(indent), p1 = pad(indent + 1), p2 = pad(indent + 2);
+		w(p0, '####################');
+		w(p0, '# ', c.name);
+		if (c.comment != null) { w(p0, '#==================='); String(c.comment).split(/\r?\n/).forEach(function (l) { w(p0, '# ', l); }); }
+		w(p0, '####################', NL);
+		w(p0, quote(c.name), ' {');
+		sortKeys(c.props).forEach(function (k, x) {
+			var prop = c.props[k];
+			if (prop[':comment'] != null) {
+				if (x !== 0) out.push(NL);
+				String(prop[':comment']).split(/\r?\n/).forEach(function (l) { w(p1, '# ', l); });
+			}
+			var pn = quote(prop[':name']);
+			if (prop.$list) { w(p1, prop.$type || 'S', ':', pn, ' <'); propList(prop).forEach(function (l) { w(p2, l); }); w(p1, ' >'); }
+			else if (prop.$type == null) w(p1, pn, '=', propString(prop));
+			else w(p1, prop.$type, ':', pn, '=', propString(prop));
+		});
+		c.children.slice().sort(function (a, b) { return a.q < b.q ? -1 : a.q > b.q ? 1 : 0; }).forEach(function (ch) { writeCat(ch, indent + 1); });
+		w(p0, '}', NL);
+	};
+	out.push('# Configuration file' + NL + NL);
+	sortKeys(cfg.cats).forEach(function (k) { var c = cfg.cats[k]; if (!c.parent) { writeCat(c, 0); out.push(NL); } });
+	var dir = cfg.path.lastIndexOf('/') > 0 ? cfg.path.substring(0, cfg.path.lastIndexOf('/')) : '';
+	if (dir) fs.mkdirs(dir);
+	fs.write(cfg.path, new TextEncoder().encode(out.join('')));
+}
+function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
+	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
+	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
+	var v = javaInt(propString(prop));
+	if (v !== -1) { f.markers[v] = true; return prop; }
+	var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc);
+	var list = bc.statics.blocksList.a;
+	if (dflt < lower) { vm.warnOnce('cfg-low:' + vm.currentMod, 'block id defaults below ' + lower + ' were moved to free ids (as Forge does)'); dflt = upper - 1; }
+	if (!list[dflt] && !f.markers[dflt]) { propSet(prop, String(dflt)); f.markers[dflt] = true; return prop; }
+	for (var j = upper - 1; j > 0; j--) if (!list[j] && !f.markers[j]) { propSet(prop, String(j)); f.markers[j] = true; return prop; }
+	vm.throwNew('java/lang/RuntimeException', 'No more block ids available for ' + key);
+}
+function cfgItemId(vm, self, category, key, dflt, comment) {
+	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
+	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
+	var v = javaInt(propString(prop)), shift = dflt + 256;
+	if (v !== -1) { f.markers[v + 256] = true; return prop; }
+	var ic = vm.loadClass(SRC + 'Item'); vm.initClass(ic);
+	var list = ic.statics.itemsList.a;
+	if (!list[shift] && !f.markers[shift] && shift >= 4096) { propSet(prop, String(dflt)); f.markers[shift] = true; return prop; }
+	for (var x = list.length - 1; x >= 256; x--) if (!list[x] && !f.markers[x]) { propSet(prop, String(x - 256)); f.markers[x] = true; return prop; }
+	vm.throwNew('java/lang/RuntimeException', 'No more item ids available for ' + key);
+}
+function dstr(vm, d) { return vm.callStatic('java/lang/Double', 'toString', '(D)Ljava/lang/String;', [d]); }
+
+function installConfig(vm, def) {
+	var C = FORGE + 'common/Configuration', P = FORGE + 'common/Property';
+	var m = {
+		'<init>()V': function () {},
+		'<init>(Ljava/io/File;)V': function (vm, self, a) { cfgState(self).path = a[0] ? a[0].$path : null; JVM.run(vm, function () { cfgLoad(vm, self); }); },
+		'<init>(Ljava/io/File;Z)V': function (vm, self, a) { var c = cfgState(self); c.path = a[0] ? a[0].$path : null; c.caseSensitive = !!a[1]; JVM.run(vm, function () { cfgLoad(vm, self); }); },
+		'load()V': function (vm, self) { try { cfgLoad(vm, self); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; vm.throwNew('java/lang/RuntimeException', e.message); } },
+		'save()V': function (vm, self) { cfgSave(vm, self); },
+		'hasChanged()Z': function (vm, self) { var c = cfgState(self); return Object.keys(c.cats).some(function (k) { return Object.keys(c.cats[k].props).some(function (p) { return c.cats[k].props[p].$changed; }); }) ? 1 : 0; },
+		'hasCategory(Ljava/lang/String;)Z': function (vm, self, a) { return cfgState(self).cats[a[0]] ? 1 : 0; },
+		'hasKey(Ljava/lang/String;Ljava/lang/String;)Z': function (vm, self, a) { var c = cfgState(self).cats[a[0]]; return c && c.props[a[1]] ? 1 : 0; },
+		'addCustomCategoryComment(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { var c = cfgState(self); getCategory(c, c.caseSensitive ? a[0] : a[0].toLowerCase()).comment = a[1]; },
+		'getCategory(Ljava/lang/String;)Lnet/minecraftforge/common/ConfigCategory;': function (vm, self, a) {
+			var cat = getCategory(cfgState(self), a[0]);
+			var o = cat.obj || (cat.obj = vm.newObject(vm.loadClass(FORGE + 'common/ConfigCategory')));
+			o.$cat = cat;
+			return o;
+		},
+		'getCategoryNames()Ljava/util/Set;': function (vm, self) {
+			var s = vm.newObject(vm.loadClass('java/util/TreeSet')); vm.callVirtual(s, '<init>', '()V', []);
+			Object.keys(cfgState(self).cats).forEach(function (k) { vm.callVirtual(s, 'add', '(Ljava/lang/Object;)Z', [k]); });
+			return s;
+		},
+	};
+	var blk = function (cat, key, d, cmt, lo, hi) { return function (vm, self, a) { return cfgBlockId(vm, self, cat(a), key(a), d(a), cmt(a), lo, hi); }; };
+	var A = function (i) { return function (a) { return a[i]; }; }, K = function (v) { return function () { return v; }; };
+	m['getBlock(Ljava/lang/String;I)Lnet/minecraftforge/common/Property;'] = blk(K('block'), A(0), A(1), K(null), 256, 4096);
+	m['getBlock(Ljava/lang/String;ILjava/lang/String;)Lnet/minecraftforge/common/Property;'] = blk(K('block'), A(0), A(1), A(2), 256, 4096);
+	m['getBlock(Ljava/lang/String;Ljava/lang/String;I)Lnet/minecraftforge/common/Property;'] = blk(A(0), A(1), A(2), K(null), 256, 4096);
+	m['getBlock(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Lnet/minecraftforge/common/Property;'] = blk(A(0), A(1), A(2), A(3), 256, 4096);
+	m['getTerrainBlock(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Lnet/minecraftforge/common/Property;'] = blk(A(0), A(1), A(2), A(3), 0, 256);
+	var itm = function (cat, key, d, cmt) { return function (vm, self, a) { return cfgItemId(vm, self, cat(a), key(a), d(a), cmt(a)); }; };
+	m['getItem(Ljava/lang/String;I)Lnet/minecraftforge/common/Property;'] = itm(K('item'), A(0), A(1), K(null));
+	m['getItem(Ljava/lang/String;ILjava/lang/String;)Lnet/minecraftforge/common/Property;'] = itm(K('item'), A(0), A(1), A(2));
+	m['getItem(Ljava/lang/String;Ljava/lang/String;I)Lnet/minecraftforge/common/Property;'] = itm(A(0), A(1), A(2), K(null));
+	m['getItem(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Lnet/minecraftforge/common/Property;'] = itm(A(0), A(1), A(2), A(3));
+	var PR = 'Lnet/minecraftforge/common/Property;';
+	var typed = function (t, conv, check) {
+		return function (vm, self, a) {
+			var prop = cfgGet(vm, self, a[0], a[1], conv(vm, a[2]), a[3] === undefined ? null : a[3], t);
+			if (!check(propString(prop))) propSet(prop, conv(vm, a[2]));
+			return prop;
+		};
+	};
+	var I = typed('I', function (vm, v) { return String(v); }, function (s) { return javaInt(s) !== null; });
+	var B = typed('B', function (vm, v) { return v ? 'true' : 'false'; }, javaBool);
+	var D = typed('D', function (vm, v) { return dstr(vm, v); }, function (s) { return javaDouble(s) !== null; });
+	var S = function (vm, self, a) { return cfgGet(vm, self, a[0], a[1], a[2], a[3] === undefined ? null : a[3], 'S'); };
+	var list = function (t, conv, check) {
+		return function (vm, self, a) {
+			var vals = a[2] ? Array.prototype.slice.call(a[2].a).map(function (v) { return conv(vm, v); }) : null;
+			var prop = cfgGet(vm, self, a[0], a[1], vals, a[3] === undefined ? null : a[3], t, true);
+			if (check && !propList(prop).every(check)) prop[':valueList'] = JVM.javaArray(vm, 'Ljava/lang/String;', vals || []), prop.$changed = true;
+			return prop;
+		};
+	};
+	[['I', I], ['Z', B], ['D', D], ['Ljava/lang/String;', S]].forEach(function (p) {
+		m['get(Ljava/lang/String;Ljava/lang/String;' + p[0] + ')' + PR] = p[1];
+		m['get(Ljava/lang/String;Ljava/lang/String;' + p[0] + 'Ljava/lang/String;)' + PR] = p[1];
+	});
+	[['[I', list('I', function (vm, v) { return String(v); }, function (s) { return javaInt(s) !== null; })],
+	 ['[Z', list('B', function (vm, v) { return v ? 'true' : 'false'; }, javaBool)],
+	 ['[D', list('D', dstr, function (s) { return javaDouble(s) !== null; })],
+	 ['[Ljava/lang/String;', list('S', function (vm, v) { return String(v); }, null)]].forEach(function (p) {
+		m['get(Ljava/lang/String;Ljava/lang/String;' + p[0] + ')' + PR] = p[1];
+		m['get(Ljava/lang/String;Ljava/lang/String;' + p[0] + 'Ljava/lang/String;)' + PR] = p[1];
+	});
+	def(C, { methods: m, statics: { CATEGORY_GENERAL: 'general', CATEGORY_BLOCK: 'block', CATEGORY_ITEM: 'item', ALLOWED_CHARS: '._-', DEFAULT_ENCODING: 'UTF-8', CATEGORY_SPLITTER: '.', NEW_LINE: '\n' } });
+	def(FORGE + 'common/ConfigCategory', { methods: {
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$cat.name; },
+		'getQualifiedName()Ljava/lang/String;': function (vm, self) { return self.$cat.q; },
+		'setComment(Ljava/lang/String;)V': function (vm, self, a) { self.$cat.comment = a[0]; },
+		'containsKey(Ljava/lang/String;)Z': function (vm, self, a) { return self.$cat.props[a[0]] ? 1 : 0; },
+		'get(Ljava/lang/String;)Lnet/minecraftforge/common/Property;': function (vm, self, a) { return self.$cat.props[a[0]] || null; },
+		'get(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { return self.$cat.props[a[0]] || null; },
+		'put(Ljava/lang/String;Lnet/minecraftforge/common/Property;)Lnet/minecraftforge/common/Property;': function (vm, self, a) { var o = self.$cat.props[a[0]] || null; self.$cat.props[a[0]] = a[1]; return o; },
+		'remove(Ljava/lang/Object;)Lnet/minecraftforge/common/Property;': function (vm, self, a) { var o = self.$cat.props[a[0]] || null; delete self.$cat.props[a[0]]; return o; },
+		'size()I': function (vm, self) { return Object.keys(self.$cat.props).length; },
+		'isEmpty()Z': function (vm, self) { return Object.keys(self.$cat.props).length ? 0 : 1; },
+		'keySet()Ljava/util/Set;': function (vm, self) { var s = vm.newObject(vm.loadClass('java/util/TreeSet')); vm.callVirtual(s, '<init>', '()V', []); Object.keys(self.$cat.props).forEach(function (k) { vm.callVirtual(s, 'add', '(Ljava/lang/Object;)Z', [k]); }); return s; },
+		'values()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, Object.keys(self.$cat.props).sort().map(function (k) { return self.$cat.props[k]; })); },
+		'isChild()Z': function (vm, self) { return self.$cat.parent ? 1 : 0; },
+	} });
+	def(P + '$Type', Object.assign(enumSpec(['STRING', 'INTEGER', 'BOOLEAN', 'DOUBLE'], function (vm, o, n) { o.$id = n.charAt(0); }), {}));
+	vm.natives[P + '$Type'].methods = {
+		'getID()C': function (vm, self) { return self.$id.charCodeAt(0); },
+	};
+	vm.natives[P + '$Type'].staticMethods = { 'tryParse(C)Lnet/minecraftforge/common/Property$Type;': function (vm, n, a) {
+		var c = vm.loadClass(P + '$Type'); vm.initClass(c);
+		return c.$values.filter(function (v) { return v.$id.charCodeAt(0) === a[0]; })[0] || null;
+	} };
+	enumStatics(vm, P + '$Type');
+	var typeObj = function (vm, t) { if (!t) return null; var c = vm.loadClass(P + '$Type'); vm.initClass(c); return c.$values.filter(function (v) { return v.$id === t; })[0]; };
+	var typeChar = function (o) { return o ? o.$id : null; };
+	def(P, { fields: { name: 'Ljava/lang/String;', value: 'Ljava/lang/String;', comment: 'Ljava/lang/String;', valueList: '[Ljava/lang/String;' }, methods: {
+		'<init>()V': function (vm, self) { self.$type = null; self.$list = false; },
+		'<init>(Ljava/lang/String;Ljava/lang/String;Lnet/minecraftforge/common/Property$Type;)V': function (vm, self, a) { self[':name'] = a[0]; self[':value'] = a[1]; self.$type = typeChar(a[2]); self.$list = false; },
+		'<init>(Ljava/lang/String;[Ljava/lang/String;Lnet/minecraftforge/common/Property$Type;)V': function (vm, self, a) { self[':name'] = a[0]; self[':value'] = ''; self[':valueList'] = a[1]; self.$type = typeChar(a[2]); self.$list = true; },
+		'getName()Ljava/lang/String;': function (vm, self) { return self[':name']; },
+		'setName(Ljava/lang/String;)V': function (vm, self, a) { self[':name'] = a[0]; },
+		'getString()Ljava/lang/String;': function (vm, self) { return propString(self); },
+		'getInt()I': function (vm, self) { var v = javaInt(propString(self)); return v === null ? -1 : v; },
+		'getInt(I)I': function (vm, self, a) { var v = javaInt(propString(self)); return v === null ? a[0] : v; },
+		'isIntValue()Z': function (vm, self) { return javaInt(propString(self)) !== null ? 1 : 0; },
+		'getBoolean(Z)Z': function (vm, self, a) { var s = propString(self); return javaBool(s) ? (s.toLowerCase() === 'true' ? 1 : 0) : a[0]; },
+		'isBooleanValue()Z': function (vm, self) { return javaBool(propString(self)) ? 1 : 0; },
+		'getDouble(D)D': function (vm, self, a) { var v = javaDouble(propString(self)); return v === null ? a[0] : v; },
+		'isDoubleValue()Z': function (vm, self) { return javaDouble(propString(self)) !== null ? 1 : 0; },
+		'getStringList()[Ljava/lang/String;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/String;', propList(self)); },
+		'getIntList()[I': function (vm, self) { var v = propList(self).map(javaInt).filter(function (x) { return x !== null; }), r = vm.newArray('I', v.length); v.forEach(function (x, i) { r.a[i] = x; }); return r; },
+		'isIntList()Z': function (vm, self) { return propList(self).every(function (s) { return javaInt(s) !== null; }) ? 1 : 0; },
+		'getBooleanList()[Z': function (vm, self) { var v = propList(self).filter(javaBool), r = vm.newArray('Z', v.length); v.forEach(function (x, i) { r.a[i] = x.toLowerCase() === 'true' ? 1 : 0; }); return r; },
+		'isBooleanList()Z': function (vm, self) { return propList(self).every(javaBool) ? 1 : 0; },
+		'getDoubleList()[D': function (vm, self) { var v = propList(self).map(javaDouble).filter(function (x) { return x !== null; }), r = vm.newArray('D', v.length); v.forEach(function (x, i) { r.a[i] = x; }); return r; },
+		'isDoubleList()Z': function (vm, self) { return propList(self).every(function (s) { return javaDouble(s) !== null; }) ? 1 : 0; },
+		'isList()Z': function (vm, self) { return self.$list ? 1 : 0; },
+		'wasRead()Z': function (vm, self) { return self.$wasRead ? 1 : 0; },
+		'getType()Lnet/minecraftforge/common/Property$Type;': function (vm, self) { return typeObj(vm, self.$type); },
+		'hasChanged()Z': function (vm, self) { return self.$changed ? 1 : 0; },
+		'set(Ljava/lang/String;)V': function (vm, self, a) { propSet(self, a[0]); },
+		'set([Ljava/lang/String;)V': function (vm, self, a) { self[':valueList'] = a[0]; self.$changed = true; },
+		'set(I)V': function (vm, self, a) { propSet(self, String(a[0])); },
+		'set(Z)V': function (vm, self, a) { propSet(self, a[0] ? 'true' : 'false'); },
+		'set(D)V': function (vm, self, a) { propSet(self, dstr(vm, a[0])); },
+		'toString()Ljava/lang/String;': function (vm, self) { return propString(self); },
+	} });
+}
+
+var PRIORITIES = ['HIGHEST', 'HIGH', 'NORMAL', 'LOW', 'LOWEST'];
+function busObj(vm, name) {
+	var f = forge(vm);
+	if (f.buses[name]) return f.buses[name];
+	var b = vm.newObject(vm.loadClass(FORGE + 'event/EventBus'));
+	b.$listeners = [];
+	b.$name = name;
+	return (f.buses[name] = b);
+}
+function eventCancelable(vm, e) { return !!classAnn(vm, e.cls, FORGE + 'event/Cancelable'); }
+function eventHasResult(vm, e) { return !!classAnn(vm, e.cls, FORGE + 'event/Event$HasResult'); }
+function busRegister(vm, bus, target) {
+	if (!target) return;
+	var seen = {};
+	for (var c = vm.classOf(target); c; c = c.superClass) {
+		Object.keys(c.methods).forEach(function (k) {
+			var m = c.methods[k];
+			if (seen[k] || m.isStatic || m.sig.args.length !== 1) return;
+			var a = JVM.annotation(vm, m.annotations, FORGE + 'event/ForgeSubscribe');
+			if (!a) return;
+			seen[k] = true;
+			var pr = a.values.priority ? a.values.priority.name : 'NORMAL';
+			var rc = a.values.receiveCanceled ? !!a.values.receiveCanceled.v : false;
+			bus.$listeners.push({ target: target, m: m, type: JVM.reflect.typeClass(vm, m.sig.args[0]), pri: Math.max(0, PRIORITIES.indexOf(pr)), rc: rc, seq: bus.$listeners.length });
+		});
+	}
+}
+function busPost(vm, bus, ev) {
+	if (!ev) return 0;
+	var ec = vm.classOf(ev);
+	var ls = bus.$listeners.filter(function (l) { return ec.isSubclassOf(l.type) && !l.type.absent; });
+	ls.sort(function (a, b) { return a.pri - b.pri || a.seq - b.seq; });
+	ls.forEach(function (l) {
+		if (ev.$canceled && !l.rc) return;
+		if (l.m.cls.source) vm.currentMod = l.m.cls.source;
+		var t = l.m.cls.findMethod && vm.classOf(l.target).findMethod(l.m.key) || l.m;
+		vm.invoke(t, l.target, [ev]);
+	});
+	return ev.$canceled ? 1 : 0;
+}
+JVM.forgePost = function (vm, cname, fill, busName) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	if (!f || !f.buses[busName || 'EVENT_BUS'] || !f.buses[busName || 'EVENT_BUS'].$listeners.length) return null;
+	var bus = f.buses[busName || 'EVENT_BUS'], ev = null;
+	JVM.run(vm, function () {
+		ev = vm.newObject(vm.loadClass(cname));
+		ev.$result = enumOf(vm, FORGE + 'event/Event$Result', 'DEFAULT');
+		if (fill) fill(ev);
+		busPost(vm, bus, ev);
+	});
+	return ev;
+};
+
+function installEvents(vm, def) {
+	def(FORGE + 'event/EventBus', { methods: {
+		'<init>()V': function (vm, self) { self.$listeners = []; },
+		'register(Ljava/lang/Object;)V': function (vm, self, a) { busRegister(vm, self, a[0]); },
+		'unregister(Ljava/lang/Object;)V': function (vm, self, a) { self.$listeners = self.$listeners.filter(function (l) { return l.target !== a[0]; }); },
+		'post(Lnet/minecraftforge/event/Event;)Z': function (vm, self, a) { return busPost(vm, self, a[0]); },
+	} });
+	def(FORGE + 'event/Event$Result', enumSpec(['DENY', 'DEFAULT', 'ALLOW']));
+	enumStatics(vm, FORGE + 'event/Event$Result');
+	def(FORGE + 'event/EventPriority', enumSpec(PRIORITIES));
+	enumStatics(vm, FORGE + 'event/EventPriority');
+	def(FORGE + 'event/Event', { methods: {
+		'<init>()V': function (vm, self) { self.$result = enumOf(vm, FORGE + 'event/Event$Result', 'DEFAULT'); },
+		'isCancelable()Z': function (vm, self) { return eventCancelable(vm, self) ? 1 : 0; },
+		'isCanceled()Z': function (vm, self) { return self.$canceled ? 1 : 0; },
+		'setCanceled(Z)V': function (vm, self, a) {
+			if (!eventCancelable(vm, self)) vm.throwNew('java/lang/IllegalArgumentException', 'Attempted to cancel a uncancelable event');
+			self.$canceled = !!a[0];
+		},
+		'hasResult()Z': function (vm, self) { return eventHasResult(vm, self) ? 1 : 0; },
+		'getResult()Lnet/minecraftforge/event/Event$Result;': function (vm, self) { return self.$result || enumOf(vm, FORGE + 'event/Event$Result', 'DEFAULT'); },
+		'setResult(Lnet/minecraftforge/event/Event$Result;)V': function (vm, self, a) { self.$result = a[0]; },
+		'getListenerList()Lnet/minecraftforge/event/ListenerList;': function () { return null; },
+		'setup()V': function () {},
+	} });
+	var ev = function (name, sup, fields, ctor, cancelable, extra) {
+		var methods = {};
+		if (ctor) methods[ctor.desc] = function (vm, self, a) {
+			self.$result = enumOf(vm, FORGE + 'event/Event$Result', 'DEFAULT');
+			ctor.set(self, a, vm);
+		};
+		def(FORGE + name, Object.assign({ super: FORGE + sup, fields: fields || {}, methods: Object.assign(methods, extra || {}), annotations: cancelable ? [FORGE + 'event/Cancelable'] : [] }));
+	};
+	var W = SRC + 'World', EP = SRC + 'EntityPlayer', E = SRC + 'Entity', EL = SRC + 'EntityLiving', IS = SRC + 'ItemStack';
+	ev('event/world/WorldEvent', 'event/Event', { world: L(W) }, { desc: '<init>(Lnet/minecraft/src/World;)V', set: function (s, a) { s[':world'] = a[0]; } });
+	['Load', 'Unload', 'Save'].forEach(function (k) { ev('event/world/WorldEvent$' + k, 'event/world/WorldEvent', {}, { desc: '<init>(Lnet/minecraft/src/World;)V', set: function (s, a) { s[':world'] = a[0]; } }); });
+	ev('event/entity/EntityEvent', 'event/Event', { entity: L(E) }, { desc: '<init>(Lnet/minecraft/src/Entity;)V', set: function (s, a) { s[':entity'] = a[0]; } });
+	ev('event/entity/living/LivingEvent', 'event/entity/EntityEvent', { entityLiving: L(EL) }, { desc: '<init>(Lnet/minecraft/src/EntityLiving;)V', set: function (s, a) { s[':entity'] = a[0]; s[':entityLiving'] = a[0]; } });
+	ev('event/entity/player/PlayerEvent', 'event/entity/living/LivingEvent', { entityPlayer: L(EP) }, { desc: '<init>(Lnet/minecraft/src/EntityPlayer;)V', set: function (s, a) { s[':entity'] = s[':entityLiving'] = s[':entityPlayer'] = a[0]; } });
+	var pl = function (s, a) { s[':entity'] = s[':entityLiving'] = s[':entityPlayer'] = a[0]; };
+	ev('event/entity/player/PlayerEvent$BreakSpeed', 'event/entity/player/PlayerEvent', { block: L(SRC + 'Block'), metadata: 'I', originalSpeed: 'F', newSpeed: 'F' },
+		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/Block;IF)V', set: function (s, a) { pl(s, a); s[':block'] = a[1]; s[':metadata'] = a[2]; s[':originalSpeed'] = a[3]; s[':newSpeed'] = a[3]; } }, true);
+	ev('event/entity/player/PlayerEvent$HarvestCheck', 'event/entity/player/PlayerEvent', { block: L(SRC + 'Block'), success: 'Z' },
+		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/Block;Z)V', set: function (s, a) { pl(s, a); s[':block'] = a[1]; s[':success'] = a[2]; } });
+	ev('event/entity/player/UseHoeEvent', 'event/entity/player/PlayerEvent', { current: L(IS), world: L(W), x: 'I', y: 'I', z: 'I' },
+		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;III)V', set: function (s, a) { pl(s, a); s[':current'] = a[1]; s[':world'] = a[2]; s[':x'] = a[3]; s[':y'] = a[4]; s[':z'] = a[5]; } }, true);
+	ev('event/entity/player/BonemealEvent', 'event/entity/player/PlayerEvent', { world: L(W), ID: 'I', X: 'I', Y: 'I', Z: 'I' },
+		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;IIII)V', set: function (s, a) { pl(s, a); s[':world'] = a[1]; s[':ID'] = a[2]; s[':X'] = a[3]; s[':Y'] = a[4]; s[':Z'] = a[5]; } }, true);
+	def(FORGE + 'event/entity/player/PlayerInteractEvent$Action', enumSpec(['RIGHT_CLICK_AIR', 'RIGHT_CLICK_BLOCK', 'LEFT_CLICK_BLOCK']));
+	enumStatics(vm, FORGE + 'event/entity/player/PlayerInteractEvent$Action');
+	ev('event/entity/player/PlayerInteractEvent', 'event/entity/player/PlayerEvent', { action: L(FORGE + 'event/entity/player/PlayerInteractEvent$Action'), x: 'I', y: 'I', z: 'I', face: 'I', useBlock: L(FORGE + 'event/Event$Result'), useItem: L(FORGE + 'event/Event$Result') },
+		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraftforge/event/entity/player/PlayerInteractEvent$Action;IIII)V', set: function (s, a, vm) {
+			pl(s, a); s[':action'] = a[1]; s[':x'] = a[2]; s[':y'] = a[3]; s[':z'] = a[4]; s[':face'] = a[5];
+			s[':useBlock'] = s[':useItem'] = enumOf(vm, FORGE + 'event/Event$Result', 'DEFAULT');
+		} }, true);
+	ev('event/entity/item/ItemEvent', 'event/entity/EntityEvent', { entityItem: L(SRC + 'EntityItem') }, null);
+	ev('event/entity/player/EntityItemPickupEvent', 'event/entity/player/PlayerEvent', { item: L(SRC + 'EntityItem') }, null, true);
+	ev('event/entity/EntityJoinWorldEvent', 'event/entity/EntityEvent', { world: L(W) }, { desc: '<init>(Lnet/minecraft/src/Entity;Lnet/minecraft/src/World;)V', set: function (s, a) { s[':entity'] = a[0]; s[':world'] = a[1]; } }, true);
+	ev('event/terraingen/PopulateChunkEvent', 'event/Event', { chunkProvider: L(SRC + 'IChunkProvider'), world: L(W), rand: 'Ljava/util/Random;', chunkX: 'I', chunkZ: 'I', hasVillageGenerated: 'Z' }, null);
+	['Pre', 'Post'].forEach(function (k) { ev('event/terraingen/PopulateChunkEvent$' + k, 'event/terraingen/PopulateChunkEvent', {}, null); });
+	ev('client/event/TextureStitchEvent', 'event/Event', { map: L(SRC + 'TextureMap') }, null);
+	['Pre', 'Post'].forEach(function (k) { ev('client/event/TextureStitchEvent$' + k, 'client/event/TextureStitchEvent', {}, null); });
+	ev('client/event/sound/SoundLoadEvent', 'event/Event', { manager: L(SRC + 'SoundManager') }, null);
+}
+
+function containerObj(vm, mod) {
+	if (mod.container) return mod.container;
+	var c = vm.newObject(vm.loadClass(FML + 'common/FMLModContainer'));
+	c.$mod = mod;
+	var md = vm.newObject(vm.loadClass(FML + 'common/ModMetadata'));
+	md[':modId'] = mod.id; md[':name'] = mod.name; md[':version'] = mod.version;
+	md[':description'] = mod.info && mod.info.description || ''; md[':url'] = mod.info && mod.info.url || '';
+	md[':credits'] = mod.info && mod.info.credits || '';
+	md[':authorList'] = JVM.newList(vm, (mod.info && mod.info.authors || mod.info && mod.info.authorList || []).map(String));
+	md[':autogenerated'] = mod.info ? 0 : 1;
+	c.$md = md;
+	return (mod.container = c);
+}
+function modById(vm, id) { return forge(vm).mods.filter(function (m) { return m.id === id; })[0] || null; }
+function activeMod(vm) { var f = forge(vm); return f.active || f.mods[f.mods.length - 1] || null; }
+function sideObj(vm, n) { return enumOf(vm, FML + 'relauncher/Side', n); }
+function effectiveSide(vm) { var g = vm.game; return sideObj(vm, g && (g.mode === 'run' || g.mode === 'gen') ? 'SERVER' : 'CLIENT'); }
+
+function installFml(vm, def) {
+	var C = FML + 'common/';
+	var ANN = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC | 0x2000;
+	['Mod', 'Mod$Init', 'Mod$PreInit', 'Mod$PostInit', 'Mod$Instance', 'Mod$Metadata', 'Mod$EventHandler', 'Mod$ServerStarting',
+	 'Mod$ServerStarted', 'Mod$ServerStopping', 'Mod$ServerStopped', 'Mod$ServerAboutToStart', 'Mod$IMCCallback', 'Mod$FingerprintWarning',
+	 'Mod$Block', 'Mod$Item', 'SidedProxy', 'network/NetworkMod', 'network/NetworkMod$SidedPacketHandler', 'network/NetworkMod$VersionCheckHandler',
+	 'network/NetworkMod$NULL'].forEach(function (n) { def(C + n, { access: ANN, interfaces: ['java/lang/annotation/Annotation'] }); });
+	[FML + 'relauncher/SideOnly', FORGE + 'event/ForgeSubscribe', FORGE + 'event/Cancelable', FORGE + 'event/Event$HasResult'].forEach(function (n) { def(n, { access: ANN, interfaces: ['java/lang/annotation/Annotation'] }); });
+	var IFACE = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+	['ITickHandler', 'IScheduledTickHandler', 'IWorldGenerator', 'IFuelHandler', 'ICraftingHandler', 'IPickupNotifier', 'IPlayerTracker',
+	 'IDispenserHandler', 'ICrashCallable', 'network/IConnectionHandler', 'network/IPacketHandler', 'network/IGuiHandler', 'network/IChatListener',
+	 'network/Player', 'registry/IEntityAdditionalSpawnData', 'registry/IThrowableEntity'].forEach(function (n) { def(C + n, { access: IFACE, interfaces: n === 'IScheduledTickHandler' ? [C + 'ITickHandler'] : [] }); });
+	def(FML + 'relauncher/Side', enumSpec(['CLIENT', 'SERVER', 'BUKKIT'], null, {}));
+	vm.natives[FML + 'relauncher/Side'].methods = {
+		'isClient()Z': function (vm, self) { return self.$name === 'CLIENT' ? 1 : 0; },
+		'isServer()Z': function (vm, self) { return self.$name !== 'CLIENT' ? 1 : 0; },
+	};
+	enumStatics(vm, FML + 'relauncher/Side');
+	def(C + 'TickType', enumSpec(['WORLD', 'RENDER', 'GUI', 'CLIENTGUI', 'WORLDLOAD', 'CLIENT', 'PLAYER', 'SERVER']));
+	vm.natives[C + 'TickType'].methods = { 'partnerTicks()Ljava/util/EnumSet;': function (vm, self) {
+		var P = { CLIENT: 'RENDER', RENDER: 'CLIENT', GUI: 'CLIENTGUI', CLIENTGUI: 'GUI' }[self.$name];
+		return enumSetOf(vm, P ? [enumOf(vm, C + 'TickType', P)] : []);
+	} };
+	enumStatics(vm, C + 'TickType');
+	def(C + 'LoaderState', enumSpec(['NOINIT', 'LOADING', 'CONSTRUCTING', 'PREINITIALIZATION', 'INITIALIZATION', 'POSTINITIALIZATION', 'AVAILABLE', 'SERVER_ABOUT_TO_START', 'SERVER_STARTING', 'SERVER_STARTED', 'SERVER_STOPPING', 'SERVER_STOPPED', 'ERRORED']));
+	enumStatics(vm, C + 'LoaderState');
+
+	var logAt = function (vm, level, text) { var lv = level && level.$name || String(level || ''); vm.log(/SEVERE|WARNING/.test(lv) ? 'warn' : 'out', text); };
+	var lvlStatic = function (lv) { return function (vm, n, a) { logAt(vm, { $name: lv }, format(vm, a[0], a[1])); }; };
+	def(C + 'FMLLog', { staticMethods: {
+		'log(Ljava/lang/String;Ljava/util/logging/Level;Ljava/lang/String;[Ljava/lang/Object;)V': function (vm, n, a) { logAt(vm, a[1], '[' + a[0] + '] ' + format(vm, a[2], a[3])); },
+		'log(Ljava/util/logging/Level;Ljava/lang/String;[Ljava/lang/Object;)V': function (vm, n, a) { logAt(vm, a[0], format(vm, a[1], a[2])); },
+		'log(Ljava/lang/String;Ljava/util/logging/Level;Ljava/lang/Throwable;Ljava/lang/String;[Ljava/lang/Object;)V': function (vm, n, a) { logAt(vm, a[1], '[' + a[0] + '] ' + format(vm, a[3], a[4]) + ' (' + JVM.describeThrowable(a[2]) + ')'); },
+		'log(Ljava/util/logging/Level;Ljava/lang/Throwable;Ljava/lang/String;[Ljava/lang/Object;)V': function (vm, n, a) { logAt(vm, a[0], format(vm, a[2], a[3]) + ' (' + JVM.describeThrowable(a[1]) + ')'); },
+		'severe(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('SEVERE'),
+		'warning(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('WARNING'),
+		'info(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('INFO'),
+		'fine(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('FINE'),
+		'finer(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('FINER'),
+		'finest(Ljava/lang/String;[Ljava/lang/Object;)V': lvlStatic('FINEST'),
+		'getLogger()Ljava/util/logging/Logger;': function (vm) { return vm.callStatic('java/util/logging/Logger', 'getLogger', '(Ljava/lang/String;)Ljava/util/logging/Logger;', ['FML']); },
+		'makeLog(Ljava/lang/String;)V': function () {},
+	} });
+
+	def(C + 'ModContainer', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def(C + 'ModMetadata', { fields: { modId: 'Ljava/lang/String;', name: 'Ljava/lang/String;', version: 'Ljava/lang/String;', description: 'Ljava/lang/String;', url: 'Ljava/lang/String;', credits: 'Ljava/lang/String;', authorList: 'Ljava/util/List;', autogenerated: 'Z', logoFile: 'Ljava/lang/String;', updateUrl: 'Ljava/lang/String;', parent: 'Ljava/lang/String;' }, methods: {
+		'<init>()V': function () {},
+		'getAuthorList()Ljava/lang/String;': function (vm, self) { return listOf(vm, self[':authorList']).join(', '); },
+		'getChildModList()Ljava/lang/String;': function () { return ''; },
+		'printableSortingRules()Ljava/lang/String;': function () { return ''; },
+	} });
+	var mc = function (f) { return function (vm, self) { return f(self.$mod, vm, self); }; };
+	def(C + 'FMLModContainer', { interfaces: [C + 'ModContainer'], methods: {
+		'getModId()Ljava/lang/String;': mc(function (m) { return m.id; }),
+		'getName()Ljava/lang/String;': mc(function (m) { return m.name; }),
+		'getVersion()Ljava/lang/String;': mc(function (m) { return m.version; }),
+		'getDisplayVersion()Ljava/lang/String;': mc(function (m) { return m.version; }),
+		'getMod()Ljava/lang/Object;': mc(function (m) { return m.instance; }),
+		'getMetadata()Lcpw/mods/fml/common/ModMetadata;': mc(function (m, vm, self) { return self.$md; }),
+		'getSource()Ljava/io/File;': mc(function (m, vm) { return JVM.fileObj(vm, 'mods/' + m.id + '.jar'); }),
+		'getSortingRules()Ljava/lang/String;': function () { return ''; },
+		'matches(Ljava/lang/Object;)Z': mc(function (m, vm, self) { return 0; }),
+		'toString()Ljava/lang/String;': mc(function (m) { return m.id; }),
+		'isImmutable()Z': function () { return 0; },
+		'isNetworkMod()Z': function () { return 1; },
+		'getRequirements()Ljava/util/Set;': function (vm) { return vm.callStatic('java/util/Collections', 'emptySet', '()Ljava/util/Set;', []); },
+		'getDependencies()Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getDependants()Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+	} });
+	def(C + 'DummyModContainer', { super: C + 'FMLModContainer', methods: {} });
+	def(C + 'MinecraftDummyContainer', { super: C + 'FMLModContainer', methods: {
+		'getVersion()Ljava/lang/String;': function () { return '1.5.2'; },
+		'getModId()Ljava/lang/String;': function () { return 'Minecraft'; },
+		'getName()Ljava/lang/String;': function () { return 'Minecraft'; },
+	} });
+	var loaderObj = function (vm) { var f = forge(vm); return f.loader || (f.loader = vm.newObject(vm.loadClass(C + 'Loader'))); };
+	var mcContainer = function (vm) { var f = forge(vm); if (!f.mcCont) { f.mcCont = vm.newObject(vm.loadClass(C + 'MinecraftDummyContainer')); f.mcCont.$mod = { id: 'Minecraft', name: 'Minecraft', version: '1.5.2' }; } return f.mcCont; };
+	var isLoaded = function (vm, id) {
+		if (id === 'Forge' || id === 'FML' || id === 'mcp' || id === 'Minecraft') return 1;
+		if (modById(vm, id)) return 1;
+		return reg(vm).mods.some(function (m) { return m.cls.name === id || m.cls.name.replace(/^mod_/, '') === id; }) ? 1 : 0;
+	};
+	def(C + 'Loader', { methods: {
+		'getModList()Ljava/util/List;': function (vm) { return JVM.newList(vm, forge(vm).mods.map(function (m) { return containerObj(vm, m); })); },
+		'getActiveModList()Ljava/util/List;': function (vm) { return JVM.newList(vm, forge(vm).mods.map(function (m) { return containerObj(vm, m); })); },
+		'getIndexedModList()Ljava/util/Map;': function (vm) {
+			var map = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(map, '<init>', '()V', []);
+			forge(vm).mods.forEach(function (m) { vm.callVirtual(map, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [m.id, containerObj(vm, m)]); });
+			return map;
+		},
+		'getConfigDir()Ljava/io/File;': function (vm) { return JVM.fileObj(vm, 'config'); },
+		'getMinecraftModContainer()Lcpw/mods/fml/common/ModContainer;': function (vm) { return mcContainer(vm); },
+		'getMinecraftModContainer()Lcpw/mods/fml/common/MinecraftDummyContainer;': function (vm) { return mcContainer(vm); },
+		'activeModContainer()Lcpw/mods/fml/common/ModContainer;': function (vm) { var m = activeMod(vm); return m ? containerObj(vm, m) : null; },
+		'getMCVersionString()Ljava/lang/String;': function () { return 'Minecraft 1.5.2'; },
+		'getFMLVersionString()Ljava/lang/String;': function () { return '5.2.23.737'; },
+		'isInState(Lcpw/mods/fml/common/LoaderState;)Z': function (vm, self, a) { return a[0] && a[0].$name === (forge(vm).state || 'AVAILABLE') ? 1 : 0; },
+		'hasReachedState(Lcpw/mods/fml/common/LoaderState;)Z': function () { return 1; },
+		'getModClassLoader()Ljava/lang/ClassLoader;': function (vm) { return JVM.classLoaderObj(vm); },
+	}, staticMethods: {
+		'instance()Lcpw/mods/fml/common/Loader;': function (vm) { return loaderObj(vm); },
+		'isModLoaded(Ljava/lang/String;)Z': function (vm, n, a) { return isLoaded(vm, a[0]); },
+	} });
+	def(C + 'FMLCommonHandler', { methods: {
+		'getEffectiveSide()Lcpw/mods/fml/relauncher/Side;': function (vm) { return effectiveSide(vm); },
+		'getSide()Lcpw/mods/fml/relauncher/Side;': function (vm) { return sideObj(vm, 'CLIENT'); },
+		'getMinecraftServerInstance()Lnet/minecraft/server/MinecraftServer;': function (vm) { var f = forge(vm); return f.server || (f.server = vm.newObject(vm.loadClass('net/minecraft/server/MinecraftServer'))); },
+		'getModName()Ljava/lang/String;': function () { return 'fml,forge'; },
+		'getBrandings()Ljava/util/List;': function (vm) { return JVM.newList(vm, ['Minecraft 1.5.2', 'FML']); },
+		'registerCrashCallable(Lcpw/mods/fml/common/ICrashCallable;)V': function () {},
+		'raiseException(Ljava/lang/Throwable;Ljava/lang/String;Z)V': function (vm, self, a) { vm.log('warn', a[1] + ': ' + JVM.describeThrowable(a[0])); },
+		'getFMLLogger()Ljava/util/logging/Logger;': function (vm) { return vm.callStatic('java/util/logging/Logger', 'getLogger', '(Ljava/lang/String;)Ljava/util/logging/Logger;', ['FML']); },
+		'getMinecraftLogger()Ljava/util/logging/Logger;': function (vm) { return vm.callStatic('java/util/logging/Logger', 'getLogger', '(Ljava/lang/String;)Ljava/util/logging/Logger;', ['Minecraft']); },
+	}, staticMethods: {
+		'instance()Lcpw/mods/fml/common/FMLCommonHandler;': function (vm) { var f = forge(vm); return f.handler || (f.handler = vm.newObject(vm.loadClass(C + 'FMLCommonHandler'))); },
+	} });
+	def(FML + 'client/FMLClientHandler', { methods: {
+		'getClient()Lnet/minecraft/client/Minecraft;': function (vm) { return vm.callStatic(SRC + 'ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []); },
+		'displayGuiScreen(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/GuiScreen;)V': function (vm) { vm.warnOnce('fml:gui', 'mod screens are not available yet (left unplugged)'); },
+		'getSide()Lcpw/mods/fml/relauncher/Side;': function (vm) { return sideObj(vm, 'CLIENT'); },
+	}, staticMethods: {
+		'instance()Lcpw/mods/fml/client/FMLClientHandler;': function (vm) { var f = forge(vm); return f.client || (f.client = vm.newObject(vm.loadClass(FML + 'client/FMLClientHandler'))); },
+	} });
+
+	var E = C + 'event/';
+	def(E + 'FMLEvent', { methods: { 'getEventType()Ljava/lang/String;': function (vm, self) { return self.cls.name.substring(self.cls.name.lastIndexOf('/') + 1); } } });
+	def(E + 'FMLStateEvent', { super: E + 'FMLEvent', methods: { 'getSide()Lcpw/mods/fml/relauncher/Side;': function (vm) { return sideObj(vm, 'CLIENT'); } } });
+	var modOf = function (self) { return self.$mod; };
+	def(E + 'FMLPreInitializationEvent', { super: E + 'FMLStateEvent', methods: {
+		'getSuggestedConfigurationFile()Ljava/io/File;': function (vm, self) { return JVM.fileObj(vm, 'config/' + modOf(self).id + '.cfg'); },
+		'getModConfigurationDirectory()Ljava/io/File;': function (vm) { return JVM.fileObj(vm, 'config'); },
+		'getSourceFile()Ljava/io/File;': function (vm, self) { return JVM.fileObj(vm, 'mods/' + modOf(self).id + '.jar'); },
+		'getModMetadata()Lcpw/mods/fml/common/ModMetadata;': function (vm, self) { return containerObj(vm, modOf(self)).$md; },
+		'getModLog()Ljava/util/logging/Logger;': function (vm, self) { return vm.callStatic('java/util/logging/Logger', 'getLogger', '(Ljava/lang/String;)Ljava/util/logging/Logger;', [modOf(self).id]); },
+		'getVersionProperties()Ljava/util/Properties;': function () { return null; },
+		'getAsmData()Lcpw/mods/fml/common/discovery/ASMDataTable;': function () { return null; },
+	} });
+	def(E + 'FMLInitializationEvent', { super: E + 'FMLStateEvent', methods: {} });
+	def(E + 'FMLPostInitializationEvent', { super: E + 'FMLStateEvent', methods: {
+		'buildSoftDependProxy(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;': function () { return null; },
+	} });
+	def(E + 'FMLServerStartingEvent', { super: E + 'FMLStateEvent', methods: {
+		'getServer()Lnet/minecraft/server/MinecraftServer;': function (vm) { return vm.callVirtual(vm.callStatic(C + 'FMLCommonHandler', 'instance', '()Lcpw/mods/fml/common/FMLCommonHandler;', []), 'getMinecraftServerInstance', '()Lnet/minecraft/server/MinecraftServer;', []); },
+		'registerServerCommand(Lnet/minecraft/src/ICommand;)V': function (vm, self, a) { forge(vm).commands.push(a[0]); },
+	} });
+	['FMLServerAboutToStartEvent', 'FMLServerStartedEvent', 'FMLServerStoppingEvent', 'FMLServerStoppedEvent', 'FMLLoadCompleteEvent'].forEach(function (n) { def(E + n, { super: E + 'FMLStateEvent', methods: {} }); });
+	def(E + 'FMLInterModComms$IMCEvent', { super: E + 'FMLEvent', methods: { 'getMessages()Lcom/google/common/collect/ImmutableList;': function (vm) { return JVM.newList(vm, []); } } });
+	def(E + 'FMLInterModComms', { staticMethods: {
+		'sendMessage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z': function () { return 1; },
+		'sendMessage(Ljava/lang/String;Ljava/lang/String;Lnet/minecraft/src/NBTTagCompound;)Z': function () { return 1; },
+		'sendMessage(Ljava/lang/String;Ljava/lang/String;Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'sendRuntimeMessage(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V': function () {},
+		'fetchRuntimeMessages(Ljava/lang/Object;)Lcom/google/common/collect/ImmutableList;': function (vm) { return JVM.newList(vm, []); },
+	} });
+
+	var R = C + 'registry/';
+	var blockOf = function (vm, o) { return o; };
+	var regBlock = function (vm, block, itemCls) {
+		if (!block) return;
+		block.$registered = true;
+		if (!itemCls) itemCls = vm.loadClass(SRC + 'ItemBlock');
+		var id = block[':blockID'] - 256, o = vm.newObject(itemCls);
+		var m1 = itemCls.findDeclared('<init>(I)V'), m2 = itemCls.findDeclared('<init>(ILnet/minecraft/src/Block;)V');
+		if (m1 && !(m2 && m1.cls.native && !m2.cls.native)) vm.invoke(m1, o, [id]);
+		else if (m2) vm.invoke(m2, o, [id, block]);
+		else { vm.log('warn', 'no item constructor for ' + itemCls.name.replace(/[/]/g, '.')); return; }
+		o.$blockItem = true;
+		block.$itemBlock = o;
+	};
+	var CLS = function (a, i) { return a[i] ? a[i].$cls : null; };
+	var ml = function (name, desc) { return function (vm, n, a) { return vm.callStatic(SRC + 'ModLoader', name, desc, a); }; };
+	def(R + 'GameRegistry', { staticMethods: {
+		'registerBlock(Lnet/minecraft/src/Block;)V': function (vm, n, a) { regBlock(vm, a[0], null); },
+		'registerBlock(Lnet/minecraft/src/Block;Ljava/lang/String;)V': function (vm, n, a) { regBlock(vm, a[0], null); if (a[0]) a[0].$regName = a[1]; },
+		'registerBlock(Lnet/minecraft/src/Block;Ljava/lang/Class;)V': function (vm, n, a) { regBlock(vm, a[0], CLS(a, 1)); },
+		'registerBlock(Lnet/minecraft/src/Block;Ljava/lang/Class;Ljava/lang/String;)V': function (vm, n, a) { regBlock(vm, a[0], CLS(a, 1)); if (a[0]) a[0].$regName = a[2]; },
+		'registerBlock(Lnet/minecraft/src/Block;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;)V': function (vm, n, a) { regBlock(vm, a[0], CLS(a, 1)); if (a[0]) a[0].$regName = a[2]; },
+		'registerItem(Lnet/minecraft/src/Item;Ljava/lang/String;)V': function (vm, n, a) { if (a[0]) a[0].$regName = a[1]; },
+		'registerItem(Lnet/minecraft/src/Item;Ljava/lang/String;Ljava/lang/String;)V': function (vm, n, a) { if (a[0]) a[0].$regName = a[1]; },
+		'addRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': ml('addRecipe', '(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V'),
+		'addShapedRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)Lnet/minecraft/src/IRecipe;': function (vm, n, a) { vm.callStatic(SRC + 'ModLoader', 'addRecipe', '(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V', a); return null; },
+		'addShapelessRecipe(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': ml('addShapelessRecipe', '(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V'),
+		'addRecipe(Lnet/minecraft/src/IRecipe;)V': function (vm, n, a) { addIRecipe(vm, a[0]); },
+		'addSmelting(ILnet/minecraft/src/ItemStack;F)V': ml('addSmelting', '(ILnet/minecraft/src/ItemStack;F)V'),
+		'registerWorldGenerator(Lcpw/mods/fml/common/IWorldGenerator;)V': function (vm, n, a) { var g = forge(vm).worldGens; if (a[0] && g.indexOf(a[0]) < 0) { g.push(a[0]); a[0].$mod = vm.currentMod; } },
+		'registerFuelHandler(Lcpw/mods/fml/common/IFuelHandler;)V': function (vm, n, a) { forge(vm).fuel.push(a[0]); },
+		'registerCraftingHandler(Lcpw/mods/fml/common/ICraftingHandler;)V': function (vm, n, a) { forge(vm).crafting.push(a[0]); },
+		'registerPickupHandler(Lcpw/mods/fml/common/IPickupNotifier;)V': function (vm, n, a) { forge(vm).pickup.push(a[0]); },
+		'registerPlayerTracker(Lcpw/mods/fml/common/IPlayerTracker;)V': function (vm, n, a) { forge(vm).playerTrackers.push(a[0]); },
+		'registerTileEntity(Ljava/lang/Class;Ljava/lang/String;)V': function (vm, n, a) { forge(vm).tileEntities[a[1]] = CLS(a, 0); },
+		'registerTileEntityWithAlternatives(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/String;)V': function (vm, n, a) { forge(vm).tileEntities[a[1]] = CLS(a, 0); },
+		'registerDispenserHandler(Lcpw/mods/fml/common/IDispenserHandler;)V': function (vm) { vm.warnOnce('fml:dispenser', 'dispenser behaviour is not available here (left unplugged)'); },
+		'getFuelValue(Lnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return forge(vm).fuel.reduce(function (mx, h) { return Math.max(mx, vm.callVirtual(h, 'getBurnTime', '(Lnet/minecraft/src/ItemStack;)I', [a[0]])); }, 0); },
+		'findBlock(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/src/Block;': function (vm, n, a) { var r = reg(vm); var k = Object.keys(r.blocks).filter(function (i) { return r.blocks[i].$regName === a[1]; })[0]; return k ? r.blocks[k] : null; },
+		'findItem(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/src/Item;': function (vm, n, a) { var r = reg(vm); var k = Object.keys(r.items).filter(function (i) { return r.items[i].$regName === a[1]; })[0]; return k ? r.items[k] : null; },
+		'generateWorld(IILnet/minecraft/src/World;Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/IChunkProvider;)V': function (vm, n, a) { generateWorld(vm, a[0], a[1], a[2]); },
+	} });
+	var langAdd = function (vm, key, lang, value) { if (!lang || /^en_/i.test(lang)) reg(vm).lang[key] = value; };
+	var nameKey = function (vm, o) {
+		if (!o) return null;
+		if (vm.isInstance(o, vm.loadClass(SRC + 'ItemStack'))) return vm.callVirtual(o, 'getItemName', '()Ljava/lang/String;', []);
+		if (vm.isInstance(o, vm.loadClass(SRC + 'Item'))) return vm.callVirtual(o, 'getUnlocalizedName', '()Ljava/lang/String;', []);
+		if (vm.isInstance(o, vm.loadClass(SRC + 'Block'))) return vm.callVirtual(o, 'getUnlocalizedName', '()Ljava/lang/String;', []);
+		vm.throwNew('java/lang/IllegalArgumentException', 'Illegal object for naming ' + vm.toJavaString(o));
+	};
+	var langInst = function (vm) { var f = forge(vm); return f.lang || (f.lang = vm.newObject(vm.loadClass(R + 'LanguageRegistry'))); };
+	var loadLangFile = function (vm, path, lang, isXml) {
+		var p = String(path || '').replace(/^\/+/, ''), b = vm.resources[p];
+		if (!b) { vm.log('warn', 'the language resource ' + path + ' cannot be located'); return; }
+		var text = new TextDecoder('utf-8').decode(b);
+		if (isXml) {
+			var re = /<entry\s+key\s*=\s*"([^"]*)"\s*>([\s\S]*?)<\/entry>/g, m;
+			while ((m = re.exec(text))) langAdd(vm, m[1], lang, m[2].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'));
+		} else text.split(/\r?\n/).forEach(function (l) {
+			if (/^\s*[#!]/.test(l)) return;
+			var i = l.search(/[=:]/);
+			if (i > 0) langAdd(vm, l.substring(0, i).trim(), lang, l.substring(i + 1).trim());
+		});
+	};
+	def(R + 'LanguageRegistry', { methods: {
+		'getStringLocalization(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { return reg(vm).lang[a[0]] || ''; },
+		'getStringLocalization(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { return reg(vm).lang[a[0]] || ''; },
+		'addStringLocalization(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { langAdd(vm, a[0], 'en_US', a[1]); },
+		'addStringLocalization(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { langAdd(vm, a[0], a[1], a[2]); },
+		'addStringLocalization(Ljava/util/Properties;)V': function (vm, self, a) { listOf(vm, vm.callVirtual(a[0], 'keySet', '()Ljava/util/Set;', [])).forEach(function (k) { langAdd(vm, k, 'en_US', vm.callVirtual(a[0], 'getProperty', '(Ljava/lang/String;)Ljava/lang/String;', [k])); }); },
+		'addStringLocalization(Ljava/util/Properties;Ljava/lang/String;)V': function (vm, self, a) { listOf(vm, vm.callVirtual(a[0], 'keySet', '()Ljava/util/Set;', [])).forEach(function (k) { langAdd(vm, k, a[1], vm.callVirtual(a[0], 'getProperty', '(Ljava/lang/String;)Ljava/lang/String;', [k])); }); },
+		'addNameForObject(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { langAdd(vm, nameKey(vm, a[0]) + '.name', a[1], a[2]); },
+		'loadLocalization(Ljava/lang/String;Ljava/lang/String;Z)V': function (vm, self, a) { loadLangFile(vm, a[0], a[1], a[2]); },
+		'loadLocalization(Ljava/net/URL;Ljava/lang/String;Z)V': function (vm, self, a) { loadLangFile(vm, a[0] && a[0].$path, a[1], a[2]); },
+	}, staticMethods: {
+		'instance()Lcpw/mods/fml/common/registry/LanguageRegistry;': function (vm) { return langInst(vm); },
+		'addName(Ljava/lang/Object;Ljava/lang/String;)V': function (vm, n, a) { langAdd(vm, nameKey(vm, a[0]) + '.name', 'en_US', a[1]); },
+		'reloadLanguageTable()V': function () {},
+	} });
+	var tick = function (scheduled) { return function (vm, n, a) { if (a[0]) forge(vm).tickHandlers.push({ h: a[0], side: a[1] ? a[1].$name : 'CLIENT', scheduled: scheduled, wait: 0, mod: vm.currentMod }); }; };
+	def(R + 'TickRegistry', { staticMethods: {
+		'registerTickHandler(Lcpw/mods/fml/common/ITickHandler;Lcpw/mods/fml/relauncher/Side;)V': tick(false),
+		'registerScheduledTickHandler(Lcpw/mods/fml/common/IScheduledTickHandler;Lcpw/mods/fml/relauncher/Side;)V': tick(true),
+	} });
+	var ent = function (kind) { return function (vm, n, a) { forge(vm).entities.push({ kind: kind, args: Array.prototype.slice.call(a), mod: vm.currentMod }); }; };
+	var spawn = function (vm, n, a) { forge(vm).spawns.push({ args: Array.prototype.slice.call(a), mod: vm.currentMod }); };
+	var entInst = function (vm) { var f = forge(vm); return f.entReg || (f.entReg = vm.newObject(vm.loadClass(R + 'EntityRegistry'))); };
+	def(R + 'EntityRegistry', { methods: {}, staticMethods: {
+		'instance()Lcpw/mods/fml/common/registry/EntityRegistry;': function (vm) { return entInst(vm); },
+		'registerModEntity(Ljava/lang/Class;Ljava/lang/String;ILjava/lang/Object;IIZ)V': ent('mod'),
+		'registerGlobalEntityID(Ljava/lang/Class;Ljava/lang/String;I)V': ent('global'),
+		'registerGlobalEntityID(Ljava/lang/Class;Ljava/lang/String;III)V': ent('global'),
+		'findGlobalUniqueEntityId()I': function (vm) { var f = forge(vm); f.nextEntity = (f.nextEntity || 255); while (f.nextEntity > 0 && [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 120, 200].indexOf(f.nextEntity) >= 0) f.nextEntity--; return f.nextEntity--; },
+		'addSpawn(Ljava/lang/Class;IIILnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': spawn,
+		'addSpawn(Ljava/lang/String;IIILnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': spawn,
+		'removeSpawn(Ljava/lang/Class;Lnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+		'removeSpawn(Ljava/lang/String;Lnet/minecraft/src/EnumCreatureType;[Lnet/minecraft/src/BiomeGenBase;)V': function () {},
+	} });
+	def(R + 'VillagerRegistry', { methods: {
+		'registerVillagerId(I)V': function () {}, 'registerVillagerSkin(ILnet/minecraft/src/ResourceLocation;)V': function () {},
+		'registerVillageTradeHandler(ILcpw/mods/fml/common/registry/VillagerRegistry$IVillageTradeHandler;)V': function () {},
+		'registerVillageCreationHandler(Lcpw/mods/fml/common/registry/VillagerRegistry$IVillageCreationHandler;)V': function () {},
+	}, staticMethods: { 'instance()Lcpw/mods/fml/common/registry/VillagerRegistry;': function (vm) { var f = forge(vm); return f.villagers || (f.villagers = vm.newObject(vm.loadClass(R + 'VillagerRegistry'))); } } });
+
+	var N = C + 'network/';
+	def(N + 'NetworkRegistry', { methods: {
+		'registerConnectionHandler(Lcpw/mods/fml/common/network/IConnectionHandler;)V': function (vm, self, a) { forge(vm).connection.push(a[0]); },
+		'registerGuiHandler(Ljava/lang/Object;Lcpw/mods/fml/common/network/IGuiHandler;)V': function (vm, self, a) { var m = a[0] && forge(vm).mods.filter(function (x) { return x.instance === a[0]; })[0]; forge(vm).guiHandlers[m ? m.id : vm.currentMod] = a[1]; },
+		'registerChannel(Lcpw/mods/fml/common/network/IPacketHandler;Ljava/lang/String;)V': function () {},
+		'registerChannel(Lcpw/mods/fml/common/network/IPacketHandler;Ljava/lang/String;Lcpw/mods/fml/relauncher/Side;)V': function () {},
+		'registerChatListener(Lcpw/mods/fml/common/network/IChatListener;)V': function () {},
+	}, staticMethods: { 'instance()Lcpw/mods/fml/common/network/NetworkRegistry;': function (vm) { var f = forge(vm); return f.net || (f.net = vm.newObject(vm.loadClass(N + 'NetworkRegistry'))); } } });
+	def(N + 'PacketDispatcher', { staticMethods: (function () {
+		var s = {}, nop = function () {};
+		['sendPacketToServer(Lnet/minecraft/src/Packet;)V', 'sendPacketToPlayer(Lnet/minecraft/src/Packet;Lcpw/mods/fml/common/network/Player;)V',
+		 'sendPacketToAllAround(DDDDILnet/minecraft/src/Packet;)V', 'sendPacketToAllInDimension(Lnet/minecraft/src/Packet;I)V',
+		 'sendPacketToAllPlayers(Lnet/minecraft/src/Packet;)V'].forEach(function (k) { s[k] = nop; });
+		s['getPacket(Ljava/lang/String;[B)Lnet/minecraft/src/Packet250CustomPayload;'] = function (vm) { return vm.newObject(vm.loadClass(SRC + 'Packet250CustomPayload')); };
+		return s;
+	})() });
+
+	def(FML + 'client/registry/RenderingRegistry', { methods: {}, staticMethods: {
+		'instance()Lcpw/mods/fml/client/registry/RenderingRegistry;': function (vm) { var f = forge(vm); return f.rr || (f.rr = vm.newObject(vm.loadClass(FML + 'client/registry/RenderingRegistry'))); },
+		'getNextAvailableRenderId()I': function (vm) { var f = forge(vm); return (f.renderId = (f.renderId || 40) + 1); },
+		'addNewArmourRendererPrefix(Ljava/lang/String;)I': function (vm, n, a) { var f = forge(vm); (f.armorPrefixes || (f.armorPrefixes = [])).push(a[0]); return 4 + f.armorPrefixes.length; },
+		'registerEntityRenderingHandler(Ljava/lang/Class;Lnet/minecraft/src/Render;)V': function (vm, n, a) { forge(vm).renderers.push({ cls: CLS(a, 0), render: a[1] }); },
+		'registerBlockHandler(Lcpw/mods/fml/client/registry/ISimpleBlockRenderingHandler;)V': function () {},
+		'registerBlockHandler(ILcpw/mods/fml/client/registry/ISimpleBlockRenderingHandler;)V': function () {},
+	} });
+	def(FML + 'client/registry/ClientRegistry', { staticMethods: {
+		'registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V': function (vm, n, a) { forge(vm).tileEntities[a[1]] = CLS(a, 0); },
+		'bindTileEntitySpecialRenderer(Ljava/lang/Class;Lnet/minecraft/src/TileEntitySpecialRenderer;)V': function () {},
+		'registerKeyBinding(Lnet/minecraft/src/KeyBinding;)V': function () {},
+	} });
+	def(FML + 'client/registry/KeyBindingRegistry', { staticMethods: {
+		'registerKeyBinding(Lcpw/mods/fml/client/registry/KeyBindingRegistry$KeyHandler;)V': function (vm, n, a) { (forge(vm).keyHandlers || (forge(vm).keyHandlers = [])).push(a[0]); },
+	} });
+	def(FML + 'client/registry/KeyBindingRegistry$KeyHandler', { methods: {
+		'<init>([Lnet/minecraft/src/KeyBinding;[Z)V': function (vm, self, a) { self[':keyBindings'] = a[0]; },
+		'<init>([Lnet/minecraft/src/KeyBinding;)V': function (vm, self, a) { self[':keyBindings'] = a[0]; },
+		'getKeyBindings()[Lnet/minecraft/src/KeyBinding;': function (vm, self) { return self[':keyBindings']; },
+	} });
+
+	var names = function (arr) { return arr ? Array.prototype.slice.call(arr.a) : []; };
+	var rget = function (vm, cls, obj, ns) { var r = findFieldByNames(vm, cls.$cls, ns); if (!r) vm.throwNew(FML + 'common/ObfuscationReflectionHelper$UnableToAccessFieldException', ns.join(',')); return getField(vm, r, obj); };
+	var rset = function (vm, cls, obj, v, ns) { var r = findFieldByNames(vm, cls.$cls, ns); if (!r) vm.throwNew(FML + 'common/ObfuscationReflectionHelper$UnableToAccessFieldException', ns.join(',')); setField(vm, r, obj, v); };
+	def(FML + 'common/ObfuscationReflectionHelper$UnableToAccessFieldException', { super: 'java/lang/RuntimeException' });
+	[FML + 'common/ObfuscationReflectionHelper', FML + 'relauncher/ReflectionHelper'].forEach(function (cn) {
+		def(cn, { staticMethods: {
+			'getPrivateValue(Ljava/lang/Class;Ljava/lang/Object;I)Ljava/lang/Object;': function (vm, n, a) { var r = fieldIndex(a[0].$cls, a[2]); return r ? JVM.reflect.boxAs(vm, getField(vm, r, a[1]), r.f.desc) : null; },
+			'getPrivateValue(Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/String;)Ljava/lang/Object;': function (vm, n, a) { var r = findFieldByNames(vm, a[0].$cls, names(a[2])); return r ? JVM.reflect.boxAs(vm, getField(vm, r, a[1]), r.f.desc) : rget(vm, a[0], a[1], names(a[2])); },
+			'setPrivateValue(Ljava/lang/Class;Ljava/lang/Object;Ljava/lang/Object;I)V': function (vm, n, a) { var r = fieldIndex(a[0].$cls, a[3]); if (r) setField(vm, r, a[1], JVM.reflect.unboxAs(a[2], r.f.desc)); },
+			'setPrivateValue(Ljava/lang/Class;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/String;)V': function (vm, n, a) { var r = findFieldByNames(vm, a[0].$cls, names(a[3])); if (r) setField(vm, r, a[1], JVM.reflect.unboxAs(a[2], r.f.desc)); else rset(vm, a[0], a[1], a[2], names(a[3])); },
+			'findField(Ljava/lang/Class;[Ljava/lang/String;)Ljava/lang/reflect/Field;': function (vm, n, a) { var r = findFieldByNames(vm, a[0].$cls, names(a[1])); return r ? JVM.reflect.fieldObj(vm, r.owner, r.f) : null; },
+			'getClass(Ljava/lang/ClassLoader;[Ljava/lang/String;)Ljava/lang/Class;': function (vm, n, a) { var ns = names(a[1]); for (var i = 0; i < ns.length; i++) { var c = vm.loadClass(ns[i].replace(/[.]/g, '/')); if (!c.absent) return vm.classObject(c); } return null; },
+		} });
+	});
+}
+
+var PHASE_ANN = {
+	preInit: ['Mod$PreInit', 'FMLPreInitializationEvent'], init: ['Mod$Init', 'FMLInitializationEvent'], postInit: ['Mod$PostInit', 'FMLPostInitializationEvent'],
+	serverAboutToStart: ['Mod$ServerAboutToStart', 'FMLServerAboutToStartEvent'], serverStarting: ['Mod$ServerStarting', 'FMLServerStartingEvent'],
+	serverStarted: ['Mod$ServerStarted', 'FMLServerStartedEvent'], serverStopping: ['Mod$ServerStopping', 'FMLServerStoppingEvent'],
+	serverStopped: ['Mod$ServerStopped', 'FMLServerStoppedEvent'],
+};
+function gatherHandlers(vm, cls) {
+	var out = {};
+	for (var c = cls; c && !c.native; c = c.superClass) {
+		Object.keys(c.methods).forEach(function (k) {
+			var m = c.methods[k];
+			if (!m.annotations || m.sig.args.length !== 1) return;
+			Object.keys(PHASE_ANN).forEach(function (ph) {
+				var p = PHASE_ANN[ph], evType = 'Lcpw/mods/fml/common/event/' + p[1] + ';';
+				var hit = JVM.annotation(vm, m.annotations, 'cpw/mods/fml/common/' + p[0]) ||
+					(JVM.annotation(vm, m.annotations, 'cpw/mods/fml/common/Mod$EventHandler') && m.sig.args[0] === evType);
+				if (hit && !(out[ph] || []).some(function (x) { return x.key === m.key; })) (out[ph] = out[ph] || []).push(m);
+			});
+		});
+	}
+	return out;
+}
+var MOD_SIG = 'Lcpw/mods/fml/common/Mod;';
+function bytesHave(b, s) {
+	var n = s.length, first = s.charCodeAt(0);
+	outer: for (var i = 0, end = b.length - n; i <= end; i++) {
+		if (b[i] !== first) continue;
+		for (var k = 1; k < n; k++) if (b[i + k] !== s.charCodeAt(k)) continue outer;
+		return true;
+	}
+	return false;
+}
+JVM.findForgeMods = function (vm, classes) {
+	return classes.filter(function (cn) {
+		var src = vm.sources[cn];
+		if (src) return bytesHave(src.bytes, MOD_SIG);
+		var c = vm.classes[cn];
+		return !!(c && c.cf && JVM.annotation(vm, c.cf.annotations, 'cpw/mods/fml/common/Mod'));
+	}).filter(function (cn) {
+		var c = vm.loadClass(cn);
+		return !!(c.cf && JVM.annotation(vm, c.cf.annotations, 'cpw/mods/fml/common/Mod'));
+	});
+};
+JVM.forgeLoad = function (vm, modClasses, allClasses, info) {
+	var f = forge(vm), mods = [];
+	modClasses.forEach(function (cn) {
+		var cls = vm.loadClass(cn), a = JVM.annotation(vm, cls.cf.annotations, 'cpw/mods/fml/common/Mod');
+		var id = sval(a, 'modid', cn.substring(cn.lastIndexOf('/') + 1));
+		var meta = (info || []).filter(function (x) { return x && x.modid === id; })[0] || null;
+		var mod = { id: id, name: sval(a, 'name', '') || (meta && meta.name) || id, version: sval(a, 'version', '') || (meta && meta.version) || '1.0',
+			info: meta, cls: cls, owner: vm.currentMod, handlers: gatherHandlers(vm, cls), instance: null };
+		f.mods.push(mod);
+		mods.push(mod);
+	});
+	var step = function (mod, what, fn) {
+		f.active = mod;
+		var r = JVM.run(vm, fn);
+		f.active = null;
+		if (!r.ok) vm.log('error', mod.id + ': ' + what + ' failed');
+		return r;
+	};
+	f.state = 'CONSTRUCTING';
+	mods.forEach(function (mod) {
+		step(mod, 'construction', function () {
+			vm.initClass(mod.cls);
+			mod.instance = vm.newObject(mod.cls);
+			var ctor = mod.cls.findDeclared('<init>()V');
+			if (ctor) vm.invoke(ctor, mod.instance, []);
+		});
+		allClasses.forEach(function (cn) {
+			var src = vm.sources[cn];
+			if (src && !bytesHave(src.bytes, 'SidedProxy;')) return;
+			var c = vm.loadClass(cn);
+			if (!c.cf) return;
+			Object.keys(c.fields).forEach(function (fn) {
+				var fd = c.fields[fn], sp = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/SidedProxy');
+				if (!sp || c.statics[fn] != null) return;
+				var target = sval(sp, 'clientSide', '') || sval(sp, 'serverSide', '');
+				if (!target) return;
+				step(mod, '@SidedProxy ' + target, function () {
+					var pc = vm.loadClass(target.replace(/[.]/g, '/'));
+					var o = vm.newObject(pc), k = pc.findDeclared('<init>()V');
+					if (k) vm.invoke(k, o, []);
+					vm.initClass(c);
+					if (fd.static) c.statics[fn] = o;
+				});
+			});
+		});
+		Object.keys(mod.cls.fields).forEach(function (fn) {
+			var fd = mod.cls.fields[fn];
+			var ia = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Instance');
+			if (ia) {
+				var want = sval(ia, 'value', '');
+				var target = want && want !== mod.id ? modById(vm, want) : mod;
+				var v = target ? target.instance : null;
+				if (fd.static) mod.cls.statics[fn] = v; else if (mod.instance) mod.instance[':' + fn] = v;
+			}
+			if (JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Metadata')) {
+				var md = containerObj(vm, mod).$md;
+				if (fd.static) mod.cls.statics[fn] = md; else if (mod.instance) mod.instance[':' + fn] = md;
+			}
+		});
+	});
+	[['preInit', 'PREINITIALIZATION'], ['init', 'INITIALIZATION'], ['postInit', 'POSTINITIALIZATION']].forEach(function (ph) {
+		f.state = ph[1];
+		mods.forEach(function (mod) { JVM.forgePhase(vm, mod, ph[0]); });
+	});
+	f.state = 'AVAILABLE';
+	return mods;
+};
+JVM.forgePhase = function (vm, mod, phase) {
+	var hs = mod.handlers[phase];
+	if (!hs || !mod.instance) return;
+	var f = forge(vm);
+	vm.currentMod = mod.owner || vm.currentMod;
+	var ev = vm.newObject(vm.loadClass('cpw/mods/fml/common/event/' + PHASE_ANN[phase][1]));
+	ev.$mod = mod;
+	hs.forEach(function (m) {
+		f.active = mod;
+		var r = JVM.run(vm, function () { vm.invoke(m, mod.instance, [ev]); });
+		f.active = null;
+		if (!r.ok) vm.log('error', mod.id + ': ' + phase + ' failed');
+	});
+};
+JVM.forgeWorldStart = function (vm) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	if (!f) return;
+	['serverAboutToStart', 'serverStarting', 'serverStarted'].forEach(function (ph) { f.mods.forEach(function (m) { JVM.forgePhase(vm, m, ph); }); });
+	JVM.forgePost(vm, FORGE + 'event/world/WorldEvent$Load', function (e) { e[':world'] = JVM.mc152.worldObj(vm); });
+	f.tickHandlers.forEach(function (t) { t.wait = 0; });
+};
+JVM.forgeWorldStop = function (vm) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	if (!f) return;
+	JVM.forgePost(vm, FORGE + 'event/world/WorldEvent$Save', function (e) { e[':world'] = JVM.mc152.worldObj(vm); });
+	JVM.forgePost(vm, FORGE + 'event/world/WorldEvent$Unload', function (e) { e[':world'] = JVM.mc152.worldObj(vm); });
+	['serverStopping', 'serverStopped'].forEach(function (ph) { f.mods.forEach(function (m) { JVM.forgePhase(vm, m, ph); }); });
+};
+JVM.forgeWantsTick = function (vm) { var f = vm.mcReg && vm.mcReg.forge; return !!(f && f.tickHandlers.length); };
+var TICK_ORDER = { SERVER: ['SERVER', 'WORLD', 'PLAYER'], CLIENT: ['CLIENT', 'WORLD', 'PLAYER'] };
+JVM.forgeTick = function (vm) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	if (!f || !f.tickHandlers.length) return;
+	var TT = FML + 'common/TickType';
+	f.tickHandlers.forEach(function (t) {
+		if (t.scheduled) { if (t.wait-- > 0) return; }
+		vm.currentMod = t.mod || vm.currentMod;
+		JVM.run(vm, function () {
+			var types = listOf(vm, vm.callVirtual(t.h, 'ticks', '()Ljava/util/EnumSet;', []));
+			(TICK_ORDER[t.side] || TICK_ORDER.SERVER).forEach(function (name) {
+				var ty = enumOf(vm, TT, name);
+				if (types.indexOf(ty) < 0) return;
+				var args = name === 'WORLD' ? [JVM.mc152.worldObj(vm)] : name === 'PLAYER' ? [JVM.mc152.playerObj(vm, null)] : [];
+				var set = enumSetOf(vm, [ty]), arr = JVM.javaArray(vm, 'Ljava/lang/Object;', args);
+				vm.callVirtual(t.h, 'tickStart', '(Ljava/util/EnumSet;[Ljava/lang/Object;)V', [set, arr]);
+				vm.callVirtual(t.h, 'tickEnd', '(Ljava/util/EnumSet;[Ljava/lang/Object;)V', [set, arr]);
+			});
+			if (t.scheduled) t.wait = Math.max(0, vm.callVirtual(t.h, 'nextTickSpacing', '()I', []) - 1);
+		});
+	});
+};
+function generateWorld(vm, cx, cz, world) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	if (!f || !f.worldGens.length) return;
+	var seed = BigInt(vm.mcSeed | 0);
+	var rnd = vm.newObject(vm.loadClass('java/util/Random'));
+	vm.callVirtual(rnd, '<init>', '(J)V', [seed]);
+	var xs = BigInt.asIntN(64, vm.callVirtual(rnd, 'nextLong', '()J', []) >> 3n);
+	var zs = BigInt.asIntN(64, vm.callVirtual(rnd, 'nextLong', '()J', []) >> 3n);
+	vm.callVirtual(rnd, 'setSeed', '(J)V', [BigInt.asIntN(64, BigInt.asIntN(64, xs * BigInt(cx) + zs * BigInt(cz)) ^ seed)]);
+	var prov = vm.newObject(vm.loadClass(SRC + 'ChunkProviderGenerate'));
+	f.worldGens.forEach(function (g) {
+		vm.currentMod = g.$mod || vm.currentMod;
+		JVM.run(vm, function () { vm.callVirtual(g, 'generate', '(Ljava/util/Random;IILnet/minecraft/src/World;Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/IChunkProvider;)V', [rnd, cx, cz, world, prov, prov]); });
+	});
+}
+JVM.forgeGenerate = function (vm, cx, cz) { generateWorld(vm, cx, cz, JVM.mc152.worldObj(vm)); };
+JVM.forgeWantsGen = function (vm) { var f = vm.mcReg && vm.mcReg.forge; return !!(f && f.worldGens.length); };
+
+function addIRecipe(vm, r) {
+	if (!r) return;
+	var cn = vm.classOf(r).name;
+	if (r.$oreRecipe) reg(vm).recipes.push({ mod: vm.currentMod, shaped: r.$shaped, out: r.$out, args: r.$args, ore: true });
+	else vm.warnOnce('recipe:' + cn, 'a recipe with its own matching code (' + cn.replace(/[/]/g, '.') + ') is not available here (left unplugged)');
+}
+function installForgeCommon(vm, def) {
+	var C = FORGE + 'common/';
+	def(C + 'MinecraftForge', {
+		statics: { EVENT_BUS: null, TERRAIN_GEN_BUS: null, ORE_GEN_BUS: null, SEED_ENTRY: null },
+		clinit: function (vm, c) { c.statics.EVENT_BUS = busObj(vm, 'EVENT_BUS'); c.statics.TERRAIN_GEN_BUS = busObj(vm, 'TERRAIN_GEN_BUS'); c.statics.ORE_GEN_BUS = busObj(vm, 'ORE_GEN_BUS'); },
+		staticMethods: {
+			'setBlockHarvestLevel(Lnet/minecraft/src/Block;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) { a[0].$harvest = { tool: a[1], level: a[2] }; } },
+			'setBlockHarvestLevel(Lnet/minecraft/src/Block;ILjava/lang/String;I)V': function (vm, n, a) { if (a[0] && (a[1] === 0 || !a[0].$harvest)) a[0].$harvest = { tool: a[2], level: a[3], meta: a[1] }; },
+			'removeBlockEffectiveness(Lnet/minecraft/src/Block;Ljava/lang/String;)V': function (vm, n, a) { if (a[0]) a[0].$harvest = { tool: 'none', level: 0 }; },
+			'removeBlockEffectiveness(Lnet/minecraft/src/Block;ILjava/lang/String;)V': function () {},
+			'getBlockHarvestLevel(Lnet/minecraft/src/Block;ILjava/lang/String;)I': function (vm, n, a) { return a[0] && a[0].$harvest && a[0].$harvest.tool === a[2] ? a[0].$harvest.level : -1; },
+			'setToolClass(Lnet/minecraft/src/Item;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) a[0].$toolClass = { tool: a[1], level: a[2] }; },
+			'addGrassSeed(Lnet/minecraft/src/ItemStack;I)V': function (vm) { vm.warnOnce('forge:seed', 'MinecraftForge.addGrassSeed is not available here (left unplugged)'); },
+			'addGrassPlant(Lnet/minecraft/src/Block;II)V': function (vm) { vm.warnOnce('forge:plant', 'MinecraftForge.addGrassPlant is not available here (left unplugged)'); },
+			'initialize()V': function () {},
+		},
+	});
+	def(C + 'ForgeDirection', enumSpec(['DOWN', 'UP', 'NORTH', 'SOUTH', 'WEST', 'EAST', 'UNKNOWN'], function (vm, o, n, i) {
+		var off = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0], [0, 0, 0]][i];
+		o[':offsetX'] = off[0]; o[':offsetY'] = off[1]; o[':offsetZ'] = off[2]; o[':flag'] = 1 << i;
+	}));
+	var FD = C + 'ForgeDirection';
+	var fdSpec = vm.natives[FD];
+	fdSpec.fields = { offsetX: 'I', offsetY: 'I', offsetZ: 'I', flag: 'I' };
+	fdSpec.statics = Object.assign(fdSpec.statics, { VALID_DIRECTIONS: null, OPPOSITES: null, ROTATION_MATRIX: null });
+	var ROT = [[0, 1, 4, 5, 3, 2, 6], [0, 1, 5, 4, 2, 3, 6], [5, 4, 2, 3, 0, 1, 6], [4, 5, 2, 3, 1, 0, 6], [2, 3, 1, 0, 4, 5, 6], [3, 2, 0, 1, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]];
+	var fdClinit = fdSpec.clinit;
+	fdSpec.clinit = function (vm, c) {
+		fdClinit(vm, c);
+		c.statics.VALID_DIRECTIONS = JVM.javaArray(vm, L(FD), c.$values.slice(0, 6));
+		var opp = vm.newArray('I', 7); [1, 0, 3, 2, 5, 4, 6].forEach(function (v, i) { opp.a[i] = v; });
+		c.statics.OPPOSITES = opp;
+		var rm = vm.newArray('[I', 7);
+		ROT.forEach(function (row, i) { var r = vm.newArray('I', 7); row.forEach(function (v, j) { r.a[j] = v; }); rm.a[i] = r; });
+		c.statics.ROTATION_MATRIX = rm;
+	};
+	var fdVals = function (vm) { var c = vm.loadClass(FD); vm.initClass(c); return c.$values; };
+	fdSpec.methods = {
+		'getOpposite()Lnet/minecraftforge/common/ForgeDirection;': function (vm, self) { return fdVals(vm)[[1, 0, 3, 2, 5, 4, 6][self.$ordinal]]; },
+		'getRotation(Lnet/minecraftforge/common/ForgeDirection;)Lnet/minecraftforge/common/ForgeDirection;': function (vm, self, a) { return fdVals(vm)[ROT[a[0].$ordinal][self.$ordinal]]; },
+	};
+	fdSpec.staticMethods = { 'getOrientation(I)Lnet/minecraftforge/common/ForgeDirection;': function (vm, n, a) { var v = fdVals(vm); return a[0] >= 0 && a[0] < 6 ? v[a[0]] : v[6]; } };
+	enumStatics(vm, FD);
+
+	var newConst = function (vm, cname, name, init) {
+		var c = vm.loadClass(cname); vm.initClass(c);
+		var o = vm.newObject(c);
+		o.$name = name;
+		o.$ordinal = c.$values ? c.$values.length : 0;
+		if (init) init(o);
+		if (c.$values) c.$values.push(o);
+		return o;
+	};
+	def(C + 'EnumHelper', { staticMethods: {
+		'addToolMaterial(Ljava/lang/String;IIFII)Lnet/minecraft/src/EnumToolMaterial;': function (vm, n, a) { return newConst(vm, SRC + 'EnumToolMaterial', a[0], function (o) { o.$m = [a[1], a[2], a[3], a[4], a[5]]; }); },
+		'addArmorMaterial(Ljava/lang/String;I[II)Lnet/minecraft/src/EnumArmorMaterial;': function (vm, n, a) { return newConst(vm, SRC + 'EnumArmorMaterial', a[0], function (o) { o.$m = [a[1], Array.prototype.slice.call(a[2].a), a[3]]; }); },
+		'addEnum(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Enum;': function (vm, n, a) { return newConst(vm, a[0].$cls.name, a[1], null); },
+		'addEnum(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Enum;': function (vm, n, a) { return newConst(vm, a[0].$cls.name, a[1], null); },
+		'addCreatureType(Ljava/lang/String;Ljava/lang/Class;IZ)Lnet/minecraft/src/EnumCreatureType;': function (vm, n, a) { return newConst(vm, SRC + 'EnumCreatureType', a[0], null); },
+		'addAction(Ljava/lang/String;)Lnet/minecraft/src/EnumAction;': function (vm, n, a) { return newConst(vm, SRC + 'EnumAction', a[0], null); },
+		'addRarity(Ljava/lang/String;ILjava/lang/String;)Lnet/minecraft/src/EnumRarity;': function (vm, n, a) { return newConst(vm, SRC + 'EnumRarity', a[0], null); },
+		'addEnchantmentType(Ljava/lang/String;)Lnet/minecraft/src/EnumEnchantmentType;': function (vm, n, a) { return newConst(vm, SRC + 'EnumEnchantmentType', a[0], null); },
+		'addArt(Ljava/lang/String;Ljava/lang/String;IIII)Lnet/minecraft/src/EnumArt;': function (vm, n, a) { return newConst(vm, SRC + 'EnumArt', a[0], null); },
+	} });
+	def(C + 'AchievementPage', { methods: {
+		'<init>(Ljava/lang/String;[Lnet/minecraft/src/Achievement;)V': function (vm, self, a) { self.$name = a[0]; self[':achievements'] = JVM.newList(vm, a[1] ? Array.prototype.slice.call(a[1].a) : []); },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'getAchievements()Ljava/util/List;': function (vm, self) { return self[':achievements']; },
+	}, staticMethods: {
+		'registerAchievementPage(Lnet/minecraftforge/common/AchievementPage;)V': function (vm) { vm.warnOnce('forge:ach', 'achievements are not available here (left unplugged)'); },
+		'getAchievementPage(I)Lnet/minecraftforge/common/AchievementPage;': function () { return null; },
+		'getAchievementPages()Ljava/util/Set;': function (vm) { return vm.callStatic('java/util/Collections', 'emptySet', '()Ljava/util/Set;', []); },
+		'isAchievementInPages(Lnet/minecraft/src/Achievement;)Z': function () { return 0; },
+	} });
+	def(C + 'DimensionManager', { staticMethods: {
+		'getWorld(I)Lnet/minecraft/src/WorldServer;': function (vm, n, a) { return (vm.mcDim | 0) === a[0] && vm.game && vm.game.mode !== 'define' ? JVM.mc152.worldObj(vm) : null; },
+		'getIDs()[Ljava/lang/Integer;': function (vm) { return JVM.javaArray(vm, 'Ljava/lang/Integer;', [0, -1, 1].map(function (d) { return JVM.box(vm, d, 'I'); })); },
+		'isDimensionRegistered(I)Z': function (vm, n, a) { return a[0] === 0 || a[0] === -1 || a[0] === 1 ? 1 : 0; },
+		'getNextFreeDimId()I': function () { return 2; },
+		'registerDimension(II)V': function (vm) { vm.warnOnce('forge:dim', 'new dimensions are not available here (left unplugged)'); },
+		'registerProviderType(ILjava/lang/Class;Z)Z': function () { return 0; },
+	} });
+
+	var O = FORGE + 'oredict/';
+	var oreId = function (vm, name) { var f = forge(vm); var i = f.oreNames.indexOf(name); if (i < 0) { i = f.oreNames.length; f.oreNames.push(name); f.ores[name] = []; } return i; };
+	var asStack = function (vm, o, meta) {
+		if (!o) return null;
+		if (vm.isInstance(o, vm.loadClass(SRC + 'ItemStack'))) return o;
+		if (vm.isInstance(o, vm.loadClass(SRC + 'Block'))) return JVM.mc152.newStack(vm, o[':blockID'], 1, meta == null ? 32767 : meta);
+		if (vm.isInstance(o, vm.loadClass(SRC + 'Item'))) return JVM.mc152.newStack(vm, o[':itemID'], 1, meta == null ? 32767 : meta);
+		return null;
+	};
+	var regOre = function (vm, name, st) {
+		if (!st) return;
+		oreId(vm, name);
+		var copy = JVM.mc152.newStack(vm, st[':itemID'], st[':stackSize'], st[':itemDamage']);
+		forge(vm).ores[name].push(copy);
+		JVM.forgePost(vm, O + 'OreDictionary$OreRegisterEvent', function (e) { e[':Name'] = name; e[':Ore'] = copy; });
+	};
+	def(O + 'OreDictionary', { statics: { WILDCARD_VALUE: 32767 }, staticMethods: {
+		'registerOre(Ljava/lang/String;Lnet/minecraft/src/ItemStack;)V': function (vm, n, a) { regOre(vm, a[0], a[1]); },
+		'registerOre(Ljava/lang/String;Lnet/minecraft/src/Item;)V': function (vm, n, a) { regOre(vm, a[0], asStack(vm, a[1])); },
+		'registerOre(Ljava/lang/String;Lnet/minecraft/src/Block;)V': function (vm, n, a) { regOre(vm, a[0], asStack(vm, a[1])); },
+		'registerOre(ILnet/minecraft/src/ItemStack;)V': function (vm, n, a) { regOre(vm, forge(vm).oreNames[a[0]], a[1]); },
+		'getOreID(Ljava/lang/String;)I': function (vm, n, a) { return oreId(vm, a[0]); },
+		'getOreID(Lnet/minecraft/src/ItemStack;)I': function (vm, n, a) {
+			var f = forge(vm), s = a[0];
+			if (!s) return -1;
+			for (var i = 0; i < f.oreNames.length; i++) if (f.ores[f.oreNames[i]].some(function (o) { return o[':itemID'] === s[':itemID'] && (o[':itemDamage'] === 32767 || o[':itemDamage'] === s[':itemDamage']); })) return i;
+			return -1;
+		},
+		'getOreName(I)Ljava/lang/String;': function (vm, n, a) { return forge(vm).oreNames[a[0]] || 'Unknown'; },
+		'getOreNames()[Ljava/lang/String;': function (vm) { return JVM.javaArray(vm, 'Ljava/lang/String;', forge(vm).oreNames.slice()); },
+		'getOres(Ljava/lang/String;)Ljava/util/ArrayList;': function (vm, n, a) { oreId(vm, a[0]); return JVM.newList(vm, forge(vm).ores[a[0]].slice()); },
+		'getOres(Ljava/lang/Integer;)Ljava/util/ArrayList;': function (vm, n, a) { var nm = forge(vm).oreNames[JVM.unbox(a[0])]; return JVM.newList(vm, nm ? forge(vm).ores[nm].slice() : []); },
+		'itemMatches(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/ItemStack;Z)Z': function (vm, n, a) {
+			if (!a[0] || !a[1]) return a[0] === a[1] ? 1 : 0;
+			return a[0][':itemID'] === a[1][':itemID'] && (a[0][':itemDamage'] === 32767 && !a[2] || a[0][':itemDamage'] === a[1][':itemDamage']) ? 1 : 0;
+		},
+		'initVanillaEntries()V': function () {},
+	}, clinit: function (vm) {
+		var B = function (n) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); return c.statics[n]; };
+		var I = function (n) { var c = vm.loadClass(SRC + 'Item'); vm.initClass(c); return c.statics[n]; };
+		regOre(vm, 'logWood', asStack(vm, B('wood'), 32767));
+		regOre(vm, 'plankWood', asStack(vm, B('planks'), 32767));
+		regOre(vm, 'slabWood', asStack(vm, B('woodSingleSlab'), 32767));
+		regOre(vm, 'stairWood', asStack(vm, B('stairsWoodOak'), 32767));
+		regOre(vm, 'stairWood', asStack(vm, B('stairsWoodSpruce'), 32767));
+		regOre(vm, 'stairWood', asStack(vm, B('stairsWoodBirch'), 32767));
+		regOre(vm, 'stairWood', asStack(vm, B('stairsWoodJungle'), 32767));
+		regOre(vm, 'stickWood', asStack(vm, I('stick'), 0));
+		regOre(vm, 'treeSapling', asStack(vm, B('sapling'), 32767));
+		regOre(vm, 'treeLeaves', asStack(vm, B('leaves'), 32767));
+	} });
+	def(O + 'OreDictionary$OreRegisterEvent', { super: FORGE + 'event/Event', fields: { Name: 'Ljava/lang/String;', Ore: L(SRC + 'ItemStack') } });
+	var oreRecipe = function (shaped) {
+		return function (vm, self, a) {
+			self.$oreRecipe = true; self.$shaped = shaped;
+			self.$out = asStack(vm, a[0], 0);
+			self.$args = a[1] ? Array.prototype.slice.call(a[1].a) : [];
+		};
+	};
+	var IR = SRC + 'IRecipe';
+	def(O + 'ShapedOreRecipe', { interfaces: [IR], methods: {
+		'<init>(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': oreRecipe(true),
+		'<init>(Lnet/minecraft/src/Item;[Ljava/lang/Object;)V': oreRecipe(true),
+		'<init>(Lnet/minecraft/src/Block;[Ljava/lang/Object;)V': oreRecipe(true),
+		'getRecipeOutput()Lnet/minecraft/src/ItemStack;': function (vm, self) { return self.$out; },
+		'getRecipeSize()I': function (vm, self) { return 9; },
+		'setMirrored(Z)Lnet/minecraftforge/oredict/ShapedOreRecipe;': function (vm, self) { return self; },
+	} });
+	def(O + 'ShapelessOreRecipe', { interfaces: [IR], methods: {
+		'<init>(Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V': oreRecipe(false),
+		'<init>(Lnet/minecraft/src/Item;[Ljava/lang/Object;)V': oreRecipe(false),
+		'<init>(Lnet/minecraft/src/Block;[Ljava/lang/Object;)V': oreRecipe(false),
+		'getRecipeOutput()Lnet/minecraft/src/ItemStack;': function (vm, self) { return self.$out; },
+		'getRecipeSize()I': function (vm, self) { return self.$args.length; },
+	} });
+	JVM.forgeOre = function (vm, name) { var f = vm.mcReg && vm.mcReg.forge; var l = f && f.ores[name]; return l && l.length ? l[0] : null; };
+}
+
+function installForge(vm) {
+	var def = function (n, s) { vm.defineNative(n, s); };
+	installConfig(vm, def);
+	installEvents(vm, def);
+	installFml(vm, def);
+	installForgeCommon(vm, def);
+	var mlSpec = vm.natives[SRC + 'ModLoader'];
+	if (mlSpec) Object.assign(mlSpec.staticMethods, {
+		'getPrivateValue(Ljava/lang/Class;Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;': function (vm, n, a) { var r = findFieldByNames(vm, a[0].$cls, [a[2]]); if (!r) vm.throwNew('java/lang/NoSuchFieldException', a[2]); return JVM.reflect.boxAs(vm, getField(vm, r, a[1]), r.f.desc); },
+		'getPrivateValue(Ljava/lang/Class;Ljava/lang/Object;I)Ljava/lang/Object;': function (vm, n, a) { var r = fieldIndex(a[0].$cls, a[2]); return r ? JVM.reflect.boxAs(vm, getField(vm, r, a[1]), r.f.desc) : null; },
+		'setPrivateValue(Ljava/lang/Class;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;)V': function (vm, n, a) { var r = findFieldByNames(vm, a[0].$cls, [a[2]]); if (!r) vm.throwNew('java/lang/NoSuchFieldException', a[2]); setField(vm, r, a[1], JVM.reflect.unboxAs(a[3], r.f.desc)); },
+		'setPrivateValue(Ljava/lang/Class;Ljava/lang/Object;ILjava/lang/Object;)V': function (vm, n, a) { var r = fieldIndex(a[0].$cls, a[2]); if (r) setField(vm, r, a[1], JVM.reflect.unboxAs(a[3], r.f.desc)); },
+	});
+}
+
+JVM.installForge = installForge;
+JVM.forgeState = function (vm) { return vm.mcReg && vm.mcReg.forge || null; };
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', MS = 'net/minecraft/server/MinecraftServer';
+function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function running(vm) { return !!(vm.game && vm.game.mode === 'run'); }
+function newStack(vm, id, n, d) { return JVM.mc152.newStack(vm, id, n, d); }
+
+function aabb(vm, a) {
+	var b = vm.newObject(vm.loadClass(SRC + 'AxisAlignedBB'));
+	b[':minX'] = a[0]; b[':minY'] = a[1]; b[':minZ'] = a[2]; b[':maxX'] = a[3]; b[':maxY'] = a[4]; b[':maxZ'] = a[5];
+	return b;
+}
+function bb(o) { return [o[':minX'], o[':minY'], o[':minZ'], o[':maxX'], o[':maxY'], o[':maxZ']]; }
+function intersects(a, b) { return b[3] > a[0] && b[0] < a[3] && b[4] > a[1] && b[1] < a[4] && b[5] > a[2] && b[2] < a[5]; }
+function entityBox(e) {
+	var hw = (e[':width'] || 0.6) / 2, h = e[':height'] || 1.8, y = e[':posY'] - (e[':yOffset'] || 0);
+	return [e[':posX'] - hw, y, e[':posZ'] - hw, e[':posX'] + hw, y + h, e[':posZ'] + hw];
+}
+
+function gameSlot(i, armor) { return armor ? -(3 - i) - 1 : i; }
+function readSlot(vm, slot) {
+	var s = op(vm, 'slot', slot);
+	if (!s || !s.id) return null;
+	return newStack(vm, s.id, s.count, s.data || 0);
+}
+function writeSlot(vm, slot, st) { op(vm, 'setslot', slot, st && st[':stackSize'] > 0 ? st[':itemID'] : 0, st ? st[':stackSize'] : 0, st ? st[':itemDamage'] : 0); }
+function liveArray(vm, n, armor) {
+	var cls = vm.loadClass('[L' + SRC + 'ItemStack;');
+	var backing = new Array(n);
+	var proxy = new Proxy(backing, {
+		get: function (t, k) {
+			if (k === 'length') return n;
+			if (typeof k === 'string' && /^\d+$/.test(k)) { var i = +k; return i < n && running(vm) ? readSlot(vm, gameSlot(i, armor)) : null; }
+			return t[k];
+		},
+		set: function (t, k, v) {
+			if (typeof k === 'string' && /^\d+$/.test(k)) { if (+k < n && running(vm)) writeSlot(vm, gameSlot(+k, armor), v); return true; }
+			t[k] = v; return true;
+		},
+	});
+	return new JVM.JArray(cls, proxy);
+}
+
+function installServer(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var spec = function (n) { return vm.natives[SRC + n]; };
+	var addTo = function (n, methods, statics) {
+		var s = spec(n);
+		s.methods = Object.assign({}, s.methods || {}, methods || {});
+		if (statics) s.staticMethods = Object.assign({}, s.staticMethods || {}, statics);
+	};
+	var D6 = '(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;', AB = 'Lnet/minecraft/src/AxisAlignedBB;';
+
+	def('AxisAlignedBB', { fields: { minX: 'D', minY: 'D', minZ: 'D', maxX: 'D', maxY: 'D', maxZ: 'D' }, methods: {
+		'setBounds(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { self[':' + k] = a[i]; }); return self; },
+		'addCoord(DDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) {
+			var b = bb(self);
+			for (var i = 0; i < 3; i++) { if (a[i] < 0) b[i] += a[i]; if (a[i] > 0) b[i + 3] += a[i]; }
+			return aabb(vm, b);
+		},
+		'expand(DDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { var b = bb(self); return aabb(vm, [b[0] - a[0], b[1] - a[1], b[2] - a[2], b[3] + a[0], b[4] + a[1], b[5] + a[2]]); },
+		'contract(DDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { var b = bb(self); return aabb(vm, [b[0] + a[0], b[1] + a[1], b[2] + a[2], b[3] - a[0], b[4] - a[1], b[5] - a[2]]); },
+		'getOffsetBoundingBox(DDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { var b = bb(self); return aabb(vm, [b[0] + a[0], b[1] + a[1], b[2] + a[2], b[3] + a[0], b[4] + a[1], b[5] + a[2]]); },
+		'offset(DDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { self[':minX'] += a[0]; self[':minY'] += a[1]; self[':minZ'] += a[2]; self[':maxX'] += a[0]; self[':maxY'] += a[1]; self[':maxZ'] += a[2]; return self; },
+		'copy()Lnet/minecraft/src/AxisAlignedBB;': function (vm, self) { return aabb(vm, bb(self)); },
+		'intersectsWith(Lnet/minecraft/src/AxisAlignedBB;)Z': function (vm, self, a) { return a[0] && intersects(bb(self), bb(a[0])) ? 1 : 0; },
+		'isVecInside(Lnet/minecraft/src/Vec3;)Z': function (vm, self, a) { var v = a[0], b = bb(self); return v && v[':xCoord'] > b[0] && v[':xCoord'] < b[3] && v[':yCoord'] > b[1] && v[':yCoord'] < b[4] && v[':zCoord'] > b[2] && v[':zCoord'] < b[5] ? 1 : 0; },
+		'getAverageEdgeLength()D': function (vm, self) { var b = bb(self); return (b[3] - b[0] + b[4] - b[1] + b[5] - b[2]) / 3; },
+		'setBB(Lnet/minecraft/src/AxisAlignedBB;)V': function (vm, self, a) { var b = bb(a[0]); ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { self[':' + k] = b[i]; }); },
+		'toString()Ljava/lang/String;': function (vm, self) { return 'box[' + bb(self).join(', ') + ']'; },
+	}, staticMethods: {
+		'getBoundingBox(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, n, a) { return aabb(vm, a); },
+		'getAABBPool()Lnet/minecraft/src/AABBPool;': function (vm) { return vm.mcAabbPool || (vm.mcAabbPool = vm.newObject(vm.loadClass(SRC + 'AABBPool'))); },
+	} });
+	def('AABBPool', { methods: { 'getAABB(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { return aabb(vm, a); }, 'cleanPool()V': function () {}, 'clearPool()V': function () {} } });
+	def('Vec3', { fields: { xCoord: 'D', yCoord: 'D', zCoord: 'D' }, methods: {
+		'addVector(DDD)Lnet/minecraft/src/Vec3;': function (vm, self, a) { return vec(vm, self[':xCoord'] + a[0], self[':yCoord'] + a[1], self[':zCoord'] + a[2]); },
+		'distanceTo(Lnet/minecraft/src/Vec3;)D': function (vm, self, a) { var dx = a[0][':xCoord'] - self[':xCoord'], dy = a[0][':yCoord'] - self[':yCoord'], dz = a[0][':zCoord'] - self[':zCoord']; return Math.sqrt(dx * dx + dy * dy + dz * dz); },
+		'squareDistanceTo(Lnet/minecraft/src/Vec3;)D': function (vm, self, a) { var dx = a[0][':xCoord'] - self[':xCoord'], dy = a[0][':yCoord'] - self[':yCoord'], dz = a[0][':zCoord'] - self[':zCoord']; return dx * dx + dy * dy + dz * dz; },
+		'lengthVector()D': function (vm, self) { return Math.sqrt(self[':xCoord'] * self[':xCoord'] + self[':yCoord'] * self[':yCoord'] + self[':zCoord'] * self[':zCoord']); },
+		'normalize()Lnet/minecraft/src/Vec3;': function (vm, self) { var l = Math.sqrt(self[':xCoord'] * self[':xCoord'] + self[':yCoord'] * self[':yCoord'] + self[':zCoord'] * self[':zCoord']); return l < 1e-4 ? vec(vm, 0, 0, 0) : vec(vm, self[':xCoord'] / l, self[':yCoord'] / l, self[':zCoord'] / l); },
+		'subtract(Lnet/minecraft/src/Vec3;)Lnet/minecraft/src/Vec3;': function (vm, self, a) { return vec(vm, a[0][':xCoord'] - self[':xCoord'], a[0][':yCoord'] - self[':yCoord'], a[0][':zCoord'] - self[':zCoord']); },
+		'dotProduct(Lnet/minecraft/src/Vec3;)D': function (vm, self, a) { return self[':xCoord'] * a[0][':xCoord'] + self[':yCoord'] * a[0][':yCoord'] + self[':zCoord'] * a[0][':zCoord']; },
+	}, staticMethods: {
+		'createVectorHelper(DDD)Lnet/minecraft/src/Vec3;': function (vm, n, a) { return vec(vm, a[0], a[1], a[2]); },
+	} });
+	function vec(vm, x, y, z) { var v = vm.newObject(vm.loadClass(SRC + 'Vec3')); v[':xCoord'] = x; v[':yCoord'] = y; v[':zCoord'] = z; return v; }
+	def('Vec3Pool', { methods: { 'getVecFromPool(DDD)Lnet/minecraft/src/Vec3;': function (vm, self, a) { return vec(vm, a[0], a[1], a[2]); } } });
+
+	var players = function (vm) { return running(vm) ? [JVM.mc152.playerObj(vm, null)] : []; };
+	var within = function (vm, cls, box, except) {
+		var b = bb(box);
+		return players(vm).filter(function (p) { return p !== except && (!cls || vm.isInstance(p, cls)) && intersects(b, entityBox(p)); });
+	};
+	var EL = 'Ljava/util/List;';
+	addTo('World', {
+		'getEntitiesWithinAABB(Ljava/lang/Class;Lnet/minecraft/src/AxisAlignedBB;)Ljava/util/List;': function (vm, self, a) { return JVM.newList(vm, within(vm, a[0] && a[0].$cls, a[1], null)); },
+		'getEntitiesWithinAABBExcludingEntity(Lnet/minecraft/src/Entity;Lnet/minecraft/src/AxisAlignedBB;)Ljava/util/List;': function (vm, self, a) { return JVM.newList(vm, within(vm, null, a[1], a[0])); },
+		'selectEntitiesWithinAABB(Ljava/lang/Class;Lnet/minecraft/src/AxisAlignedBB;Lnet/minecraft/src/IEntitySelector;)Ljava/util/List;': function (vm, self, a) {
+			return JVM.newList(vm, within(vm, a[0] && a[0].$cls, a[1], null).filter(function (e) { return !a[2] || vm.callVirtual(a[2], 'isEntityApplicable', '(Lnet/minecraft/src/Entity;)Z', [e]); }));
+		},
+		'getPlayerEntityByName(Ljava/lang/String;)Lnet/minecraft/src/EntityPlayer;': function (vm, self, a) { return players(vm).filter(function (p) { return p[':username'] === a[0]; })[0] || null; },
+		'getClosestVulnerablePlayer(DDDD)Lnet/minecraft/src/EntityPlayer;': function (vm) { return players(vm)[0] || null; },
+		'getCollidingBoundingBoxes(Lnet/minecraft/src/Entity;Lnet/minecraft/src/AxisAlignedBB;)Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getWorldInfo()Lnet/minecraft/src/WorldInfo;': function (vm) { return worldInfo(vm); },
+		'getSaveHandler()Lnet/minecraft/src/ISaveHandler;': function (vm) { return vm.mcSave || (vm.mcSave = vm.newObject(vm.loadClass(SRC + 'SaveHandler'))); },
+		'getMinecraftServer()Lnet/minecraft/server/MinecraftServer;': function (vm) { return server(vm); },
+		'getSpawnPoint()Lnet/minecraft/src/ChunkCoordinates;': function (vm) { var c = vm.newObject(vm.loadClass(SRC + 'ChunkCoordinates')); c[':posX'] = 0; c[':posY'] = 64; c[':posZ'] = 0; return c; },
+		'getWorldVec3Pool()Lnet/minecraft/src/Vec3Pool;': function (vm) { return vm.mcVecPool || (vm.mcVecPool = vm.newObject(vm.loadClass(SRC + 'Vec3Pool'))); },
+		'getBiomeGenForCoords(II)Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) { return JVM.biomeAt ? JVM.biomeAt(vm, a[0], a[1]) : null; },
+		'canBlockSeeTheSky(III)Z': function (vm, self, a) { return op(vm, 'sky', a[0], a[1], a[2]) ? 1 : 0; },
+		'getBlockLightValue(III)I': function (vm, self, a) { var v = op(vm, 'bright', a[0], a[1], a[2]); return v == null ? 15 : v | 0; },
+		'getFullBlockLightValue(III)I': function (vm, self, a) { var v = op(vm, 'bright', a[0], a[1], a[2]); return v == null ? 15 : v | 0; },
+		'isRaining()Z': function () { return 0; }, 'isThundering()Z': function () { return 0; },
+		'getRainStrength(F)F': function () { return 0; }, 'canLightningStrikeAt(III)Z': function () { return 0; },
+		'addWeatherEffect(Lnet/minecraft/src/Entity;)Z': function (vm) { vm.warnOnce('w:weather', 'lightning from mods is not available here (left unplugged)'); return 0; },
+		'getActualHeight()I': function () { return 128; }, 'getHeight()I': function () { return 128; },
+	});
+	function worldInfo(vm) {
+		var wi = vm.mcWorldInfo || (vm.mcWorldInfo = vm.newObject(vm.loadClass(SRC + 'WorldInfo')));
+		return wi;
+	}
+	var winfo = function (vm) { return (running(vm) && op(vm, 'world')) || {}; };
+	def('WorldInfo', { methods: {
+		'getWorldName()Ljava/lang/String;': function (vm) { return winfo(vm).name || 'world'; },
+		'getSeed()J': function (vm) { return BigInt(vm.mcSeed | 0); },
+		'getWorldTime()J': function (vm) { return BigInt(op(vm, 'time') || 0); },
+		'getWorldTotalTime()J': function (vm) { return BigInt(op(vm, 'time') || 0); },
+		'isHardcoreModeEnabled()Z': function () { return 0; },
+		'areCommandsAllowed()Z': function () { return 1; },
+		'isRaining()Z': function () { return 0; }, 'isThundering()Z': function () { return 0; },
+		'getGameType()Lnet/minecraft/src/EnumGameType;': function (vm) { var c = vm.loadClass(SRC + 'EnumGameType'); vm.initClass(c); return c.statics[winfo(vm).creative ? 'CREATIVE' : 'SURVIVAL'] || null; },
+		'getSpawnX()I': function () { return 0; }, 'getSpawnY()I': function () { return 64; }, 'getSpawnZ()I': function () { return 0; },
+		'getTerrainType()Lnet/minecraft/src/WorldType;': function () { return null; },
+		'getDimension()I': function (vm) { return vm.mcDim | 0; },
+	} });
+	def('ISaveHandler', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def('SaveHandler', { interfaces: [SRC + 'ISaveHandler'], methods: {
+		'getWorldDirectory()Ljava/io/File;': function (vm) { return JVM.fileObj(vm, 'world'); },
+		'getWorldDirectoryName()Ljava/lang/String;': function () { return 'world'; },
+		'getMapFileFromName(Ljava/lang/String;)Ljava/io/File;': function (vm, self, a) { return JVM.fileObj(vm, 'world/data/' + a[0] + '.dat'); },
+		'getSaveDirectoryName()Ljava/lang/String;': function () { return 'world'; },
+		'checkSessionLock()V': function () {},
+		'getChunkLoader(Lnet/minecraft/src/WorldProvider;)Lnet/minecraft/src/IChunkLoader;': function (vm) {
+			var l = vm.newObject(vm.loadClass(SRC + 'AnvilChunkLoader'));
+			l[':chunkSaveLocation'] = JVM.fileObj(vm, 'world');
+			return l;
+		},
+	} });
+	def('IChunkLoader', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def('AnvilChunkLoader', { interfaces: [SRC + 'IChunkLoader'], fields: { chunkSaveLocation: 'Ljava/io/File;' }, methods: {} });
+	def('ChunkCoordinates', { fields: { posX: 'I', posY: 'I', posZ: 'I' }, methods: {
+		'<init>(III)V': function (vm, self, a) { self[':posX'] = a[0]; self[':posY'] = a[1]; self[':posZ'] = a[2]; },
+		'<init>()V': function () {},
+		'set(III)V': function (vm, self, a) { self[':posX'] = a[0]; self[':posY'] = a[1]; self[':posZ'] = a[2]; },
+		'getDistanceSquared(III)F': function (vm, self, a) { var dx = self[':posX'] - a[0], dy = self[':posY'] - a[1], dz = self[':posZ'] - a[2]; return dx * dx + dy * dy + dz * dz; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { var o = a[0]; return o && o[':posX'] === self[':posX'] && o[':posY'] === self[':posY'] && o[':posZ'] === self[':posZ'] ? 1 : 0; },
+		'hashCode()I': function (vm, self) { return (self[':posX'] + (self[':posZ'] << 8) + (self[':posY'] << 16)) | 0; },
+	} });
+
+	addTo('InventoryPlayer', {
+		'getStackInSlot(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { var i = a[0]; return i < 36 ? readSlot(vm, i) : i < 40 ? readSlot(vm, gameSlot(i - 36, true)) : null; },
+		'setInventorySlotContents(ILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { var i = a[0]; if (i < 36) writeSlot(vm, i, a[1]); else if (i < 40) writeSlot(vm, gameSlot(i - 36, true), a[1]); },
+		'armorItemInSlot(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return a[0] >= 0 && a[0] < 4 ? readSlot(vm, gameSlot(a[0], true)) : null; },
+		'getSizeInventory()I': function () { return 40; },
+		'getInventoryStackLimit()I': function () { return 64; },
+		'getFirstEmptyStack()I': function (vm) { for (var i = 0; i < 36; i++) if (!readSlot(vm, i)) return i; return -1; },
+		'decrStackSize(II)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var i = a[0], slot = i < 36 ? i : gameSlot(i - 36, true), s = readSlot(vm, slot);
+			if (!s) return null;
+			var n = Math.min(a[1], s[':stackSize']);
+			s[':stackSize'] -= n;
+			writeSlot(vm, slot, s[':stackSize'] > 0 ? s : null);
+			return newStack(vm, s[':itemID'], n, s[':itemDamage']);
+		},
+		'getTotalArmorValue()I': function (vm) {
+			var t = 0;
+			for (var i = 0; i < 4; i++) { var s = readSlot(vm, gameSlot(i, true)); var it = s && vm.callVirtual(s, 'getItem', '()Lnet/minecraft/src/Item;', []); if (it && it[':damageReduceAmount']) t += it[':damageReduceAmount']; }
+			return t;
+		},
+		'hasItemStack(Lnet/minecraft/src/ItemStack;)Z': function (vm, self, a) { for (var i = 0; i < 40; i++) { var s = i < 36 ? readSlot(vm, i) : readSlot(vm, gameSlot(i - 36, true)); if (s && a[0] && s[':itemID'] === a[0][':itemID'] && s[':itemDamage'] === a[0][':itemDamage']) return 1; } return 0; },
+		'onInventoryChanged()V': function () {},
+	});
+	addTo('EntityPlayer', {
+		'getCurrentArmor(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return a[0] >= 0 && a[0] < 4 ? readSlot(vm, gameSlot(a[0], true)) : null; },
+		'getTotalArmorValue()I': function (vm, self) { return vm.callVirtual(self[':inventory'], 'getTotalArmorValue', '()I', []); },
+		'isUsingItem()Z': function () { return 0; },
+		'isPlayerSleeping()Z': function () { return 0; },
+		'getBedLocation()Lnet/minecraft/src/ChunkCoordinates;': function () { return null; },
+		'isEntityAlive()Z': function (vm, self) { return self.$info && self.$info.health > 0 ? 1 : 0; },
+	});
+	JVM.mc152.onPlayer = function (vm, p) {
+		var inv = p[':inventory'];
+		if (inv && !inv.$live) {
+			inv.$live = true;
+			inv[':mainInventory'] = liveArray(vm, 36, false);
+			inv[':armorInventory'] = liveArray(vm, 4, true);
+		}
+		if (inv) inv[':currentItem'] = p.$info && p.$info.slot != null ? p.$info.slot : 0;
+		p[':inventorySlots'] = p[':inventorySlots'] || null;
+		p[':width'] = 0.6; p[':height'] = 1.8; p[':yOffset'] = 1.62;
+		var b = p[':boundingBox'] || (p[':boundingBox'] = aabb(vm, [0, 0, 0, 0, 0, 0]));
+		var e = entityBox(p);
+		['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { b[':' + k] = e[i]; });
+	};
+	JVM.mc152.onWorld = function (vm, w) {
+		if (!w[':playerEntities']) { w[':playerEntities'] = JVM.newList(vm, []); w[':loadedEntityList'] = JVM.newList(vm, []); }
+		if (running(vm) && !vm.$fillingPlayers) {
+			vm.$fillingPlayers = true;
+			try {
+				var ps = players(vm);
+				[w[':playerEntities'], w[':loadedEntityList']].forEach(function (l) {
+					vm.callVirtual(l, 'clear', '()V', []);
+					ps.forEach(function (p) { vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [p]); });
+				});
+			} finally { vm.$fillingPlayers = false; }
+		}
+	};
+
+	function server(vm) { return vm.mcServer || (vm.mcServer = vm.newObject(vm.loadClass(MS))); }
+	function configManager(vm) { return vm.mcConfigMgr || (vm.mcConfigMgr = vm.newObject(vm.loadClass(SRC + 'ServerConfigurationManager'))); }
+	vm.defineNative(MS, { methods: {
+		'getConfigurationManager()Lnet/minecraft/src/ServerConfigurationManager;': function (vm) { return configManager(vm); },
+		'worldServerForDimension(I)Lnet/minecraft/src/WorldServer;': function (vm, self, a) { return (vm.mcDim | 0) === a[0] ? JVM.mc152.worldObj(vm) : null; },
+		'getEntityWorld()Lnet/minecraft/src/World;': function (vm) { return JVM.mc152.worldObj(vm); },
+		'getTickCounter()I': function (vm) { return vm.mcTicks | 0; },
+		'isSinglePlayer()Z': function () { return 1; },
+		'isDedicatedServer()Z': function () { return 0; },
+		'getServerOwner()Ljava/lang/String;': function (vm) { var p = running(vm) && op(vm, 'player'); return p && p.name || 'Player'; },
+		'getMOTD()Ljava/lang/String;': function () { return ''; },
+		'getFolderName()Ljava/lang/String;': function () { return 'world'; },
+		'getWorldName()Ljava/lang/String;': function (vm) { return winfo(vm).name || 'world'; },
+		'getMinecraftVersion()Ljava/lang/String;': function () { return '1.5.2'; },
+		'getCurrentPlayerCount()I': function (vm) { return players(vm).length; },
+		'getMaxPlayers()I': function () { return 8; },
+		'getAllUsernames()[Ljava/lang/String;': function (vm) { return JVM.javaArray(vm, 'Ljava/lang/String;', players(vm).map(function (p) { return p[':username']; })); },
+		'getDifficulty()I': function () { return 2; },
+		'isPVPEnabled()Z': function () { return 1; },
+		'canStructuresSpawn()Z': function () { return 1; },
+		'getCommandManager()Lnet/minecraft/src/ICommandManager;': function (vm) { return vm.newObject(vm.loadClass(SRC + 'ServerCommandManager')); },
+		'logInfo(Ljava/lang/String;)V': function (vm, self, a) { vm.log('out', a[0]); },
+		'logWarning(Ljava/lang/String;)V': function (vm, self, a) { vm.log('warn', a[0]); },
+		'logSevere(Ljava/lang/String;)V': function (vm, self, a) { vm.log('warn', a[0]); },
+	}, staticMethods: {
+		'getServer()Lnet/minecraft/server/MinecraftServer;': function (vm) { return server(vm); },
+	}, statics: { worldServers: null }, clinit: function (vm, c) { c.statics.worldServers = JVM.javaArray(vm, 'L' + SRC + 'WorldServer;', []); } });
+	def('ServerConfigurationManager', { methods: {
+		'sendChatMsg(Ljava/lang/String;)V': function (vm, self, a) { op(vm, 'msg', a[0]); },
+		'sendPacketToAllPlayers(Lnet/minecraft/src/Packet;)V': function () {},
+		'sendPacketToAllPlayersInDimension(Lnet/minecraft/src/Packet;I)V': function () {},
+		'getPlayerForUsername(Ljava/lang/String;)Lnet/minecraft/src/EntityPlayerMP;': function (vm, self, a) { return players(vm).filter(function (p) { return p[':username'] === a[0]; })[0] || null; },
+		'getAllUsernames()[Ljava/lang/String;': function (vm) { return JVM.javaArray(vm, 'Ljava/lang/String;', players(vm).map(function (p) { return p[':username']; })); },
+		'getCurrentPlayerCount()I': function (vm) { return players(vm).length; },
+		'areCommandsAllowed(Ljava/lang/String;)Z': function () { return 1; },
+		'isPlayerOpped(Ljava/lang/String;)Z': function () { return 1; },
+		'getOps()Ljava/util/Set;': function (vm) { return vm.callStatic('java/util/Collections', 'emptySet', '()Ljava/util/Set;', []); },
+	} });
+	spec('ServerConfigurationManager').fields = { playerEntityList: 'Ljava/util/List;' };
+	var mgrProto = vm.natives[SRC + 'ServerConfigurationManager'];
+	mgrProto.methods['<init>()V'] = function () {};
+	JVM.mc152.onServerList = function (vm) { var m = configManager(vm); m[':playerEntityList'] = JVM.newList(vm, players(vm)); return m; };
+	vm.natives[MS].methods['getConfigurationManager()Lnet/minecraft/src/ServerConfigurationManager;'] = function (vm) { return JVM.mc152.onServerList(vm); };
+}
+
+JVM.installServer = installServer;
 })();
 
 (function () {
