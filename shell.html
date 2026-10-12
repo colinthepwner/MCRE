@@ -1570,6 +1570,148 @@
                 };
             }
             J.hasClasses = function (files) { return Object.keys(files).some(function (k) { return /\.class$/i.test(k); }); };
+
+            var running = false, javaMods = {};
+            function mp(line) {
+                try { return JSON.parse(Module.ccall('mcModpeOp', 'string', ['string'], [line])); } catch (e) { return null; }
+            }
+            function clean(s) { return String(s).replace(/[\t\r\n]+/g, ' '); }
+            function reg() { return vm && vm.mcReg; }
+            function blockRef(id) {
+                var r = reg(), b = r && r.blocks[id];
+                return b ? 'mod:' + b.$mod + ':b' + id : 'id:' + id;
+            }
+            function itemRef(id) {
+                var r = reg();
+                if (id < 4096) return blockRef(id);
+                var it = r && r.items[id];
+                return it ? 'mod:' + it.$mod + ':i' + id : 'id:' + id;
+            }
+            function refToJava(ref) {
+                var m = /^mod:([^:]+):([bi])(\d+)$/.exec(ref || '');
+                if (m) return javaMods[m[1]] ? +m[3] : 4095;
+                m = /^id:(\d+)/.exec(ref || '');
+                return m ? +m[1] : 0;
+            }
+            function player() { return mp('player'); }
+            var bridge = {
+                mode: 'run',
+                blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
+                itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; },
+                op: function (name) {
+                    var a = Array.prototype.slice.call(arguments, 1);
+                    switch (name) {
+                    case 'tile': { var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t')); return t ? { id: refToJava(t[0]), data: t[1] | 0 } : { id: 0, data: 0 }; }
+                    case 'settile': return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? blockRef(a[3]) : 'id:0', a[4] | 0].join('\t'));
+                    case 'setdata': return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    case 'destroy': return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
+                    case 'player': {
+                        var p = player();
+                        if (!p) return null;
+                        return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, name: p.name, health: p.health, food: p.food,
+                                 creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot };
+                    }
+                    case 'held': { var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; return { id: refToJava(hp.carried[0]), count: hp.carried[1], data: hp.carried[2] }; }
+                    case 'give': return mp(['give', itemRef(a[0]), a[1] | 0, a[2] | 0].join('\t'));
+                    case 'drop': return mp(['drop', +a[0], +a[1], +a[2], itemRef(a[3]), a[4] | 0, a[5] | 0].join('\t'));
+                    case 'msg': return mp('msg\t' + clean(a[0]));
+                    case 'sound': return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
+                    case 'particle': return mp(['particle', clean(a[0]), +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
+                    case 'explode': return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
+                    case 'time': return mp('time');
+                    case 'settime': return mp('settime\t' + (a[0] | 0));
+                    case 'setpos': { var sp = player(); return sp ? mp(['setpos', sp.id, +a[0], +a[1], +a[2]].join('\t')) : null; }
+                    case 'sethealth': { var sh = player(); return sh ? mp(['sethealth', sh.id, a[0] | 0].join('\t')) : null; }
+                    case 'heal': { var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
+                    case 'setslot': return mp(['setslot', a[0] | 0, a[1] ? itemRef(a[1]) : 'id:0', a[2] | 0, a[3] | 0].join('\t'));
+                    case 'hasitem': case 'takeitem': {
+                        var want = itemRef(a[0]);
+                        for (var s = 0; s < 36; s++) {
+                            var st = mp('slot\t' + s);
+                            if (st && st[0] === want && st[1] > 0) {
+                                if (name === 'takeitem') mp(['setslot', s, st[1] > 1 ? want : 'id:0', st[1] - 1, st[2]].join('\t'));
+                                return 1;
+                            }
+                        }
+                        return 0;
+                    }
+                    default:
+                        if (vm) vm.warnOnce('op:' + name, 'game action "' + name + '" is not available here (left unplugged)');
+                        return undefined;
+                    }
+                },
+            };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1 };
+            J.running = function () { return running; };
+            J.wants = function (type) { return running && !!WANTS[type]; };
+            J.worldStart = function () {
+                running = false;
+                var r = reg();
+                if (!vm || !r || !r.mods.length) return null;
+                javaMods = {};
+                Object.keys(r.blocks).forEach(function (k) { javaMods[r.blocks[k].$mod] = true; });
+                Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
+                vm.game = bridge;
+                vm.mcPlayer = null; vm.mcWorld = null;
+                running = true;
+                return r.tickMods.length ? ['subscribe\tgametick'] : [];
+            };
+            J.worldStop = function () {
+                running = false;
+                if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
+            };
+            var SIG = {
+                activated: 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z',
+                added: 'onBlockAdded(Lnet/minecraft/src/World;III)V',
+                placedBy: 'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V',
+                breakB: 'breakBlock(Lnet/minecraft/src/World;IIIII)V',
+                destroyedBy: 'onBlockDestroyedByPlayer(Lnet/minecraft/src/World;IIII)V',
+                walking: 'onEntityWalking(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V',
+                updateTick: 'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V',
+                rightClick: 'onItemRightClick(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;',
+                itemUse: 'onItemUse(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;IIIIFFF)Z',
+                tick: 'onTickInGame(FLnet/minecraft/client/Minecraft;)Z',
+            };
+            function call(obj, sig, args) {
+                var p = sig.indexOf('(');
+                return window.JVM.run(vm, function () { return vm.callVirtual(obj, sig.substring(0, p), sig.substring(p), args); });
+            }
+            J.handle = function (e) {
+                if (!running || !WANTS[e.t]) return;
+                var JV = window.JVM, M = JV.mc152, r = reg();
+                vm.steps = 0;
+                var world = M.worldObj(vm);
+                if (e.t === 'gametick') {
+                    if (!r.tickMods.length) return;
+                    var mc = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
+                    r.tickMods.forEach(function (m) { call(m, SIG.tick, [0, mc]); });
+                    return;
+                }
+                var x = e.x | 0, y = e.y | 0, z = e.z | 0;
+                if (e.block) {
+                    var bid = refToJava(e.block), blk = r.blocks[bid];
+                    if (!blk || !javaMods[blk.$mod]) return;
+                    var pl = M.playerObj(vm, null);
+                    if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
+                    else if (e.t === 'place') { call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]); }
+                    else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, e.data | 0]); call(blk, SIG.destroyedBy, [world, x, y, z, e.data | 0]); }
+                    else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
+                    else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
+                    return;
+                }
+                if (e.item && (e.t === 'useItem' || e.t === 'useItemOn')) {
+                    var iid = refToJava(e.item), it = r.items[iid];
+                    if (!it || !javaMods[it.$mod]) return;
+                    var pl2 = M.playerObj(vm, null), slot = pl2.$info ? pl2.$info.slot : 0;
+                    var count = e.count != null ? e.count | 0 : 1, dmg = e.data | 0;
+                    var stack = M.newStack(vm, iid, count, dmg);
+                    var res = e.t === 'useItem' ? call(it, SIG.rightClick, [stack, world, pl2]) : call(it, SIG.itemUse, [stack, pl2, world, x, y, z, e.face | 0, 0.5, 0.5, 0.5]);
+                    var out = e.t === 'useItem' && res.ok ? res.value : stack;
+                    if (out && (out[':itemID'] !== iid || out[':stackSize'] !== count || out[':itemDamage'] !== dmg))
+                        bridge.op('setslot', slot, out[':stackSize'] > 0 ? out[':itemID'] : 0, out[':stackSize'], out[':itemDamage']);
+                    else if (!out) bridge.op('setslot', slot, 0, 0, 0);
+                }
+            };
             J.begin = function () { vm = null; };
             J.define = function (modId, files, problem) {
                 return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
@@ -1611,8 +1753,8 @@
                     var c = JVM.collectContent(vm, modId);
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
-                    Object.keys(c.blocks).forEach(function (k) { var b = c.blocks[k]; delete b.scripted; put('blocks/' + k + '.json', b); });
-                    Object.keys(c.items).forEach(function (k) { var it = c.items[k]; delete it.scripted; put('items/' + k + '.json', it); });
+                    Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
+                    Object.keys(c.items).forEach(function (k) { put('items/' + k + '.json', c.items[k]); });
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
                     Object.keys(c.textures).forEach(function (k) {
                         var t = c.textures[k], kind = k.split('/')[0];
@@ -4985,9 +5127,10 @@
                 if (Module._syncSaves) Module._syncSaves();
             }
 
-            api.running = function () { return !!worker; };
+            var javaOn = function () { return !!(Module.mcJava && Module.mcJava.running()); };
+            api.running = function () { return !!worker || javaOn(); };
             api.wantsTick = function () { return worker && wants.tick ? 1 : 0; };
-            api.wants = function (type) { return !!(worker && swants[type]); };
+            api.wants = function (type) { return !!(worker && swants[type]) || (javaOn() && Module.mcJava.wants(type)); };
             api.peekLen = function () {
                 if (wants.screen) { var nowP = performance.now(); if (nowP - lastPoll > 12) { lastPoll = nowP; pollScreen(true); } }
                 return actions.length ? lengthBytesUTF8(actions[0]) + 1 : 0;
@@ -4999,6 +5142,8 @@
                 var e;
                 try { e = JSON.parse(json); } catch (x) { return; }
                 if ((e.t === 'start' || e.t === 'stop') && Module.mcModpe) Module.mcModpe.worldEvent(e);
+                if (e.t === 'stop' && Module.mcJava) Module.mcJava.worldStop();
+                if (javaOn() && Module.mcJava.wants(e.t)) Module.mcJava.handle(e);
                 if (e.t === 'start') {
                     var newSide = e.client ? 'client' : 'host';
                     me = e.player || null;
@@ -5011,6 +5156,10 @@
                     }
                     stop();
                     lastStart = e;
+                    if (Module.mcJava && !e.client) {
+                        var jacts = Module.mcJava.worldStart();
+                        if (jacts) jacts.forEach(function (a) { actions.push(a); });
+                    }
                     if (W() && W().clearProblems) W().clearProblems('script');
                     var scripts = W() && W().scripts ? W().scripts(newSide === 'client') : [];
                     if (!scripts.length) return;

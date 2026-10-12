@@ -3926,7 +3926,8 @@ JVM.collectContent = function (vm, modId) {
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
-		if (overrides(b, BLOCK_SCRIPTED) || b[':needsRandomTick']) { json.scripted = true; out.scripted.blocks[id] = true; }
+		if (overrides(b, BLOCK_SCRIPTED)) out.scripted.blocks[id] = true;
+		if (overrides(b, BLOCK_SCRIPTED.slice(0, 3)) || b[':needsRandomTick'] || overrides(b, [BLOCK_SCRIPTED[7]])) json.scripted = true;
 		out.blocks['b' + id] = json;
 	});
 	Object.keys(r.items).forEach(function (idS) {
