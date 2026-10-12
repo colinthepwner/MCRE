@@ -151,6 +151,17 @@ function VM(opts) {
 	this.steps = 0;
 	this.fs = opts.fs || null;
 	this.resources = Object.create(null);
+	if (typeof Proxy !== 'undefined') this.resources = new Proxy(this.resources, {
+		get: function (t, k) {
+			if (typeof k !== 'string' || k in t) return t[k];
+			var m = /^[/]?assets[/][^/]+[/]((?:textures|models|blockstates|sounds|lang)[/].*)$/i.exec(k);
+			if (!m) return undefined;
+			if (m[1] in t) return t[m[1]];
+			var low = m[1].toLowerCase();
+			for (var x in t) if (x.toLowerCase() === low) return t[x];
+			return undefined;
+		},
+	});
 	JVM.installLang(this);
 	JVM.installUtil(this);
 	JVM.installIo(this);
@@ -6214,6 +6225,7 @@ JVM.collectContent = function (vm, modId) {
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
 	if (JVM.collectBiomes) out.biomes = JVM.collectBiomes(vm, modId, ref, safe);
+	if (JVM.collectWorldTypes) out.worldtypes = JVM.collectWorldTypes(vm, modId);
 	if (JVM.collectEnchantments) out.enchantments = JVM.collectEnchantments(vm, modId, safe);
 	if (JVM.collectDims) out.dimensions = JVM.collectDims(vm, modId, safe);
 	return out;
@@ -8872,7 +8884,8 @@ function install(vm) {
 	vm.$biomeTreeGens = treeGens;
 
 	var WT = SRC + 'WorldType', BGD = 'Lnet/minecraft/src/BiomeGenBase;';
-	var addToType = function (vm, self, b) { if (b && JVM.placeModBiome) JVM.placeModBiome(vm, b, ['*land'], 10); };
+	var typeKey = function (wt) { return wt && wt.$key ? wt.$key : 'default'; };
+	var addToType = function (vm, self, b) { if (b && JVM.placeModBiome) JVM.placeModBiome(vm, b, ['*land'], 10, typeKey(self)); };
 	var wtStat = { worldTypes: null, DEFAULT: null, FLAT: null, LARGE_BIOMES: null, DEFAULT_1_1: null, base12Biomes: null };
 	def('WorldType', { statics: wtStat, fields: { worldType: 'Ljava/lang/String;', generatorVersion: 'I', canBeCreated: 'Z', isWorldTypeVersioned: 'Z', worldTypeId: 'I' },
 		clinit: function (vm, c) {
@@ -8891,8 +8904,8 @@ function install(vm) {
 			'getCanBeCreated()Z': function (vm, self) { return self[':canBeCreated'] ? 1 : 0; },
 			'setCanBeCreated(Z)Lnet/minecraft/src/WorldType;': function (vm, self, a) { self[':canBeCreated'] = a[0]; return self; },
 			'addNewBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, self, a) { (self.$biomes = self.$biomes || []).push(a[0]); addToType(vm, self, a[0]); },
-			'removeBiome(Lnet/minecraft/src/BiomeGenBase;)V': function () {},
-			'removeAllBiomes()V': function (vm, self) { self.$biomes = []; },
+			'removeBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, self, a) { if (self.$key && a[0] && !a[0].$biomeKey) self.$noVanilla = true; },
+			'removeAllBiomes()V': function (vm, self) { self.$biomes = []; if (self.$key) self.$noVanilla = true; },
 			'getBiomesForWorldType()[Lnet/minecraft/src/BiomeGenBase;': function (vm, self) { return JVM.javaArray(vm, BGD, (self.$biomes || []).slice()); },
 			'getSeaLevel(Lnet/minecraft/src/World;)I': function () { return 64; },
 			'hasVoidParticles(Z)Z': function () { return 0; },
@@ -8902,6 +8915,10 @@ function install(vm) {
 	function wtInit(vm, self, i, n) {
 		var c = vm.loadClass(WT); vm.initClass(c);
 		self[':worldTypeId'] = i; self[':worldType'] = n; self[':canBeCreated'] = 1; self.$biomes = [];
+		self.$mod = vm.currentMod || 'java';
+		self.$key = self.$mod + ':' + String(n || 'world').toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+		var r = JVM.mc152.reg(vm);
+		(r.worldTypes || (r.worldTypes = [])).push(self);
 		if (i >= 0 && i < c.statics.worldTypes.a.length) c.statics.worldTypes.a[i] = self;
 	}
 
@@ -13808,10 +13825,12 @@ function keyName(s) { return String(s || 'biome').toLowerCase().replace(/[^a-z0-
 var LAND = ['plains', 'forest', 'taiga', 'desert', 'swampland', 'extreme_hills', 'jungle', 'ice_plains', 'forest_hills', 'taiga_hills', 'desert_hills', 'jungle_hills',
 	'rainforest', 'seasonal_forest', 'savanna', 'shrubland', 'tundra', 'ice_desert'];
 
-function place(vm, b, hosts, weight) {
+function place(vm, b, hosts, weight, type) {
 	if (!b) return;
+	type = type || 'default';
 	var list = placed(vm);
-	for (var i = 0; i < list.length; i++) if (list[i].b === b) return;
+	for (var i = 0; i < list.length; i++) if (list[i].b === b) { if (b.$worldTypes.indexOf(type) < 0) b.$worldTypes.push(type); return; }
+	b.$worldTypes = [type];
 	var mod = vm.currentMod || b.$mod || 'java';
 	b.$biomeKey = mod + ':' + keyName(b[':biomeName']);
 	list.push({ b: b, mod: mod, hosts: hosts, weight: Math.max(1, Math.round(weight)) });
@@ -13981,6 +14000,16 @@ function install(vm) {
 }
 JVM.installModBiomes = install;
 
+JVM.collectWorldTypes = function (vm, modId) {
+	var out = {}, r = reg(vm);
+	(r.worldTypes || []).forEach(function (wt) {
+		if (wt.$mod !== modId) return;
+		var raw = String(wt[':worldType'] || 'world'), name = r.lang['generator.' + raw];
+		if (!name) name = raw.replace(/[_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+		out[wt.$key.split(':').slice(1).join(':')] = { name: String(name), vanilla_biomes: !wt.$noVanilla };
+	});
+	return out;
+};
 JVM.collectBiomes = function (vm, modId, ref, safe) {
 	var out = {};
 	placed(vm).forEach(function (p) {
@@ -14023,6 +14052,9 @@ JVM.collectBiomes = function (vm, modId, ref, safe) {
 			});
 		}
 		if (p.hosts.length === 1 && p.hosts[0] === 'hell') { j.trees = 'none'; j.dimension = 'nether'; }
+		var tys = b.$worldTypes || ['default'];
+		if (tys.length !== 1 || tys[0] !== 'default') j.world_types = tys.slice();
+		if (b.$types && b.$types.length) j.tags = b.$types.map(function (t) { return String(t).toLowerCase(); });
 		out[b.$biomeKey.split(':').slice(1).join(':')] = j;
 	});
 	return out;

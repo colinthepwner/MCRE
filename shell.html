@@ -2410,6 +2410,7 @@
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
+                    Object.keys(c.worldtypes || {}).forEach(function (k) { put('worldtypes/' + k + '.json', c.worldtypes[k]); });
                     Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
                     Object.keys(c.dimensions || {}).forEach(function (k) { put('dimensions/' + k + '.json', c.dimensions[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
@@ -2624,7 +2625,7 @@
             }
             function usable(files) {
                 return Object.keys(files).some(function (k) {
-                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$|dimensions\/)/i.test(k)
+                    return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|worldtypes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$|dimensions\/)/i.test(k)
                         || /\.class$/i.test(k);
                 });
             }
@@ -2948,6 +2949,7 @@
                 say(count(/^recipes[/].+[.]json$/i), 'recipe', 'recipes');
                 say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
                 say(count(/^biomes[/][^/]+[.]json$/i), 'biome', 'biomes');
+                say(count(/^worldtypes[/][^/]+[.]json$/i), 'world type', 'world types');
                 say(count(/^enchantments[/][^/]+[.]json$/i), 'enchantment', 'enchantments');
                 say(count(/^dimensions[/][^/]+[.]json$/i), 'dimension', 'dimensions');
                 say(count(/^(assets[/][^/]+[/])?models[/].+[.]json$/i), 'model', 'models');
@@ -3187,7 +3189,7 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
-                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
+                            } else if ((m = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
@@ -3731,7 +3733,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3743,6 +3745,7 @@
                     if (c.kind === 'mobs') { mobs[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
+                    if (c.kind === 'worldtypes') { typeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'enchantments') { enchFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'dimensions') { dimFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
@@ -4227,6 +4230,12 @@
                                 inc.join(';') || '-', n(j.damage, 0, 0, 100), Math.round(n(j.protection, 0, 0, 25)), Math.round(n(j.knockback, 0, 0, 10)),
                                 Math.round(n(j.fire, 0, 0, 60)), eff, j.treasure ? 1 : 0].join('\t'));
                 });
+                typeFiles.forEach(function (t) {
+                    var tj = t.j || {};
+                    lines.push(['worldtype', t.mod + ':' + t.name, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].join('\t'));
+                });
+                var typeKeys = {};
+                typeFiles.forEach(function (t) { typeKeys[t.mod + ':' + t.name] = true; });
                 var LEGACY_TO_MODERN = { rainforest: 'jungle', seasonal_forest: 'forest', savanna: 'plains', shrubland: 'extreme_hills',
                     ice_desert: 'ice_plains', tundra: 'ice_plains' };
                 var hexColor = function (v, mod, file, what) {
@@ -4273,11 +4282,20 @@
                         var n = function (v) { v = Math.round(Number(v)); return isFinite(v) ? Math.max(0, Math.min(128, v)) : 0; };
                         rules.push([rb, rr, n(r.ground), n(r.ceiling), n(r.min_y), n(r.max_y)].join(','));
                     });
+                    var wts = (j.world_types === undefined ? ['default'] : Array.isArray(j.world_types) ? j.world_types : [j.world_types]).map(function (w) {
+                        var s = String(w).toLowerCase().trim();
+                        if (s === 'default' || s === 'minecraft:default' || s === 'normal') return 'default';
+                        var full = s.indexOf(':') < 0 ? b.mod + ':' + s : s;
+                        if (!typeKeys[full]) bad(b.mod, b.file, 'no world type "' + full + '" (worldtypes/' + full.split(':')[1] + '.json in the ' + full.split(':')[0] + ' mod)');
+                        return full;
+                    });
+                    var tags = (Array.isArray(j.tags) ? j.tags : j.tags ? [j.tags] : []).map(function (x) { return String(x).toLowerCase().replace(/[^a-z_]/g, ''); }).filter(Boolean);
                     lines.push(['biome', key, clean(j.name || pretty(b.name)), hosts.join(';') || '-', Math.round(num(j.weight, 10, 0, 1000)),
                                 num(j.temperature, 0.7, -1, 2), num(j.rainfall, 0.5, 0, 1), top || '-', filler || '-',
                                 hexColor(j.grass_color, b.mod, b.file, 'grass_color'), hexColor(j.foliage_color, b.mod, b.file, 'foliage_color'),
                                 trees, num(j.trees_per_chunk, trees === 'none' ? 0 : 3, 0, 64), Math.round(num(j.flowers_per_chunk, 2, 0, 64)),
-                                Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1, rules.join(';') || '-', terrain].join('\t'));
+                                Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1, rules.join(';') || '-', terrain,
+                                wts.join(';') || 'default', tags.join(';') || '-'].join('\t'));
                 });
                 var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
                 function ore(o, blockRef, mod, file) {
@@ -5640,6 +5658,7 @@
                             spawnItem: function (x, y, z, item, n) { act(mod, ['spawnitem', +x, +y, +z, item, Math.max(1, n | 0 || 1)]); },
                             explode: function (x, y, z, power, fire) { act(mod, ['explode', +x, +y, +z, +power || 2, fire ? 1 : 0]); },
                             time: function () { return ask(mod, ['time']).then(function (r) { return r.time; }); },
+                            worldType: function () { return ask(mod, ['worldtype']).then(function (r) { return r.type || 'default'; }); },
                             setTime: function (t) { act(mod, ['settime', t | 0]); },
                             DAY: 19200,
                             timeOfDay: function () {
@@ -6062,7 +6081,7 @@
                     var pa = a;
                     eachJoiner(function (c) { net().sendCtlTo(c, { t: 'particle', a: pa }); });
                 }
-                if ((k === 'getblock' || k === 'players' || k === 'time' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
+                if ((k === 'getblock' || k === 'players' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
                      k === 'entities' || k === 'entity' || k === 'signtext') && fromGuid) {
                     var id = nextRemoteReq++;
                     remoteReq[id] = { guid: fromGuid, req: a[1] };
