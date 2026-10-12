@@ -1648,8 +1648,10 @@ F	acu	e	field_76812_e	biome
 F	acu	z	field_76832_z	treesPerChunk
 F	aee	d	field_75825_d	chunkSaveLocation
 F	aei	b	field_76579_a	worldObj
+F	aei	e	field_76578_c	worldChunkMgr
 F	aei	f	field_76575_d	isHellWorld
 F	aei	g	field_76576_e	hasNoSky
+F	aei	h	field_76573_f	lightBrightnessTable
 F	aei	i	field_76574_g	dimensionId
 F	afe	a	field_76488_a	doBlockNotify
 F	afq	a	field_76542_a	minableBlockId
@@ -1929,6 +1931,7 @@ F	aul	X	field_74317_L	mc
 F	aul	al	field_74335_Z	guiScale
 F	aul	an	field_74363_ab	language
 F	aul	j	field_74347_j	fancyGraphics
+F	aul	l	field_74345_l	clouds
 F	aut	b	field_73747_a	width
 F	aut	c	field_73745_b	height
 F	aut	d	field_73746_c	xPosition
@@ -2125,6 +2128,7 @@ F	bcu	p	field_82908_p	offsetY
 F	bcu	q	field_82907_q	offsetZ
 F	bcu	r	field_78803_o	textureOffsetX
 F	bcu	s	field_78813_p	textureOffsetY
+F	bcu	t	field_78812_q	compiled
 F	bcu	v	field_78810_s	baseModel
 F	bcv	a	field_78783_a	textureOffsetX
 F	bcv	b	field_78782_b	textureOffsetY
@@ -2527,6 +2531,7 @@ M	abw	H	()J	func_72905_C	getSeed
 M	abw	I	()J	func_82737_E	getTotalWorldTime
 M	abw	J	()J	func_72820_D	getWorldTime
 M	abw	K	()Lt;	func_72861_E	getSpawnPoint
+M	abw	L	()Lado;	func_72863_F	getChunkProvider
 M	abw	M	()Lamc;	func_72860_G	getSaveHandler
 M	abw	N	()Lals;	func_72912_H	getWorldInfo
 M	abw	P	()Z	func_72911_I	isThundering
@@ -2602,7 +2607,14 @@ M	acq	j	()F	func_76743_j	getFloatTemperature
 M	acq	k	()I	func_76737_k	getBiomeGrassColor
 M	acq	l	()I	func_76726_l	getBiomeFoliageColor
 M	acq	m	()Lacq;	func_76745_m	setDisableRain
+M	aei	a	()V	func_76556_a	generateLightBrightnessTable
+M	aei	a	(II)Z	func_76566_a	canCoordinateBeSpawn
+M	aei	a	(JF)F	func_76563_a	calculateCelestialAngle
+M	aei	a	(Labw;)V	func_76558_a	registerWorld
+M	aei	b	()V	func_76572_b	registerWorldChunkManager
 M	aei	d	()Z	func_76569_d	isSurfaceWorld
+M	aei	e	()Z	func_76567_e	canRespawnHere
+M	aei	f	()F	func_76571_f	getCloudHeight
 M	aei	i	()I	func_76557_i	getAverageGroundLevel
 M	aei	l	()Ljava/lang/String;	func_80007_l	getDimensionName
 M	afe	a	(DDD)V	func_76487_a	setScale
@@ -3228,6 +3240,7 @@ M	nn	B	()V	func_70066_B	extinguish
 M	nn	F	()Z	func_70045_F	isImmuneToFire
 M	nn	G	()Z	func_70026_G	isWet
 M	nn	H	()Z	func_70090_H	isInWater
+M	nn	R	()V	func_110123_P	onChunkLoad
 M	nn	T	()Z	func_70089_S	isEntityAlive
 M	nn	a	(FF)V	func_70105_a	setSize
 M	nn	af	()Z	func_70027_ad	isBurning

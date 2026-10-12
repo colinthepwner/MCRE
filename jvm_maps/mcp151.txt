@@ -1595,8 +1595,10 @@ F	aaz	e	field_76812_e	biome
 F	aaz	z	field_76832_z	treesPerChunk
 F	acj	d	field_75825_d	chunkSaveLocation
 F	acn	a	field_76579_a	worldObj
+F	acn	d	field_76578_c	worldChunkMgr
 F	acn	e	field_76575_d	isHellWorld
 F	acn	f	field_76576_e	hasNoSky
+F	acn	g	field_76573_f	lightBrightnessTable
 F	acn	h	field_76574_g	dimensionId
 F	adj	a	field_76488_a	doBlockNotify
 F	adv	a	field_76542_a	minableBlockId
@@ -1872,6 +1874,7 @@ F	avy	X	field_74317_L	mc
 F	avy	al	field_74335_Z	guiScale
 F	avy	an	field_74363_ab	language
 F	avy	j	field_74347_j	fancyGraphics
+F	avy	l	field_74345_l	clouds
 F	awg	a	field_73747_a	width
 F	awg	b	field_73745_b	height
 F	awg	c	field_73746_c	xPosition
@@ -2069,6 +2072,7 @@ F	bdj	m	field_78805_m	childModels
 F	bdj	n	field_78802_n	boxName
 F	bdj	r	field_78803_o	textureOffsetX
 F	bdj	s	field_78813_p	textureOffsetY
+F	bdj	t	field_78812_q	compiled
 F	bdj	v	field_78810_s	baseModel
 F	bdk	a	field_78783_a	textureOffsetX
 F	bdk	b	field_78782_b	textureOffsetY
@@ -2493,6 +2497,7 @@ M	aab	F	(III)Z	func_72951_B	canLightningStrikeAt
 M	aab	G	()J	func_82737_E	getTotalWorldTime
 M	aab	H	()J	func_72820_D	getWorldTime
 M	aab	I	()Lt;	func_72861_E	getSpawnPoint
+M	aab	J	()Labt;	func_72863_F	getChunkProvider
 M	aab	K	()Lakf;	func_72860_G	getSaveHandler
 M	aab	L	()Lajv;	func_72912_H	getWorldInfo
 M	aab	N	()Z	func_72911_I	isThundering
@@ -2569,7 +2574,14 @@ M	aav	j	()F	func_76743_j	getFloatTemperature
 M	aav	k	()I	func_76737_k	getBiomeGrassColor
 M	aav	l	()I	func_76726_l	getBiomeFoliageColor
 M	aav	m	()Laav;	func_76745_m	setDisableRain
+M	acn	a	()V	func_76556_a	generateLightBrightnessTable
+M	acn	a	(II)Z	func_76566_a	canCoordinateBeSpawn
+M	acn	a	(JF)F	func_76563_a	calculateCelestialAngle
+M	acn	a	(Laab;)V	func_76558_a	registerWorld
+M	acn	b	()V	func_76572_b	registerWorldChunkManager
 M	acn	d	()Z	func_76569_d	isSurfaceWorld
+M	acn	e	()Z	func_76567_e	canRespawnHere
+M	acn	f	()F	func_76571_f	getCloudHeight
 M	acn	i	()I	func_76557_i	getAverageGroundLevel
 M	acn	l	()Ljava/lang/String;	func_80007_l	getDimensionName
 M	adj	a	(DDD)V	func_76487_a	setScale

@@ -1404,8 +1404,10 @@ C	zy	net/minecraft/src/EmptyChunk
 C	zz	net/minecraft/src/Chunk
 F	aam	d	field_75825_d	chunkSaveLocation
 F	aaq	a	field_76579_a	worldObj
+F	aaq	d	field_76578_c	worldChunkMgr
 F	aaq	e	field_76575_d	isHellWorld
 F	aaq	f	field_76576_e	hasNoSky
+F	aaq	g	field_76573_f	lightBrightnessTable
 F	aaq	h	field_76574_g	dimensionId
 F	abm	a	field_76488_a	doBlockNotify
 F	aby	a	field_76542_a	minableBlockId
@@ -1663,6 +1665,7 @@ F	ast	T	field_74317_L	mc
 F	ast	ah	field_74335_Z	guiScale
 F	ast	aj	field_74363_ab	language
 F	ast	j	field_74347_j	fancyGraphics
+F	ast	l	field_74345_l	clouds
 F	atb	a	field_73747_a	width
 F	atb	b	field_73745_b	height
 F	atb	c	field_73746_c	xPosition
@@ -1858,6 +1861,7 @@ F	ayf	m	field_78805_m	childModels
 F	ayf	n	field_78802_n	boxName
 F	ayf	r	field_78803_o	textureOffsetX
 F	ayf	s	field_78813_p	textureOffsetY
+F	ayf	t	field_78812_q	compiled
 F	ayf	v	field_78810_s	baseModel
 F	ayg	a	field_78783_a	textureOffsetX
 F	ayg	b	field_78782_b	textureOffsetY
@@ -2277,6 +2281,7 @@ F	yc	A	field_72988_C	mapStorage
 F	yc	I	field_72995_K	isRemote
 F	yc	e	field_72996_f	loadedEntityList
 F	yc	h	field_73010_i	playerEntities
+F	yc	r	field_73014_t	editingBlocks
 F	yc	t	field_73012_v	rand
 F	yc	u	field_73011_w	provider
 F	yc	w	field_73020_y	chunkProvider
@@ -2325,7 +2330,14 @@ F	zc	A	field_76802_A	flowersPerChunk
 F	zc	B	field_76803_B	grassPerChunk
 F	zc	e	field_76812_e	biome
 F	zc	z	field_76832_z	treesPerChunk
+M	aaq	a	()V	func_76556_a	generateLightBrightnessTable
+M	aaq	a	(II)Z	func_76566_a	canCoordinateBeSpawn
+M	aaq	a	(JF)F	func_76563_a	calculateCelestialAngle
+M	aaq	a	(Lyc;)V	func_76558_a	registerWorld
+M	aaq	b	()V	func_76572_b	registerWorldChunkManager
 M	aaq	d	()Z	func_76569_d	isSurfaceWorld
+M	aaq	e	()Z	func_76567_e	canRespawnHere
+M	aaq	f	()F	func_76571_f	getCloudHeight
 M	aaq	i	()I	func_76557_i	getAverageGroundLevel
 M	aaq	l	()Ljava/lang/String;	func_80007_l	getDimensionName
 M	abm	a	(DDD)V	func_76487_a	setScale
@@ -3267,6 +3279,7 @@ M	yc	E	()J	func_72905_C	getSeed
 M	yc	F	()J	func_82737_E	getTotalWorldTime
 M	yc	G	()J	func_72820_D	getWorldTime
 M	yc	H	()Ls;	func_72861_E	getSpawnPoint
+M	yc	I	()Lzw;	func_72863_F	getChunkProvider
 M	yc	J	()Laih;	func_72860_G	getSaveHandler
 M	yc	K	()Lahx;	func_72912_H	getWorldInfo
 M	yc	M	()Z	func_72911_I	isThundering

@@ -1653,7 +1653,7 @@
                     case 'settile': {
                         forget(a[0], a[1], a[2]);
                         var sref = a[3] ? blockRef(a[3], a[4]) : 'id:0';
-                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : a[4] | 0].join('\t'));
+                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : a[4] | 0, a[5] ? 1 : 0].join('\t'));
                     }
                     case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
@@ -1841,9 +1841,39 @@
                 var r = reg();
                 genRefs = {}; genIds = {};
                 var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm)) ||
+                    (window.JVM && window.JVM.hasJavaDims && window.JVM.hasJavaDims(vm)) ||
                     (window.JVM && window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm))));
                 if (Module._mcJavaGenOn) Module._mcJavaGenOn(on ? 1 : 0);
                 return on;
+            };
+            function dimKeyOf(dim) {
+                var md = Module.mcModDims || {};
+                for (var k in md) if (md[k].id === dim && md[k].java) return k;
+                return null;
+            }
+            Module.mcDims = {
+                chunk: function (key, cx, cz, blocksPtr, dataPtr) {
+                    var r = reg();
+                    if (!vm || !r || !window.JVM || !window.JVM.dimChunk) return false;
+                    var JV = window.JVM, prev = vm.game, out = null;
+                    vm.game = genBridge; vm.steps = 0;
+                    try { out = JV.dimChunk(vm, key, cx, cz); } finally { vm.game = prev; }
+                    if (!out) return false;
+                    var cache = {};
+                    for (var i = 0; i < 32768; i++) {
+                        var id = out.ids[i];
+                        if (!id) continue;
+                        var m = out.meta[i], ck = id * 16 + m, g = cache[ck];
+                        if (g === undefined) {
+                            var gg = genGame(id, m);
+                            g = cache[ck] = gg ? [gg.id, gg.mod ? gg.aux & 15 : m] : null;
+                        }
+                        if (!g) continue;
+                        HEAPU8[blocksPtr + i] = g[0];
+                        HEAPU8[dataPtr + i] = g[1];
+                    }
+                    return true;
+                },
             };
             J.populate = function (cx, cz, dim, seed) {
                 var r = reg();
@@ -1851,7 +1881,8 @@
                 var gm = dim === 0 || dim === -1 ? genMods(r) : [];
                 var fg = !!(window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm));
                 var sg = !!(window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm));
-                if (!gm.length && !fg && !sg) return;
+                var dk = dimKeyOf(dim);
+                if (!gm.length && !fg && !sg && !dk) return;
                 var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim;
                 if (!running) {
                     javaMods = {};
@@ -1874,6 +1905,7 @@
                                 else vm.callVirtual(m, 'generateNether', '(Lnet/minecraft/src/World;Ljava/util/Random;II)V', [world, rnd, cx * 16, cz * 16]);
                             });
                         });
+                        if (dk && JV.dimPopulate) JV.dimPopulate(vm, dk, cx, cz);
                         if (fg) JV.forgeGenerate(vm, cx, cz);
                         if (sg) JV.stationGenerate(vm, world, cx, cz, rnd, dim);
                     });
@@ -1949,6 +1981,7 @@
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
+                    if (e.t === 'place' && JV.stationBlockSet) JV.stationBlockSet(vm, world, x, y, z, bid, bdata);
                     if (!blk || !javaMods[blk.$mod]) return;
                     var pl = M.playerObj(vm, null);
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
@@ -2362,6 +2395,7 @@
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
+                    Object.keys(c.dimensions || {}).forEach(function (k) { put('dimensions/' + k + '.json', c.dimensions[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
                     var cuts = [];
                     var fileOf = function (path) {
@@ -3690,12 +3724,12 @@
                 dimFiles.sort(function (a, b) { return (a.mod + ':' + a.name) < (b.mod + ':' + b.name) ? -1 : 1; }).forEach(function (d) {
                     var j = d.j, key = d.mod + ':' + d.name;
                     var terrain = String(j.terrain || 'overworld').toLowerCase();
-                    if (!TERRAINS[terrain] || (terrain === 'script' && !d.java)) { bad(d.mod, d.file, 'unknown "terrain": "' + j.terrain + '" (overworld, nether, end, flat or void)'); terrain = 'overworld'; }
+                    if (!TERRAINS[terrain] || (terrain === 'script' && j.java_generator !== true)) { bad(d.mod, d.file, 'unknown "terrain": "' + j.terrain + '" (overworld, nether, end, flat or void)'); terrain = 'overworld'; }
                     var id = 2 + fnv(key) % 97;
                     for (var n = 0; takenDim[id] && n < 200; n++) id = id >= 98 ? 2 : id + 1;
                     takenDim[id] = true; dimIds[key] = id;
                     var name = String(j.name || d.name.replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })).replace(/[\t\r\n]+/g, ' ').trim().slice(0, 64);
-                    Module.mcModDims[key] = { id: id, name: name };
+                    Module.mcModDims[key] = { id: id, name: name, java: terrain === 'script' };
                     var t = j.time == null || j.time === 'cycle' ? -1 : { day: 0, noon: 0, sunset: 0.25, night: 0.5, midnight: 0.5, sunrise: 0.75 }[String(j.time)];
                     if (t === undefined) { t = Number(j.time); if (!isFinite(t)) { problem(d.mod, d.file, '"time": "cycle", "day", "night", "sunset", "sunrise" or 0-1'); t = -1; } else t = Math.max(0, Math.min(1, t)); }
                     var layers = Array.isArray(j.layers) ? j.layers.map(function (l) {
