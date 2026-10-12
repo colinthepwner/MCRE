@@ -1882,6 +1882,8 @@ F	in	a	field_73061_a	mcServer
 F	iq	b	field_71133_b	mcServer
 F	ke	a	field_76144_a	SIN_TABLE
 F	lq	A	field_70125_A	rotationPitch
+F	lq	B	field_70126_B	prevRotationYaw
+F	lq	C	field_70127_C	prevRotationPitch
 F	lq	D	field_70121_D	boundingBox
 F	lq	E	field_70122_E	onGround
 F	lq	M	field_70129_M	yOffset
@@ -1899,6 +1901,9 @@ F	lq	p	field_70170_p	worldObj
 F	lq	t	field_70165_t	posX
 F	lq	u	field_70163_u	posY
 F	lq	v	field_70161_v	posZ
+F	lq	w	field_70159_w	motionX
+F	lq	x	field_70181_x	motionY
+F	lq	y	field_70179_y	motionZ
 F	lq	z	field_70177_z	rotationYaw
 F	lv	a	field_75627_a	entityEggs
 F	lv	b	field_75625_b	stringToClassMapping
@@ -1949,6 +1954,7 @@ F	qw	a	field_70462_a	mainInventory
 F	qw	b	field_70460_b	armorInventory
 F	qw	c	field_70461_c	currentItem
 F	qw	d	field_70458_d	player
+F	qw	g	field_70457_g	itemStack
 F	qx	bJ	field_71071_by	inventory
 F	qx	bL	field_71070_bA	openContainer
 F	qx	bR	field_71092_bJ	username
@@ -3053,6 +3059,7 @@ M	yc	a	(Llq;D)Lqx;	func_72890_a	getClosestPlayerToEntity
 M	yc	a	(Llq;DDDFZ)Lxx;	func_72876_a	createExplosion
 M	yc	a	(Llq;Laoe;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	yc	a	(Llq;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
+M	yc	a	(Lqx;IIIII)V	func_72889_a	playAuxSFXAtEntity
 M	yc	b	(DDDD)Lqx;	func_72846_b	getClosestVulnerablePlayer
 M	yc	b	(IIII)Z	func_72822_b	setBlock
 M	yc	b	(IIILany;)V	func_72944_b	updateTileEntityChunkAndDoNothing
@@ -3067,6 +3074,7 @@ M	yc	d	(Llq;)Z	func_72838_d	spawnEntityInWorld
 M	yc	e	(IIII)Z	func_72859_e	setBlockWithNotify
 M	yc	f	(II)I	func_72976_f	getHeightValue
 M	yc	f	(III)Z	func_72899_e	blockExists
+M	yc	f	(IIIII)V	func_72926_e	playAuxSFX
 M	yc	g	(III)Lagi;	func_72803_f	getBlockMaterial
 M	yc	h	(II)I	func_72874_g	getPrecipitationHeight
 M	yc	h	(III)I	func_72805_g	getBlockMetadata

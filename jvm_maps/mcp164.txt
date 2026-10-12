@@ -2110,6 +2110,8 @@ F	net/minecraft/server/MinecraftServer	l	field_71309_l	mcServer
 F	net/minecraft/server/MinecraftServer	v	field_71316_v	serverStopped
 F	nn	A	field_70177_z	rotationYaw
 F	nn	B	field_70125_A	rotationPitch
+F	nn	C	field_70126_B	prevRotationYaw
+F	nn	D	field_70127_C	prevRotationPitch
 F	nn	E	field_70121_D	boundingBox
 F	nn	F	field_70122_E	onGround
 F	nn	N	field_70129_M	yOffset
@@ -2127,6 +2129,9 @@ F	nn	q	field_70170_p	worldObj
 F	nn	u	field_70165_t	posX
 F	nn	v	field_70163_u	posY
 F	nn	w	field_70161_v	posZ
+F	nn	x	field_70159_w	motionX
+F	nn	y	field_70181_x	motionY
+F	nn	z	field_70179_y	motionZ
 F	nt	a	field_75627_a	entityEggs
 F	nt	b	field_75625_b	stringToClassMapping
 F	nt	c	field_75626_c	classToStringMapping
@@ -2166,6 +2171,7 @@ F	ud	a	field_70462_a	mainInventory
 F	ud	b	field_70460_b	armorInventory
 F	ud	c	field_70461_c	currentItem
 F	ud	d	field_70458_d	player
+F	ud	g	field_70457_g	itemStack
 F	uf	bG	field_71075_bZ	capabilities
 F	uf	bn	field_71071_by	inventory
 F	uf	bp	field_71070_bA	openContainer
@@ -2425,6 +2431,7 @@ M	abw	a	(Lnn;D)Luf;	func_72890_a	getClosestPlayerToEntity
 M	abw	a	(Lnn;DDDFZ)Labr;	func_72876_a	createExplosion
 M	abw	a	(Lnn;Lasx;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	abw	a	(Lnn;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
+M	abw	a	(Luf;IIIII)V	func_72889_a	playAuxSFXAtEntity
 M	abw	b	(DDDD)Luf;	func_72846_b	getClosestVulnerablePlayer
 M	abw	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
 M	abw	b	(IIIII)Z	func_72921_c	setBlockMetadata
@@ -2436,6 +2443,7 @@ M	abw	c	(IIII)Z	func_94575_c	setBlock
 M	abw	c	(Lnn;)Z	func_72942_c	addWeatherEffect
 M	abw	d	(IIIIII)V	func_72965_b	addBlockEvent
 M	abw	d	(Lnn;)Z	func_72838_d	spawnEntityInWorld
+M	abw	e	(IIIII)V	func_72926_e	playAuxSFX
 M	abw	e	(IIIIII)Z	func_72904_c	checkChunksExist
 M	abw	f	(II)I	func_72976_f	getHeightValue
 M	abw	f	(III)Z	func_72899_e	blockExists

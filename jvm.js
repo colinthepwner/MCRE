@@ -4322,6 +4322,29 @@ function readZip(bytes) {
 }
 
 JVM.readZip = readZip;
+
+JVM.expandNestedJars = function (files, depth) {
+	depth = depth || 0;
+	var inner = Object.keys(files).filter(function (k) { return /^META-INF[/]jars[/][^/]+[.]jar$/i.test(k); });
+	if (!inner.length || depth > 3) return Promise.resolve(files);
+	return Promise.all(inner.map(function (k) {
+		var b = files[k]; delete files[k];
+		return readZip(b).then(function (list) {
+			var o = {}; list.forEach(function (e) { o[e.name] = e.bytes; });
+			return JVM.expandNestedJars(o, depth + 1);
+		}, function () { return {}; });
+	})).then(function (sets) {
+		sets.forEach(function (o, i) {
+			if (o['fabric.mod.json']) files['META-INF/nested-mods/' + inner[i].split('/').pop() + '.json'] = o['fabric.mod.json'];
+			Object.keys(o).forEach(function (n) { if (/^META-INF[/]nested-mods[/]/.test(n) && !(n in files)) files[n] = o[n]; });
+			Object.keys(o).forEach(function (n) {
+				if (/^(fabric[.]mod[.]json|META-INF[/]|mcmod[.]info$|pack[.]mcmeta$)/i.test(n) && !/^META-INF[/].+[.]kotlin_module$/i.test(n)) return;
+				if (!(n in files)) files[n] = o[n];
+			});
+		});
+		return files;
+	});
+};
 })();
 
 (function () {
@@ -4989,6 +5012,7 @@ function installMc152(vm) {
 	installSounds(vm);
 	if (JVM.installStation) JVM.installStation(vm);
 	if (JVM.installStates) JVM.installStates(vm);
+	if (JVM.installDispense) JVM.installDispense(vm);
 }
 
 var SIN_TABLE = null;
@@ -6545,7 +6569,7 @@ function installFml(vm, def) {
 		'registerPlayerTracker(Lcpw/mods/fml/common/IPlayerTracker;)V': function (vm, n, a) { forge(vm).playerTrackers.push(a[0]); },
 		'registerTileEntity(Ljava/lang/Class;Ljava/lang/String;)V': function (vm, n, a) { forge(vm).tileEntities[a[1]] = CLS(a, 0); },
 		'registerTileEntityWithAlternatives(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/String;)V': function (vm, n, a) { forge(vm).tileEntities[a[1]] = CLS(a, 0); },
-		'registerDispenserHandler(Lcpw/mods/fml/common/IDispenserHandler;)V': function (vm) { vm.warnOnce('fml:dispenser', 'dispenser behaviour is not available here (left unplugged)'); },
+		'registerDispenserHandler(Lcpw/mods/fml/common/IDispenserHandler;)V': function (vm, n, a) { if (JVM.addDispenserHandler) JVM.addDispenserHandler(vm, a[0]); },
 		'getFuelValue(Lnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return forge(vm).fuel.reduce(function (mx, h) { return Math.max(mx, vm.callVirtual(h, 'getBurnTime', '(Lnet/minecraft/src/ItemStack;)I', [a[0]])); }, 0); },
 		'findBlock(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/src/Block;': function (vm, n, a) { var r = reg(vm); var k = Object.keys(r.blocks).filter(function (i) { return r.blocks[i].$regName === a[1]; })[0]; return k ? r.blocks[k] : null; },
 		'findItem(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/src/Item;': function (vm, n, a) { var r = reg(vm); var k = Object.keys(r.items).filter(function (i) { return r.items[i].$regName === a[1]; })[0]; return k ? r.items[k] : null; },
@@ -8937,6 +8961,301 @@ JVM.installGui = installGui;
 (function () {
 'use strict';
 
+var SRC = 'net/minecraft/src/', ST = 'net/modificationstation/stationapi/api/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function disp(vm) { var r = reg(vm); return r.dispense || (r.dispense = { behaviors: new Map(), handlers: [], registry: null }); }
+function stackItem(vm, s) { return s ? vm.callVirtual(s, 'getItem', '()Lnet/minecraft/src/Item;', []) : null; }
+
+var FACINGS = [['DOWN', 0, -1, 0], ['UP', 0, 1, 0], ['NORTH', 0, 0, -1], ['SOUTH', 0, 0, 1], ['EAST', -1, 0, 0], ['WEST', 1, 0, 0]];
+function facings(vm) { var c = vm.loadClass(SRC + 'EnumFacing'); vm.initClass(c); return c.$values; }
+function facingOf(vm, src) { return facings(vm)[(src.$meta & 7) % 6]; }
+
+function auxSfx(vm, id, x, y, z, data) {
+	if (id === 1000) op(vm, 'sound', x + 0.5, y + 0.5, z + 0.5, 'random.click', 1, 1);
+	else if (id === 1001) op(vm, 'sound', x + 0.5, y + 0.5, z + 0.5, 'random.click', 1, 1.2);
+	else if (id === 1002) op(vm, 'sound', x + 0.5, y + 0.5, z + 0.5, 'random.bow', 1, 1.2);
+	else if (id === 2000) {
+		var dx = data % 3 - 1, dz = Math.floor(data / 3) % 3 - 1;
+		var px = x + dx * 0.6 + 0.5, py = y + 0.5, pz = z + dz * 0.6 + 0.5;
+		for (var i = 0; i < 10; i++) {
+			var sp = Math.random() * 0.2 + 0.01;
+			op(vm, 'particle', 'smoke', px + (Math.random() - 0.5) * dz * 0.5, py + (Math.random() - 0.5) * 0.5, pz + (Math.random() - 0.5) * dx * 0.5, dx * sp, -0.03, dz * sp);
+		}
+	} else if (id === 2001) {   }
+}
+
+function toStack(vm, v) { return v && v.id && v.count > 0 ? JVM.mc152.newStack(vm, v.id, v.count, v.data | 0) : null; }
+function slotGet(vm, te, i) { return toStack(vm, op(vm, 'chest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i)); }
+function slotSet(vm, te, i, s) {
+	op(vm, 'setchest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i, s && s[':stackSize'] > 0 ? s[':itemID'] : 0, s ? s[':stackSize'] : 0, s ? s[':itemDamage'] : 0);
+}
+function dispenserTile(vm, world, x, y, z) {
+	var te = vm.newObject(vm.loadClass(SRC + 'TileEntityDispenser'));
+	te[':worldObj'] = world; te[':xCoord'] = x; te[':yCoord'] = y; te[':zCoord'] = z;
+	return te;
+}
+
+function installDispense(vm) {
+	var def = function (n, s) { vm.defineNative(n.indexOf('/') < 0 ? SRC + n : n, s); };
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+
+	def('IRegistry', { access: I });
+	var regMethods = {
+		'<init>()V': function (vm, self) { self.$map = new Map(); },
+		'<init>(Ljava/lang/Object;)V': function (vm, self, a) { self.$map = new Map(); self.$dflt = a[0]; },
+		'putObject(Ljava/lang/Object;Ljava/lang/Object;)V': function (vm, self, a) { (self.$map || (self.$map = new Map())).set(a[0], a[1]); },
+		'getObject(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { var m = self.$map; return m && m.has(a[0]) ? m.get(a[0]) : self.$dflt || null; },
+		'containsKey(Ljava/lang/Object;)Z': function (vm, self, a) { return self.$map && self.$map.has(a[0]) ? 1 : 0; },
+		'getKeys()Ljava/util/Set;': function (vm, self) { var s = vm.newObject(vm.loadClass('java/util/HashSet')); vm.callVirtual(s, '<init>', '()V', []); (self.$map || new Map()).forEach(function (v, k) { vm.callVirtual(s, 'add', '(Ljava/lang/Object;)Z', [k]); }); return s; },
+	};
+	def('RegistrySimple', { interfaces: [SRC + 'IRegistry'], methods: regMethods });
+	def('RegistryDefaulted', { super: SRC + 'RegistrySimple', methods: regMethods });
+
+	def('EnumFacing', { super: 'java/lang/Enum', statics: { DOWN: null, UP: null, NORTH: null, SOUTH: null, EAST: null, WEST: null }, clinit: function (vm, c) {
+		c.$values = FACINGS.map(function (f, i) {
+			var o = vm.newObject(c); o.$name = f[0]; o[':name'] = f[0]; o[':ordinal'] = i; o.$off = [f[1], f[2], f[3]];
+			c.statics[f[0]] = o; return o;
+		});
+	}, methods: {
+		'getFrontOffsetX()I': function (vm, self) { return self.$off[0]; },
+		'getFrontOffsetY()I': function (vm, self) { return self.$off[1]; },
+		'getFrontOffsetZ()I': function (vm, self) { return self.$off[2]; },
+		'ordinal()I': function (vm, self) { return facings(vm).indexOf(self); },
+		'name()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$name; },
+	}, staticMethods: {
+		'getFront(I)Lnet/minecraft/src/EnumFacing;': function (vm, n, a) { return facings(vm)[Math.abs(a[0] % 6)]; },
+		'values()[Lnet/minecraft/src/EnumFacing;': function (vm) { return JVM.javaArray(vm, 'L' + SRC + 'EnumFacing;', facings(vm).slice()); },
+	} });
+	def('IPosition', { access: I });
+	def('PositionImpl', { interfaces: [SRC + 'IPosition'], methods: {
+		'<init>(DDD)V': function (vm, self, a) { self.$x = a[0]; self.$y = a[1]; self.$z = a[2]; },
+		'getX()D': function (vm, self) { return self.$x; }, 'getY()D': function (vm, self) { return self.$y; }, 'getZ()D': function (vm, self) { return self.$z; },
+	} });
+	def('ILocation', { access: I, interfaces: [SRC + 'IPosition'] });
+	def('ILocatableSource', { access: I, interfaces: [SRC + 'ILocation'] });
+	def('IBlockSource', { access: I, interfaces: [SRC + 'ILocatableSource'] });
+	def('BlockSourceImpl', { interfaces: [SRC + 'IBlockSource'], methods: {
+		'<init>(Lnet/minecraft/src/World;III)V': function (vm, self, a) { self.$world = a[0]; self.$bx = a[1]; self.$by = a[2]; self.$bz = a[3]; },
+		'getX()D': function (vm, self) { return self.$bx + 0.5; }, 'getY()D': function (vm, self) { return self.$by + 0.5; }, 'getZ()D': function (vm, self) { return self.$bz + 0.5; },
+		'getXInt()I': function (vm, self) { return self.$bx; }, 'getYInt()I': function (vm, self) { return self.$by; }, 'getZInt()I': function (vm, self) { return self.$bz; },
+		'getBlockMetadata()I': function (vm, self) { return self.$meta | 0; },
+		'getBlockTileEntity()Lnet/minecraft/src/TileEntity;': function (vm, self) { return self.$te || (self.$te = dispenserTile(vm, self.$world, self.$bx, self.$by, self.$bz)); },
+		'getWorld()Lnet/minecraft/src/World;': function (vm, self) { return self.$world; },
+	} });
+
+	def('TileEntityDispenser', { super: SRC + 'TileEntity', interfaces: [SRC + 'IInventory'], methods: {
+		'getSizeInventory()I': function () { return 9; },
+		'getStackInSlot(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return slotGet(vm, self, a[0]); },
+		'setInventorySlotContents(ILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { slotSet(vm, self, a[0], a[1]); },
+		'decrStackSize(II)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var s = slotGet(vm, self, a[0]);
+			if (!s) return null;
+			var n = Math.min(a[1], s[':stackSize']), out = JVM.mc152.newStack(vm, s[':itemID'], n, s[':itemDamage']);
+			s[':stackSize'] -= n; slotSet(vm, self, a[0], s);
+			return out;
+		},
+		'getRandomStackFromInventory()I': function (vm, self) {
+			var full = [];
+			for (var i = 0; i < 9; i++) if (slotGet(vm, self, i)) full.push(i);
+			return full.length ? full[Math.floor(Math.random() * full.length)] : -1;
+		},
+		'addItem(Lnet/minecraft/src/ItemStack;)I': function (vm, self, a) {
+			for (var i = 0; i < 9; i++) if (!slotGet(vm, self, i)) { slotSet(vm, self, i, a[0]); return i; }
+			return -1;
+		},
+		'getInvName()Ljava/lang/String;': function () { return 'container.dispenser'; },
+		'getInventoryStackLimit()I': function () { return 64; },
+		'onInventoryChanged()V': function () {},
+	} });
+
+	def('BlockDispenser', { super: SRC + 'BlockContainer', statics: { dispenseBehaviorRegistry: null }, clinit: function (vm, c) {
+		var r = vm.newObject(vm.loadClass(SRC + 'RegistryDefaulted'));
+		r.$map = disp(vm).behaviors;
+		r.$dflt = vm.newObject(vm.loadClass(SRC + 'BehaviorDefaultDispenseItem'));
+		c.statics.dispenseBehaviorRegistry = r;
+		disp(vm).registry = r;
+	}, staticMethods: {
+		'getFacing(I)Lnet/minecraft/src/EnumFacing;': function (vm, n, a) { return facings(vm)[(a[0] & 7) % 6]; },
+		'getIPositionFromBlockSource(Lnet/minecraft/src/IBlockSource;)Lnet/minecraft/src/IPosition;': function (vm, n, a) {
+			var s = a[0], f = facingOf(vm, s), p = vm.newObject(vm.loadClass(SRC + 'PositionImpl'));
+			p.$x = s.$bx + 0.5 + 0.7 * f.$off[0]; p.$y = s.$by + 0.5 + 0.7 * f.$off[1]; p.$z = s.$bz + 0.5 + 0.7 * f.$off[2];
+			return p;
+		},
+	} });
+
+	def('IBehaviorDispenseItem', { access: I });
+	var BDI = SRC + 'BehaviorDefaultDispenseItem';
+	var srcSig = '(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;';
+	def(BDI, { interfaces: [SRC + 'IBehaviorDispenseItem'], methods: {
+		'<init>()V': function () {},
+		'dispense(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var res = vm.callVirtual(self, 'dispenseStack', srcSig, a);
+			vm.callVirtual(self, 'playDispenseSound', '(Lnet/minecraft/src/IBlockSource;)V', [a[0]]);
+			vm.callVirtual(self, 'spawnDispenseParticles', '(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/EnumFacing;)V', [a[0], facingOf(vm, a[0])]);
+			return res;
+		},
+		'dispenseStack(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var f = facingOf(vm, a[0]);
+			var pos = vm.callStatic(SRC + 'BlockDispenser', 'getIPositionFromBlockSource', '(Lnet/minecraft/src/IBlockSource;)Lnet/minecraft/src/IPosition;', [a[0]]);
+			var one = vm.callVirtual(a[1], 'splitStack', '(I)Lnet/minecraft/src/ItemStack;', [1]);
+			vm.callStatic(BDI, 'doDispense', '(Lnet/minecraft/src/World;Lnet/minecraft/src/ItemStack;ILnet/minecraft/src/EnumFacing;Lnet/minecraft/src/IPosition;)V', [a[0].$world, one, 6, f, pos]);
+			return a[1];
+		},
+		'playDispenseSound(Lnet/minecraft/src/IBlockSource;)V': function (vm, self, a) { auxSfx(vm, 1000, a[0].$bx, a[0].$by, a[0].$bz, 0); },
+		'spawnDispenseParticles(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/EnumFacing;)V': function (vm, self, a) {
+			auxSfx(vm, 2000, a[0].$bx, a[0].$by, a[0].$bz, a[1].$off[0] + 1 + (a[1].$off[2] + 1) * 3);
+		},
+		'func_82485_a(Lnet/minecraft/src/EnumFacing;)I': function (vm, self, a) { return a[0].$off[0] + 1 + (a[0].$off[2] + 1) * 3; },
+	}, staticMethods: {
+		'doDispense(Lnet/minecraft/src/World;Lnet/minecraft/src/ItemStack;ILnet/minecraft/src/EnumFacing;Lnet/minecraft/src/IPosition;)V': function (vm, n, a) {
+			var p = a[4], s = a[1];
+			if (!s || s[':stackSize'] <= 0) return;
+			op(vm, 'drop', p.$x, p.$y - (a[3].$off[1] === 0 ? 0.15625 : 0.125), p.$z, s[':itemID'], s[':stackSize'], s[':itemDamage']);
+		},
+	} });
+	def('BehaviorProjectileDispense', { super: BDI, access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {
+		'dispenseStack(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var world = a[0].$world, f = facingOf(vm, a[0]);
+			var pos = vm.callStatic(SRC + 'BlockDispenser', 'getIPositionFromBlockSource', '(Lnet/minecraft/src/IBlockSource;)Lnet/minecraft/src/IPosition;', [a[0]]);
+			var p = vm.callVirtual(self, 'getProjectileEntity', '(Lnet/minecraft/src/World;Lnet/minecraft/src/IPosition;)Lnet/minecraft/src/IProjectile;', [world, pos]);
+			if (p) {
+				var spread = vm.callVirtual(self, 'func_82498_a', '()F', []), speed = vm.callVirtual(self, 'func_82500_b', '()F', []);
+				JVM.run(vm, function () { vm.callVirtual(p, 'setThrowableHeading', '(DDDFF)V', [f.$off[0], f.$off[1] + 0.1, f.$off[2], speed, spread]); });
+				vm.callVirtual(world, 'spawnEntityInWorld', '(Lnet/minecraft/src/Entity;)Z', [p]);
+			}
+			vm.callVirtual(a[1], 'splitStack', '(I)Lnet/minecraft/src/ItemStack;', [1]);
+			return a[1];
+		},
+		'playDispenseSound(Lnet/minecraft/src/IBlockSource;)V': function (vm, self, a) { auxSfx(vm, 1002, a[0].$bx, a[0].$by, a[0].$bz, 0); },
+		'func_82498_a()F': function () { return 6; },
+		'func_82500_b()F': function () { return 1.1; },
+	}, abstractMethods: ['getProjectileEntity(Lnet/minecraft/src/World;Lnet/minecraft/src/IPosition;)Lnet/minecraft/src/IProjectile;'] });
+
+	var wspec = vm.natives[SRC + 'World'];
+	if (wspec) wspec.methods = Object.assign({}, wspec.methods, {
+		'playAuxSFX(IIIII)V': function (vm, self, a) { auxSfx(vm, a[0], a[1], a[2], a[3], a[4]); },
+		'playAuxSFXAtEntity(Lnet/minecraft/src/EntityPlayer;IIIII)V': function (vm, self, a) { auxSfx(vm, a[1], a[2], a[3], a[4], a[5]); },
+	});
+
+	if (!JVM.station) return;
+	var DIR = ST + 'util/math/Direction';
+	def(ST + 'dispenser/DispenseEvent', { super: 'net/mine_diver/unsafeevents/Event', fields: { context: 'L' + ST + 'dispenser/ItemDispenseContext;' } });
+	def(ST + 'item/CustomDispenseBehavior', { access: I });
+	def(ST + 'dispenser/ItemDispenseContext$ShootEntityFunction', { access: I });
+	var shoot = function (vm, e, vx, vy, vz, pitch, yaw) {
+		var l = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+		vx /= l; vy /= l; vz /= l;
+		var g = function () { var u = 1 - Math.random(), v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+		vx += g() * 0.0075 * yaw; vy += g() * 0.0075 * yaw; vz += g() * 0.0075 * yaw;
+		e[':motionX'] = vx * pitch; e[':motionY'] = vy * pitch; e[':motionZ'] = vz * pitch;
+		e[':rotationYaw'] = e[':prevRotationYaw'] = Math.atan2(vx, vz) * 180 / Math.PI;
+		e[':rotationPitch'] = e[':prevRotationPitch'] = Math.atan2(vy, Math.sqrt(vx * vx + vz * vz)) * 180 / Math.PI;
+	};
+	def(ST + 'dispenser/ItemDispenseContext', { fields: { dispenser: 'L' + SRC + 'TileEntityDispenser;', slot: 'I', direction: 'L' + DIR + ';', itemStack: 'L' + SRC + 'ItemStack;', skipSpecial: 'Z' }, methods: {
+		'<init>(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/TileEntityDispenser;I)V': function (vm, self, a) {
+			self[':itemStack'] = a[0]; self[':dispenser'] = a[1]; self[':slot'] = a[2]; self[':skipSpecial'] = 0;
+			var te = a[1], meta = vm.callVirtual(te[':worldObj'], 'getBlockMetadata', '(III)I', [te[':xCoord'], te[':yCoord'], te[':zCoord']]);
+			self[':direction'] = vm.callStatic(DIR, 'byId', '(I)L' + DIR + ';', [meta]);
+		},
+		'shootEntity(Lnet/minecraft/src/Entity;)V': function (vm, self, a) { vm.callVirtual(self, 'shootEntity', '(Lnet/minecraft/src/Entity;L' + ST + 'dispenser/ItemDispenseContext$ShootEntityFunction;)V', [a[0], null]); },
+		'shootEntity(Lnet/minecraft/src/Entity;Lnet/modificationstation/stationapi/api/dispenser/ItemDispenseContext$ShootEntityFunction;)V': function (vm, self, a) {
+			var te = self[':dispenser'], d = self[':direction'], e = a[0], w = te[':worldObj'];
+			var off = d.$off || [0, 0, 0];
+			e[':posX'] = te[':xCoord'] + 0.5; e[':posY'] = te[':yCoord'] + 0.5; e[':posZ'] = te[':zCoord'] + 0.5;
+			if (a[1]) vm.callVirtual(a[1], 'shoot', '(Lnet/minecraft/src/Entity;DDDFF)V', [e, off[0], off[1] + 0.1, off[2], 1.1, 6]);
+			else shoot(vm, e, off[0], off[1] + 0.1, off[2], 1.1, 6);
+			vm.callVirtual(w, 'spawnEntityInWorld', '(Lnet/minecraft/src/Entity;)Z', [e]);
+			auxSfx(vm, 1002, te[':xCoord'], te[':yCoord'], te[':zCoord'], 0);
+			auxSfx(vm, 2000, te[':xCoord'], te[':yCoord'], te[':zCoord'], off[0] + 1 + (off[2] + 1) * 3);
+		},
+		'getFacingBlockPos()Lnet/modificationstation/stationapi/api/util/math/BlockPos;': function (vm, self) {
+			var te = self[':dispenser'], off = self[':direction'].$off || [0, 0, 0];
+			var p = vm.newObject(vm.loadClass(ST + 'util/math/BlockPos'));
+			vm.callVirtual(p, '<init>', '(III)V', [te[':xCoord'] + off[0], te[':yCoord'] + off[1], te[':zCoord'] + off[2]]);
+			return p;
+		},
+	}, staticMethods: {
+		'genericShootEntity(Lnet/minecraft/src/Entity;DDDFF)V': function (vm, n, a) { shoot(vm, a[0], a[1], a[2], a[3], a[4], a[5]); },
+	} });
+	if (!vm.natives[ST + 'util/math/BlockPos']) def(ST + 'util/math/BlockPos', { super: ST + 'util/math/Vec3i', methods: {
+		'<init>(III)V': function (vm, self, a) { self[':x'] = a[0]; self[':y'] = a[1]; self[':z'] = a[2]; },
+		'add(Lnet/modificationstation/stationapi/api/util/math/Vec3i;)Lnet/modificationstation/stationapi/api/util/math/BlockPos;': function (vm, self, a) {
+			var p = vm.newObject(self.cls); p[':x'] = self[':x'] + a[0][':x']; p[':y'] = self[':y'] + a[0][':y']; p[':z'] = self[':z'] + a[0][':z']; return p;
+		},
+		'up()Lnet/modificationstation/stationapi/api/util/math/BlockPos;': function (vm, self) { var p = vm.newObject(self.cls); p[':x'] = self[':x']; p[':y'] = self[':y'] + 1; p[':z'] = self[':z']; return p; },
+		'down()Lnet/modificationstation/stationapi/api/util/math/BlockPos;': function (vm, self) { var p = vm.newObject(self.cls); p[':x'] = self[':x']; p[':y'] = self[':y'] - 1; p[':z'] = self[':z']; return p; },
+	} });
+}
+JVM.installDispense = installDispense;
+
+JVM.addDispenserHandler = function (vm, h) { if (h) disp(vm).handlers.push(h); };
+
+JVM.dispense = function (vm, info) {
+	var world = JVM.mc152.worldObj(vm), d = disp(vm);
+	var x = info.x | 0, y = info.y | 0, z = info.z | 0;
+	var one = JVM.mc152.newStack(vm, info.id, 1, info.data | 0);
+	var item = null;
+	JVM.run(vm, function () { item = stackItem(vm, one); });
+	for (var i = 0; i < d.handlers.length; i++) {
+		var h = d.handlers[i], f = FACINGS[(info.meta & 7) % 6];
+		var r = JVM.run(vm, function () {
+			return vm.callVirtual(h, 'dispense', '(IIIIILnet/minecraft/src/World;Lnet/minecraft/src/ItemStack;Ljava/util/Random;DDD)I',
+				[x, y, z, f[1], f[3], world, one, world[':rand'], x + f[1] * 0.6 + 0.5, y + 0.5, z + f[3] * 0.6 + 0.5]);
+		});
+		if (r.ok && r.value >= 0) return 1;
+	}
+	if (item && d.behaviors.has(item)) {
+		var beh = d.behaviors.get(item);
+		var src = vm.newObject(vm.loadClass(SRC + 'BlockSourceImpl'));
+		src.$world = world; src.$bx = x; src.$by = y; src.$bz = z; src.$meta = info.meta | 0;
+		var whole = JVM.mc152.newStack(vm, info.id, (info.left | 0) + 1, info.data | 0);
+		var rb = JVM.run(vm, function () { return vm.callVirtual(beh, 'dispense', '(Lnet/minecraft/src/IBlockSource;Lnet/minecraft/src/ItemStack;)Lnet/minecraft/src/ItemStack;', [src, whole]); });
+		if (!rb.ok) return 0;
+		var te = dispenserTile(vm, world, x, y, z), res = rb.value;
+		if (!res || res[':stackSize'] <= 0) { if (info.left > 0 || res !== whole) slotSet(vm, te, info.slot, null); }
+		else if (res[':itemID'] !== info.id || res[':itemDamage'] !== (info.data | 0) || res[':stackSize'] !== (info.left | 0)) slotSet(vm, te, info.slot, res);
+		return 1;
+	}
+	if (JVM.station && vm.natives[ST + 'dispenser/DispenseEvent']) {
+		var s = JVM.station.st(vm);
+		var wants = s.listeners && s.listeners.some(function (l) { return /DispenseEvent;$/.test(l.type); });
+		var custom = item && vm.isInstance(item, vm.loadClass(ST + 'item/CustomDispenseBehavior'));
+		if (!wants && !custom) return 0;
+		var te2 = dispenserTile(vm, world, x, y, z), ctx = null;
+		JVM.run(vm, function () {
+			ctx = vm.newObject(vm.loadClass(ST + 'dispenser/ItemDispenseContext'));
+			vm.callVirtual(ctx, '<init>', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/TileEntityDispenser;I)V', [one, te2, info.slot | 0]);
+		});
+		if (!ctx) return 0;
+		var ev = vm.newObject(vm.loadClass(ST + 'dispenser/DispenseEvent'));
+		ev[':context'] = ctx;
+		if (wants) JVM.station.fire(vm, ev);
+		if (ev.$canceled) return 1;
+		var it2 = stackItem(vm, ctx[':itemStack']);
+		if (it2 && vm.isInstance(it2, vm.loadClass(ST + 'item/CustomDispenseBehavior'))) {
+			JVM.run(vm, function () { vm.callVirtual(it2, 'dispense', '(' + 'L' + ST + 'dispenser/ItemDispenseContext;)V', [ctx]); });
+			return 1;
+		}
+		return ctx[':skipSpecial'] ? 2 : 0;
+	}
+	return 0;
+};
+JVM.dispenseWanted = function (vm) {
+	var d = reg(vm).dispense;
+	if (d && (d.handlers.length || d.behaviors.size)) return true;
+	if (!JVM.station || !vm.natives[ST + 'dispenser/DispenseEvent']) return false;
+	var s = JVM.station.st(vm), r = reg(vm);
+	if (s.listeners && s.listeners.some(function (l) { return /DispenseEvent;$/.test(l.type); })) return true;
+	var CDB = vm.loadClass(ST + 'item/CustomDispenseBehavior');
+	return Object.keys(r.items).some(function (k) { return r.items[k] && vm.isInstance(r.items[k], CDB); });
+};
+})();
+
+(function () {
+'use strict';
+
 var FEATURES = [
 	[/Enchantment/, 'enchantments'],
 	[/Potion/, 'potion effects'],
@@ -8982,6 +9301,8 @@ var LIBS = [
 	[/^paulscode[/]sound|^ibxm[/]/, null],
 	[/^kotlin[/]|^kotlinx[/]/, 'Fabric Language Kotlin'],
 	[/^net[/]lomeli[/]lomlib[/]/, 'LomLib'],
+	[/^pw[/]tmpim[/]goodutils[/]/, 'Good Utils'],
+	[/^net[/]zekromaster[/]/, "zekromaster's library mod"],
 	[/^paulevs[/]bhcreative[/]/, 'BH Creative'],
 	[/^net[/]glasslauncher[/]mods[/]api[/]gcapi|^net[/]glasslauncher[/]mods[/]gcapi/, null],
 	[/^net[/]glasslauncher[/]mods[/]alwaysmoreitems|^net[/]glasslauncher[/]hmifabric/, null],
@@ -9077,11 +9398,14 @@ JVM.javaKind = function (vm, classes, files) {
 	if (fj) {
 		var dep = fj.depends && fj.depends.minecraft;
 		var babric = (typeof dep === 'string' && /b1[.]7|beta|1[.]0[.]0-beta/.test(dep)) || !!(fj.depends && (fj.depends.stationapi || fj.depends['station-api']));
+		var library = dep == null && !(fj.depends && (fj.depends['fabric-api'] || fj.depends.fabric));
+		if (library) babric = true;
 		out.loader = babric ? 'Babric' : 'Fabric';
 		out.version = babric ? 'Beta 1.7.3' : (typeof dep === 'string' ? dep.replace(/[~^>=<*\s]/g, '') : '');
 		if (!babric) { out.cant = 'made for Fabric on Minecraft ' + (out.version || 'a newer version') + ' (only Beta 1.7.3 Babric mods can be supported)'; return out; }
 		var bk = JVM.babricKind ? JVM.babricKind(fj, files) : { runnable: true, mixins: 0 };
 		out.mixins = bk.mixins;
+		if (library && !bk.runnable && !bk.mixins) { out.library = true; return out; }
 		if (!bk.runnable) out.cant = bk.mixins ? "it only changes the game's own code (mixins), which can't be done here" : 'nothing in it runs (no entrypoints)';
 		return out;
 	}
@@ -9824,6 +10148,55 @@ function installStation(vm) {
 		'<init>(Lnet/minecraft/src/WorldGenerator;I)V': function (vm, self, a) { self.$f = a[0]; self.$w = a[1]; },
 	}, wf) });
 
+	var RS = ST + 'resource/';
+	def(RS + 'ResourceManager', { access: I });
+	['DataManager', 'AssetsManager', 'AssetManager'].forEach(function (n) {
+		def(RS + n, { interfaces: [RS + 'ResourceManager'], statics: { INSTANCE: null }, clinit: function (vm, c) { var o = vm.newObject(c); o.$root = /^Data/.test(n) ? 'data' : 'assets'; c.statics.INSTANCE = o; } });
+	});
+	var resource = function (vm, bytes, id) {
+		var r = vm.newObject(vm.loadClass(RS + 'Resource')); r.$bytes = bytes; r.$id = id; return r;
+	};
+	var textReader = function (vm, bytes) { var rd = vm.newObject(vm.loadClass('java/io/BufferedReader')); rd.$text = new TextDecoder().decode(bytes).replace(/^﻿/, ''); rd.$tpos = 0; return rd; };
+	def(RS + 'Resource', { methods: {
+		'getInputStream()Ljava/io/InputStream;': function (vm, self) { return JVM.bytesStream(vm, self.$bytes); },
+		'getReader()Ljava/io/BufferedReader;': function (vm, self) { return textReader(vm, self.$bytes); },
+		'getResourcePackName()Ljava/lang/String;': function (vm, self) { return self.$id ? self.$id.split(':')[0] : 'mod'; },
+	} });
+	var findRes = function (vm, self, mgr) {
+		var root = mgr && mgr.$root || 'data', out = [];
+		var all = vm.$stFiles || {};
+		Object.keys(all).forEach(function (mid) {
+			var files = all[mid];
+			Object.keys(files).forEach(function (k) {
+				var m = new RegExp('^' + root + '[/]([^/]+)[/](?:stationapi[/])?(' + self.$dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[/].+' + self.$ext.replace(/[.]/g, '[.]') + ')$').exec(k);
+				if (m) out.push([m[1] + ':' + m[2], files[k]]);
+			});
+		});
+		return out;
+	};
+	def(RS + 'ResourceFinder', { methods: {
+		'<init>(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { self.$dir = String(a[0]); self.$ext = String(a[1]); },
+		'findResources(Lnet/modificationstation/stationapi/api/resource/ResourceManager;)Ljava/util/Map;': function (vm, self, a) {
+			var mm = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(mm, '<init>', '()V', []);
+			findRes(vm, self, a[0]).forEach(function (e) { vm.callVirtual(mm, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [parseId(vm, e[0]), resource(vm, e[1], e[0])]); });
+			return mm;
+		},
+		'findAllResources(Lnet/modificationstation/stationapi/api/resource/ResourceManager;)Ljava/util/Map;': function (vm, self, a) {
+			var mm = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(mm, '<init>', '()V', []);
+			findRes(vm, self, a[0]).forEach(function (e) { vm.callVirtual(mm, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [parseId(vm, e[0]), JVM.newList(vm, [resource(vm, e[1], e[0])])]); });
+			return mm;
+		},
+		'toResourceId(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) {
+			var p = a[0][':path'], d = self.$dir + '/';
+			if (p.indexOf(d) === 0) p = p.slice(d.length);
+			if (p.slice(-self.$ext.length) === self.$ext) p = p.slice(0, -self.$ext.length);
+			return identifier(vm, a[0][':namespace'].$s, p);
+		},
+		'toResourcePath(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/util/Identifier;': function (vm, self, a) { return identifier(vm, a[0][':namespace'].$s, self.$dir + '/' + a[0][':path'] + self.$ext); },
+	}, staticMethods: {
+		'json(Ljava/lang/String;)Lnet/modificationstation/stationapi/api/resource/ResourceFinder;': function (vm, n, a) { var f = vm.newObject(vm.loadClass(RS + 'ResourceFinder')); f.$dir = String(a[0]); f.$ext = '.json'; return f; },
+	} });
+
 	var OLD = {};
 	OLD[ST + 'registry/Identifier'] = ID;
 	OLD[ST + 'registry/ModID'] = NS;
@@ -10181,7 +10554,13 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	vm.currentMod = modId;
 	stationTags(vm, files);
 	applyAccessorMixins(vm, modId, fj, files);
-	var eps = fj.entrypoints || {}, objs = [];
+	var eps = {}, objs = [];
+	Object.keys(files).filter(function (k) { return /^META-INF[/]nested-mods[/]/.test(k); }).map(function (k) { return json(files, k); }).concat([fj]).forEach(function (m) {
+		if (!m) return;
+		if (m !== fj && m.id && !s.mods[m.id]) s.mods[m.id] = { id: String(m.id), name: m.name || m.id, version: m.version || '1.0', description: m.description || '', folder: modId };
+		var e = m.entrypoints || {};
+		Object.keys(e).forEach(function (k) { eps[k] = (eps[k] || []).concat(e[k]); });
+	});
 	(s.gcClasses = s.gcClasses || {})[modId] = (eps.gcapi3 || []).concat(eps.gcapi || []).map(function (v) { return String(typeof v === 'string' ? v : v && v.value || '').split('::')[0].replace(/[.]/g, '/'); }).filter(Boolean);
 	var run = function (what, fn) { var r = JVM.run(vm, fn); if (!r.ok) vm.log('error', id + ': ' + what + ' failed'); return r; };
 	['stationapi:event_bus', 'stationapi:event_bus_client'].forEach(function (k) {

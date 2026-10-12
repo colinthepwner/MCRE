@@ -1660,6 +1660,16 @@
                         var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
                         if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : ''), n: a[1] | 0 }); return 1; }
                         return mp(['give', gref, a[1] | 0, gd].join('\t'));
+                    case 'chest': {
+                        var cs = mp(['chest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('	'));
+                        if (!cs || !cs[0] || cs[0] === 'id:0' || !(cs[1] > 0)) return null;
+                        var cj = javaOf(cs[0], cs[2]);
+                        return { id: cj.id, count: cs[1], data: cj.data };
+                    }
+                    case 'setchest': {
+                        var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
+                        return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref, a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
+                    }
                     case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : a[5] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
@@ -1716,11 +1726,23 @@
             };
             var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1 };
             J.running = function () { return running; };
+            J.dispense = function (json) {
+                if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
+                var e; try { e = JSON.parse(json); } catch (x) { return 0; }
+                var j = javaOf(e.item, e.data);
+                if (!j.id) return 0;
+                tiles = {}; vm.steps = 0;
+                try { return window.JVM.dispense(vm, { x: e.x, y: e.y, z: e.z, meta: e.meta, slot: e.slot, id: j.id, data: j.data, left: e.left }) | 0; }
+                catch (x) { console.warn('[java] dispense', x); return 0; }
+                finally { tiles = null; }
+            };
             J.wants = function (type) { return running && !!WANTS[type]; };
             J.worldStart = function () {
                 running = false;
                 var r = reg();
-                if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length))) return null;
+                var hasMod = function (o) { return Object.keys(o || {}).some(function (k) { return o[k] && o[k].$mod; }); };
+                var stMods = window.JVM.station && vm && window.JVM.station.st(vm).listeners.length;
+                if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length) || hasMod(r.blocks) || hasMod(r.items) || stMods)) return null;
                 var wi = mp('world');
                 worldDir = wi && wi.dir ? '/games/com.mojang/minecraftWorlds/' + wi.dir : null;
                 javaMods = {};
@@ -2204,7 +2226,8 @@
             J.preload = function (modId, files, problem) {
                 if (J.pre[modId]) return Promise.resolve(J.pre[modId]);
                 var JVM = null;
-                return loadJvm().then(function (j) { JVM = j; return versionTag(JVM, files); }).then(function (ver) {
+                return loadJvm().then(function (j) { JVM = j; return JVM.expandNestedJars ? JVM.expandNestedJars(files) : files; })
+                    .then(function () { return versionTag(JVM, files); }).then(function (ver) {
                     if (ver.tag && vm && vm.$tag && vm.$tag !== ver.tag) {
                         var why = 'made for Minecraft ' + JVM.versionOfTag[ver.tag] + ', but the Java mods already on are for ' + JVM.versionOfTag[vm.$tag] + ' - only one version\'s mods run at a time';
                         J.reports[modId] = JVM.javaReport(vm, modId, { loader: '', version: JVM.versionOfTag[ver.tag], cant: why });
@@ -2239,7 +2262,7 @@
                                 classes.push(cn);
                             } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
                         });
-                        return (J.pre[modId] = { ver: ver, classes: classes });
+                        return (J.pre[modId] = { ver: ver, classes: classes, files: files });
                     });
                 }).catch(function (e) {
                     problem('', 'Java mod could not run: ' + (e && e.message || e));
@@ -2249,6 +2272,7 @@
             J.define = function (modId, files, problem) {
                 return J.preload(modId, files, problem).then(function (st) {
                     if (!st || st.skip) return {};
+                    files = st.files || files;
                     var JVM = window.JVM, ver = st.ver, classes = st.classes;
                     var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;

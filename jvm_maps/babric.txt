@@ -727,6 +727,9 @@ F	net/minecraft/class_106	field_332	field_332	rand
 F	net/minecraft/class_108	field_334	field_334	path
 F	net/minecraft/class_110	field_337	field_337	random
 F	net/minecraft/class_119	field_364	field_364	entityId
+F	net/minecraft/class_119	field_365	field_365	motionX
+F	net/minecraft/class_119	field_366	field_366	motionY
+F	net/minecraft/class_119	field_367	field_367	motionZ
 F	net/minecraft/class_124	field_376	field_376	axeDiamond
 F	net/minecraft/class_124	field_377	field_377	stick
 F	net/minecraft/class_124	field_378	field_378	bowlEmpty
@@ -854,6 +857,7 @@ F	net/minecraft/class_54	field_529	field_529	dimension
 F	net/minecraft/class_145	field_542	field_542	xPosition
 F	net/minecraft/class_145	field_543	field_543	yPosition
 F	net/minecraft/class_145	field_545	field_545	direction
+F	net/minecraft/class_145	field_546	field_546	itemStack
 F	net/minecraft/class_146	field_547	field_547	attackStrength
 F	net/minecraft/class_156	field_558	field_558	time
 F	net/minecraft/class_148	field_561	field_561	instance
@@ -894,6 +898,7 @@ F	net/minecraft/class_136	field_745	field_745	mainInventory
 F	net/minecraft/class_136	field_746	field_746	armorInventory
 F	net/minecraft/class_136	field_747	field_747	currentItem
 F	net/minecraft/class_136	field_748	field_748	player
+F	net/minecraft/class_136	field_750	field_750	itemStack
 F	net/minecraft/class_31	field_751	field_751	stackSize
 F	net/minecraft/class_31	field_753	field_753	itemID
 F	net/minecraft/class_31	field_754	field_754	itemDamage
@@ -921,6 +926,7 @@ F	net/minecraft/class_228	field_856	field_856	status
 F	net/minecraft/class_80	field_859	field_859	slots
 F	net/minecraft/class_80	field_860	field_860	count
 F	net/minecraft/class_236	field_869	field_869	windowId
+F	net/minecraft/class_236	field_870	field_870	itemStack
 F	net/minecraft/class_237	field_872	field_872	username
 F	net/minecraft/class_153	field_875	field_875	rainforest
 F	net/minecraft/class_153	field_876	field_876	swampland
@@ -1037,6 +1043,7 @@ F	net/minecraft/class_343	field_1307	field_1307	unknown
 F	net/minecraft/class_353	field_1318	field_1318	offsets
 F	net/minecraft/class_359	field_1350	field_1350	worldObj
 F	net/minecraft/class_363	field_1365	field_1365	action
+F	net/minecraft/class_363	field_1366	field_1366	itemStack
 F	net/minecraft/class_33	field_1368	field_1368	width
 F	net/minecraft/class_33	field_1369	field_1369	height
 F	net/minecraft/class_33	field_1370	field_1370	xPosition
@@ -1114,8 +1121,13 @@ F	net/minecraft/class_57	field_1596	field_1596	worldObj
 F	net/minecraft/class_57	field_1600	field_1600	posX
 F	net/minecraft/class_57	field_1601	field_1601	posY
 F	net/minecraft/class_57	field_1602	field_1602	posZ
+F	net/minecraft/class_57	field_1603	field_1603	motionX
+F	net/minecraft/class_57	field_1604	field_1604	motionY
+F	net/minecraft/class_57	field_1605	field_1605	motionZ
 F	net/minecraft/class_57	field_1606	field_1606	rotationYaw
 F	net/minecraft/class_57	field_1607	field_1607	rotationPitch
+F	net/minecraft/class_57	field_1608	field_1608	prevRotationYaw
+F	net/minecraft/class_57	field_1609	field_1609	prevRotationPitch
 F	net/minecraft/class_57	field_1610	field_1610	boundingBox
 F	net/minecraft/class_57	field_1614	field_1614	air
 F	net/minecraft/class_57	field_1615	field_1615	isImmuneToFire
@@ -1408,6 +1420,7 @@ F	net/minecraft/class_587	field_2539	field_2539	options
 F	net/minecraft/class_588	field_2546	field_2546	rand
 F	net/minecraft/class_455	field_2555	field_2555	worldObj
 F	net/minecraft/class_589	field_2556	field_2556	modelBipedMain
+F	net/minecraft/class_595	field_2581	field_2581	cancelled
 F	net/minecraft/class_598	field_2594	field_2594	instance
 F	net/minecraft/class_600	field_2601	field_2601	squidBody
 F	net/minecraft/class_600	field_2602	field_2602	squidTentacles
