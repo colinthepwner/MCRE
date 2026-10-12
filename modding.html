@@ -148,6 +148,10 @@ items/&lt;name&gt;.json     A new item, &quot;&lt;mod id&gt;:&lt;name&gt;&quot;.
                         &quot;stack&quot; (1-64), &quot;food&quot; (hunger points it fills, or
                         {&quot;hunger&quot;: 4, &quot;saturation&quot;: 0.6}), &quot;scripted&quot; (using it on a block does
                         nothing else - your script&#x27;s &quot;useItemOn&quot; decides)
+                        &quot;ore&quot;         &quot;ingotCopper&quot; (or a list) - the material it is: recipes
+                                      using any mod&#x27;s item of that name accept yours too, and
+                                      yours accept theirs (the same-named materials of different
+                                      mods - &quot;Copper Ingot&quot; - are matched up even without it)
                         &quot;tool&quot;        &quot;pickaxe&quot;, &quot;axe&quot;, &quot;shovel&quot;, &quot;hoe&quot;, &quot;sword&quot; or &quot;shears&quot;,
                                       or {&quot;type&quot;: &quot;pickaxe&quot;, &quot;tier&quot;: &quot;iron&quot;, &quot;speed&quot;: 6,
                                       &quot;durability&quot;: 250, &quot;damage&quot;: 4} - the tier (wood, stone,

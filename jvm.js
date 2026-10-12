@@ -5458,7 +5458,15 @@ function installMc152(vm) {
 		self[':isBlockContainer'] = 0;
 		if (id < 0 || id >= 4096) return;
 		var list = c.statics.blocksList.a;
-		if (list[id] && !list[id].$vanilla && !reg(vm).vanilla) vm.log('warn', 'block id ' + id + ' is used twice');
+		var prev = list[id];
+		if (prev && prev !== self && !prev.$vanilla && !reg(vm).vanilla && prev.$mod && prev.$mod !== (vm.currentMod || '')) {
+			var mk = reg(vm).forge && reg(vm).forge.markers || {}, nid = 0;
+			for (var j = 4095; j > 256; j--) if (!list[j] && !mk[j]) { nid = j; break; }
+			if (nid) {
+				vm.warnOnce('idclash:b:' + id + ':' + vm.currentMod, 'block id ' + id + ' is also ' + prev.$mod + '\'s - this mod\'s block moved to ' + nid + ' so both work');
+				id = nid; self[':blockID'] = id;
+			} else vm.log('warn', 'block id ' + id + ' is used twice');
+		} else if (prev && prev !== self && !prev.$vanilla && !reg(vm).vanilla) vm.log('warn', 'block id ' + id + ' is used twice');
 		list[id] = self;
 		if (!reg(vm).vanilla) {
 			reg(vm).blocks[id] = self;
@@ -5542,7 +5550,15 @@ function installMc152(vm) {
 		self[':bFull3D'] = 0;
 		if (id < 0 || id >= 32000) return;
 		var list = c.statics.itemsList.a;
-		if (list[id] && !list[id].$vanilla && !reg(vm).vanilla && !list[id].$blockItem) vm.log('warn', 'item id ' + id + ' is used twice');
+		var prevI = list[id];
+		if (prevI && prevI !== self && !prevI.$vanilla && !reg(vm).vanilla && !prevI.$blockItem && !self.$blockItem && prevI.$mod && prevI.$mod !== (vm.currentMod || '')) {
+			var nidI = 0;
+			for (var k = list.length - 1; k >= 4096; k--) if (!list[k]) { nidI = k; break; }
+			if (nidI) {
+				vm.warnOnce('idclash:i:' + id + ':' + vm.currentMod, 'item id ' + (id - 256) + ' is also ' + prevI.$mod + '\'s - this mod\'s item moved so both work');
+				id = nidI; self[':itemID'] = id;
+			}
+		} else if (prevI && !prevI.$vanilla && !reg(vm).vanilla && !prevI.$blockItem) vm.log('warn', 'item id ' + id + ' is used twice');
 		list[id] = self;
 		if (!reg(vm).vanilla && !self.$blockItem) { reg(vm).items[id] = self; self.$mod = vm.currentMod || ''; if (VANILLA_IDS[id]) self.$override = true; }
 	}
@@ -6265,6 +6281,15 @@ JVM.collectContent = function (vm, modId) {
 	}
 	if (JVM.collectBiomes) out.biomes = JVM.collectBiomes(vm, modId, ref, safe);
 	if (JVM.collectWorldTypes) out.worldtypes = JVM.collectWorldTypes(vm, modId);
+	var fo = r.forge && r.forge.ores;
+	if (fo) {
+		out.oredict = {};
+		Object.keys(fo).forEach(function (name) {
+			var mine = fo[name].filter(function (s) { var o = r.blocks[s[':itemID']] || r.items[s[':itemID']]; return o && o.$mod === modId && !o.$override; })
+				.map(function (s) { return ref(s[':itemID'], s[':itemDamage'] === 32767 || s[':itemDamage'] < 0 ? 0 : s[':itemDamage']); });
+			if (mine.length) out.oredict[name] = mine;
+		});
+	}
 	if (JVM.collectEnchantments) out.enchantments = JVM.collectEnchantments(vm, modId, safe);
 	if (JVM.collectDims) out.dimensions = JVM.collectDims(vm, modId, safe);
 	return out;
@@ -6880,25 +6905,27 @@ function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
 	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
-	var v = javaInt(propString(prop));
-	if (v !== -1) { f.markers[v] = true; return prop; }
+	var v = javaInt(propString(prop)), me = vm.currentMod || true;
 	var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc);
 	var list = bc.statics.blocksList.a;
+	if (v !== -1 && f.markers[v] && f.markers[v] !== me) { vm.warnOnce('cfgclash:' + vm.currentMod, 'some block ids in its config are other mods\' too - moved to free ones'); v = -1; dflt = upper - 1; }
+	if (v !== -1) { f.markers[v] = me; return prop; }
 	if (dflt < lower) { vm.warnOnce('cfg-low:' + vm.currentMod, 'block id defaults below ' + lower + ' were moved to free ids (as Forge does)'); dflt = upper - 1; }
-	if (!list[dflt] && !f.markers[dflt]) { propSet(prop, String(dflt)); f.markers[dflt] = true; return prop; }
-	for (var j = upper - 1; j > 0; j--) if (!list[j] && !f.markers[j]) { propSet(prop, String(j)); f.markers[j] = true; return prop; }
+	if (!list[dflt] && !f.markers[dflt]) { propSet(prop, String(dflt)); f.markers[dflt] = me; return prop; }
+	for (var j = upper - 1; j > 0; j--) if (!list[j] && !f.markers[j]) { propSet(prop, String(j)); f.markers[j] = me; return prop; }
 	vm.throwNew('java/lang/RuntimeException', 'No more block ids available for ' + key);
 }
 function cfgItemId(vm, self, category, key, dflt, comment) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
 	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
-	var v = javaInt(propString(prop)), shift = dflt + 256;
-	if (v !== -1) { f.markers[v + 256] = true; return prop; }
+	var v = javaInt(propString(prop)), shift = dflt + 256, me = vm.currentMod || true;
+	if (v !== -1 && f.markers[v + 256] && f.markers[v + 256] !== me) { vm.warnOnce('cfgclash:i:' + vm.currentMod, 'some item ids in its config are other mods\' too - moved to free ones'); v = -1; shift = 31999; }
+	if (v !== -1) { f.markers[v + 256] = me; return prop; }
 	var ic = vm.loadClass(SRC + 'Item'); vm.initClass(ic);
 	var list = ic.statics.itemsList.a;
-	if (!list[shift] && !f.markers[shift] && shift >= 4096) { propSet(prop, String(dflt)); f.markers[shift] = true; return prop; }
-	for (var x = list.length - 1; x >= 256; x--) if (!list[x] && !f.markers[x]) { propSet(prop, String(x - 256)); f.markers[x] = true; return prop; }
+	if (!list[shift] && !f.markers[shift] && shift >= 4096) { propSet(prop, String(shift - 256)); f.markers[shift] = me; return prop; }
+	for (var x = list.length - 1; x >= 256; x--) if (!list[x] && !f.markers[x]) { propSet(prop, String(x - 256)); f.markers[x] = me; return prop; }
 	vm.throwNew('java/lang/RuntimeException', 'No more item ids available for ' + key);
 }
 function dstr(vm, d) { return vm.callStatic('java/lang/Double', 'toString', '(D)Ljava/lang/String;', [d]); }

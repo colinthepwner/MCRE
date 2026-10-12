@@ -3721,6 +3721,7 @@ R	field_71425_J	running
 R	field_71426_K	debug
 R	field_71446_o	renderEngine
 R	field_71428_T	timer
+R	field_71449_j	session
 R	field_110453_aa	proxy
 R	field_71443_c	displayWidth
 R	field_71440_d	displayHeight

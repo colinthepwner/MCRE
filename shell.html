@@ -2428,6 +2428,7 @@
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.worldtypes || {}).forEach(function (k) { put('worldtypes/' + k + '.json', c.worldtypes[k]); });
+                    if (c.oredict && Object.keys(c.oredict).length) put('oredict.json', c.oredict);
                     Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
                     Object.keys(c.dimensions || {}).forEach(function (k) { put('dimensions/' + k + '.json', c.dimensions[k]); });
                     Object.keys(c.mobFiles || {}).forEach(function (k) { var v = c.mobFiles[k]; add[k] = typeof v === 'string' ? enc.encode(v) : v; });
@@ -3208,6 +3209,8 @@
                                 sounds[sn].push(u);
                             } else if (/^lang\/en_us\.lang$/i.test(path)) {
                                 lang.push(new TextDecoder().decode(data));
+                            } else if (/^oredict[.]json$/i.test(path)) {
+                                content.push({ mod: id, kind: 'oredict', name: 'oredict', data: data, file: path });
                             } else if ((m = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
@@ -3752,7 +3755,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
@@ -3765,6 +3768,7 @@
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'worldtypes') { typeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
+                    if (c.kind === 'oredict') { oreFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'enchantments') { enchFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'dimensions') { dimFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'blockstate') { states[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
@@ -3833,6 +3837,79 @@
                     if (file && !blocks[p[0] + ':' + p[1]] && !items[p[0] + ':' + p[1]])
                         problem(mod, file, '"' + raw + '" isn\'t loaded (is the ' + p[0] + ' mod on?)');
                     return 'mod:' + p[0] + ':' + p[1];
+                }
+                var MATERIAL = /\b(ingots?|nuggets?|gems?|dusts?|plates?|gears?|rods?|shards?|crystals?|chunks?|sheets?|bars?|block of|ores?)\b|^(ruby|sapphire|amethyst|topaz|peridot|jade|onyx|tin|copper|silver|lead|bronze|steel|aluminium|aluminum|titanium|uranium|platinum|zinc|nickel|cobalt|mithril|adamantium|obsidian shard)$/i;
+                function unifyRecipes() {
+                    var parent = {};
+                    var find = function (x) { while (parent[x] && parent[x] !== x) x = parent[x] = parent[parent[x]] || parent[x]; return x; };
+                    var join = function (list) {
+                        list = list.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+                        if (list.length < 2) return;
+                        list.forEach(function (v) { if (!parent[v]) parent[v] = v; });
+                        var root = find(list[0]);
+                        list.slice(1).forEach(function (v) { var rv = find(v); if (rv !== root) parent[rv] = root; });
+                    };
+                    var byOre = {};
+                    var addOre = function (name, r) { name = String(name || '').trim(); if (!name || !r) return; (byOre[name] = byOre[name] || []).push(r); };
+                    oreFiles.forEach(function (o) {
+                        Object.keys(o.j || {}).forEach(function (name) {
+                            (Array.isArray(o.j[name]) ? o.j[name] : []).forEach(function (rr) { addOre(name, ref(String(rr).replace(/^mod:/, ''), o.mod, '')); });
+                        });
+                    });
+                    var named = {};
+                    [items, blocks].forEach(function (tbl) {
+                        Object.keys(tbl).forEach(function (k) {
+                            var e = tbl[k], j = e.j || {}, r = 'mod:' + k;
+                            (Array.isArray(j.ore) ? j.ore : j.ore ? [j.ore] : []).forEach(function (n) { addOre(n, r); });
+                            var nm = String(j.name || '').replace(/\u00a7./g, '').trim().toLowerCase();
+                            if (nm && MATERIAL.test(nm)) (named[nm] = named[nm] || []).push({ mod: e.mod, r: r });
+                        });
+                    });
+                    Object.keys(byOre).forEach(function (n) { join(byOre[n]); });
+                    Object.keys(named).forEach(function (n) {
+                        var l = named[n];
+                        if (l.some(function (x) { return x.mod !== l[0].mod; })) join(l.map(function (x) { return x.r; }));
+                    });
+                    if (!Object.keys(parent).length) return;
+                    var groups = {};
+                    Object.keys(parent).forEach(function (v) { var g = find(v); (groups[g] = groups[g] || []).push(v); });
+                    var alts = function (r) { return parent[r] ? groups[find(r)] : [r]; };
+                    var combos = function (lists, cap) {
+                        var out = [[]];
+                        lists.forEach(function (l) {
+                            var next = [];
+                            out.forEach(function (o) { l.forEach(function (v) { if (next.length < cap) next.push(o.concat([v])); }); });
+                            out = next;
+                        });
+                        return out;
+                    };
+                    var seen = {}, extra = [], added = 0;
+                    lines.forEach(function (l) { seen[l] = true; });
+                    lines.forEach(function (l) {
+                        var f = l.split('\t');
+                        if (f[0] === 'shaped' && f[4]) {
+                            var ks = f[4].split(';').map(function (kv) { var i = kv.indexOf('='); return [kv.slice(0, i), kv.slice(i + 1)]; });
+                            if (!ks.some(function (k) { return parent[k[1]]; })) return;
+                            combos(ks.map(function (k) { return alts(k[1]).map(function (r) { return k[0] + '=' + r; }); }), 16).forEach(function (c) {
+                                var nl = [f[0], f[1], f[2], f[3], c.join(';')].join('\t');
+                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                            });
+                        } else if (f[0] === 'shapeless' && f[3]) {
+                            var ing = f[3].split(';');
+                            if (!ing.some(function (r) { return parent[r]; })) return;
+                            combos(ing.map(alts), 16).forEach(function (c) {
+                                var nl = [f[0], f[1], f[2], c.join(';')].join('\t');
+                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                            });
+                        } else if (f[0] === 'smelt' && parent[f[1]]) {
+                            alts(f[1]).slice(0, 8).forEach(function (r) {
+                                var nl = [f[0], r, f[2], f[3]].join('\t');
+                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                            });
+                        }
+                    });
+                    extra.forEach(function (l) { lines.push(l); added++; });
+                    if (added) console.log('[mods] clash layer: ' + Object.keys(groups).length + ' shared materials, ' + added + ' extra recipe versions');
                 }
                 var next = { blocks: 512, items: 512 }, given = { blocks: {}, items: {} }, draw = { blocks: [], items: [] };
                 var limit = Math.floor(maxTextureSize() / 16) * 16;
@@ -4674,6 +4751,7 @@
                     jobs = jobs.then(function () { return paint('/data/images/terrain.png', draw.blocks); })
                                .then(function () { return paint('/data/images/gui/items.png', draw.items); });
                 }
+                unifyRecipes();
                 return jobs.then(function () {
                     try { FS.mkdirTree('/data/web_mods'); FS.writeFile('/data/web_mods/content.txt', lines.join('\n') + '\n'); } catch (e) { }
                     return warn;

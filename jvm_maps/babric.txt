@@ -1521,6 +1521,7 @@ F	net/minecraft/client/Minecraft	field_2802	field_2802	displayWidth
 F	net/minecraft/client/Minecraft	field_2803	field_2803	displayHeight
 F	net/minecraft/client/Minecraft	field_2804	field_2804	theWorld
 F	net/minecraft/client/Minecraft	field_2806	field_2806	thePlayer
+F	net/minecraft/client/Minecraft	field_2809	field_2809	session
 F	net/minecraft/client/Minecraft	field_2814	field_2814	renderEngine
 F	net/minecraft/client/Minecraft	field_2815	field_2815	fontRenderer
 F	net/minecraft/client/Minecraft	field_2816	field_2816	currentScreen
