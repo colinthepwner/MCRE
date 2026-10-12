@@ -3798,6 +3798,11 @@ var TABS = ['tabBlock', 'tabDecorations', 'tabRedstone', 'tabTransport', 'tabMis
 var TOOL_MATS = { WOOD: [0, 59, 2, 0, 15], STONE: [1, 131, 4, 1, 5], IRON: [2, 250, 6, 2, 14], EMERALD: [3, 1561, 8, 3, 10], GOLD: [0, 32, 12, 0, 22] };
 var ARMOR_MATS = { CLOTH: [5, [1, 3, 2, 1], 15], CHAIN: [15, [2, 5, 4, 1], 12], IRON: [15, [2, 6, 5, 2], 9], GOLD: [7, [2, 5, 3, 1], 25], DIAMOND: [33, [3, 8, 6, 3], 10] };
 
+function langOf(vm, k) {
+	var v = reg(vm).lang[k];
+	if (v != null) return v;
+	return vm.gameLang ? vm.gameLang(k) : null;
+}
 function reg(vm) { return vm.mcReg || (vm.mcReg = { blocks: {}, items: {}, recipes: [], smelting: [], names: {}, lang: {}, tickMods: [], mods: [], vanilla: true }); }
 function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
 function F(o, n) { return o[':' + n]; }
@@ -3884,6 +3889,7 @@ function installMc152(vm) {
 	function minecraftObj(vm) {
 		var mc = vm.mcInstance || (vm.mcInstance = vm.newObject(vm.loadClass('net/minecraft/client/Minecraft')));
 		if (vm.game && vm.game.mode === 'run') { mc[':theWorld'] = worldObj(vm); mc[':thePlayer'] = playerObj(vm, null); }
+		if (JVM.mc152.onMinecraft) JVM.mc152.onMinecraft(vm, mc);
 		return mc;
 	}
 	vm.defineNative('net/minecraft/client/Minecraft', { methods: { 'isSingleplayer()Z': function () { return 1; } } });
@@ -3992,7 +3998,7 @@ function installMc152(vm) {
 		'disableStats()Lnet/minecraft/src/Block;': function (vm, self) { return self; },
 		'setBlockBounds(FFFFFF)V': function (vm, self, a) { ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { self[':' + k] = a[i]; }); },
 		'getUnlocalizedName()Ljava/lang/String;': function (vm, self) { return 'tile.' + (self[':unlocalizedName'] || 'null'); },
-		'getLocalizedName()Ljava/lang/String;': function (vm, self) { var k = vm.callVirtual(self, 'getUnlocalizedName', '()Ljava/lang/String;', []); return reg(vm).lang[k + '.name'] || k; },
+		'getLocalizedName()Ljava/lang/String;': function (vm, self) { var k = vm.callVirtual(self, 'getUnlocalizedName', '()Ljava/lang/String;', []); return langOf(vm, k + '.name') || k; },
 		'registerIcons(Lnet/minecraft/src/IconRegister;)V': function (vm, self, a) { self[':blockIcon'] = vm.callVirtual(a[0], 'registerIcon', '(Ljava/lang/String;)Lnet/minecraft/src/Icon;', [self[':unlocalizedName'] || 'stone']); },
 		'getIcon(II)Lnet/minecraft/src/Icon;': function (vm, self) { return self[':blockIcon']; },
 		'getBlockTextureFromSide(I)Lnet/minecraft/src/Icon;': function (vm, self, a) { return vm.callVirtual(self, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[0], 0]); },
@@ -4117,7 +4123,7 @@ function installMc152(vm) {
 		'setPotionEffect(Ljava/lang/String;)Lnet/minecraft/src/Item;': function (vm, self) { return self; },
 		'getUnlocalizedName()Ljava/lang/String;': function (vm, self) { return 'item.' + (self[':unlocalizedName'] || 'null'); },
 		'getUnlocalizedName(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;': function (vm, self) { return vm.callVirtual(self, 'getUnlocalizedName', '()Ljava/lang/String;', []); },
-		'getItemDisplayName(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;': function (vm, self, a) { var k = vm.callVirtual(self, 'getUnlocalizedName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [a[0]]); return reg(vm).lang[k + '.name'] || k; },
+		'getItemDisplayName(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;': function (vm, self, a) { var k = vm.callVirtual(self, 'getUnlocalizedName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [a[0]]); return langOf(vm, k + '.name') || k; },
 		'getItemStackLimit()I': function (vm, self) { return self[':maxStackSize']; },
 		'getMaxDamage()I': function (vm, self) { return self[':maxDamage']; },
 		'isDamageable()Z': function (vm, self) { return self[':maxDamage'] > 0 && !self[':hasSubtypes'] ? 1 : 0; },
@@ -4232,7 +4238,7 @@ function installMc152(vm) {
 		'copy()Lnet/minecraft/src/ItemStack;': function (vm, self) { return newStack(vm, self[':itemID'], self[':stackSize'], self[':itemDamage']); },
 		'isItemEqual(Lnet/minecraft/src/ItemStack;)Z': function (vm, self, a) { return a[0] && a[0][':itemID'] === self[':itemID'] && a[0][':itemDamage'] === self[':itemDamage'] ? 1 : 0; },
 		'getItemName()Ljava/lang/String;': function (vm, self) { var it = itemById(vm, self[':itemID']); return it ? vm.callVirtual(it, 'getUnlocalizedName', '(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;', [self]) : 'item.null'; },
-		'getDisplayName()Ljava/lang/String;': function (vm, self) { var k = vm.callVirtual(self, 'getItemName', '()Ljava/lang/String;', []); return reg(vm).lang[k + '.name'] || k; },
+		'getDisplayName()Ljava/lang/String;': function (vm, self) { var k = vm.callVirtual(self, 'getItemName', '()Ljava/lang/String;', []); return langOf(vm, k + '.name') || k; },
 		'toString()Ljava/lang/String;': function (vm, self) { return self[':stackSize'] + 'x' + vm.callVirtual(self, 'getItemName', '()Ljava/lang/String;', []) + '@' + self[':itemDamage']; },
 		'damageItem(ILnet/minecraft/src/EntityLiving;)V': function (vm, self, a) { self[':itemDamage'] += a[0]; },
 		'splitStack(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { self[':stackSize'] -= a[0]; return newStack(vm, self[':itemID'], a[0], self[':itemDamage']); },
@@ -4242,7 +4248,7 @@ function installMc152(vm) {
 	function itemById(vm, id) { var c = vm.loadClass(SRC + 'Item'); vm.initClass(c); return c.statics.itemsList.a[id] || null; }
 	function newStack(vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); stackInit(vm, s, id, n, d); return s; }
 
-	var tr = function (vm, k) { var v = reg(vm).lang[k]; return v != null ? v : k; };
+	var tr = function (vm, k) { var v = langOf(vm, k); return v != null ? v : k; };
 	def('StringTranslate', { methods: {
 		'getCurrentLanguage()Ljava/lang/String;': function () { return 'en_US'; },
 		'translateKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { return tr(vm, a[0]); },
@@ -4305,6 +4311,7 @@ function installMc152(vm) {
 	if (JVM.installForge) JVM.installForge(vm);
 	if (JVM.installTiles) JVM.installTiles(vm);
 	if (JVM.installSettings) JVM.installSettings(vm);
+	if (JVM.installGui) JVM.installGui(vm);
 }
 
 var SIN_TABLE = null;
@@ -7276,6 +7283,573 @@ JVM.tileLoad = function (vm, mods) {
 };
 
 JVM.installTiles = installTiles;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function reg(vm) { return JVM.mc152.reg(vm); }
+function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function listArr(vm, l) { if (!l) return []; var a = vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []); return a ? Array.prototype.slice.call(a.a) : []; }
+function newStack(vm, id, n, d) { return JVM.mc152.newStack(vm, id, n, d); }
+
+function R(vm) { return vm.mcDraw || (vm.mcDraw = { ops: [], tex: null, color: [1, 1, 1, 1], t: [0, 0], stack: [] }); }
+function push(vm, o) {
+	var r = R(vm);
+	if (!r.on) return;
+	if (o.x !== undefined) { o.x += r.t[0]; o.y += r.t[1]; }
+	if (o.x2 !== undefined) { o.x2 += r.t[0]; o.y2 += r.t[1]; }
+	r.ops.push(o);
+}
+var CW = (function () {
+	var w = {};
+	for (var c = 32; c < 127; c++) w[c] = 6;
+	' 4|!2|.2|,2|:2|;2|i2|\'3|l3|`3|I4|[4|]4|t4|"5|(5|)5|*5|<5|>5|f5|k5|{5|}5|@7|~7'.split('|').forEach(function (p) { w[p.charCodeAt(0)] = +p.slice(1); });
+	w[32] = 4;
+	return w;
+})();
+function strWidth(s) {
+	s = String(s || '');
+	var n = 0;
+	for (var i = 0; i < s.length; i++) {
+		var c = s.charCodeAt(i);
+		if (c === 167) { i++; continue; }
+		n += CW[c] || 6;
+	}
+	return n;
+}
+JVM.mcStrWidth = strWidth;
+
+function installGui(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var FR = 'Lnet/minecraft/src/FontRenderer;';
+	vm.defineNative('org/lwjgl/opengl/GL11', { statics: { GL_BLEND: 3042, GL_LIGHTING: 2896, GL_DEPTH_TEST: 2929, GL_TEXTURE_2D: 3553, GL_ALPHA_TEST: 3008, GL_RESCALE_NORMAL: 32826, GL_CULL_FACE: 2884, GL_SRC_ALPHA: 770, GL_ONE_MINUS_SRC_ALPHA: 771 }, staticMethods: {
+		'glColor4f(FFFF)V': function (vm, n, a) { R(vm).color = [a[0], a[1], a[2], a[3]]; },
+		'glColor3f(FFF)V': function (vm, n, a) { R(vm).color = [a[0], a[1], a[2], 1]; },
+		'glPushMatrix()V': function (vm) { var r = R(vm); r.stack.push(r.t.slice()); },
+		'glPopMatrix()V': function (vm) { var r = R(vm); if (r.stack.length) r.t = r.stack.pop(); },
+		'glTranslatef(FFF)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; },
+		'glTranslated(DDD)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; },
+		'glBindTexture(II)V': function (vm, n, a) { R(vm).tex = texName(vm, a[1]); },
+		'glEnable(I)V': function () {}, 'glDisable(I)V': function () {}, 'glBlendFunc(II)V': function () {}, 'glScalef(FFF)V': function () {},
+		'glRotatef(FFFF)V': function () {}, 'glDepthMask(Z)V': function () {}, 'glColorMask(ZZZZ)V': function () {}, 'glPolygonOffset(FF)V': function () {},
+		'glNormal3f(FFF)V': function () {}, 'glShadeModel(I)V': function () {}, 'glAlphaFunc(IF)V': function () {}, 'glTexParameteri(III)V': function () {},
+	} });
+	vm.defineNative('org/lwjgl/input/Keyboard', { staticMethods: {
+		'isKeyDown(I)Z': function (vm, n, a) { return vm.mcKeys && vm.mcKeys[a[0]] ? 1 : 0; },
+		'getEventKey()I': function (vm) { return vm.mcLastKey | 0; },
+		'getEventKeyState()Z': function () { return 1; },
+		'getKeyName(I)Ljava/lang/String;': function (vm, n, a) { return String(JVM.lwjglKey ? JVM.lwjglKey(a[0]) : a[0]).replace(/^Key|^Digit/, '').toUpperCase(); },
+		'enableRepeatEvents(Z)V': function () {},
+	} });
+	vm.defineNative('org/lwjgl/input/Mouse', { staticMethods: {
+		'getEventDWheel()I': function () { return 0; }, 'getDWheel()I': function () { return 0; },
+		'isButtonDown(I)Z': function (vm, n, a) { return vm.mcMouseDown === a[0] ? 1 : 0; },
+		'getX()I': function (vm) { return vm.mcMouse ? vm.mcMouse[0] : 0; }, 'getY()I': function (vm) { return vm.mcMouse ? vm.mcMouse[1] : 0; },
+	} });
+	function texName(vm, id) { var t = vm.mcTexIds || []; return t[id] || null; }
+	function texId(vm, name) { var t = vm.mcTexIds || (vm.mcTexIds = [null]); var i = t.indexOf(name); if (i < 0) { i = t.length; t.push(name); } return i; }
+	def('RenderEngine', { methods: {
+		'getTexture(Ljava/lang/String;)I': function (vm, self, a) { return texId(vm, a[0]); },
+		'bindTexture(I)V': function (vm, self, a) { R(vm).tex = texName(vm, a[0]); },
+		'bindTexture(Ljava/lang/String;)V': function (vm, self, a) { R(vm).tex = a[0]; },
+		'resetBoundTexture()V': function () {},
+		'getTextureForDownloadableImage(Ljava/lang/String;Ljava/lang/String;)I': function (vm, self, a) { return texId(vm, a[1]); },
+	} });
+	var drawStr = function (vm, s, x, y, color, shadow) {
+		push(vm, { k: 'text', s: String(s == null ? 'null' : s), x: x, y: y, c: color | 0, shadow: !!shadow });
+		return x + strWidth(s);
+	};
+	def('FontRenderer', { fields: { FONT_HEIGHT: 'I' }, methods: {
+		'drawString(Ljava/lang/String;III)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], false); },
+		'drawStringWithShadow(Ljava/lang/String;III)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], true); },
+		'drawString(Ljava/lang/String;IIIZ)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], a[4]); },
+		'getStringWidth(Ljava/lang/String;)I': function (vm, self, a) { return strWidth(a[0]); },
+		'getCharWidth(C)I': function (vm, self, a) { return CW[a[0]] || 6; },
+		'trimStringToWidth(Ljava/lang/String;I)Ljava/lang/String;': function (vm, self, a) { var s = String(a[0] || ''), o = ''; for (var i = 0; i < s.length && strWidth(o + s[i]) <= a[1]; i++) o += s[i]; return o; },
+		'drawSplitString(Ljava/lang/String;IIII)V': function (vm, self, a) { wrap(a[0], a[3]).forEach(function (l, i) { drawStr(vm, l, a[1], a[2] + i * 9, a[4], false); }); },
+		'listFormattedStringToWidth(Ljava/lang/String;I)Ljava/util/List;': function (vm, self, a) { return JVM.newList(vm, wrap(a[0], a[1])); },
+		'splitStringWidth(Ljava/lang/String;I)I': function (vm, self, a) { return wrap(a[0], a[1]).length * 9; },
+		'getUnicodeFlag()Z': function () { return 0; },
+		'setUnicodeFlag(Z)V': function () {},
+	} });
+	function wrap(s, w) {
+		var out = [];
+		String(s || '').split('\n').forEach(function (para) {
+			var line = '';
+			para.split(' ').forEach(function (word) {
+				var t = line ? line + ' ' + word : word;
+				if (strWidth(t) > w && line) { out.push(line); line = word; } else line = t;
+			});
+			out.push(line);
+		});
+		return out;
+	}
+	var font = function (vm) { var f = vm.mcFont || (vm.mcFont = vm.newObject(vm.loadClass(SRC + 'FontRenderer'))); f[':FONT_HEIGHT'] = 9; return f; };
+	var engine = function (vm) { return vm.mcEngine || (vm.mcEngine = vm.newObject(vm.loadClass(SRC + 'RenderEngine'))); };
+
+	var tr = function (vm, x, y, u, v, w, h) { var r = R(vm), c = r.color; push(vm, { k: 'tex', tex: r.tex, x: x, y: y, u: u, v: v, w: w, h: h, col: c[0] !== 1 || c[1] !== 1 || c[2] !== 1 || c[3] !== 1 ? c.slice() : null }); };
+	var rect = function (vm, x1, y1, x2, y2, c) { push(vm, { k: 'rect', x: Math.min(x1, x2), y: Math.min(y1, y2), x2: Math.max(x1, x2), y2: Math.max(y1, y2), c: c | 0 }); };
+	def('Gui', { fields: { zLevel: 'F' }, methods: {
+		'drawTexturedModalRect(IIIIII)V': function (vm, self, a) { tr(vm, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		'drawTexturedModelRectFromIcon(IILnet/minecraft/src/Icon;II)V': function (vm, self, a) { push(vm, { k: 'icon', icon: a[2] && a[2].$name, x: a[0], y: a[1], w: a[3], h: a[4] }); },
+		'drawGradientRect(IIIIII)V': function (vm, self, a) { push(vm, { k: 'grad', x: a[0], y: a[1], x2: a[2], y2: a[3], c: a[4] | 0, c2: a[5] | 0 }); },
+		'drawCenteredString(Lnet/minecraft/src/FontRenderer;Ljava/lang/String;III)V': function (vm, self, a) { drawStr(vm, a[1], a[2] - (strWidth(a[1]) >> 1), a[3], a[4], true); },
+		'drawString(Lnet/minecraft/src/FontRenderer;Ljava/lang/String;III)V': function (vm, self, a) { drawStr(vm, a[1], a[2], a[3], a[4], true); },
+		'drawHorizontalLine(IIII)V': function (vm, self, a) { rect(vm, Math.min(a[0], a[1]), a[2], Math.max(a[0], a[1]) + 1, a[2] + 1, a[3]); },
+		'drawVerticalLine(IIII)V': function (vm, self, a) { rect(vm, a[0], Math.min(a[1], a[2]) + 1, a[0] + 1, Math.max(a[1], a[2]), a[3]); },
+	}, staticMethods: {
+		'drawRect(IIIII)V': function (vm, n, a) { rect(vm, a[0], a[1], a[2], a[3], a[4]); },
+	} });
+	var GS = SRC + 'GuiScreen';
+	def('GuiScreen', { super: SRC + 'Gui', fields: { mc: 'Lnet/minecraft/client/Minecraft;', width: 'I', height: 'I', buttonList: 'Ljava/util/List;', labelList: 'Ljava/util/List;', fontRenderer: FR, allowUserInput: 'Z' }, methods: {
+		'<init>()V': function (vm, self) { screenInit(vm, self); },
+		'setWorldAndResolution(Lnet/minecraft/client/Minecraft;II)V': function (vm, self, a) {
+			screenInit(vm, self);
+			self[':mc'] = a[0]; self[':fontRenderer'] = font(vm); self[':width'] = a[1]; self[':height'] = a[2];
+			vm.callVirtual(self[':buttonList'], 'clear', '()V', []);
+			vm.callVirtual(self, 'initGui', '()V', []);
+		},
+		'initGui()V': function () {},
+		'drawScreen(IIF)V': function (vm, self, a) { listArr(vm, self[':buttonList']).forEach(function (b) { vm.callVirtual(b, 'drawButton', '(Lnet/minecraft/client/Minecraft;II)V', [self[':mc'], a[0], a[1]]); }); },
+		'keyTyped(CI)V': function (vm, self, a) { if (a[1] === 1) closeScreen(vm); },
+		'mouseClicked(III)V': function (vm, self, a) {
+			if (a[2] !== 0) return;
+			listArr(vm, self[':buttonList']).some(function (b) {
+				if (!vm.callVirtual(b, 'mousePressed', '(Lnet/minecraft/client/Minecraft;II)Z', [self[':mc'], a[0], a[1]])) return false;
+				vm.mcSelectedButton = b;
+				op(vm, 'sound', 0, 0, 0, 'random.click', 1, 1);
+				vm.callVirtual(self, 'actionPerformed', '(Lnet/minecraft/src/GuiButton;)V', [b]);
+				return true;
+			});
+		},
+		'mouseMovedOrUp(III)V': function (vm, self, a) { if (vm.mcSelectedButton && a[2] === 0) { vm.callVirtual(vm.mcSelectedButton, 'mouseReleased', '(II)V', [a[0], a[1]]); vm.mcSelectedButton = null; } },
+		'actionPerformed(Lnet/minecraft/src/GuiButton;)V': function () {},
+		'updateScreen()V': function () {},
+		'onGuiClosed()V': function () {},
+		'drawDefaultBackground()V': function (vm, self) { push(vm, { k: 'dim' }); },
+		'drawWorldBackground(I)V': function (vm, self) { push(vm, { k: 'dim' }); },
+		'drawBackground(I)V': function (vm, self) { push(vm, { k: 'dim' }); },
+		'doesGuiPauseGame()Z': function () { return 1; },
+		'handleInput()V': function () {},
+		'confirmClicked(ZI)V': function () {},
+	}, staticMethods: {
+		'isShiftKeyDown()Z': function (vm) { return vm.mcKeys && (vm.mcKeys[42] || vm.mcKeys[54]) ? 1 : 0; },
+		'isCtrlKeyDown()Z': function (vm) { return vm.mcKeys && (vm.mcKeys[29] || vm.mcKeys[157]) ? 1 : 0; },
+		'getClipboardString()Ljava/lang/String;': function () { return ''; },
+		'setClipboardString(Ljava/lang/String;)V': function () {},
+	}, anyInit: function (vm, self) { screenInit(vm, self); } });
+	function screenInit(vm, self) {
+		if (!self[':buttonList']) self[':buttonList'] = JVM.newList(vm, []);
+		if (!self[':labelList']) self[':labelList'] = JVM.newList(vm, []);
+		self[':fontRenderer'] = self[':fontRenderer'] || font(vm);
+		self[':allowUserInput'] = 0;
+	}
+	def('GuiButton', { super: SRC + 'Gui', fields: { id: 'I', xPosition: 'I', yPosition: 'I', width: 'I', height: 'I', displayString: 'Ljava/lang/String;', enabled: 'Z', drawButton: 'Z', field_82253_i: 'Z' }, methods: {
+		'<init>(IIILjava/lang/String;)V': function (vm, self, a) { btn(self, a[0], a[1], a[2], 200, 20, a[3]); },
+		'<init>(IIIIILjava/lang/String;)V': function (vm, self, a) { btn(self, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		'drawButton(Lnet/minecraft/client/Minecraft;II)V': function (vm, self, a) {
+			if (!self[':drawButton']) return;
+			var hover = a[1] >= self[':xPosition'] && a[2] >= self[':yPosition'] && a[1] < self[':xPosition'] + self[':width'] && a[2] < self[':yPosition'] + self[':height'];
+			push(vm, { k: 'button', x: self[':xPosition'], y: self[':yPosition'], w: self[':width'], h: self[':height'], s: String(self[':displayString'] || ''), on: !!self[':enabled'], hover: hover });
+		},
+		'mousePressed(Lnet/minecraft/client/Minecraft;II)Z': function (vm, self, a) { return self[':enabled'] && self[':drawButton'] && a[1] >= self[':xPosition'] && a[2] >= self[':yPosition'] && a[1] < self[':xPosition'] + self[':width'] && a[2] < self[':yPosition'] + self[':height'] ? 1 : 0; },
+		'mouseReleased(II)V': function () {},
+		'mouseDragged(Lnet/minecraft/client/Minecraft;II)V': function () {},
+		'getHoverState(Z)I': function (vm, self, a) { return !self[':enabled'] ? 0 : a[0] ? 2 : 1; },
+		'func_82252_a()Z': function (vm, self) { return self[':field_82253_i']; },
+	} });
+	function btn(self, id, x, y, w, h, s) { self[':id'] = id; self[':xPosition'] = x; self[':yPosition'] = y; self[':width'] = w; self[':height'] = h; self[':displayString'] = s; self[':enabled'] = 1; self[':drawButton'] = 1; }
+	def('GuiTextField', { methods: {
+		'<init>(Lnet/minecraft/src/FontRenderer;IIII)V': function (vm, self, a) { self[':xPos'] = a[1]; self[':yPos'] = a[2]; self[':width'] = a[3]; self[':height'] = a[4]; self.$text = ''; self.$max = 32; self.$focus = false; },
+		'drawTextBox()V': function (vm, self) { push(vm, { k: 'field', x: self[':xPos'], y: self[':yPos'], w: self[':width'], h: self[':height'], s: self.$text, focus: self.$focus }); },
+		'getText()Ljava/lang/String;': function (vm, self) { return self.$text; },
+		'setText(Ljava/lang/String;)V': function (vm, self, a) { self.$text = String(a[0] || '').slice(0, self.$max); },
+		'setMaxStringLength(I)V': function (vm, self, a) { self.$max = a[0]; },
+		'setFocused(Z)V': function (vm, self, a) { self.$focus = !!a[0]; },
+		'isFocused()Z': function (vm, self) { return self.$focus ? 1 : 0; },
+		'mouseClicked(III)V': function (vm, self, a) { self.$focus = a[0] >= self[':xPos'] && a[0] < self[':xPos'] + self[':width'] && a[1] >= self[':yPos'] && a[1] < self[':yPos'] + self[':height']; },
+		'textboxKeyTyped(CI)Z': function (vm, self, a) {
+			if (!self.$focus) return 0;
+			if (a[1] === 14) { self.$text = self.$text.slice(0, -1); return 1; }
+			if (a[0] >= 32 && a[0] !== 127 && self.$text.length < self.$max) { self.$text += String.fromCharCode(a[0]); return 1; }
+			return 0;
+		},
+		'updateCursorCounter()V': function () {},
+		'setEnableBackgroundDrawing(Z)V': function () {}, 'setTextColor(I)V': function () {}, 'setCanLoseFocus(Z)V': function () {},
+	} });
+
+	var itemOp = function (vm, s, x, y, overlay) { if (s && s[':itemID']) push(vm, { k: 'item', id: s[':itemID'], data: s[':itemDamage'], n: overlay ? s[':stackSize'] : 1, x: x, y: y, overlay: !!overlay }); };
+	def('RenderItem', { fields: { zLevel: 'F' }, methods: {
+		'<init>()V': function () {},
+		'renderItemIntoGUI(Lnet/minecraft/src/FontRenderer;Lnet/minecraft/src/RenderEngine;Lnet/minecraft/src/ItemStack;II)V': function (vm, self, a) { itemOp(vm, a[2], a[3], a[4], false); },
+		'renderItemAndEffectIntoGUI(Lnet/minecraft/src/FontRenderer;Lnet/minecraft/src/RenderEngine;Lnet/minecraft/src/ItemStack;II)V': function (vm, self, a) { itemOp(vm, a[2], a[3], a[4], false); },
+		'renderItemOverlayIntoGUI(Lnet/minecraft/src/FontRenderer;Lnet/minecraft/src/RenderEngine;Lnet/minecraft/src/ItemStack;II)V': function (vm, self, a) { if (a[2] && a[2][':stackSize'] > 1) drawStr(vm, String(a[2][':stackSize']), a[3] + 19 - 2 - strWidth(String(a[2][':stackSize'])), a[4] + 6 + 3, 0xffffff, true); },
+		'renderItemOverlayIntoGUI(Lnet/minecraft/src/FontRenderer;Lnet/minecraft/src/RenderEngine;Lnet/minecraft/src/ItemStack;IILjava/lang/String;)V': function (vm, self, a) { var t = a[5] != null ? a[5] : (a[2] && a[2][':stackSize'] > 1 ? String(a[2][':stackSize']) : ''); if (t) drawStr(vm, t, a[3] + 19 - 2 - strWidth(t), a[4] + 6 + 3, 0xffffff, true); },
+	} });
+	def('RenderHelper', { staticMethods: { 'enableGUIStandardItemLighting()V': function () {}, 'disableStandardItemLighting()V': function () {}, 'enableStandardItemLighting()V': function () {} } });
+
+	var MC = vm.natives['net/minecraft/client/Minecraft'];
+	MC.fields = Object.assign({}, MC.fields || {}, { renderEngine: 'Lnet/minecraft/src/RenderEngine;', fontRenderer: FR, currentScreen: 'L' + GS + ';', displayWidth: 'I', displayHeight: 'I' });
+	MC.methods = Object.assign({}, MC.methods, {
+		'displayGuiScreen(Lnet/minecraft/src/GuiScreen;)V': function (vm, self, a) { if (a[0]) openScreen(vm, a[0], null); else closeScreen(vm); },
+	});
+	JVM.mc152.onMinecraft = function (vm, mc) {
+		mc[':renderEngine'] = engine(vm); mc[':fontRenderer'] = font(vm);
+		mc[':currentScreen'] = vm.mcGui ? vm.mcGui.screen : null;
+		mc[':displayWidth'] = 854; mc[':displayHeight'] = 480;
+		if (!mc[':gameSettings']) {
+			var gs = vm.newObject(vm.loadClass(SRC + 'GameSettings'));
+			var kb = function (d, k) { var o = vm.newObject(vm.loadClass(SRC + 'KeyBinding')); vm.callVirtual(o, '<init>', '(Ljava/lang/String;I)V', [d, k]); return o; };
+			gs[':keyBindInventory'] = kb('key.inventory', 18); gs[':keyBindJump'] = kb('key.jump', 57); gs[':keyBindSneak'] = kb('key.sneak', 42);
+			gs[':keyBindForward'] = kb('key.forward', 17); gs[':keyBindBack'] = kb('key.back', 31); gs[':keyBindLeft'] = kb('key.left', 30); gs[':keyBindRight'] = kb('key.right', 32);
+			gs[':keyBindDrop'] = kb('key.drop', 16); gs[':keyBindChat'] = kb('key.chat', 20); gs[':keyBindAttack'] = kb('key.attack', -100); gs[':keyBindUseItem'] = kb('key.use', -99);
+			gs[':fancyGraphics'] = 1; gs[':guiScale'] = 0; gs[':language'] = 'en_US';
+			mc[':gameSettings'] = gs;
+		}
+	};
+	var FCH = vm.natives['cpw/mods/fml/client/FMLClientHandler'];
+	if (FCH) FCH.methods['displayGuiScreen(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/GuiScreen;)V'] = function (vm, self, a) { openScreen(vm, a[1], null); };
+	vm.natives[SRC + 'ModLoader'].staticMethods['openGUI(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/GuiScreen;)V'] = function (vm, n, a) { openScreen(vm, a[1], null); };
+	vm.natives[SRC + 'ModLoader'].staticMethods['isGUIOpen(Ljava/lang/Class;)Z'] = function (vm, n, a) { var g = vm.mcGui; return g && (!a[0] || vm.isInstance(g.screen, a[0].$cls)) ? 1 : 0; };
+	var EP = vm.natives[SRC + 'EntityPlayer'];
+	EP.methods = Object.assign({}, EP.methods, {
+		'openGui(Ljava/lang/Object;ILnet/minecraft/src/World;III)V': function (vm, self, a) { openModGui(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		'closeScreen()V': function (vm) { closeScreen(vm); },
+		'displayGUIChest(Lnet/minecraft/src/IInventory;)V': function (vm, self, a) { vm.warnOnce('gui:chest', 'a mod chest screen (displayGUIChest) is not available here yet'); },
+	});
+	var NR = vm.natives['cpw/mods/fml/common/network/NetworkRegistry'];
+	if (NR) NR.methods['openRemoteGui(Lcpw/mods/fml/common/ModContainer;Lnet/minecraft/src/EntityPlayerMP;ILnet/minecraft/src/World;III)V'] = function (vm, self, a) { openModGui(vm, JVM.mc152.playerObj(vm, null), a[0] && a[0].$mod && a[0].$mod.instance, a[2], a[3], a[4], a[5], a[6]); };
+
+	def('IInventory', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	var IS = 'Lnet/minecraft/src/ItemStack;', EPd = 'Lnet/minecraft/src/EntityPlayer;';
+	def('Slot', { fields: { inventory: 'Lnet/minecraft/src/IInventory;', slotNumber: 'I', xDisplayPosition: 'I', yDisplayPosition: 'I', slotIndex: 'I' }, methods: {
+		'<init>(Lnet/minecraft/src/IInventory;III)V': function (vm, self, a) { self[':inventory'] = a[0]; self[':slotIndex'] = a[1]; self[':xDisplayPosition'] = a[2]; self[':yDisplayPosition'] = a[3]; },
+		'getStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return vm.callVirtual(self[':inventory'], 'getStackInSlot', '(I)Lnet/minecraft/src/ItemStack;', [self[':slotIndex']]); },
+		'getHasStack()Z': function (vm, self) { return vm.callVirtual(self, 'getStack', '()Lnet/minecraft/src/ItemStack;', []) ? 1 : 0; },
+		'putStack(Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { vm.callVirtual(self[':inventory'], 'setInventorySlotContents', '(ILnet/minecraft/src/ItemStack;)V', [self[':slotIndex'], a[0]]); vm.callVirtual(self, 'onSlotChanged', '()V', []); },
+		'onSlotChanged()V': function (vm, self) { vm.callVirtual(self[':inventory'], 'onInventoryChanged', '()V', []); },
+		'onSlotChange(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/ItemStack;)V': function () {},
+		'getSlotStackLimit()I': function (vm, self) { return vm.callVirtual(self[':inventory'], 'getInventoryStackLimit', '()I', []); },
+		'decrStackSize(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return vm.callVirtual(self[':inventory'], 'decrStackSize', '(II)Lnet/minecraft/src/ItemStack;', [self[':slotIndex'], a[0]]); },
+		'isItemValid(Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+		'canTakeStack(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'onPickupFromSlot(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;)V': function (vm, self) { vm.callVirtual(self, 'onSlotChanged', '()V', []); },
+		'isSlotInInventory(Lnet/minecraft/src/IInventory;I)Z': function (vm, self, a) { return a[0] === self[':inventory'] && a[1] === self[':slotIndex'] ? 1 : 0; },
+		'getBackgroundIconIndex()Lnet/minecraft/src/Icon;': function () { return null; },
+	} });
+	def('SlotFurnace', { super: SRC + 'Slot', methods: {
+		'<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/IInventory;III)V': function (vm, self, a) { self[':thePlayer'] = a[0]; self[':inventory'] = a[1]; self[':slotIndex'] = a[2]; self[':xDisplayPosition'] = a[3]; self[':yDisplayPosition'] = a[4]; },
+		'isItemValid(Lnet/minecraft/src/ItemStack;)Z': function () { return 0; },
+	} });
+	def('InventoryBasic', { interfaces: [SRC + 'IInventory'], methods: {
+		'<init>(Ljava/lang/String;ZI)V': function (vm, self, a) { self.$name = a[0]; self.$items = vm.newArray('L' + SRC + 'ItemStack;', a[2]); },
+		'getSizeInventory()I': function (vm, self) { return self.$items.a.length; },
+		'getStackInSlot(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return self.$items.a[a[0]] || null; },
+		'setInventorySlotContents(ILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$items.a[a[0]] = a[1]; },
+		'decrStackSize(II)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var s = self.$items.a[a[0]]; if (!s) return null;
+			if (s[':stackSize'] <= a[1]) { self.$items.a[a[0]] = null; return s; }
+			var o = vm.callVirtual(s, 'splitStack', '(I)Lnet/minecraft/src/ItemStack;', [a[1]]); return o;
+		},
+		'getStackInSlotOnClosing(I)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { var s = self.$items.a[a[0]] || null; self.$items.a[a[0]] = null; return s; },
+		'getInvName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'isInvNameLocalized()Z': function () { return 1; },
+		'getInventoryStackLimit()I': function () { return 64; },
+		'onInventoryChanged()V': function () {},
+		'isUseableByPlayer(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'openChest()V': function () {}, 'closeChest()V': function () {},
+		'isStackValidForSlot(ILnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+	} });
+	var IP = vm.natives[SRC + 'InventoryPlayer'];
+	IP.interfaces = [SRC + 'IInventory'];
+	IP.methods = Object.assign({}, IP.methods, {
+		'getItemStack()Lnet/minecraft/src/ItemStack;': function (vm) { return vm.mcHeld || null; },
+		'setItemStack(Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { vm.mcHeld = a[0] && a[0][':stackSize'] > 0 ? a[0] : null; },
+		'getInvName()Ljava/lang/String;': function () { return 'container.inventory'; },
+		'isInvNameLocalized()Z': function () { return 0; },
+		'isUseableByPlayer(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'getStackInSlotOnClosing(I)Lnet/minecraft/src/ItemStack;': function () { return null; },
+		'openChest()V': function () {}, 'closeChest()V': function () {},
+		'isStackValidForSlot(ILnet/minecraft/src/ItemStack;)Z': function () { return 1; },
+	});
+	def('ICrafting', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
+	def('mcre/GuiCrafter', { interfaces: [SRC + 'ICrafting'], methods: {
+		'sendProgressBarUpdate(Lnet/minecraft/src/Container;II)V': function (vm, self, a) { if (self.$client) vm.callVirtual(self.$client, 'updateProgressBar', '(II)V', [a[1], a[2]]); },
+		'sendSlotContents(Lnet/minecraft/src/Container;ILnet/minecraft/src/ItemStack;)V': function () {},
+		'sendContainerAndContentsToPlayer(Lnet/minecraft/src/Container;Ljava/util/List;)V': function () {},
+	} });
+	vm.natives[SRC + 'ICrafting'].abstractMethods = { 'sendProgressBarUpdate(Lnet/minecraft/src/Container;II)V': true };
+	def('Container', { fields: { inventorySlots: 'Ljava/util/List;', inventoryItemStacks: 'Ljava/util/List;', windowId: 'I' }, methods: {
+		'<init>()V': function (vm, self) { contInit(vm, self); },
+		'addSlotToContainer(Lnet/minecraft/src/Slot;)Lnet/minecraft/src/Slot;': function (vm, self, a) {
+			contInit(vm, self);
+			var n = vm.callVirtual(self[':inventorySlots'], 'size', '()I', []);
+			a[0][':slotNumber'] = n;
+			vm.callVirtual(self[':inventorySlots'], 'add', '(Ljava/lang/Object;)Z', [a[0]]);
+			vm.callVirtual(self[':inventoryItemStacks'], 'add', '(Ljava/lang/Object;)Z', [null]);
+			return a[0];
+		},
+		'getSlot(I)Lnet/minecraft/src/Slot;': function (vm, self, a) { return listArr(vm, self[':inventorySlots'])[a[0]] || null; },
+		'getSlotFromInventory(Lnet/minecraft/src/IInventory;I)Lnet/minecraft/src/Slot;': function (vm, self, a) { return listArr(vm, self[':inventorySlots']).filter(function (s) { return s[':inventory'] === a[0] && s[':slotIndex'] === a[1]; })[0] || null; },
+		'addCraftingToCrafters(Lnet/minecraft/src/ICrafting;)V': function (vm, self, a) { (self.$crafters || (self.$crafters = [])).push(a[0]); self[':crafters'] = JVM.newList(vm, self.$crafters); vm.callVirtual(self, 'detectAndSendChanges', '()V', []); },
+		'removeCraftingFromCrafters(Lnet/minecraft/src/ICrafting;)V': function (vm, self, a) { if (self.$crafters) self.$crafters = self.$crafters.filter(function (c) { return c !== a[0]; }); },
+		'detectAndSendChanges()V': function () {},
+		'updateProgressBar(II)V': function () {},
+		'transferStackInSlot(Lnet/minecraft/src/EntityPlayer;I)Lnet/minecraft/src/ItemStack;': function () { return null; },
+		'canInteractWith(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'onCraftGuiClosed(Lnet/minecraft/src/EntityPlayer;)V': function (vm, self, a) { putBack(vm); },
+		'onCraftMatrixChanged(Lnet/minecraft/src/IInventory;)V': function (vm, self) { vm.callVirtual(self, 'detectAndSendChanges', '()V', []); },
+		'mergeItemStack(Lnet/minecraft/src/ItemStack;IIZ)Z': function (vm, self, a) { return merge(vm, self, a[0], a[1], a[2], a[3]) ? 1 : 0; },
+		'slotClick(IIILnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) { return slotClick(vm, self, a[0], a[1], a[2], a[3]); },
+		'getInventory()Ljava/util/List;': function (vm, self) { return JVM.newList(vm, listArr(vm, self[':inventorySlots']).map(function (s) { return vm.callVirtual(s, 'getStack', '()Lnet/minecraft/src/ItemStack;', []); })); },
+		'putStackInSlot(ILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { var s = listArr(vm, self[':inventorySlots'])[a[0]]; if (s) vm.callVirtual(s, 'putStack', '(Lnet/minecraft/src/ItemStack;)V', [a[1]]); },
+		'isPlayerNotUsingContainer(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'setPlayerIsPresent(Lnet/minecraft/src/EntityPlayer;Z)V': function () {},
+	}, anyInit: function (vm, self) { contInit(vm, self); } });
+	function contInit(vm, self) { if (!self[':inventorySlots']) { self[':inventorySlots'] = JVM.newList(vm, []); self[':inventoryItemStacks'] = JVM.newList(vm, []); self[':crafters'] = JVM.newList(vm, []); } }
+
+	def('GuiContainer', { super: GS, fields: { inventorySlots: 'Lnet/minecraft/src/Container;', xSize: 'I', ySize: 'I', guiLeft: 'I', guiTop: 'I' }, methods: {
+		'<init>(Lnet/minecraft/src/Container;)V': function (vm, self, a) { screenInit(vm, self); self[':inventorySlots'] = a[0]; self[':xSize'] = 176; self[':ySize'] = 166; },
+		'initGui()V': function (vm, self) { self[':guiLeft'] = (self[':width'] - self[':xSize']) >> 1; self[':guiTop'] = (self[':height'] - self[':ySize']) >> 1; },
+		'drawScreen(IIF)V': function (vm, self, a) {
+			var mx = a[0], my = a[1], L = self[':guiLeft'], T = self[':guiTop'];
+			vm.callVirtual(self, 'drawDefaultBackground', '()V', []);
+			R(vm).color = [1, 1, 1, 1];
+			vm.callVirtual(self, 'drawGuiContainerBackgroundLayer', '(FII)V', [a[2], mx, my]);
+			vm.invoke(vm.loadClass(GS).methods['drawScreen(IIF)V'], self, a);
+			var r = R(vm), t0 = r.t.slice();
+			r.t = [t0[0] + L, t0[1] + T];
+			var hover = null;
+			listArr(vm, self[':inventorySlots'][':inventorySlots']).forEach(function (s) {
+				var x = s[':xDisplayPosition'], y = s[':yDisplayPosition'];
+				push(vm, { k: 'slot', x: x, y: y });
+				var st = vm.callVirtual(s, 'getStack', '()Lnet/minecraft/src/ItemStack;', []);
+				if (st) { itemOp(vm, st, x, y, true); }
+				if (mx - L >= x - 1 && mx - L < x + 17 && my - T >= y - 1 && my - T < y + 17) { hover = s; push(vm, { k: 'rect', x: x, y: y, x2: x + 16, y2: y + 16, c: 0x80ffffff | 0 }); }
+			});
+			R(vm).color = [1, 1, 1, 1];
+			vm.callVirtual(self, 'drawGuiContainerForegroundLayer', '(II)V', [mx, my]);
+			r.t = t0;
+			if (vm.mcHeld) itemOp(vm, vm.mcHeld, mx - 8, my - 8, true);
+			else if (hover) {
+				var hs = vm.callVirtual(hover, 'getStack', '()Lnet/minecraft/src/ItemStack;', []);
+				if (hs) push(vm, { k: 'tip', s: vm.callVirtual(hs, 'getDisplayName', '()Ljava/lang/String;', []), x: mx + 12, y: my - 12 });
+			}
+		},
+		'drawGuiContainerBackgroundLayer(FII)V': function () {},
+		'drawGuiContainerForegroundLayer(II)V': function () {},
+		'mouseClicked(III)V': function (vm, self, a) {
+			vm.invoke(vm.loadClass(GS).methods['mouseClicked(III)V'], self, a);
+			var L = self[':guiLeft'], T = self[':guiTop'];
+			var s = listArr(vm, self[':inventorySlots'][':inventorySlots']).filter(function (sl) { var x = sl[':xDisplayPosition'], y = sl[':yDisplayPosition']; return a[0] - L >= x - 1 && a[0] - L < x + 17 && a[1] - T >= y - 1 && a[1] - T < y + 17; })[0];
+			var outside = a[0] < L || a[1] < T || a[0] >= L + self[':xSize'] || a[1] >= T + self[':ySize'];
+			var id = s ? s[':slotNumber'] : outside ? -999 : -1;
+			if (id === -1) return;
+			var shift = vm.mcKeys && (vm.mcKeys[42] || vm.mcKeys[54]) ? 1 : 0;
+			vm.callVirtual(self, 'handleMouseClick', '(Lnet/minecraft/src/Slot;III)V', [s || null, id, a[2], shift]);
+		},
+		'handleMouseClick(Lnet/minecraft/src/Slot;III)V': function (vm, self, a) {
+			var id = a[0] ? a[0][':slotNumber'] : a[1];
+			var server = vm.mcGui && vm.mcGui.server;
+			vm.callVirtual(server || self[':inventorySlots'], 'slotClick', '(IIILnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;', [id, a[2], a[3], JVM.mc152.playerObj(vm, null)]);
+		},
+		'keyTyped(CI)V': function (vm, self, a) { if (a[1] === 1 || a[1] === 18) closeScreen(vm); },
+		'onGuiClosed()V': function (vm, self) { var c = self[':inventorySlots']; if (c) vm.callVirtual(c, 'onCraftGuiClosed', '(Lnet/minecraft/src/EntityPlayer;)V', [JVM.mc152.playerObj(vm, null)]); },
+		'doesGuiPauseGame()Z': function () { return 0; },
+		'updateScreen()V': function () {},
+	} });
+}
+
+function stackOf(vm, s) { return s ? vm.callVirtual(s, 'getStack', '()Lnet/minecraft/src/ItemStack;', []) : null; }
+function same(a, b) { return a && b && a[':itemID'] === b[':itemID'] && (!vm_hasSub(a) || a[':itemDamage'] === b[':itemDamage']); }
+function vm_hasSub(s) { return true; }
+function limitOf(vm, s) { var it = s && vm.callVirtual(s, 'getItem', '()Lnet/minecraft/src/Item;', []); return it ? it[':maxStackSize'] || 64 : 64; }
+function slotClick(vm, c, id, button, mode, player) {
+	var slots = listArr(vm, c[':inventorySlots']), held = vm.mcHeld || null, result = null;
+	var ISV = '(Lnet/minecraft/src/ItemStack;)V';
+	if (mode === 1 && id >= 0) {
+		var s0 = slots[id];
+		if (s0 && vm.callVirtual(s0, 'canTakeStack', '(Lnet/minecraft/src/EntityPlayer;)Z', [player])) {
+			var st = vm.callVirtual(c, 'transferStackInSlot', '(Lnet/minecraft/src/EntityPlayer;I)Lnet/minecraft/src/ItemStack;', [player, id]);
+			for (var guard = 0; st && guard < 64; guard++) {
+				result = st.cls ? vm.callVirtual(st, 'copy', '()Lnet/minecraft/src/ItemStack;', []) : st;
+				var now = stackOf(vm, s0);
+				if (!now || now[':itemID'] !== st[':itemID']) break;
+				st = vm.callVirtual(c, 'transferStackInSlot', '(Lnet/minecraft/src/EntityPlayer;I)Lnet/minecraft/src/ItemStack;', [player, id]);
+			}
+		}
+	} else if (id === -999) {
+		if (held) {
+			var dropN = button === 0 ? held[':stackSize'] : 1;
+			var dp = JVM.mc152.newStack(vm, held[':itemID'], dropN, held[':itemDamage']);
+			if (held[':stackTagCompound']) dp[':stackTagCompound'] = held[':stackTagCompound'];
+			op(vm, 'drop', player[':posX'], player[':posY'], player[':posZ'], dp[':itemID'], dropN, dp[':itemDamage']);
+			held[':stackSize'] -= dropN;
+			vm.mcHeld = held[':stackSize'] > 0 ? held : null;
+		}
+	} else if (mode === 0 && id >= 0) {
+		var s = slots[id];
+		if (!s) return null;
+		var cur = stackOf(vm, s);
+		if (cur) result = vm.callVirtual(cur, 'copy', '()Lnet/minecraft/src/ItemStack;', []);
+		if (!cur) {
+			if (held && vm.callVirtual(s, 'isItemValid', '(Lnet/minecraft/src/ItemStack;)Z', [held])) {
+				var n = button === 0 ? held[':stackSize'] : 1;
+				n = Math.min(n, vm.callVirtual(s, 'getSlotStackLimit', '()I', []));
+				var put = JVM.mc152.newStack(vm, held[':itemID'], n, held[':itemDamage']);
+				if (held[':stackTagCompound']) put[':stackTagCompound'] = held[':stackTagCompound'];
+				vm.callVirtual(s, 'putStack', ISV, [put]);
+				held[':stackSize'] -= n;
+				vm.mcHeld = held[':stackSize'] > 0 ? held : null;
+			}
+		} else if (vm.callVirtual(s, 'canTakeStack', '(Lnet/minecraft/src/EntityPlayer;)Z', [player])) {
+			if (!held) {
+				var take = button === 0 ? cur[':stackSize'] : (cur[':stackSize'] + 1) >> 1;
+				var got = vm.callVirtual(s, 'decrStackSize', '(I)Lnet/minecraft/src/ItemStack;', [take]);
+				vm.mcHeld = got && got[':stackSize'] > 0 ? got : null;
+				if (!stackOf(vm, s)) vm.callVirtual(s, 'putStack', ISV, [null]);
+				if (got) vm.callVirtual(s, 'onPickupFromSlot', '(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;)V', [player, vm.mcHeld || got]);
+			} else if (vm.callVirtual(s, 'isItemValid', '(Lnet/minecraft/src/ItemStack;)Z', [held])) {
+				if (cur[':itemID'] !== held[':itemID'] || cur[':itemDamage'] !== held[':itemDamage']) {
+					if (held[':stackSize'] <= vm.callVirtual(s, 'getSlotStackLimit', '()I', [])) { vm.callVirtual(s, 'putStack', ISV, [held]); vm.mcHeld = cur; }
+				} else {
+					var room = Math.min(vm.callVirtual(s, 'getSlotStackLimit', '()I', []), limitOf(vm, cur)) - cur[':stackSize'];
+					var add = Math.min(room, button === 0 ? held[':stackSize'] : 1);
+					if (add > 0) {
+						cur[':stackSize'] += add; held[':stackSize'] -= add;
+						vm.callVirtual(s, 'putStack', ISV, [cur]);
+						vm.mcHeld = held[':stackSize'] > 0 ? held : null;
+					}
+				}
+			} else if (cur[':itemID'] === held[':itemID'] && cur[':itemDamage'] === held[':itemDamage'] && limitOf(vm, cur) > 1) {
+				var n2 = cur[':stackSize'];
+				if (n2 + held[':stackSize'] <= limitOf(vm, cur)) {
+					held[':stackSize'] += n2;
+					var g2 = vm.callVirtual(s, 'decrStackSize', '(I)Lnet/minecraft/src/ItemStack;', [n2]);
+					if (!stackOf(vm, s)) vm.callVirtual(s, 'putStack', ISV, [null]);
+					vm.callVirtual(s, 'onPickupFromSlot', '(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;)V', [player, held]);
+				}
+			}
+		}
+		vm.callVirtual(s, 'onSlotChanged', '()V', []);
+	}
+	vm.callVirtual(c, 'detectAndSendChanges', '()V', []);
+	return result;
+}
+function merge(vm, c, st, from, to, backwards) {
+	var slots = listArr(vm, c[':inventorySlots']), moved = false, i;
+	var ISV = '(Lnet/minecraft/src/ItemStack;)V';
+	if (limitOf(vm, st) > 1) {
+		for (i = backwards ? to - 1 : from; st[':stackSize'] > 0 && (backwards ? i >= from : i < to); i += backwards ? -1 : 1) {
+			var s = slots[i], cur = stackOf(vm, s);
+			if (cur && cur[':itemID'] === st[':itemID'] && cur[':itemDamage'] === st[':itemDamage']) {
+				var max = limitOf(vm, st), sum = cur[':stackSize'] + st[':stackSize'];
+				if (sum <= max) { st[':stackSize'] = 0; cur[':stackSize'] = sum; vm.callVirtual(s, 'putStack', ISV, [cur]); moved = true; }
+				else if (cur[':stackSize'] < max) { st[':stackSize'] -= max - cur[':stackSize']; cur[':stackSize'] = max; vm.callVirtual(s, 'putStack', ISV, [cur]); moved = true; }
+			}
+		}
+	}
+	if (st[':stackSize'] > 0) {
+		for (i = backwards ? to - 1 : from; backwards ? i >= from : i < to; i += backwards ? -1 : 1) {
+			var s2 = slots[i];
+			if (!stackOf(vm, s2)) {
+				vm.callVirtual(s2, 'putStack', ISV, [vm.callVirtual(st, 'copy', '()Lnet/minecraft/src/ItemStack;', [])]);
+				st[':stackSize'] = 0; moved = true; break;
+			}
+		}
+	}
+	return moved;
+}
+function putBack(vm) {
+	var h = vm.mcHeld;
+	vm.mcHeld = null;
+	if (!h || h[':stackSize'] <= 0) return;
+	op(vm, 'give', h[':itemID'], h[':stackSize'], h[':itemDamage']);
+}
+
+function openModGui(vm, player, modObj, id, world, x, y, z) {
+	var f = vm.mcReg && vm.mcReg.forge;
+	var mod = f && f.mods.filter(function (m) { return m.instance === modObj; })[0];
+	var handler = f && (mod ? f.guiHandlers[mod.id] || f.guiHandlers[mod.owner] : null);
+	if (!handler) { vm.warnOnce('gui:nohandler', 'a mod screen was asked for, but its mod registered no screen handler'); return; }
+	var server = null, client = null;
+	JVM.run(vm, function () { server = vm.callVirtual(handler, 'getServerGuiElement', '(ILnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;III)Ljava/lang/Object;', [id, player, world, x, y, z]); });
+	JVM.run(vm, function () { client = vm.callVirtual(handler, 'getClientGuiElement', '(ILnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;III)Ljava/lang/Object;', [id, player, world, x, y, z]); });
+	if (!client || !vm.isInstance(client, vm.loadClass(SRC + 'GuiScreen'))) { if (client || server) vm.warnOnce('gui:noclient', 'a mod screen without a client screen can not be shown'); return; }
+	openScreen(vm, client, server && vm.isInstance(server, vm.loadClass(SRC + 'Container')) ? server : null);
+}
+function openScreen(vm, screen, server) {
+	if (vm.mcGui && vm.mcGui.screen !== screen) closeScreen(vm, true);
+	var g = vm.mcGui = { screen: screen, server: server, mod: screen.cls.source || vm.currentMod };
+	if (server) {
+		var crafter = vm.newObject(vm.loadClass('mcre/GuiCrafter'));
+		crafter.$client = screen[':inventorySlots'];
+		g.crafter = crafter;
+		JVM.run(vm, function () { vm.callVirtual(server, 'addCraftingToCrafters', '(Lnet/minecraft/src/ICrafting;)V', [crafter]); });
+		var p = JVM.mc152.playerObj(vm, null);
+		p[':openContainer'] = server;
+	}
+	if (JVM.onGuiOpen) JVM.onGuiOpen(vm);
+}
+function closeScreen(vm, replacing) {
+	var g = vm.mcGui;
+	if (!g) return;
+	vm.mcGui = null;
+	JVM.run(vm, function () { vm.callVirtual(g.screen, 'onGuiClosed', '()V', []); });
+	if (g.server && g.server !== g.screen[':inventorySlots']) JVM.run(vm, function () { vm.callVirtual(g.server, 'onCraftGuiClosed', '(Lnet/minecraft/src/EntityPlayer;)V', [JVM.mc152.playerObj(vm, null)]); });
+	putBack(vm);
+	var p = vm.mcPlayer; if (p) p[':openContainer'] = null;
+	if (!replacing && JVM.onGuiClose) JVM.onGuiClose(vm);
+}
+JVM.guiOpen = function (vm) { return !!vm.mcGui; };
+JVM.guiClose = function (vm) { closeScreen(vm); };
+JVM.guiLayout = function (vm, w, h) {
+	var g = vm.mcGui;
+	if (!g) return;
+	g.w = w; g.h = h;
+	var mc = vm.callStatic(SRC + 'ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
+	JVM.run(vm, function () { vm.callVirtual(g.screen, 'setWorldAndResolution', '(Lnet/minecraft/client/Minecraft;II)V', [mc, w, h]); });
+};
+JVM.guiFrame = function (vm, mx, my) {
+	var g = vm.mcGui;
+	if (!g) return null;
+	var r = R(vm);
+	r.ops = []; r.t = [0, 0]; r.stack = []; r.color = [1, 1, 1, 1]; r.on = true;
+	vm.mcMouse = [mx, my];
+	vm.steps = 0;
+	JVM.run(vm, function () { vm.callVirtual(g.screen, 'drawScreen', '(IIF)V', [mx, my, 0]); });
+	r.on = false;
+	return r.ops;
+};
+JVM.guiMouse = function (vm, mx, my, button, down) {
+	var g = vm.mcGui;
+	if (!g) return;
+	vm.mcMouseDown = down ? button : -1;
+	vm.steps = 0;
+	JVM.run(vm, function () { vm.callVirtual(g.screen, down ? 'mouseClicked' : 'mouseMovedOrUp', '(III)V', [mx, my, button]); });
+};
+JVM.guiKey = function (vm, ch, code, down) {
+	var g = vm.mcGui;
+	(vm.mcKeys || (vm.mcKeys = {}))[code] = !!down;
+	if (!g || !down) return;
+	vm.mcLastKey = code;
+	vm.steps = 0;
+	JVM.run(vm, function () { vm.callVirtual(g.screen, 'keyTyped', '(CI)V', [ch | 0, code]); });
+};
+JVM.guiTick = function (vm) {
+	var g = vm.mcGui;
+	if (!g) return;
+	JVM.run(vm, function () { vm.callVirtual(g.screen, 'updateScreen', '()V', []); });
+	if (g.server) JVM.run(vm, function () { vm.callVirtual(g.server, 'detectAndSendChanges', '()V', []); });
+};
+JVM.guiTexture = function (vm, path) {
+	var p = String(path || '').replace(/^[/]+/, '');
+	return vm.resources[p] || null;
+};
+
+JVM.installGui = installGui;
 })();
 
 (function () {

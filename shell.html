@@ -1694,6 +1694,14 @@
                 Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
                 vm.game = bridge;
                 vm.mcPlayer = null; vm.mcWorld = null; vm.mcTicks = 0;
+                var gameLang = null;
+                vm.gameLang = function (k) {
+                    if (!gameLang) {
+                        gameLang = {};
+                        try { FS.readFile('/data/lang/en_US.lang', { encoding: 'utf8' }).split('\n').forEach(function (l) { var i = l.indexOf('='); if (i > 0) gameLang[l.slice(0, i).trim()] = l.slice(i + 1).trim(); }); } catch (e) { }
+                    }
+                    return gameLang[k] != null ? gameLang[k] : null;
+                };
                 running = true;
                 if (window.JVM.tileLoad) window.JVM.tileLoad(vm, Object.keys(javaMods));
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
@@ -1792,6 +1800,8 @@
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
                 worldDir = null;
+                if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
+                jgClose(true);
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
             };
@@ -1827,6 +1837,7 @@
                         r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
+                    if (JV.guiTick) JV.guiTick(vm);
                     if (JV.tileTick) {
                         JV.tileTick(vm);
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
@@ -1881,6 +1892,237 @@
             }
             document.addEventListener('keydown', function (e) { javaKeyEvent(e, true); }, true);
             document.addEventListener('keyup', function (e) { javaKeyEvent(e, false); }, true);
+            var jg = null;
+            var JGUI_W = 320, JGUI_H = 240;
+            function jgScale() { return Math.max(1, Math.min(Math.floor(window.innerWidth / JGUI_W), Math.floor(window.innerHeight / JGUI_H))); }
+            var jgImgs = {}, jgFont = null, jgFontW = null, jgTint = {};
+            function jgImage(path) {
+                if (jgImgs[path] !== undefined) return jgImgs[path];
+                jgImgs[path] = null;
+                var p = String(path || '').replace(/^[/]+/, '');
+                var show = function (bytes) { var img = new Image(); img.onload = function () { jgImgs[path] = img; }; img.onerror = function () { jgImgs[path] = 'missing'; }; img.src = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); };
+                var fsGet = function (fp) { try { return FS.readFile(fp); } catch (e) { return null; } };
+                var bytes = window.JVM && vm ? window.JVM.guiTexture(vm, path) : null;
+                if (!bytes && /^gui[/]/.test(p)) bytes = fsGet('/data/images/gui/java/' + p.substring(4));
+                if (!bytes) bytes = fsGet('/data/images/' + p);
+                if (bytes) { show(bytes); return null; }
+                if (/^gui[/][\w.-]+[.]png$/.test(p)) {
+                    fetch('jvm_assets/' + p).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (ab) { if (ab) show(new Uint8Array(ab)); else jgImgs[path] = 'missing'; }, function () { jgImgs[path] = 'missing'; });
+                    return null;
+                }
+                jgImgs[path] = 'missing';
+                return 'missing';
+            }
+            function jgLoadFont() {
+                if (jgFont) return jgFont;
+                var img = jgImage('font/default8.png');
+                if (!img || img === 'missing') return null;
+                var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+                var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+                var d = x.getImageData(0, 0, img.width, img.height).data, cell = img.width / 16;
+                jgFontW = [];
+                for (var ch = 0; ch < 256; ch++) {
+                    var cx = (ch % 16) * cell, cy = Math.floor(ch / 16) * cell, w = 0;
+                    for (var col = cell - 1; col >= 0 && !w; col--) for (var row = 0; row < cell; row++) if (d[((cy + row) * img.width + cx + col) * 4 + 3] > 0) { w = col + 1; break; }
+                    jgFontW[ch] = ch === 32 ? cell / 2 : w;
+                }
+                jgFont = { img: img, cell: cell };
+                return jgFont;
+            }
+            function jgTinted(rgb) {
+                if (jgTint[rgb]) return jgTint[rgb];
+                var f = jgFont, c = document.createElement('canvas');
+                c.width = f.img.width; c.height = f.img.height;
+                var x = c.getContext('2d');
+                x.drawImage(f.img, 0, 0);
+                x.globalCompositeOperation = 'source-in';
+                x.fillStyle = '#' + ('00000' + (rgb & 0xffffff).toString(16)).slice(-6);
+                x.fillRect(0, 0, c.width, c.height);
+                return (jgTint[rgb] = c);
+            }
+            var CODES = [0x000000, 0x0000aa, 0x00aa00, 0x00aaaa, 0xaa0000, 0xaa00aa, 0xffaa00, 0xaaaaaa, 0x555555, 0x5555ff, 0x55ff55, 0x55ffff, 0xff5555, 0xff55ff, 0xffff55, 0xffffff];
+            function jgText(ctx, s, x, y, color, shadow) {
+                var f = jgLoadFont();
+                if (!f) { ctx.fillStyle = '#' + ('00000' + (color & 0xffffff).toString(16)).slice(-6); ctx.font = '8px monospace'; ctx.textBaseline = 'top'; ctx.fillText(s, x, y); return; }
+                var k = 8 / f.cell;
+                var run = function (rgb, dx) {
+                    var t = jgTinted(rgb), px = x + dx, col = rgb;
+                    for (var i = 0; i < s.length; i++) {
+                        var ch = s.charCodeAt(i);
+                        if (ch === 167 && i + 1 < s.length) {
+                            var n = '0123456789abcdef'.indexOf(s[i + 1].toLowerCase());
+                            if (n >= 0) { col = dx ? (CODES[n] & 0xfcfcfc) >> 2 : CODES[n]; t = jgTinted(col); }
+                            i++; continue;
+                        }
+                        if (ch > 255) ch = 63;
+                        ctx.drawImage(t, (ch % 16) * f.cell, Math.floor(ch / 16) * f.cell, f.cell, f.cell, px, y + dx, 8, 8);
+                        px += (jgFontW[ch] + 1) * k;
+                    }
+                };
+                if (shadow) run((color & 0xfcfcfc) >> 2, 1);
+                run(color & 0xffffff, 0);
+            }
+            function argb(c) { var a = (c >>> 24) & 255; return 'rgba(' + ((c >> 16) & 255) + ',' + ((c >> 8) & 255) + ',' + (c & 255) + ',' + (a / 255) + ')'; }
+            var jgPanel = null;
+            function jgStandIn() {
+                if (jgPanel) return jgPanel;
+                var c = document.createElement('canvas'); c.width = c.height = 256;
+                var x = c.getContext('2d');
+                x.fillStyle = '#c6c6c6'; x.fillRect(0, 0, 176, 166);
+                x.fillStyle = '#fff'; x.fillRect(0, 0, 175, 2); x.fillRect(0, 0, 2, 165);
+                x.fillStyle = '#555'; x.fillRect(1, 164, 175, 2); x.fillRect(174, 1, 2, 165);
+                x.fillStyle = '#000'; x.fillRect(2, 0, 172, 1); x.fillRect(0, 2, 1, 162); x.fillRect(2, 165, 172, 1); x.fillRect(175, 2, 1, 162);
+                x.fillStyle = '#fff';
+                x.fillRect(176, 21, 16, 3); x.beginPath(); x.moveTo(192, 15); x.lineTo(200, 22.5); x.lineTo(192, 30); x.fill();
+                x.fillStyle = '#ff9a1e';
+                x.beginPath(); x.moveTo(183, 0); x.lineTo(189, 8); x.lineTo(186, 13); x.lineTo(180, 13); x.lineTo(177, 8); x.fill();
+                return (jgPanel = c);
+            }
+            function jgSlot(ctx, x, y) {
+                ctx.fillStyle = '#8b8b8b'; ctx.fillRect(x - 1, y - 1, 18, 18);
+                ctx.fillStyle = '#373737'; ctx.fillRect(x - 1, y - 1, 17, 1); ctx.fillRect(x - 1, y - 1, 1, 17);
+                ctx.fillStyle = '#fff'; ctx.fillRect(x, y + 16, 17, 1); ctx.fillRect(x + 16, y, 1, 17);
+            }
+            var jgIcons = {};
+            function jgIcon(id, data) {
+                var ref = id < 4096 ? blockRef(id) : itemRef(id);
+                if (/^id:/.test(ref) && data) ref += ':' + data;
+                if (jgIcons[ref] !== undefined) return jgIcons[ref];
+                jgIcons[ref] = null;
+                var api = Module.mcScripts;
+                if (api && api.iconUrlOf) api.iconUrlOf(ref).then(function (u) {
+                    if (!u) { jgIcons[ref] = 'missing'; return; }
+                    var im = new Image(); im.onload = function () { jgIcons[ref] = im; }; im.src = u;
+                }, function () { jgIcons[ref] = 'missing'; });
+                return null;
+            }
+            function jgButton(ctx, o) {
+                var img = jgImage('/gui/chest_actions.png'), lit = o.on && (o.hover || o.down);
+                if (img && img !== 'missing') {
+                    var k = img.width / 256, u0 = lit ? 60 : 40, e = 3, W = o.w, H = o.h;
+                    if (!o.on) ctx.globalAlpha = 0.5;
+                    var src = [[0, e], [e, 20 - 2 * e], [20 - e, e]], dx = [[0, e], [e, W - 2 * e], [W - e, e]], dy = [[0, e], [e, H - 2 * e], [H - e, e]];
+                    for (var r = 0; r < 3; r++) for (var c2 = 0; c2 < 3; c2++) {
+                        if (dx[c2][1] <= 0 || dy[r][1] <= 0) continue;
+                        ctx.drawImage(img, (u0 + src[c2][0]) * k, src[r][0] * k, src[c2][1] * k, src[r][1] * k, o.x + dx[c2][0], o.y + dy[r][0], dx[c2][1], dy[r][1]);
+                    }
+                    ctx.globalAlpha = 1;
+                } else {
+                    ctx.fillStyle = !o.on ? '#2c2c2c' : lit ? '#7e88bf' : '#6f6f6f';
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                }
+                var tw = window.JVM.mcStrWidth(o.s);
+                jgText(ctx, o.s, o.x + ((o.w - tw) >> 1), o.y + ((o.h - 8) >> 1), !o.on ? 0xa0a0a0 : lit ? 0xffffa0 : 0xe0e0e0, true);
+            }
+            function jgDraw() {
+                if (!jg || !vm) return;
+                var JV = window.JVM;
+                var ops = JV.guiFrame(vm, jg.mx, jg.my);
+                if (!ops) { jgClose(true); return; }
+                var ctx = jg.ctx, s = jg.scale;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, jg.cv.width, jg.cv.height);
+                ctx.setTransform(s, 0, 0, s, 0, 0);
+                ctx.imageSmoothingEnabled = false;
+                var standIn = false;
+                ops.forEach(function (o) {
+                    switch (o.k) {
+                    case 'dim': { var gr = ctx.createLinearGradient(0, 0, 0, jg.h); gr.addColorStop(0, 'rgba(16,16,16,.75)'); gr.addColorStop(1, 'rgba(16,16,16,.82)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, jg.w, jg.h); break; }
+                    case 'tex': {
+                        var img = jgImage(o.tex);
+                        if (img === 'missing') { img = jgStandIn(); standIn = true; }
+                        if (!img) break;
+                        var k = img.width / 256;
+                        if (o.col && o.col[3] < 1) ctx.globalAlpha = Math.max(0, o.col[3]);
+                        if (o.w > 0 && o.h > 0) ctx.drawImage(img, o.u * k, o.v * k, o.w * k, o.h * k, o.x, o.y, o.w, o.h);
+                        ctx.globalAlpha = 1;
+                        break;
+                    }
+                    case 'rect': ctx.fillStyle = argb(o.c); ctx.fillRect(o.x, o.y, o.x2 - o.x, o.y2 - o.y); break;
+                    case 'grad': { var g2 = ctx.createLinearGradient(0, o.y, 0, o.y2); g2.addColorStop(0, argb(o.c)); g2.addColorStop(1, argb(o.c2)); ctx.fillStyle = g2; ctx.fillRect(o.x, o.y, o.x2 - o.x, o.y2 - o.y); break; }
+                    case 'slot': if (standIn) jgSlot(ctx, o.x, o.y); break;
+                    case 'text': jgText(ctx, o.s, o.x, o.y, o.c, o.shadow); break;
+                    case 'button': jgButton(ctx, o); break;
+                    case 'field':
+                        ctx.fillStyle = '#a0a0a0'; ctx.fillRect(o.x - 1, o.y - 1, o.w + 2, o.h + 2);
+                        ctx.fillStyle = '#000'; ctx.fillRect(o.x, o.y, o.w, o.h);
+                        jgText(ctx, o.s + (o.focus && (Date.now() >> 9) % 2 ? '_' : ''), o.x + 4, o.y + ((o.h - 8) >> 1), 0xe0e0e0, true);
+                        break;
+                    case 'item': {
+                        var ic = jgIcon(o.id, o.data);
+                        if (ic && ic !== 'missing') ctx.drawImage(ic, o.x, o.y, 16, 16);
+                        if (o.overlay && o.n > 1) { var t = String(o.n); jgText(ctx, t, o.x + 17 - JV.mcStrWidth(t), o.y + 9, 0xffffff, true); }
+                        break;
+                    }
+                    case 'tip': {
+                        var tw = JV.mcStrWidth(o.s);
+                        ctx.fillStyle = 'rgba(16,0,16,.94)'; ctx.fillRect(o.x - 3, o.y - 3, tw + 6, 14);
+                        ctx.strokeStyle = 'rgba(80,0,255,.5)'; ctx.lineWidth = 1; ctx.strokeRect(o.x - 2.5, o.y - 2.5, tw + 5, 13);
+                        jgText(ctx, o.s, o.x, o.y, 0xffffff, true);
+                        break;
+                    }
+                    }
+                });
+            }
+            function jgPoint(e) {
+                var b = jg.cv.getBoundingClientRect(), t = e.touches ? (e.touches[0] || e.changedTouches[0]) : e;
+                return [Math.floor((t.clientX - b.left) / jg.scale), Math.floor((t.clientY - b.top) / jg.scale)];
+            }
+            function jgLayout() {
+                if (!jg) return;
+                var s = jgScale();
+                jg.scale = s;
+                jg.w = Math.ceil(window.innerWidth / s); jg.h = Math.ceil(window.innerHeight / s);
+                jg.cv.width = window.innerWidth; jg.cv.height = window.innerHeight;
+                window.JVM.guiLayout(vm, jg.w, jg.h);
+            }
+            function jgOpen() {
+                if (jg) jgClose(true);
+                if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;z-index:9998;touch-action:none';
+                ov.tabIndex = -1;
+                var cv = document.createElement('canvas');
+                cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated';
+                ov.appendChild(cv);
+                document.body.appendChild(ov);
+                jg = { ov: ov, cv: cv, ctx: cv.getContext('2d'), mx: -1, my: -1, scale: 1, w: JGUI_W, h: JGUI_H };
+                jgLayout();
+                var JV = window.JVM;
+                var stop = function (e) { e.stopPropagation(); };
+                ['mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'keypress'].forEach(function (t) { ov.addEventListener(t, stop); });
+                ov.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+                ov.addEventListener('mousemove', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; });
+                ov.addEventListener('mousedown', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, true); jgDraw(); });
+                ov.addEventListener('mouseup', function (e) { var p = jgPoint(e); JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, false); });
+                var tStart = 0;
+                ov.addEventListener('touchstart', function (e) { e.preventDefault(); tStart = Date.now(); var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; });
+                ov.addEventListener('touchend', function (e) { e.preventDefault(); var p = jgPoint(e), b = Date.now() - tStart > 500 ? 1 : 0; JV.guiMouse(vm, p[0], p[1], b, true); JV.guiMouse(vm, p[0], p[1], b, false); jg.mx = -1; jgDraw(); });
+                jg.onResize = function () { jgLayout(); };
+                window.addEventListener('resize', jg.onResize);
+                jg.timer = setInterval(jgDraw, 50);
+                if (Module.mcTopX) Module.mcTopX.add(ov, function () { if (vm) JV.guiClose(vm); });
+                setTimeout(function () { try { ov.focus(); } catch (x) { } }, 20);
+                jgDraw();
+            }
+            function jgClose(fromJava) {
+                if (!jg) return;
+                clearInterval(jg.timer);
+                window.removeEventListener('resize', jg.onResize);
+                if (jg.ov.parentNode) jg.ov.parentNode.removeChild(jg.ov);
+                if (Module.mcTopX) Module.mcTopX.remove(jg.ov);
+                jg = null;
+                try { Module.canvas.focus(); } catch (x) { }
+            }
+            function jgKey(e, down) {
+                if (!jg || !vm) return;
+                e.stopPropagation(); e.preventDefault();
+                var code = window.JVM.keyToLwjgl(e.code) || 0, ch = e.key && e.key.length === 1 ? e.key.charCodeAt(0) : e.key === 'Escape' ? 27 : e.key === 'Backspace' ? 8 : e.key === 'Enter' ? 13 : 0;
+                window.JVM.guiKey(vm, ch, code, down);
+                jgDraw();
+            }
+            window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
+            window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
             J.begin = function () { J.decls = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
             J.define = function (modId, files, problem) {
                 return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
@@ -1897,6 +2139,8 @@
                                     itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } };
                     }
                     if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
+                    JVM.onGuiOpen = function () { jgOpen(); };
+                    JVM.onGuiClose = function () { jgClose(true); };
                     var classes = [];
                     Object.keys(files).forEach(function (k) {
                         if (/\.class$/i.test(k)) {
@@ -6177,6 +6421,7 @@
                 ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
                 ov.tabIndex = -1;
                 document.body.appendChild(ov);
+                if (Module.mcTopX) Module.mcTopX.add(ov, close);
                 var refocus = prev || (lastGui && lastGui.id === spec.id) ? (lastGui && lastGui.focus) : null;
                 setTimeout(function () {
                     var target = (refocus && inputs[refocus]) || box.querySelector('input');
@@ -6324,9 +6569,44 @@
                 }
                 ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
                 document.body.appendChild(ov);
+                if (Module.mcTopX) Module.mcTopX.add(ov, close);
                 gui = g;
                 setTimeout(function () { try { frame.focus(); } catch (x) { } }, 30);
             }
+        })();
+        (function () {
+            var open = [], btn = null, timer = 0;
+            function touch() { return !!(Module._mcIsTouchMode && Module._mcIsTouchMode()) || (!!window.matchMedia && matchMedia('(pointer: coarse)').matches); }
+            function live() { open = open.filter(function (o) { return document.body.contains(o.el); }); return open; }
+            function sync() {
+                var top = live()[open.length - 1];
+                if (!top || !touch()) { if (btn) btn.style.display = 'none'; if (!open.length && timer) { clearInterval(timer); timer = 0; } return; }
+                if (!btn) {
+                    btn = document.createElement('button');
+                    btn.textContent = '×';
+                    btn.setAttribute('aria-label', 'Close');
+                    btn.style.cssText = 'position:fixed;top:6px;right:6px;width:44px;height:44px;z-index:2147483647;background:rgba(0,0,0,.6);color:#fff;' +
+                        'border:2px solid #aaa;font:26px/1 monospace;padding:0;cursor:pointer;touch-action:manipulation';
+                    ['mousedown', 'mouseup', 'touchstart', 'touchend', 'keydown'].forEach(function (t) { btn.addEventListener(t, function (e) { e.stopPropagation(); }); });
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        var t = live()[open.length - 1];
+                        if (t) { open.pop(); try { t.close(); } catch (x) { } }
+                        sync();
+                    });
+                }
+                if (btn.parentNode !== document.body || btn !== document.body.lastElementChild) document.body.appendChild(btn);
+                btn.style.display = '';
+            }
+            Module.mcTopX = {
+                add: function (el, close) {
+                    open = open.filter(function (o) { return o.el !== el; });
+                    open.push({ el: el, close: close });
+                    if (!timer) timer = setInterval(sync, 250);
+                    sync();
+                },
+                remove: function (el) { open = open.filter(function (o) { return o.el !== el; }); sync(); },
+            };
         })();
         (function () {
             Module.mcKeepOff = function (has, x, y, w, h, gw, gh) {
