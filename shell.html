@@ -1606,6 +1606,16 @@
                 var it = r && r.items[id];
                 return it && !it.$override ? 'mod:' + it.$mod + ':' + window.JVM.contentName(vm, id, data) : 'id:' + id;
             }
+            function enchOf(s) {
+                if (!s) return null;
+                var o = {};
+                String(s).split(',').forEach(function (p) { var m = /^(\d+):(\d+)$/.exec(p); if (m) o[+m[1]] = +m[2]; });
+                return Object.keys(o).length ? o : null;
+            }
+            function enchSpec(e) {
+                var k = e ? Object.keys(e).filter(function (id) { return e[id] > 0; }) : [];
+                return k.length ? '|e' + k.map(function (id) { return id + ':' + e[id]; }).join(',') : '';
+            }
             function variantRef(ref) { return /^mod:[^:]+:.+_\d+$/.test(ref || ''); }
             function javaOf(ref, data) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
@@ -1656,7 +1666,7 @@
                     }
                     case 'held': {
                         if (actor) return actor.held || null;
-                        var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data }; }
+                        var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data, ench: enchOf(hp.carried[3]) }; }
                     case 'give':
                         var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
                         if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : ''), n: a[1] | 0 }); return 1; }
@@ -1672,7 +1682,7 @@
                         var cs = mp(['chest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('	'));
                         if (!cs || !cs[0] || cs[0] === 'id:0' || !(cs[1] > 0)) return null;
                         var cj = javaOf(cs[0], cs[2]);
-                        return { id: cj.id, count: cs[1], data: cj.data };
+                        return { id: cj.id, count: cs[1], data: cj.data, ench: enchOf(cs[3]) };
                     }
                     case 'setchest': {
                         var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
@@ -1701,14 +1711,14 @@
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
                     case 'setslot':
                         if (actor) { actorOnly('inventory'); return 0; }
-                        var sref2 = a[1] ? itemRef(a[1], a[3]) : 'id:0';
-                        return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sref2) ? 0 : a[3] | 0].join('\t'));
+                        var sbase = a[1] ? itemRef(a[1], a[3]) : 'id:0', sref2 = a[1] ? sbase + enchSpec(a[4]) : 'id:0';
+                        return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sbase) ? 0 : a[3] | 0].join('\t'));
                     case 'slot': {
                         if (actor) { actorOnly('inventory'); return null; }
                         var sl = mp('slot\t' + (a[0] | 0));
                         if (!(sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0)) return null;
                         var sj = javaOf(sl[0], sl[2]);
-                        return { id: sj.id, count: sl[1], data: sj.data };
+                        return { id: sj.id, count: sl[1], data: sj.data, ench: enchOf(sl[3]) };
                     }
                     case 'world': return mp('world');
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
@@ -1732,7 +1742,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1 };
             J.running = function () { return running; };
             J.dispense = function (json) {
                 if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
@@ -1885,6 +1895,7 @@
                 destroyedBy: 'onBlockDestroyedByPlayer(Lnet/minecraft/src/World;IIII)V',
                 walking: 'onEntityWalking(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V',
                 updateTick: 'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V',
+                neighbor: 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V',
                 rightClick: 'onItemRightClick(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;',
                 itemUse: 'onItemUse(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;IIIIFFF)Z',
                 tick: 'onTickInGame(FLnet/minecraft/client/Minecraft;)Z',
@@ -1938,10 +1949,14 @@
                     if (!blk || !javaMods[blk.$mod]) return;
                     var pl = M.playerObj(vm, null);
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
-                    else if (e.t === 'place') { if (JV.tilePlaced) JV.tilePlaced(vm, x, y, z); call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]); }
+                    else if (e.t === 'place') {
+                        if (blk.$stStates && JV.stationState) JV.stationState.placed(vm, blk, world, x, y, z, pl, M.heldStack(vm), e.face);
+                        if (JV.tilePlaced) JV.tilePlaced(vm, x, y, z); call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]);
+                    }
                     else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, bdata]); call(blk, SIG.destroyedBy, [world, x, y, z, bdata]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
                     else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
                     else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
+                    else if (e.t === 'neighbor') call(blk, SIG.neighbor, [world, x, y, z, e.neighbor ? javaOf(e.neighbor, 0).id : 0]);
                     return;
                 }
                 if (e.item && (e.t === 'useItem' || e.t === 'useItemOn')) {
@@ -2681,10 +2696,73 @@
                 return String(v).slice(0, 200);
             }
 
-            function iconOf(id, files) {
-                if (!files['pack.png']) return '';
+            function iconOf(id, files, m) {
+                var pic = modLogo(files) || modTexture(files);
+                var bytes = pic ? files[pic] : modTile((m && m.name) || id).bytes;
+                if (!bytes) return '';
                 var p = 'web_mods/' + id + '.png';
-                try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, files['pack.png']); return p; } catch (e) { return ''; }
+                try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, bytes); return p; } catch (e) { return ''; }
+            }
+            function pngSize(b) {
+                if (!b || b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return null;
+                var dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+                return { w: dv.getUint32(16), h: dv.getUint32(20) };
+            }
+            function modLogo(files) {
+                var dec = new TextDecoder(), c = ['pack.png', 'pack_icon.png', 'icon.png', 'logo.png'];
+                try {
+                    var fm = files['fabric.mod.json'] && JSON.parse(dec.decode(files['fabric.mod.json']));
+                    var ic = fm && fm.icon;
+                    if (ic && typeof ic === 'object') ic = ic[Object.keys(ic).sort(function (a, b) { return b - a; })[0]];
+                    if (typeof ic === 'string') c.unshift(ic.replace(/^[/]+/, ''));
+                } catch (e) { }
+                try {
+                    var jm = files['mcmod.info'] && JSON.parse(dec.decode(files['mcmod.info']));
+                    if (jm && !Array.isArray(jm) && jm.modList) jm = jm.modList;
+                    jm = Array.isArray(jm) ? jm[0] : null;
+                    if (jm && typeof jm.logoFile === 'string' && jm.logoFile) c.push(jm.logoFile.replace(/^[/]+/, ''));
+                } catch (e) { }
+                for (var i = 0; i < c.length; i++) if (pngSize(files[c[i]])) return c[i];
+                return null;
+            }
+            function modTexture(files) {
+                var keys = Object.keys(files).filter(function (k) { return /(^|[/])textures[/](items?|blocks?)[/][^/]+[.]png$/i.test(k) && !/(^|[/])minecraft[/]/i.test(k); }).sort();
+                var items = keys.filter(function (k) { return /[/]items?[/]/i.test(k); }), blocks = keys.filter(function (k) { return /[/]blocks?[/]/i.test(k); });
+                var all = items.concat(blocks);
+                for (var i = 0; i < all.length; i++) { var s = pngSize(files[all[i]]); if (s && s.w === s.h && s.w >= 8 && s.w <= 512) return all[i]; }
+                return null;
+            }
+            var modTiles = {};
+            function modTile(name) {
+                name = String(name || '?');
+                if (modTiles[name]) return modTiles[name];
+                var out = { bytes: null, url: '' };
+                try {
+                    var h = 0;
+                    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+                    var hue = ((h % 360) + 360) % 360, words = name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+                    var letters = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
+                    if (words.length === 1 && words[0].length > 1 && /[a-z]/.test(words[0][1])) letters = words[0][0].toUpperCase() + words[0][1];
+                    var S = 64, cv = document.createElement('canvas');
+                    cv.width = cv.height = S;
+                    var g = cv.getContext('2d');
+                    g.fillStyle = 'hsl(' + hue + ',45%,38%)'; g.fillRect(0, 0, S, S);
+                    for (var y = 0; y < S; y += 4) for (var x = 0; x < S; x += 4) {
+                        var n = ((Math.imul(x * 73856093 ^ y * 19349663 ^ h, 2654435761) >>> 0) % 7) - 3;
+                        g.fillStyle = 'hsl(' + hue + ',45%,' + (38 + n) + '%)'; g.fillRect(x, y, 4, 4);
+                    }
+                    g.fillStyle = 'hsl(' + hue + ',50%,58%)'; g.fillRect(0, 0, S, 4); g.fillRect(0, 0, 4, S);
+                    g.fillStyle = 'hsl(' + hue + ',50%,20%)'; g.fillRect(0, S - 4, S, 4); g.fillRect(S - 4, 0, 4, S);
+                    g.textAlign = 'center'; g.textBaseline = 'middle';
+                    g.font = 'bold ' + (letters.length > 1 ? 28 : 36) + 'px "Trebuchet MS", Verdana, sans-serif';
+                    g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(letters, S / 2 + 3, S / 2 + 4);
+                    g.fillStyle = '#fff'; g.fillText(letters, S / 2, S / 2 + 1);
+                    out.url = cv.toDataURL('image/png');
+                    var bin = atob(out.url.split(',')[1]), b = new Uint8Array(bin.length);
+                    for (var j = 0; j < bin.length; j++) b[j] = bin.charCodeAt(j);
+                    out.bytes = b;
+                } catch (e) { }
+                return (modTiles[name] = out);
             }
 
             var DEV_DB = 'mcre-devmods';
@@ -2867,7 +2945,7 @@
                                     x.contentId = taken ? x.m.id.slice(0, 44) + '-dev' : x.m.id;
                                     x.m.id = x.contentId;
                                 } else x.m.id = x.id;
-                                x.icon = iconOf(x.contentId || x.id, files);
+                                x.icon = iconOf(x.contentId || x.id, files, x.m);
                                 x.contents = contentsOf(files);
                                 x.err = '';
                             }).catch(function (e) { x.err = 'This mod ' + e.message; if (!x.dev) x.enabled = false; });
@@ -3675,6 +3753,8 @@
                                 shape, collide ? 1 : 0, j.gravity ? 1 : 0, friction.toFixed(2), j.flammable ? 1 : 0, j.scripted ? 1 : 0,
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
+                    if (j.creative === false) lines.push(['hidden', key].join('\t'));
+                    if (j.neighbor_updates === true) lines.push(['neighbors', key].join('\t'));
                     var st = states[b.mod + ':' + b.name], rot = String(j.rotate || '').toLowerCase();
                     var mref = j.model;
                     if (mref === undefined && st && st.j.variants && typeof st.j.variants === 'object') {
@@ -3687,7 +3767,7 @@
                     }
                     if (mref === undefined && models[b.mod + ':block/' + b.name]) mref = 'block/' + b.name;
                     if (mref !== undefined) {
-                        var compiled = compileModel(mref, b.mod, b.file);
+                        var compiled = compileModel(mref, b.mod, b.file, j.model_rotation);
                         if (compiled) lines.push(['model', key, rot === 'horizontal' ? 4 : 1, compiled].join('\t'));
                     } else if (rot) bad(b.mod, b.file, '"rotate" needs a "model" to turn');
                 });
@@ -3820,7 +3900,14 @@
                     if (!s || s.charAt(0) === '#') return '';
                     return s.replace(/^[^:]*:/, '').split('/').pop();
                 }
-                function compileModel(r, mod, file) {
+                function compileModel(r, mod, file, vrot) {
+                    var vx = vrot ? ((Math.round((+vrot.x || 0) / 90) % 4) + 4) % 4 : 0, vy = vrot ? ((Math.round((+vrot.y || 0) / 90) % 4) + 4) % 4 : 0;
+                    var vturn = function (p) {
+                        var x = p[0] - 8, y = p[1] - 8, z = p[2] - 8, t, i;
+                        for (i = 0; i < vx; i++) { t = y; y = z; z = -t; }
+                        for (i = 0; i < vy; i++) { t = x; x = -z; z = t; }
+                        return [x + 8, y + 8, z + 8];
+                    };
                     var rm = resolveModel(r, mod, file);
                     if (!rm) return '';
                     if (!rm.elements.length) { bad(mod, file, 'its model has no "elements" (nothing to draw)'); return ''; }
@@ -3863,10 +3950,11 @@
                             var tn = texName(fc.texture, rm.textures);
                             if (!tn) { bad(mod, file, 'a ' + fname + ' face has no texture ("' + (fc.texture || '') + '")'); return; }
                             var cell = cellOf('blocks', mod, tn, file);
-                            var cull = fc.cullface !== undefined && FACE[String(fc.cullface).toLowerCase()] !== undefined ? FACE[String(fc.cullface).toLowerCase()] : -1;
+                            var cull = (vx || vy) ? -1 : fc.cullface !== undefined && FACE[String(fc.cullface).toLowerCase()] !== undefined ? FACE[String(fc.cullface).toLowerCase()] : -1;
                             var parts = [cell, f, cull, el.shade === false ? 0 : 1];
                             for (var i = 0; i < 4; i++) {
                                 var p = turn(P[i]), t = C[(i + r4) % 4];
+                                if (vx || vy) p = vturn(p);
                                 parts.push(num(p[0]), num(p[1]), num(p[2]), num(t[0]), num(t[1]));
                             }
                             out.push(parts.join(','));
@@ -4823,7 +4911,7 @@
                         FS.mkdirTree(LIB);
                         FS.writeFile(LIB + '/' + m.id + '.zip', bytes);
                         if (i >= 0) mods.splice(i, 1);
-                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files) });
+                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m) });
                         writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
                         return Promise.resolve(reapply(true)).then(function () { return true; });
                     });
@@ -5163,8 +5251,9 @@
                         var st = installedState(e);
                         var row = document.createElement('div');
                         row.style.cssText = 'display:flex;gap:10px;padding:8px;border-bottom:1px solid #333;align-items:flex-start';
-                        row.innerHTML = (e.iconUrl ? '<img src="' + esc(e.iconUrl) + '" crossorigin="anonymous" style="width:40px;height:40px;image-rendering:pixelated;flex:none;background:#333" onerror="this.style.visibility=\'hidden\'">'
-                                                   : '<div style="width:40px;height:40px;flex:none;background:#333"></div>') +
+                        var tileUrl = modTile(e.name || e.id).url;
+                        row.innerHTML = (e.iconUrl ? '<img src="' + esc(e.iconUrl) + '" crossorigin="anonymous" style="width:40px;height:40px;image-rendering:pixelated;flex:none;background:#333" onerror="this.onerror=null;this.src=\'' + tileUrl + '\'">'
+                                                   : '<img src="' + tileUrl + '" style="width:40px;height:40px;flex:none" alt="">') +
                             '<div style="flex:1;min-width:0"><div><b style="color:#fff">' + esc(e.name) + '</b>' + (e.version ? ' <span style="color:#999">' + esc(e.version) + '</span>' : '') +
                             (e.author ? ' <span style="color:#999">by ' + esc(e.author) + '</span>' : '') + '</div>' +
                             '<div style="color:#bbb;margin-top:2px;white-space:pre-wrap;max-height:4.2em;overflow:hidden">' + esc(e.description) + '</div>' +
@@ -5962,6 +6051,7 @@
                 if (Array.isArray(e.players)) e.players.forEach(function (p) { if (p) known[p.id] = p; });
                 if (typeof e.block === 'string') e.block = nameOf(e.block);
                 if (typeof e.item === 'string') e.item = nameOf(e.item);
+                if (typeof e.neighbor === 'string') e.neighbor = nameOf(e.neighbor);
                 ['entity', 'source'].forEach(function (k) { var x = e[k]; if (x && x.guid !== undefined && x.id != null) known[x.id] = x; });
                 var named = function (list) { return list.map(stackForScript); };
                 if (Array.isArray(e.items)) e.items = named(e.items);

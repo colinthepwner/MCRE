@@ -5245,7 +5245,7 @@ function playerObj(vm, info) {
 function heldStack(vm) {
 	var h = op(vm, 'held');
 	if (!h || !h.id) return null;
-	return (function () { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = vm.game.itemToJava(h.id); s[':stackSize'] = h.count; s[':itemDamage'] = h.data || 0; return s; })();
+	return (function () { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = vm.game.itemToJava(h.id); s[':stackSize'] = h.count; s[':itemDamage'] = h.data || 0; if (h.ench) s.$ench = h.ench; return s; })();
 }
 
 function setBlock(vm, world, x, y, z, id, meta) {
@@ -5513,7 +5513,20 @@ JVM.collectContent = function (vm, modId) {
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
-		if (stFiles && JVM.stationModel) {
+		if (stFiles && JVM.stationModel && b.$stStates) {
+			var def0 = JVM.stationState.metaOf(JVM.stationState.defaultOf(vm, b));
+			var ssm = safe(function () { return JVM.stationModel(vm, b, stFiles, meta); }, null);
+			if (ssm) {
+				json.model = ssm.model;
+				if (ssm.rotation) json.model_rotation = ssm.rotation;
+				ssm.textures.forEach(function (t) { out.textures['blocks/' + t.name] = t; });
+			}
+			if (meta !== def0) {
+				json.creative = false;
+				if (!langOf(b, meta)) json.name = langOf(b, def0) || langOf(b, 0) || json.name;
+			}
+			if (drop === id && json.drops !== 'none') json.drops = ref(id, def0);
+		} else if (stFiles && JVM.stationModel) {
 			var sm = safe(function () { return JVM.stationModel(vm, b, stFiles); }, null);
 			if (sm) {
 				json.model = sm.model;
@@ -5521,10 +5534,19 @@ JVM.collectContent = function (vm, modId) {
 				sm.textures.forEach(function (t) { out.textures['blocks/' + t.name] = t; });
 			}
 		}
+		if (json.model && json.model.textures) {
+			var tinted = {};
+			Object.keys(faces).forEach(function (f) {
+				var t0 = out.textures['blocks/' + faces[f]];
+				if (t0 && t0.tint != null) tinted[faces[f].replace(/_t[0-9a-f]{6}$/, '')] = faces[f];
+			});
+			Object.keys(json.model.textures).forEach(function (k) { var v = json.model.textures[k]; if (tinted[v]) json.model.textures[k] = tinted[v]; });
+		}
 		if (overrides(b, BLOCK_SCRIPTED)) out.scripted.blocks[id] = true;
 		if (overrides(b, BLOCK_SCRIPTED.slice(0, 3)) || b[':needsRandomTick'] || overrides(b, [BLOCK_SCRIPTED[7]])) json.scripted = true;
 		var bf = fuelOf(id, meta);
 		if (bf > 0) json.fuel = bf;
+		if (overrides(b, ['onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V'])) json.neighbor_updates = true;
 		out.blocks[JVM.contentName(vm, id, meta)] = json;
 	}
 	Object.keys(r.items).forEach(function (idS) {
@@ -5689,6 +5711,16 @@ JVM.variantsOf = function (vm, o) {
 	var out = [0];
 	o.$variants = out;
 	var isBlock = vm.isInstance(o, vm.loadClass(SRC + 'Block'));
+	if (isBlock && o.$stId && JVM.stationState && vm.$tag === 'babric') {
+		var n = 0;
+		JVM.run(vm, function () { n = JVM.stationState.stateCount(vm, o); });
+		if (n > 1) {
+			o.$stStates = true;
+			o.$variants = [];
+			for (var si = 0; si < n; si++) o.$variants.push(si);
+			return o.$variants;
+		}
+	}
 	var key = isBlock ? 'getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V' : 'getSubItems(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V';
 	var m = o.cls.findMethod(key);
 	var metas = [];
@@ -7400,9 +7432,11 @@ function gameSlot(i, armor) { return armor ? -(3 - i) - 1 : i; }
 function readSlot(vm, slot) {
 	var s = op(vm, 'slot', slot);
 	if (!s || !s.id) return null;
-	return newStack(vm, s.id, s.count, s.data || 0);
+	var st = newStack(vm, s.id, s.count, s.data || 0);
+	if (s.ench) st.$ench = s.ench;
+	return st;
 }
-function writeSlot(vm, slot, st) { op(vm, 'setslot', slot, st && st[':stackSize'] > 0 ? st[':itemID'] : 0, st ? st[':stackSize'] : 0, st ? st[':itemDamage'] : 0); }
+function writeSlot(vm, slot, st) { op(vm, 'setslot', slot, st && st[':stackSize'] > 0 ? st[':itemID'] : 0, st ? st[':stackSize'] : 0, st ? st[':itemDamage'] : 0, st && st.$ench || null); }
 function liveArray(vm, n, armor) {
 	var cls = vm.loadClass('[L' + SRC + 'ItemStack;');
 	var backing = new Array(n);
@@ -9235,7 +9269,7 @@ function auxSfx(vm, id, x, y, z, data) {
 	} else if (id === 2001) {   }
 }
 
-function toStack(vm, v) { return v && v.id && v.count > 0 ? JVM.mc152.newStack(vm, v.id, v.count, v.data | 0) : null; }
+function toStack(vm, v) { var s = v && v.id && v.count > 0 ? JVM.mc152.newStack(vm, v.id, v.count, v.data | 0) : null; if (s && v.ench) s.$ench = v.ench; return s; }
 function slotGet(vm, te, i) { return toStack(vm, op(vm, 'chest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i)); }
 function slotSet(vm, te, i, s) {
 	op(vm, 'setchest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i, s && s[':stackSize'] > 0 ? s[':itemID'] : 0, s ? s[':stackSize'] : 0, s ? s[':itemDamage'] : 0);
@@ -11019,7 +11053,10 @@ function blockModelFaces(files, id) {
 	if (bs && bs.variants) { var v = bs.variants[''] || bs.variants[Object.keys(bs.variants)[0]]; if (Array.isArray(v)) v = v[0]; model = v && v.model; }
 	else if (bs && bs.multipart && bs.multipart[0]) { var ap = bs.multipart[0].apply; if (Array.isArray(ap)) ap = ap[0]; model = ap && ap.model; }
 	if (!model) model = p[0] + ':block/' + p[1];
-	var t = modelTextures(files, model, 0), f = {};
+	return modelFaces(files, modelTextures(files, model, 0));
+}
+function modelFaces(files, t) {
+	var f = {};
 	if (t.$elements) {
 		FACE.forEach(function (k) {
 			var cands = [];
@@ -11085,12 +11122,13 @@ function stationTex0(vm, o, side, files, meta) {
 	return null;
 }
 var SHAPED_PARENTS = /^(minecraft:)?block[/](slab|slab_top|cross|carpet)$/;
-JVM.stationModel = function (vm, o, files) {
+JVM.stationModel = function (vm, o, files, stateIdx) {
 	LASTVM = vm;
 	var id = o && o.$stId;
 	if (!id || !files) return null;
 	var p = String(id).split(':');
 	var bs = json(files, 'assets/' + p[0] + '/stationapi/blockstates/' + p[1] + '.json');
+	if (stateIdx != null && bs) return stateModel(vm, o, files, bs, stateIdx | 0);
 	var ref = null, facing = false;
 	if (bs && bs.variants) {
 		var vk = Object.keys(bs.variants);
@@ -11123,6 +11161,106 @@ JVM.stationModel = function (vm, o, files) {
 	else model.parent = 'minecraft:' + parent.replace(/^minecraft:/, '');
 	return { model: model, rotate: facing, textures: entries };
 };
+function inlineTextures(files, t, entries, prefix) {
+	var textures = {};
+	Object.keys(t).forEach(function (k) {
+		if (k[0] === '$') return;
+		var v = t[k];
+		if (typeof v !== 'string') return;
+		if (v[0] === '#') { textures[prefix + k] = '#' + prefix + v.slice(1); return; }
+		var r = texRef(files, v);
+		if (!r) return;
+		textures[prefix + k] = r.name;
+		if (r.file && !entries.some(function (e) { return e.name === r.name; })) entries.push(r);
+	});
+	return textures;
+}
+var CUBE_FACES = ['down', 'up', 'north', 'south', 'west', 'east'];
+function elementsOf(files, t) {
+	if (t.$elements) return { elements: t.$elements, t: t };
+	var f = modelFaces(files, t);
+	if (!f) return null;
+	var t2 = { $parent: '' }, faces = {};
+	CUBE_FACES.forEach(function (k) { if (f[k]) { t2['f_' + k] = f[k]; faces[k] = { texture: '#f_' + k, cullface: k }; } });
+	return { elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: faces }], t: t2 };
+}
+function variantHolds(key, props) {
+	if (!key || key === 'normal') return true;
+	return String(key).split(',').every(function (kv) { var q = kv.split('='); return q.length < 2 || props[q[0]] === undefined || props[q[0]] === q[1]; });
+}
+function whenHolds(w, props) {
+	if (!w) return true;
+	if (Array.isArray(w.OR)) return w.OR.some(function (x) { return whenHolds(x, props); });
+	if (Array.isArray(w.AND)) return w.AND.every(function (x) { return whenHolds(x, props); });
+	return Object.keys(w).every(function (k) { return props[k] === undefined || String(w[k]).split('|').indexOf(props[k]) >= 0; });
+}
+var Y_TURN = { north: 'east', east: 'south', south: 'west', west: 'north', up: 'up', down: 'down' };
+function turnElementsY(els, quarter) {
+	quarter = ((quarter % 4) + 4) % 4;
+	if (!quarter) return els;
+	return els.map(function (e) {
+		var a = e.from.slice(), b = e.to.slice(), faces = {};
+		var pts = [[a[0], a[2]], [b[0], b[2]]];
+		for (var q = 0; q < quarter; q++) pts = pts.map(function (pt) { return [16 - pt[1], pt[0]]; });
+		var x0 = Math.min(pts[0][0], pts[1][0]), x1 = Math.max(pts[0][0], pts[1][0]);
+		var z0 = Math.min(pts[0][1], pts[1][1]), z1 = Math.max(pts[0][1], pts[1][1]);
+		Object.keys(e.faces || {}).forEach(function (k) {
+			var nk = k, fc = Object.assign({}, e.faces[k]);
+			for (var q = 0; q < quarter; q++) nk = Y_TURN[nk] || nk;
+			if (fc.cullface) { var c = String(fc.cullface).toLowerCase(); for (var q2 = 0; q2 < quarter; q2++) c = Y_TURN[c] || c; fc.cullface = c; }
+			faces[nk] = fc;
+		});
+		var out = Object.assign({}, e, { from: [x0, a[1], z0], to: [x1, b[1], z1], faces: faces });
+		if (e.rotation && e.rotation.origin) {
+			var o = [e.rotation.origin[0], e.rotation.origin[2]];
+			for (var q3 = 0; q3 < quarter; q3++) o = [16 - o[1], o[0]];
+			var ax = e.rotation.axis, ang = e.rotation.angle;
+			if (quarter & 1) { if (ax === 'x') { ax = 'z'; } else if (ax === 'z') { ax = 'x'; ang = -ang; } }
+			if (quarter === 2 && ax !== 'y') ang = -ang;
+			out.rotation = Object.assign({}, e.rotation, { origin: [o[0], e.rotation.origin[1], o[1]], axis: ax, angle: ang });
+		}
+		return out;
+	});
+}
+function stateModel(vm, o, files, bs, idx) {
+	var props = JVM.stationState.propsOf(vm, o, idx), entries = [];
+	if (bs.variants) {
+		var vk = Object.keys(bs.variants), pick = vk.filter(function (k) { return variantHolds(k, props); })[0] || vk[0];
+		var v = bs.variants[pick];
+		if (Array.isArray(v)) v = v[0];
+		if (!v || !v.model) return null;
+		var t = modelTextures(files, v.model, 0);
+		var model;
+		if (!t.$elements && SHAPED_PARENTS.test(t.$parent || '')) model = { textures: inlineTextures(files, t, entries, ''), parent: 'minecraft:' + String(t.$parent).replace(/^minecraft:/, '') };
+		else {
+			var el = elementsOf(files, t);
+			if (!el) return null;
+			model = { textures: inlineTextures(files, el.t, entries, ''), elements: el.elements };
+		}
+		return { model: model, rotation: (v.x || v.y) ? { x: v.x | 0, y: v.y | 0 } : null, textures: entries };
+	}
+	if (Array.isArray(bs.multipart)) {
+		var els = [], textures = {};
+		bs.multipart.forEach(function (part, i) {
+			if (!part || !whenHolds(part.when, props)) return;
+			var ap = Array.isArray(part.apply) ? part.apply[0] : part.apply;
+			if (!ap || !ap.model) return;
+			var pt = modelTextures(files, ap.model, 0), pe = elementsOf(files, pt);
+			if (!pe) return;
+			var pre = 'p' + i + '_';
+			Object.assign(textures, inlineTextures(files, pe.t, entries, pre));
+			var mine = pe.elements.map(function (e) {
+				var faces = {};
+				Object.keys(e.faces || {}).forEach(function (k) { var fc = Object.assign({}, e.faces[k]); if (typeof fc.texture === 'string' && fc.texture[0] === '#') fc.texture = '#' + pre + fc.texture.slice(1); faces[k] = fc; });
+				return Object.assign({}, e, { faces: faces });
+			});
+			els = els.concat(turnElementsY(mine, Math.round((ap.y | 0) / 90)));
+		});
+		if (!els.length) return null;
+		return { model: { textures: textures, elements: els }, rotation: null, textures: entries };
+	}
+	return null;
+}
 
 JVM.vanillaCellName = function (sheet, cell, vm) {
 	var d = D(), kind = /^[/]?terrain[.]png$/i.test(sheet) ? 'blocks' : /^[/]?gui[/]items[.]png$/i.test(sheet) ? 'items' : null;
@@ -11238,9 +11376,22 @@ function managerOf(vm, block) {
 	var r = JVM.run(vm, function () { vm.callVirtual(block, 'appendProperties', '(L' + ST + 'state/StateManager$Builder;)V', [b]); });
 	if (!r.ok) vm.log('error', 'a block\'s appendProperties failed');
 	var n = mgr.$props.reduce(function (a, p) { return a * p.$values.length; }, 1);
-	if (n > 16) vm.warnOnce('st:states:' + block.cls.name, block.cls.name.split('/').pop() + ' has ' + n + ' block states - this game keeps 16 per block: the rest look like the 16th');
+	mgr.$stored = storedProps(mgr.$props);
+	if (n > 16) vm.warnOnce('st:states:' + block.cls.name, block.cls.name.split('/').pop() + ' has ' + n + ' block states - this game keeps 16 per block: ' +
+		mgr.$props.filter(function (p, i) { return mgr.$stored.indexOf(i) < 0; }).map(function (p) { return p.$name; }).join(', ') + ' keep their default');
 	return mgr;
 }
+var STORE_FIRST = /^(facing|axis|half|type|rotation|age|level|layers|stage|power|open|lit|shape|part|hinge|face|attachment)$/;
+function storedProps(props) {
+	var all = props.map(function (p, i) { return i; });
+	var n = props.reduce(function (a, p) { return a * p.$values.length; }, 1);
+	if (n <= 16) return all;
+	var order = all.filter(function (i) { return STORE_FIRST.test(props[i].$name); }).concat(all.filter(function (i) { return !STORE_FIRST.test(props[i].$name); }));
+	var keep = [], m = 1;
+	order.forEach(function (i) { if (m * props[i].$values.length <= 16) { keep.push(i); m *= props[i].$values.length; } });
+	return keep.sort(function (a, b) { return a - b; });
+}
+function metaCount(mgr) { return mgr.$stored.reduce(function (a, i) { return a * mgr.$props[i].$values.length; }, 1); }
 function stateAt(vm, mgr, idx) {
 	var s = mgr.$states[idx];
 	if (s) return s;
@@ -11263,9 +11414,20 @@ function defaultOf(vm, block) {
 function stateOfMeta(vm, block, meta) {
 	var mgr = managerOf(vm, block);
 	if (!mgr.$props.length) return defaultOf(vm, block);
-	return stateAt(vm, mgr, meta | 0);
+	if (mgr.$stored.length === mgr.$props.length) return stateAt(vm, mgr, (meta | 0) % metaCount(mgr));
+	var d = defaultOf(vm, block), vals = valuesOf(mgr, d.$idx !== undefined ? d.$idx : 0);
+	meta = meta | 0;
+	mgr.$stored.forEach(function (i) { var len = mgr.$props[i].$values.length; vals[i] = meta % len; meta = Math.floor(meta / len); });
+	return stateAt(vm, mgr, indexOfValues(mgr, vals));
 }
-function metaOf(state) { return state && state.$idx !== undefined ? Math.min(state.$idx, 15) : 0; }
+function metaOf(state) {
+	if (!state || state.$idx === undefined) return 0;
+	var mgr = state.$mgr;
+	if (!mgr || !mgr.$stored || mgr.$stored.length === mgr.$props.length) return Math.min(state.$idx, 15);
+	var vals = valuesOf(mgr, state.$idx), meta = 0, mul = 1;
+	mgr.$stored.forEach(function (i) { meta += vals[i] * mul; mul *= mgr.$props[i].$values.length; });
+	return meta;
+}
 
 function installStates(vm) {
 	var def = function (n, s) { vm.defineNative(n, s); };
@@ -11465,7 +11627,29 @@ function installStates(vm) {
 	def(ST + 'world/BlockStateView', { access: I });
 }
 
-JVM.stationState = { defaultOf: defaultOf, managerOf: managerOf, stateOfMeta: stateOfMeta, metaOf: metaOf, valueName: valueName };
+function propsOf(vm, block, meta) {
+	var mgr = managerOf(vm, block), s = stateOfMeta(vm, block, meta), vals = valuesOf(mgr, s.$idx), out = {};
+	mgr.$props.forEach(function (p, i) { out[p.$name] = valueName(vm, p.$values[vals[i]]); });
+	return out;
+}
+function stateCount(vm, block) {
+	var mgr = managerOf(vm, block);
+	if (!mgr.$props.length) return 0;
+	return metaCount(mgr);
+}
+function placed(vm, block, world, x, y, z, player, stack, face) {
+	if (!stateCount(vm, block)) return;
+	var ctx = vm.newObject(vm.loadClass(ST + 'item/ItemPlacementContext'));
+	ctx.$world = world; ctx.$player = player; ctx.$stack = stack; ctx.$side = face == null ? 1 : face | 0;
+	ctx.$x = x; ctx.$y = y; ctx.$z = z;
+	var s = null;
+	var r = JVM.run(vm, function () { s = vm.callVirtual(block, 'getPlacementState', '(L' + ST + 'item/ItemPlacementContext;)L' + ST + 'block/BlockState;', [ctx]); });
+	if (!r.ok || !s || s.$block !== block) return;
+	var meta = metaOf(s);
+	if (meta !== (vm.callVirtual(world, 'getBlockMetadata', '(III)I', [x, y, z]) | 0)) vm.callVirtual(world, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, meta, 3]);
+}
+
+JVM.stationState = { defaultOf: defaultOf, managerOf: managerOf, stateOfMeta: stateOfMeta, metaOf: metaOf, valueName: valueName, propsOf: propsOf, stateCount: stateCount, placed: placed };
 JVM.installStates = installStates;
 })();
 
@@ -11709,6 +11893,7 @@ var VANILLA = [['protection', 0, 4], ['fireProtection', 1, 4], ['featherFalling'
 var TYPES = ['all', 'armor', 'armor_feet', 'armor_legs', 'armor_torso', 'armor_head', 'weapon', 'digger', 'bow'];
 var TYPE_JSON = { all: 'all', armor: 'armor', armor_feet: 'boots', armor_legs: 'leggings', armor_torso: 'chestplate', armor_head: 'helmet', weapon: 'weapon', digger: 'tool', bow: 'bow' };
 
+function safeCall(vm, fn) { var r = JVM.run(vm, fn); return r.ok ? r.value : null; }
 function install(vm) {
 	var def = function (n, s) { vm.defineNative(SRC + n, s); };
 	var ET = SRC + 'EnumEnchantmentType';
@@ -11755,22 +11940,41 @@ function install(vm) {
 		'func_92089_a(Lnet/minecraft/src/ItemStack;)Z': function () { return 1; },
 		'isAllowedOnBooks()Z': function () { return 1; },
 	} });
+	var lvl = function (st, id) { return st && st.$ench ? (st.$ench[id] | 0) : 0; };
+	var held = function (vm, e) { return e ? safeCall(vm, function () { return vm.callVirtual(e, 'getHeldItem', '()Lnet/minecraft/src/ItemStack;', []); }) : null; };
+	var armor = function (vm, e) { var r = safeCall(vm, function () { return vm.callVirtual(e, 'getLastActiveItems', '()[Lnet/minecraft/src/ItemStack;', []); }); return r && r.a ? Array.prototype.slice.call(r.a) : []; };
+	var maxOf = function (id, stacks) { return stacks.reduce(function (m, s) { return Math.max(m, lvl(s, id)); }, 0); };
 	def('EnchantmentHelper', { staticMethods: {
-		'getEnchantmentLevel(ILnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return a[1] && a[1].$ench ? (a[1].$ench[a[0]] | 0) : 0; },
-		'getEnchantments(Lnet/minecraft/src/ItemStack;)Ljava/util/Map;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(m, '<init>', '()V', []); return m; },
-		'getEfficiencyModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getKnockbackModifier(Lnet/minecraft/src/EntityLiving;Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getFireAspectModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getLootingModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getSilkTouchModifier(Lnet/minecraft/src/EntityLiving;)Z': function () { return 0; },
-		'getFortuneModifier(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getRespiration(Lnet/minecraft/src/EntityLiving;)I': function () { return 0; },
-		'getAquaAffinityModifier(Lnet/minecraft/src/EntityLiving;)Z': function () { return 0; },
-		'getMaxEnchantmentLevel(I[Lnet/minecraft/src/ItemStack;)I': function () { return 0; },
+		'getEnchantmentLevel(ILnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return lvl(a[1], a[0]); },
+		'getEnchantments(Lnet/minecraft/src/ItemStack;)Ljava/util/Map;': function (vm, n, a) {
+			var m = vm.newObject(vm.loadClass('java/util/LinkedHashMap')); vm.callVirtual(m, '<init>', '()V', []);
+			var e = a[0] && a[0].$ench || {};
+			Object.keys(e).forEach(function (id) { vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [JVM.box(vm, +id, 'I'), JVM.box(vm, e[id] | 0, 'I')]); });
+			return m;
+		},
+		'setEnchantments(Ljava/util/Map;Lnet/minecraft/src/ItemStack;)V': function (vm, n, a) {
+			if (!a[1]) return;
+			var o = {};
+			JVM.iterate(vm, vm.callVirtual(a[0], 'keySet', '()Ljava/util/Set;', [])).forEach(function (k) {
+				var v = vm.callVirtual(a[0], 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', [k]);
+				o[JVM.unbox ? JVM.unbox(k) : k.$box] = JVM.unbox ? JVM.unbox(v) : v.$box;
+			});
+			a[1].$ench = o;
+		},
+		'getMaxEnchantmentLevel(I[Lnet/minecraft/src/ItemStack;)I': function (vm, n, a) { return a[1] ? maxOf(a[0], Array.prototype.slice.call(a[1].a)) : 0; },
+		'getEfficiencyModifier(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return lvl(held(vm, a[0]), 32); },
+		'getKnockbackModifier(Lnet/minecraft/src/EntityLiving;Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return lvl(held(vm, a[0]), 19); },
+		'getFireAspectModifier(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return lvl(held(vm, a[0]), 20); },
+		'getLootingModifier(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return lvl(held(vm, a[0]), 21); },
+		'getSilkTouchModifier(Lnet/minecraft/src/EntityLiving;)Z': function (vm, n, a) { return lvl(held(vm, a[0]), 33) > 0 ? 1 : 0; },
+		'getFortuneModifier(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return lvl(held(vm, a[0]), 35); },
+		'getRespiration(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return maxOf(5, armor(vm, a[0])); },
+		'getAquaAffinityModifier(Lnet/minecraft/src/EntityLiving;)Z': function (vm, n, a) { return maxOf(6, armor(vm, a[0])) > 0 ? 1 : 0; },
 	} });
 	var IS = vm.natives[SRC + 'ItemStack'];
 	if (IS) IS.methods = Object.assign({}, IS.methods, {
 		'addEnchantment(Lnet/minecraft/src/Enchantment;I)V': function (vm, self, a) { if (a[0]) (self.$ench = self.$ench || {})[a[0][':effectId']] = a[1] | 0; },
+		'copy()Lnet/minecraft/src/ItemStack;': (function (prev) { return function (vm, self) { var c = prev ? prev(vm, self) : JVM.mc152.newStack(vm, self[':itemID'], self[':stackSize'], self[':itemDamage']); if (self.$ench) c.$ench = Object.assign({}, self.$ench); return c; }; })(IS && IS.methods['copy()Lnet/minecraft/src/ItemStack;']),
 		'isItemEnchanted()Z': function (vm, self) { return self.$ench && Object.keys(self.$ench).length ? 1 : 0; },
 		'isItemEnchantable()Z': function () { return 1; },
 	});

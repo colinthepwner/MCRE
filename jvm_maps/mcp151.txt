@@ -3511,6 +3511,7 @@ M	za	a	(Lwk;)Z	func_77557_a	canEnchantItem
 M	za	values	()[Lza;	values	values
 M	zb	a	(ILwm;)I	func_77506_a	getEnchantmentLevel
 M	zb	a	(I[Lwm;)I	func_77511_a	getMaxEnchantmentLevel
+M	zb	a	(Ljava/util/Map;Lwm;)V	func_82782_a	setEnchantments
 M	zb	a	(Lng;)I	func_90036_a	getFireAspectModifier
 M	zb	a	(Lwm;)Ljava/util/Map;	func_82781_a	getEnchantments
 M	zb	b	(Lng;)I	func_77501_a	getRespiration
