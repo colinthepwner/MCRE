@@ -3651,6 +3651,7 @@
                                 (j.transparent || j.see_through) ? 1 : 0, drop, count,
                                 shape, collide ? 1 : 0, j.gravity ? 1 : 0, friction.toFixed(2), j.flammable ? 1 : 0, j.scripted ? 1 : 0,
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : ''].join('\t'));
+                    if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     var st = states[b.mod + ':' + b.name], rot = String(j.rotate || '').toLowerCase();
                     var mref = j.model;
                     if (mref === undefined && st && st.j.variants && typeof st.j.variants === 'object') {
@@ -3682,7 +3683,13 @@
                     lines.push(['item', key, desc, cellOf('items', it.mod, itex || it.name, it.file),
                                 Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
+                    if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
                 });
+                function fuelLine(r, v, mod, file) {
+                    var t = v === true ? 300 : v === false ? 0 : Math.round(+v);
+                    if (!(t >= 0) || t > 1000000) { bad(mod, file, '"fuel" is a burn time in ticks (coal: 1600)'); return; }
+                    lines.push(['fuel', r, t].join('\t'));
+                }
                 function itemBehaviours(it, key) {
                     var TIERS = { wood: [0, 2, 59, 0], stone: [1, 4, 131, 1], iron: [2, 6, 250, 2], diamond: [3, 8, 1561, 3], gold: [0, 12, 32, 0] };
                     var TOOL_DAMAGE = { sword: 4, axe: 3, pickaxe: 2, shovel: 1, hoe: 1, shears: 1 };
@@ -4083,6 +4090,12 @@
                 });
                 recipes.forEach(function (r) {
                     var j = r.j, type = String(j.type || '').toLowerCase().replace('minecraft:', '').replace('crafting_', '');
+                    if (type === 'fuel') {
+                        if (j.item === undefined) { bad(r.mod, r.file, 'a fuel needs an "item"'); return; }
+                        var fr = ref(j.item, r.mod, r.file);
+                        if (fr) fuelLine(fr, j.burn_time !== undefined ? j.burn_time : j.fuel !== undefined ? j.fuel : true, r.mod, r.file);
+                        return;
+                    }
                     if (j.result === undefined) { bad(r.mod, r.file, 'a recipe needs a "result"'); return; }
                     var res = ref(j.result, r.mod, r.file);
                     var count = (j.result && typeof j.result === 'object' && j.result.count) || j.count || 1;
@@ -4114,7 +4127,7 @@
                         var inp = ref(j.input || j.ingredient, r.mod, r.file);
                         if (!inp) return;
                         lines.push(['smelt', inp, res, count].join('\t'));
-                    } else bad(r.mod, r.file, 'unknown recipe "type": "' + (j.type || '') + '" (shaped, shapeless or smelting)');
+                    } else bad(r.mod, r.file, 'unknown recipe "type": "' + (j.type || '') + '" (shaped, shapeless, smelting or fuel)');
                 });
                 var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4 };
                 Object.keys(mobs).forEach(function (key) {

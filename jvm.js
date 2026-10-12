@@ -4510,6 +4510,7 @@ function installMc152(vm) {
 			'<init>()V': function (vm, self) { reg(vm).mods.push(self); },
 			'getName()Ljava/lang/String;': function (vm, self) { return self.cls.name.substring(self.cls.name.lastIndexOf('/') + 1); },
 			'getPriorities()Ljava/lang/String;': function () { return ''; },
+			'addFuel(II)I': function () { return 0; },
 			'toString()Ljava/lang/String;': function (vm, self) { return vm.callVirtual(self, 'getName', '()Ljava/lang/String;', []) + ' ' + vm.callVirtual(self, 'getVersion', '()Ljava/lang/String;', []); },
 			'modsLoaded()V': function () {},
 			'onTickInGame(FLnet/minecraft/client/Minecraft;)Z': function () { return 1; },
@@ -5426,6 +5427,8 @@ JVM.collectContent = function (vm, modId) {
 		}
 		if (overrides(b, BLOCK_SCRIPTED)) out.scripted.blocks[id] = true;
 		if (overrides(b, BLOCK_SCRIPTED.slice(0, 3)) || b[':needsRandomTick'] || overrides(b, [BLOCK_SCRIPTED[7]])) json.scripted = true;
+		var bf = fuelOf(id, meta);
+		if (bf > 0) json.fuel = bf;
 		out.blocks[JVM.contentName(vm, id, meta)] = json;
 	}
 	Object.keys(r.items).forEach(function (idS) {
@@ -5445,8 +5448,24 @@ JVM.collectContent = function (vm, modId) {
 		if (it.$tool && it.$toolMat) json.tool = { type: it.$tool, level: it.$toolMat.$m[0], uses: it.$toolMat.$m[1], speed: it.$toolMat.$m[2], damage: it.$toolMat.$m[3] };
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED) || it.$scriptedUse) { json.scripted = true; out.scripted.items[id] = true; }
+		var itf = fuelOf(id, meta);
+		if (itf > 0) json.fuel = itf;
 		out.items[JVM.contentName(vm, id, meta)] = json;
 	}
+	function fuelOf(id, meta) {
+		var best = 0, st = null;
+		r.mods.forEach(function (m) { best = Math.max(best, safe(function () { return vm.callVirtual(m, 'addFuel', '(II)I', [id, meta]); }, 0) | 0); });
+		var hs = r.forge && r.forge.fuel || [];
+		if (hs.length) {
+			st = JVM.mc152.newStack(vm, id, 1, meta);
+			hs.forEach(function (h) { best = Math.max(best, safe(function () { return vm.callVirtual(h, 'getBurnTime', '(Lnet/minecraft/src/ItemStack;)I', [st]); }, 0) | 0); });
+		}
+		if (JVM.stationFuel && (r.stFuel || r.stFuelTags)) best = Math.max(best, JVM.stationFuel(vm, id) | 0);
+		return best;
+	}
+	if (JVM.stationVanillaFuels) JVM.stationVanillaFuels(vm, modId).forEach(function (f) {
+		out.recipes.push({ type: 'fuel', item: ref(f.id, 0), burn_time: f.ticks });
+	});
 	var stackRef = function (o) {
 		if (!o) return null;
 		if (typeof o === 'string') { var ore = JVM.forgeOre && JVM.forgeOre(vm, o); return ore ? stackRef(ore) : null; }
@@ -7946,7 +7965,8 @@ JVM.javaSettings = function (vm, modId) {
 	if (JVM.stationSettings) out = out.concat(JVM.stationSettings(vm, modId));
 	keysOf(vm).filter(function (k) { return k.mod === modId; }).forEach(function (k) {
 		var desc = String(k.kb[':keyDescription'] || 'key');
-		var label = reg(vm).lang[desc] || desc.replace(/^key[.]/, '');
+		var lang = reg(vm).lang;
+		var label = lang[desc] || lang[desc.replace(':', '.')] || desc.replace(/^key[.]/, '').replace(/^[^:]*:/, '').replace(/_/g, ' ');
 		out.push({ id: 'key|' + desc, type: 'key', name: pretty(label).slice(0, 48), description: '', group: 'Controls', default: JVM.lwjglKey(k.kb[':keyCode'] | 0) });
 	});
 	return out;
@@ -7997,7 +8017,16 @@ JVM.javaKey = function (vm, modId, settingId, down) {
 		k.kb[':pressed'] = down ? 1 : 0;
 		if (down) k.kb.$presses = (k.kb.$presses | 0) + 1;
 		JVM.run(vm, function () {
-			if (k.kind === 'ml') { if (down) vm.callVirtual(k.owner, 'keyboardEvent', '(Lnet/minecraft/src/KeyBinding;)V', [k.kb]); }
+			if (k.kind === 'st') {
+				var code = k.kb[':keyCode'] | 0;
+				(vm.mcKeys || (vm.mcKeys = {}))[code] = !!down;
+				vm.mcLastKey = code; vm.mcKeyState = down ? 1 : 0;
+				var env = vm.loadClass('net/modificationstation/stationapi/api/client/event/keyboard/KeyStateChangedEvent$Environment'); vm.initClass(env);
+				var ev = vm.newObject(vm.loadClass('net/modificationstation/stationapi/api/client/event/keyboard/KeyStateChangedEvent'));
+				ev[':environment'] = env.statics.IN_GAME;
+				JVM.station.fire(vm, ev, modId);
+				vm.mcKeyState = undefined;
+			} else if (k.kind === 'ml') { if (down) vm.callVirtual(k.owner, 'keyboardEvent', '(Lnet/minecraft/src/KeyBinding;)V', [k.kb]); }
 			else {
 				var tt = vm.loadClass('cpw/mods/fml/common/TickType'); vm.initClass(tt);
 				var set = vm.callStatic('java/util/EnumSet', 'of', '(Ljava/lang/Enum;)Ljava/util/EnumSet;', [tt.statics.CLIENT]);
@@ -8444,7 +8473,7 @@ function installGui(vm) {
 	vm.defineNative('org/lwjgl/input/Keyboard', { staticMethods: {
 		'isKeyDown(I)Z': function (vm, n, a) { return vm.mcKeys && vm.mcKeys[a[0]] ? 1 : 0; },
 		'getEventKey()I': function (vm) { return vm.mcLastKey | 0; },
-		'getEventKeyState()Z': function () { return 1; },
+		'getEventKeyState()Z': function (vm) { return vm.mcKeyState === 0 ? 0 : 1; },
 		'getKeyName(I)Ljava/lang/String;': function (vm, n, a) { return String(JVM.lwjglKey ? JVM.lwjglKey(a[0]) : a[0]).replace(/^Key|^Digit/, '').toUpperCase(); },
 		'enableRepeatEvents(Z)V': function () {},
 	} });
@@ -9783,6 +9812,15 @@ function installStation(vm) {
 	ev('event/world/gen/WorldGenEvent$ChunkDecoration', 'event/world/gen/WorldGenEvent', { fields: { biome: OBJ, x: 'I', z: 'I', random: OBJ } });
 	ev('event/worldgen/biome/BiomeModificationEvent', null, { fields: { world: OBJ, biome: OBJ } });
 	ev('event/achievement/AchievementRegisterEvent', null, { fields: { achievements: 'Ljava/util/List;' } });
+	ev('client/event/option/KeyBindingRegisterEvent', null, { fields: { keyBindings: 'Ljava/util/List;' }, methods: {
+		'register(Lnet/minecraft/src/KeyBinding;)V': function (vm, self, a) { vm.callVirtual(self[':keyBindings'], 'add', '(Ljava/lang/Object;)Z', [a[0]]); },
+	} });
+	ev('client/event/keyboard/KeyStateChangedEvent', null, { fields: { environment: 'L' + ST + 'client/event/keyboard/KeyStateChangedEvent$Environment;' } });
+	def(ST + 'client/event/keyboard/KeyStateChangedEvent$Environment', { super: 'java/lang/Enum', statics: { IN_GUI: null, IN_GAME: null }, clinit: function (vm, c) {
+		c.$values = ['IN_GUI', 'IN_GAME'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+	}, staticMethods: {
+		'values()[Lnet/modificationstation/stationapi/api/client/event/keyboard/KeyStateChangedEvent$Environment;': function (vm, n) { var c = vm.loadClass(ST + 'client/event/keyboard/KeyStateChangedEvent$Environment'); vm.initClass(c); return JVM.javaArray(vm, 'L' + c.name + ';', c.$values.slice()); },
+	} });
 	ev('client/event/render/entity/EntityRendererRegisterEvent', null, { fields: { renderers: 'Ljava/util/Map;' } });
 	var MB = vm.natives[SRC + 'BiomeGenBase'];
 	var spawnAdd = function (type) { return function (vm, self, a) {
@@ -10222,10 +10260,11 @@ function installStation(vm) {
 		'getCode()C': function (vm, self) { return self.$code.charCodeAt(0); },
 		'getName()Ljava/lang/String;': function (vm, self) { return self.$name.toLowerCase(); },
 	} });
-	var fuel = function (vm) { vm.warnOnce('feature:fuel', 'StationAPI FuelRegistry: fuel items are not available here'); };
+	var fuelItem = function (vm, n, a) { var r = reg(vm); (r.stFuel || (r.stFuel = new Map())).set(a[0], a[1] | 0); };
+	var fuelTag = function (vm, n, a) { var r = reg(vm); if (a[0]) (r.stFuelTags || (r.stFuelTags = [])).push({ tag: a[0], ticks: a[1] | 0, mod: vm.currentMod }); };
 	def(ST + 'recipe/FuelRegistry', { staticMethods: {
-		'addFuelItem(Lnet/minecraft/src/Item;I)V': fuel, 'addFuelItem(Lnet/minecraft/src/Item;II)V': fuel,
-		'addFuelTag(Lnet/modificationstation/stationapi/api/tag/TagKey;I)V': fuel,
+		'addFuelItem(Lnet/minecraft/src/Item;I)V': fuelItem, 'addFuelItem(Lnet/minecraft/src/Item;II)V': fuelItem,
+		'addFuelTag(Lnet/modificationstation/stationapi/api/tag/TagKey;I)V': fuelTag,
 		'getFuelTime(Lnet/minecraft/src/ItemStack;)I': function () { return 0; },
 	} });
 	var ctxMethods = {
@@ -10310,6 +10349,24 @@ function tagStack(vm, x) {
 	vm.warnOnce('st:tag:' + x.$s, 'recipe tag #' + x.$s + ' has nothing in it here');
 	return null;
 }
+JVM.stationFuel = function (vm, id) {
+	var r = reg(vm), best = 0, io = r.items[id];
+	if (r.stFuel && io && r.stFuel.has(io)) best = r.stFuel.get(io);
+	(r.stFuelTags || []).forEach(function (f) { if (f.ticks > best && inTag(vm, f.tag, id)) best = f.ticks; });
+	return best;
+};
+JVM.stationVanillaFuels = function (vm, modId) {
+	var out = [];
+	(reg(vm).stFuelTags || []).forEach(function (f) {
+		if (f.mod !== modId) return;
+		tagValues(vm, f.tag.$s).forEach(function (v) {
+			if (String(v).indexOf(':') >= 0 && String(v).split(':')[0] !== 'minecraft') return;
+			var id = itemIdOf(vm, v);
+			if (id) out.push({ id: id, ticks: f.ticks });
+		});
+	});
+	return out;
+};
 function inTag(vm, tag, itemId) {
 	var vals = tag ? tagValues(vm, tag.$s) : [];
 	return vals.some(function (v) { return itemIdOf(vm, v) === itemId; });
@@ -10599,9 +10656,15 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 		fire(vm, newEvent(vm, E('client/event/color/block/BlockColorsRegisterEvent'), { blockColors: bcs }), modId);
 		fire(vm, newEvent(vm, E('client/event/color/item/ItemColorsRegisterEvent'), { itemColors: ics, blockColors: bcs }), modId);
 	});
+	JVM.run(vm, function () {
+		var kl = JVM.newList(vm, []);
+		fire(vm, newEvent(vm, E('client/event/option/KeyBindingRegisterEvent'), { keyBindings: kl }), modId);
+		var arr = vm.callVirtual(kl, 'toArray', '()[Ljava/lang/Object;', []).a, r = reg(vm);
+		Array.prototype.forEach.call(arr, function (kb) { if (kb) (r.keys || (r.keys = [])).push({ mod: modId, kind: 'st', owner: null, kb: kb }); });
+	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
+	var SENT = /(KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();

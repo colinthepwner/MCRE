@@ -130,6 +130,8 @@ lang/en_US.lang       Lines of key=value that replace the game&#x27;s text, e.g.
                         &quot;gravity&quot;     true: falls like sand
                         &quot;friction&quot;    0.6 normal, 0.98 like ice (&quot;slippery&quot;: true is ice)
                         &quot;flammable&quot;   true: catches fire and burns like wood
+                        &quot;fuel&quot;        burns in a furnace for that many ticks (20 a second:
+                                      coal 1600, a plank 300, a stick 100); true is a plank&#x27;s
                         &quot;scripted&quot;    true: using it does nothing else - your script&#x27;s &quot;use&quot;
                                       event decides (and it never places a block against it);
                                       its world.scheduleTick ticks reach the script too
@@ -163,6 +165,7 @@ items/&lt;name&gt;.json     A new item, &quot;&lt;mod id&gt;:&lt;name&gt;&quot;.
                                       384} - drawn and shot like a bow; the ammo can be an
                                       arrow or one of your throwable items
                         &quot;damage&quot;      what a hit with it does (a club...)
+                        &quot;fuel&quot;        furnace burn time in ticks, as for blocks
                         &quot;ore&quot;         makes it generate in new chunks, like the game&#x27;s ores:
                                       {&quot;vein_size&quot;: 8, &quot;veins_per_chunk&quot;: 8, &quot;min_y&quot;: 1,
                                        &quot;max_y&quot;: 64, &quot;dimension&quot;: &quot;overworld&quot;, &quot;replace&quot;:
@@ -179,6 +182,8 @@ recipes/&lt;name&gt;.json   {&quot;type&quot;: &quot;shaped&quot;, &quot;pattern
                        &quot;result&quot;: item, &quot;count&quot;: 1}
                       {&quot;type&quot;: &quot;shapeless&quot;, &quot;ingredients&quot;: [item, item], &quot;result&quot;: item}
                       {&quot;type&quot;: &quot;smelting&quot;, &quot;input&quot;: item, &quot;result&quot;: item}
+                      {&quot;type&quot;: &quot;fuel&quot;, &quot;item&quot;: item, &quot;burn_time&quot;: 400} - any item a furnace
+                      fuel, the game&#x27;s too (0: not a fuel any more)
                       An item is &quot;&lt;name&gt;&quot; (this mod&#x27;s), &quot;&lt;mod id&gt;:&lt;name&gt;&quot; (another mod&#x27;s) or
                       &quot;minecraft:&lt;name&gt;&quot; (the game&#x27;s, Java names like minecraft:iron_ingot;
                       add &quot;:&lt;number&gt;&quot; for a variant, e.g. minecraft:wool:14).
