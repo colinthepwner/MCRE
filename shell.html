@@ -1645,8 +1645,9 @@
                     case 'tile': {
                         var tk = (a[0] | 0) + ',' + (a[1] | 0) + ',' + (a[2] | 0), hit = tiles && tiles[tk];
                         if (hit) return { id: hit.id, data: hit.data };
-                        var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
-                        var tv = t ? javaOf(t[0], t[1]) : { id: 0, data: 0 };
+                        var tv;
+                        if (Module._mcJavaRunTile && typeof genJava === 'function') { var tr = genJava(Module._mcJavaRunTile(a[0] | 0, a[1] | 0, a[2] | 0)); tv = { id: tr.id, data: tr.data }; }
+                        else { var t = mp(['tile', a[0] | 0, a[1] | 0, a[2] | 0].join('\t')); tv = t ? javaOf(t[0], t[1]) : { id: 0, data: 0 }; }
                         if (tiles) tiles[tk] = { id: tv.id, data: tv.data };
                         return tv;
                     }
@@ -1751,6 +1752,11 @@
                     case 'inmat': return mp(['inmat', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] === 'lava' ? 'lava' : 'water'].join('\t'));
                     case 'cubes': return mp(['cubes', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5]].join('\t'));
                     case 'setdriven': return mp(['setdriven', a[0] | 0, a[1] ? 1 : 0].join('\t'));
+                    case 'mobs': return mp(['mobs', +a[0] || 48].join('\t'));
+                    case 'mobtarget': return mp(['mobtarget', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'mobwalk': return mp(['mobwalk', a[0] | 0, +a[1], +a[2], +a[3]].join('\t'));
+                    case 'mobstop': return mp(['mobstop', a[0] | 0].join('\t'));
+                    case 'mobhealth': return mp(['sethealth', a[0] | 0, a[1] | 0].join('\t'));
                     case 'entpos': return mp(['setpos', a[0] | 0, +a[1], +a[2], +a[3]].join('\t'));
                     case 'accessories': {
                         var al = mp('accessories');
@@ -1786,7 +1792,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -2012,6 +2018,7 @@
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
                     if (JV.shotTick) JV.shotTick(vm);
+                    if (JV.mobTick) JV.mobTick(vm);
                     if (JV.accessoryTick) JV.accessoryTick(vm);
                     if (JV.guiTick) JV.guiTick(vm);
                     if (JV.tileTick) {
@@ -2032,6 +2039,8 @@
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
+                if (e.t === 'javahit') { if (JV.mobHit) JV.mobHit(vm, e); return; }
+                if (e.t === 'javadeath') { if (JV.mobDeath) JV.mobDeath(vm, e); return; }
                 if (e.t === 'accessory') { if (JV.accessoryChanged) JV.accessoryChanged(vm, e, javaOf); return; }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
@@ -4756,7 +4765,7 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(mb.name)));
                     lines.push(['mob', key, desc, beh, num(j.health, 10, 1, 1000), num(j.speed, 0.25, 0, 2), num(j.damage, 2, 0, 100),
                                 num(size[0], 0.9, 0.1, 8), num(size[1], 0.9, 0.1, 8), texPath, model.tw, model.th, num(j.scale, 1, 0.1, 8),
-                                (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0), drops,
+                                (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0) | (j.java_hit ? 8 : 0) | (j.java_drops ? 16 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
                                 egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : ''].join('\t'));
                     var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8 };

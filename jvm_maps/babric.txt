@@ -732,6 +732,7 @@ F	net/minecraft/class_49	field_178	field_178	blockType
 F	net/minecraft/class_18	field_198	field_198	loadedEntityList
 F	net/minecraft/class_18	field_200	field_200	playerEntities
 F	net/minecraft/class_18	field_211	field_211	editingBlocks
+F	net/minecraft/class_18	field_213	field_213	difficultySetting
 F	net/minecraft/class_18	field_214	field_214	rand
 F	net/minecraft/class_18	field_216	field_216	worldProvider
 F	net/minecraft/class_18	field_218	field_218	chunkProvider
@@ -1025,10 +1026,12 @@ F	net/minecraft/class_15	field_1000	field_1000	cactus
 F	net/minecraft/class_15	field_1001	field_1001	clay
 F	net/minecraft/class_15	field_1002	field_1002	pumpkin
 F	net/minecraft/class_15	field_1003	field_1003	portal
+F	net/minecraft/class_127	field_1012	field_1012	renderYawOffset
 F	net/minecraft/class_127	field_1019	field_1019	texture
 F	net/minecraft/class_127	field_1029	field_1029	moveForward
 F	net/minecraft/class_127	field_1033	field_1033	moveSpeed
 F	net/minecraft/class_127	field_1036	field_1036	health
+F	net/minecraft/class_127	field_1038	field_1038	hurtTime
 F	net/minecraft/class_127	field_1059	field_1059	entityAge
 F	net/minecraft/class_135	field_1066	field_1066	shake
 F	net/minecraft/class_135	field_1067	field_1067	angler
@@ -1143,6 +1146,7 @@ F	net/minecraft/class_322	field_1474	field_1474	keyBindDrop
 F	net/minecraft/class_322	field_1475	field_1475	keyBindChat
 F	net/minecraft/class_322	field_1477	field_1477	keyBindSneak
 F	net/minecraft/class_322	field_1478	field_1478	keyBindings
+F	net/minecraft/class_322	field_1480	field_1480	difficulty
 F	net/minecraft/class_63	field_1482	field_1482	x
 F	net/minecraft/class_63	field_1483	field_1483	y
 F	net/minecraft/class_63	field_1484	field_1484	z
@@ -1711,6 +1715,8 @@ M	net/minecraft/class_58	method_547	()Z	method_547	isDirty
 M	net/minecraft/class_58	method_548	(Lnet/minecraft/class_8;)V	method_548	writeToNBT
 M	net/minecraft/class_188	method_633	()Z	method_633	hasPath
 M	net/minecraft/class_188	method_636	(Lnet/minecraft/class_57;)V	method_636	setTarget
+M	net/minecraft/class_188	method_637	(Lnet/minecraft/class_57;F)V	method_637	attackEntity
+M	net/minecraft/class_188	method_638	()Lnet/minecraft/class_57;	method_638	findPlayerToAttack
 M	net/minecraft/class_189	method_642	(D)F	method_642	sqrt_double
 M	net/minecraft/class_189	method_643	(DD)D	method_643	abs_max
 M	net/minecraft/class_189	method_644	(F)F	method_644	sin
@@ -1781,10 +1787,15 @@ M	net/minecraft/class_127	method_912	()Ljava/lang/String;	method_912	getHurtSoun
 M	net/minecraft/class_127	method_913	()Ljava/lang/String;	method_913	getDeathSound
 M	net/minecraft/class_127	method_914	()I	method_914	getDropItemId
 M	net/minecraft/class_127	method_915	()F	method_915	getSoundVolume
+M	net/minecraft/class_127	method_924	(Lnet/minecraft/class_57;FF)V	method_924	faceEntity
+M	net/minecraft/class_127	method_928	(Lnet/minecraft/class_57;)Z	method_928	canEntityBeSeen
 M	net/minecraft/class_127	method_936	()I	method_936	getTalkInterval
+M	net/minecraft/class_127	method_937	()V	method_937	onLivingUpdate
 M	net/minecraft/class_127	method_939	(I)V	method_939	heal
 M	net/minecraft/class_127	method_940	()Z	method_940	canDespawn
+M	net/minecraft/class_127	method_942	()Z	method_942	isMovementBlocked
 M	net/minecraft/class_127	method_943	()Z	method_943	isPlayerSleeping
+M	net/minecraft/class_127	method_945	(FF)V	method_945	moveEntityWithHeading
 M	net/minecraft/class_134	method_947	()V	method_947	onInventoryChanged
 M	net/minecraft/class_134	method_948	()I	method_948	getSizeInventory
 M	net/minecraft/class_134	method_949	(II)Lnet/minecraft/class_31;	method_949	decrStackSize
@@ -1865,15 +1876,21 @@ M	net/minecraft/class_26	method_1293	(DDD)Lnet/minecraft/class_26;	method_1293	c
 M	net/minecraft/class_26	method_1297	(DDD)Lnet/minecraft/class_26;	method_1297	createVector
 M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
 M	net/minecraft/class_26	method_1301	(DDD)Lnet/minecraft/class_26;	method_1301	addVector
+M	net/minecraft/class_26	method_1306	(F)V	method_1306	rotateAroundX
+M	net/minecraft/class_26	method_1308	(F)V	method_1308	rotateAroundY
 M	net/minecraft/class_57	method_1310	()V	method_1310	entityInit
+M	net/minecraft/class_57	method_1317	()V	method_1317	onEntityUpdate
 M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
 M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
 M	net/minecraft/class_57	method_1322	(DDD)V	method_1322	addVelocity
 M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
+M	net/minecraft/class_57	method_1325	(IIF)Lnet/minecraft/class_142;	method_1325	dropItemWithOffset
+M	net/minecraft/class_57	method_1327	(Lnet/minecraft/class_31;F)Lnet/minecraft/class_142;	method_1327	entityDropItem
 M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
 M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet
 M	net/minecraft/class_57	method_1334	()Z	method_1334	isInWater
 M	net/minecraft/class_57	method_1335	()Z	method_1335	handleLavaMovement
+M	net/minecraft/class_57	method_1339	(II)Lnet/minecraft/class_142;	method_1339	dropItem
 M	net/minecraft/class_57	method_1340	(DDD)V	method_1340	setPosition
 M	net/minecraft/class_57	method_1341	(DDDFF)V	method_1341	setLocationAndAngles
 M	net/minecraft/class_57	method_1342	(FF)V	method_1342	setRotation

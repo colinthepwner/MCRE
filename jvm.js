@@ -5857,6 +5857,7 @@ function installMc152(vm) {
 	if (JVM.installLiving16) JVM.installLiving16(vm);
 	if (JVM.installContact) JVM.installContact(vm);
 	if (JVM.installProjectiles) JVM.installProjectiles(vm);
+	if (JVM.installBrain) JVM.installBrain(vm);
 	if (JVM.installParticles) JVM.installParticles(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 	if (JVM.installForgeDims) JVM.installForgeDims(vm);
@@ -11045,6 +11046,8 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			if (ad != null) json.damage = Math.round(ad);
 		}
 		if (ent[':isImmuneToFire']) json.fire_immune = true;
+		if (own('attackEntityAsMob(Lnet/minecraft/src/Entity;)Z') && (behaviour === 'hostile' || behaviour === 'neutral')) json.java_hit = true;
+		if (own('dropFewItems(ZI)V') || own('dropRareDrop(I)V')) json.java_drops = true;
 		if (has('EntityZombie') || has('EntitySkeleton')) json.burns_in_daylight = true;
 		var snd = {
 			ambient: own('getLivingSound()Ljava/lang/String;') || !stats ? str('getLivingSound') : stats[4],
@@ -11624,6 +11627,389 @@ JVM.shotTick = function (vm) {
 };
 JVM.installProjectiles = install;
 JVM.entityFor = entityFor;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var E = 'Lnet/minecraft/src/Entity;';
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function idOf(o) {
+	if (!o) return 0;
+	if (o.$info && o.$info.id != null) return o.$info.id | 0;
+	if (o.$entityId != null) return o.$entityId | 0;
+	return o[':entityId'] | 0;
+}
+
+function install(vm) {
+	var spec = function (n) { return vm.natives[SRC + n]; };
+	var add = function (n, methods) { var s = spec(n); if (s) s.methods = Object.assign({}, s.methods || {}, methods); };
+	var brainOn = function (vm, self) { return !!(vm.$brainTick && self.$brain); };
+
+	var onUpdate = function (vm, self) { if (brainOn(vm, self)) vm.callVirtual(self, 'onLivingUpdate', '()V', []); };
+	var onLiving = function (vm, self) {
+		if (!brainOn(vm, self)) return;
+		var ai = 0;
+		try { ai = vm.callVirtual(self, 'isAIEnabled', '()Z', []); } catch (e) { ai = 0; }
+		if (ai || (self[':tasks'] && self[':tasks'].$list && self[':tasks'].$list.length)) vm.callVirtual(self, 'updateAITasks', '()V', []);
+		if (!ai) vm.callVirtual(self, 'updateEntityActionState', '()V', []);
+	};
+	var actionState = function (vm, self) {
+		if (!brainOn(vm, self)) return;
+		var t = self[':entityToAttack'] || self[':attackTarget'];
+		if (!t || t[':isDead']) {
+			t = vm.callVirtual(self, 'findPlayerToAttack', '()' + E, []);
+			if (t) self[':entityToAttack'] = t;
+		}
+		if (t && !t[':isDead']) {
+			var dx = t[':posX'] - self[':posX'], dy = t[':posY'] - self[':posY'], dz = t[':posZ'] - self[':posZ'];
+			vm.callVirtual(self, 'attackEntity', '(' + E + 'F)V', [t, Math.fround(Math.sqrt(dx * dx + dy * dy + dz * dz))]);
+		}
+	};
+	var runTasks = function (vm, list) {
+		(list || []).forEach(function (t) {
+			if (!t || !t.cls || t.cls.native || t.$brainOff) return;
+			try {
+				if (!t.$running) {
+					if (vm.callVirtual(t, 'shouldExecute', '()Z', [])) { t.$running = true; vm.callVirtual(t, 'startExecuting', '()V', []); }
+				} else if (vm.callVirtual(t, 'continueExecuting', '()Z', [])) vm.callVirtual(t, 'updateTask', '()V', []);
+				else { t.$running = false; vm.callVirtual(t, 'resetTask', '()V', []); }
+			} catch (e) {
+				t.$brainErr = (t.$brainErr | 0) + 1;
+				if (t.$brainErr > 3) t.$brainOff = true;
+				throw e;
+			}
+		});
+	};
+	var aiTasks = function (vm, self) {
+		if (!brainOn(vm, self)) return;
+		runTasks(vm, self[':targetTasks'] && self[':targetTasks'].$list);
+		runTasks(vm, self[':tasks'] && self[':tasks'].$list);
+	};
+	var getTarget = function (vm, self) { return self[':attackTarget'] || self[':entityToAttack'] || null; };
+	var setTarget = function (vm, self, a) { self[':attackTarget'] = a[0] || null; self[':entityToAttack'] = a[0] || null; };
+	var face = function (vm, self, a) {
+		var t = a[0];
+		if (!t) return;
+		var dx = t[':posX'] - self[':posX'], dz = t[':posZ'] - self[':posZ'];
+		var ty = t[':posY'] + (t.$info ? 1.62 - (+t[':yOffset'] || 0) : (+t[':height'] || 1.8) * 0.85);
+		var dy = ty - (self[':posY'] + (+self[':height'] || 1.8) * 0.85);
+		self[':rotationYaw'] = Math.atan2(dz, dx) * 180 / Math.PI - 90;
+		self[':rotationPitch'] = -(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)) * 180 / Math.PI);
+	};
+	var canSee = function (vm, self, a) {
+		var t = a[0];
+		if (!t) return 0;
+		var ey = self[':posY'] + (+self[':height'] || 1.8) * 0.85;
+		var ty = t[':posY'] + (t.$info ? 1.62 - (+t[':yOffset'] || 0) : (+t[':height'] || 1.8) * 0.85);
+		var hit = op(vm, 'raytrace', self[':posX'], ey, self[':posZ'], t[':posX'], ty, t[':posZ'], 0);
+		return hit ? 0 : 1;
+	};
+	var living = {
+		'onUpdate()V': onUpdate,
+		'onLivingUpdate()V': onLiving,
+		'updateAITasks()V': aiTasks,
+		'updateEntityActionState()V': actionState,
+		'findPlayerToAttack()Lnet/minecraft/src/Entity;': function (vm, self) {
+			var w = self[':worldObj'];
+			return w ? vm.callVirtual(w, 'getClosestVulnerablePlayerToEntity', '(' + E + 'D)Lnet/minecraft/src/EntityPlayer;', [self, 16]) : null;
+		},
+		'attackEntity(Lnet/minecraft/src/Entity;F)V': function () {},
+		'getAttackTarget()Lnet/minecraft/src/EntityLiving;': getTarget,
+		'getAttackTarget()Lnet/minecraft/src/EntityLivingBase;': getTarget,
+		'setAttackTarget(Lnet/minecraft/src/EntityLiving;)V': setTarget,
+		'setAttackTarget(Lnet/minecraft/src/EntityLivingBase;)V': setTarget,
+		'faceEntity(Lnet/minecraft/src/Entity;FF)V': face,
+		'canEntityBeSeen(Lnet/minecraft/src/Entity;)Z': canSee,
+	};
+	['EntityLivingBase', 'EntityLiving', 'EntityCreature'].forEach(function (n) { add(n, living); });
+	var defaultHit = function (vm, self, a) {
+		var t = a[0];
+		if (!t) return 0;
+		var dmg = null;
+		try { if (JVM.attrValue) dmg = JVM.attrValue(self, 'generic.attackDamage'); } catch (e) { dmg = null; }
+		if (dmg == null) { try { dmg = vm.callVirtual(self, 'getAttackStrength', '(' + E + ')I', [t]); } catch (e2) { dmg = null; } }
+		if (dmg == null) dmg = self[':attackStrength'] != null ? self[':attackStrength'] : 2;
+		var DS = SRC + 'DamageSource';
+		var src = null;
+		try { src = vm.callStatic(DS, 'causeMobDamage', '(Lnet/minecraft/src/EntityLiving;)L' + DS + ';', [self]); } catch (e3) { src = null; }
+		if (!src) return 0;
+		var hit = 0;
+		try { hit = vm.callVirtual(t, 'attackEntityFrom', '(L' + DS + ';F)Z', [src, Math.fround(+dmg)]); }
+		catch (e4) { hit = vm.callVirtual(t, 'attackEntityFrom', '(L' + DS + ';I)Z', [src, dmg | 0]); }
+		return hit ? 1 : 0;
+	};
+	['EntityLivingBase', 'EntityLiving', 'EntityMob'].forEach(function (n) { add(n, {
+		'attackEntityAsMob(Lnet/minecraft/src/Entity;)Z': defaultHit,
+		'getAttackStrength(Lnet/minecraft/src/Entity;)I': function (vm, self) { return self[':attackStrength'] != null ? self[':attackStrength'] | 0 : 2; },
+	}); });
+	var drop = function (vm, self, id, n, data, up) {
+		if (!id || n <= 0) return null;
+		var st = JVM.mc152.newStack(vm, id, n, data | 0);
+		var ei = vm.newObject(vm.loadClass(SRC + 'EntityItem'));
+		vm.callVirtual(ei, '<init>', '(Lnet/minecraft/src/World;DDDLnet/minecraft/src/ItemStack;)V', [self[':worldObj'], self[':posX'], self[':posY'] + (up || 0), self[':posZ'], st]);
+		ei[':delayBeforeCanPickup'] = 10;
+		vm.callVirtual(self[':worldObj'], 'spawnEntityInWorld', '(' + E + ')Z', [ei]);
+		return ei;
+	};
+	add('Entity', {
+		'dropItem(II)Lnet/minecraft/src/EntityItem;': function (vm, self, a) { return drop(vm, self, a[0], a[1], 0, 0); },
+		'dropItemWithOffset(IIF)Lnet/minecraft/src/EntityItem;': function (vm, self, a) { return drop(vm, self, a[0], a[1], 0, a[2]); },
+		'entityDropItem(Lnet/minecraft/src/ItemStack;F)Lnet/minecraft/src/EntityItem;': function (vm, self, a) {
+			var st = a[0];
+			return st ? drop(vm, self, st[':itemID'], st[':stackSize'], st[':itemDamage'], a[1]) : null;
+		},
+	});
+	add('EntityLiving', {
+		'dropFewItems(ZI)V': function (vm, self, a) {
+			var id = vm.callVirtual(self, 'getDropItemId', '()I', []);
+			if (id > 0) { var n = Math.floor(Math.random() * (3 + (a[1] | 0))); if (n) drop(vm, self, id, n, 0, 0); }
+		},
+		'dropRareDrop(I)V': function () {},
+		'dropEquipment(ZI)V': function () {},
+	});
+	var vec = function (vm, x, y, z) { var v = vm.newObject(vm.loadClass(SRC + 'Vec3')); v[':xCoord'] = x; v[':yCoord'] = y; v[':zCoord'] = z; return v; };
+	var look = function (vm, self) {
+		var r = Math.PI / 180, yaw = +self[':rotationYaw'] || 0, pitch = +self[':rotationPitch'] || 0;
+		var f1 = Math.cos(-yaw * r - Math.PI), f2 = Math.sin(-yaw * r - Math.PI), f3 = -Math.cos(-pitch * r), f4 = Math.sin(-pitch * r);
+		return vec(vm, f2 * f3, f4, f1 * f3);
+	};
+	var looks = {
+		'getLookVec()Lnet/minecraft/src/Vec3;': function (vm, self) { return look(vm, self); },
+		'getLook(F)Lnet/minecraft/src/Vec3;': function (vm, self) { return look(vm, self); },
+		'getPosition(F)Lnet/minecraft/src/Vec3;': function (vm, self) { return vec(vm, +self[':posX'], +self[':posY'], +self[':posZ']); },
+	};
+	['Entity', 'EntityLivingBase', 'EntityLiving'].forEach(function (n) { add(n, looks); });
+	var W = spec('World');
+	add('EntityLivingBase', {
+		'isMovementBlocked()Z': function (vm, self) { return +self[':health'] <= 0 ? 1 : 0; },
+		'func_70610_aX()Z': function (vm, self) { return +self[':health'] <= 0 ? 1 : 0; },
+		'isClientWorld()Z': function () { return 1; }, 'func_70613_aW()Z': function () { return 1; },
+		'moveEntityWithHeading(FF)V': function () {}, 'func_70612_e(FF)V': function () {},
+		'onEntityUpdate()V': function () {}, 'func_70030_z()V': function () {},
+		'despawnEntity()V': function () {}, 'func_70623_bb()V': function () {},
+	});
+	add('EntityCreature', { 'func_110174_bM()F': function (vm, self) { return self[':maximumHomeDistance'] != null ? +self[':maximumHomeDistance'] : -1; } });
+	var rot = function (axis) {
+		return function (vm, self, a) {
+			var c = Math.cos(a[0]), s = Math.sin(a[0]), x = self[':xCoord'], y = self[':yCoord'], z = self[':zCoord'];
+			if (axis === 'x') { self[':yCoord'] = y * c + z * s; self[':zCoord'] = z * c - y * s; }
+			else if (axis === 'y') { self[':xCoord'] = x * c + z * s; self[':zCoord'] = z * c - x * s; }
+			else { self[':xCoord'] = x * c + y * s; self[':yCoord'] = y * c - x * s; }
+		};
+	};
+	add('Vec3', {
+		'rotateAroundX(F)V': rot('x'), 'rotateAroundY(F)V': rot('y'), 'rotateAroundZ(F)V': rot('z'),
+		'func_72440_a(F)V': rot('x'), 'func_72442_b(F)V': rot('y'), 'func_72446_c(F)V': rot('z'),
+	});
+	if (W) {
+		W.methods['findNearestEntityWithinAABB(Ljava/lang/Class;Lnet/minecraft/src/AxisAlignedBB;' + E + ')' + E] = function (vm, self, a) {
+			var l = vm.callVirtual(self, 'getEntitiesWithinAABB', '(Ljava/lang/Class;Lnet/minecraft/src/AxisAlignedBB;)Ljava/util/List;', [a[0], a[1]]);
+			var arr = l ? Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a) : [];
+			var me = a[2], best = null, bd = Infinity;
+			arr.forEach(function (o) {
+				if (o === me) return;
+				var dx = o[':posX'] - me[':posX'], dy = o[':posY'] - me[':posY'], dz = o[':posZ'] - me[':posZ'], d = dx * dx + dy * dy + dz * dz;
+				if (d < bd) { bd = d; best = o; }
+			});
+			return best;
+		};
+		W.methods['getEntityPathToXYZ(' + E + 'IIIFZZZZ)Lnet/minecraft/src/PathEntity;'] = function () { return null; };
+		W.methods['func_72844_a(' + E + 'IIIFZZZZ)Lnet/minecraft/src/PathEntity;'] = function () { return null; };
+	}
+	if (!vm.natives[SRC + 'EntityDragonPart']) vm.defineNative(SRC + 'EntityDragonPart', { super: SRC + 'Entity', fields: { entityDragonObj: 'L' + SRC + 'IEntityMultiPart;', name: 'Ljava/lang/String;' }, methods: {
+		'<init>(Lnet/minecraft/src/IEntityMultiPart;Ljava/lang/String;FF)V': function (vm, self, a) { self[':entityDragonObj'] = a[0]; self[':name'] = a[1]; self[':width'] = a[2]; self[':height'] = a[3]; if (JVM.mc152.entityInit) JVM.mc152.entityInit(vm, self); },
+		'onUpdate()V': function () {},
+		'canBeCollidedWith()Z': function () { return 1; },
+		'attackEntityFrom(Lnet/minecraft/src/DamageSource;F)Z': function (vm, self, a) {
+			var d = self[':entityDragonObj'];
+			return d ? vm.callVirtual(d, 'attackEntityFromPart', '(Lnet/minecraft/src/EntityDragonPart;Lnet/minecraft/src/DamageSource;F)Z', [self, a[0], a[1]]) : 0;
+		},
+		'isEntityEqual(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) { return self === a[0] || self[':entityDragonObj'] === a[0] ? 1 : 0; },
+	} });
+	if (!vm.natives[SRC + 'IEntityMultiPart']) vm.defineNative(SRC + 'IEntityMultiPart', { access: JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT });
+	var rpos = function (vm, e, h, v, toward, away) {
+		var x = +e[':posX'], y = +e[':posY'], z = +e[':posZ'];
+		for (var i = 0; i < 10; i++) {
+			var dx = Math.floor(Math.random() * (2 * h + 1)) - h, dy = Math.floor(Math.random() * (2 * v + 1)) - v, dz = Math.floor(Math.random() * (2 * h + 1)) - h;
+			if (toward && dx * (toward[':xCoord'] - x) + dz * (toward[':zCoord'] - z) < 0) continue;
+			if (away && dx * (away[':xCoord'] - x) + dz * (away[':zCoord'] - z) > 0) continue;
+			return vec(vm, Math.floor(x) + dx, Math.floor(y) + dy, Math.floor(z) + dz);
+		}
+		return null;
+	};
+	if (!vm.natives[SRC + 'RandomPositionGenerator']) vm.defineNative(SRC + 'RandomPositionGenerator', { staticMethods: {
+		'findRandomTarget(Lnet/minecraft/src/EntityCreature;II)Lnet/minecraft/src/Vec3;': function (vm, n, a) { return rpos(vm, a[0], a[1], a[2], null, null); },
+		'findRandomTargetBlockTowards(Lnet/minecraft/src/EntityCreature;IILnet/minecraft/src/Vec3;)Lnet/minecraft/src/Vec3;': function (vm, n, a) { return rpos(vm, a[0], a[1], a[2], a[3], null); },
+		'findRandomTargetBlockAwayFrom(Lnet/minecraft/src/EntityCreature;IILnet/minecraft/src/Vec3;)Lnet/minecraft/src/Vec3;': function (vm, n, a) { return rpos(vm, a[0], a[1], a[2], null, a[3]); },
+	} });
+	add('EntityLookHelper', {
+		'setLookPositionWithEntity(Lnet/minecraft/src/Entity;FF)V': function (vm, self, a) { var o = owner(self); if (o && a[0]) face(vm, o, [a[0]]); },
+		'setLookPosition(DDDFF)V': function () {},
+	});
+	var home = function (vm, self) {
+		var h = self[':homePosition'];
+		if (!h) { h = vm.newObject(vm.loadClass(SRC + 'ChunkCoordinates')); h[':posX'] = 0; h[':posY'] = 0; h[':posZ'] = 0; self[':homePosition'] = h; }
+		if (self[':maximumHomeDistance'] == null) self[':maximumHomeDistance'] = -1;
+		return h;
+	};
+	var within = function (vm, self, x, y, z) {
+		var h = home(vm, self), m = +self[':maximumHomeDistance'];
+		if (m === -1) return 1;
+		var dx = h[':posX'] - x, dy = h[':posY'] - y, dz = h[':posZ'] - z;
+		return dx * dx + dy * dy + dz * dz < m * m ? 1 : 0;
+	};
+	add('EntityCreature', {
+		'getHomePosition()Lnet/minecraft/src/ChunkCoordinates;': home,
+		'setHomeArea(IIII)V': function (vm, self, a) { var h = home(vm, self); h[':posX'] = a[0]; h[':posY'] = a[1]; h[':posZ'] = a[2]; self[':maximumHomeDistance'] = a[3]; },
+		'hasHome()Z': function (vm, self) { home(vm, self); return +self[':maximumHomeDistance'] !== -1 ? 1 : 0; },
+		'detachHome()V': function (vm, self) { self[':maximumHomeDistance'] = -1; },
+		'getMaximumHomeDistance()F': function (vm, self) { home(vm, self); return +self[':maximumHomeDistance']; },
+		'isWithinHomeDistance(III)Z': function (vm, self, a) { return within(vm, self, a[0], a[1], a[2]); },
+		'isWithinHomeDistanceCurrentPosition()Z': function (vm, self) { return within(vm, self, Math.floor(self[':posX']), Math.floor(self[':posY']), Math.floor(self[':posZ'])); },
+		'getEntityToAttack()Lnet/minecraft/src/Entity;': getTarget,
+		'setTarget(Lnet/minecraft/src/Entity;)V': function (vm, self, a) { setTarget(vm, self, a); },
+		'hasPath()Z': function (vm, self) { return self.$brainInfo && self.$brainInfo.pathing ? 1 : 0; },
+	});
+	if (W && !W.methods['getClosestVulnerablePlayerToEntity(' + E + 'D)Lnet/minecraft/src/EntityPlayer;']) {
+		var closest = function (vm, self, a) {
+			var p = JVM.mc152.playerObj(vm, null), e = a[0];
+			if (!p || !e) return null;
+			var dx = p[':posX'] - e[':posX'], dy = p[':posY'] - e[':posY'], dz = p[':posZ'] - e[':posZ'];
+			return a[1] < 0 || dx * dx + dy * dy + dz * dz < a[1] * a[1] ? p : null;
+		};
+		W.methods['getClosestVulnerablePlayerToEntity(' + E + 'D)Lnet/minecraft/src/EntityPlayer;'] = closest;
+		if (!W.methods['getClosestPlayerToEntity(' + E + 'D)Lnet/minecraft/src/EntityPlayer;']) W.methods['getClosestPlayerToEntity(' + E + 'D)Lnet/minecraft/src/EntityPlayer;'] = closest;
+	}
+
+	var owner = function (h) { return h && h.$owner; };
+	var walk = function (vm, o, x, y, z) { var id = idOf(o); return id ? (op(vm, 'mobwalk', id, x, y, z) ? 1 : 0) : 0; };
+	add('PathNavigate', {
+		'tryMoveToXYZ(DDDD)Z': function (vm, self, a) { return walk(vm, owner(self), a[0], a[1], a[2]); },
+		'tryMoveToEntityLiving(Lnet/minecraft/src/Entity;D)Z': function (vm, self, a) { var t = a[0]; return t ? walk(vm, owner(self), t[':posX'], t[':posY'], t[':posZ']) : 0; },
+		'clearPathEntity()V': function (vm, self) { var o = owner(self); if (idOf(o)) op(vm, 'mobstop', idOf(o)); },
+		'noPath()Z': function (vm, self) { var o = owner(self); return o && o.$brainInfo && o.$brainInfo.pathing ? 0 : 1; },
+	});
+	add('EntityMoveHelper', {
+		'setMoveTo(DDDD)V': function (vm, self, a) { walk(vm, owner(self), a[0], a[1], a[2]); },
+		'isUpdating()Z': function (vm, self) { var o = owner(self); return o && o.$brainInfo && o.$brainInfo.pathing ? 1 : 0; },
+	});
+	add('EntityJumpHelper', {
+		'setJumping()V': function (vm, self) { var o = owner(self); if (o && o[':onGround']) o[':motionY'] = 0.42; },
+	});
+	['getNavigator()Lnet/minecraft/src/PathNavigate;', 'getMoveHelper()Lnet/minecraft/src/EntityMoveHelper;', 'getJumpHelper()Lnet/minecraft/src/EntityJumpHelper;', 'getLookHelper()Lnet/minecraft/src/EntityLookHelper;'].forEach(function (k) {
+		var EL = spec('EntityLiving'), prev = EL && EL.methods[k];
+		if (!prev) return;
+		EL.methods[k] = function (vm, self, a) { var h = prev(vm, self, a); if (h) h.$owner = self; return h; };
+	});
+}
+
+var ACTIVE = ['onUpdate()V', 'onLivingUpdate()V', 'updateEntityActionState()V', 'updateAITasks()V', 'attackEntity(Lnet/minecraft/src/Entity;F)V'];
+function brainOf(vm, o) {
+	var c = o.cls;
+	if (c.$brain === undefined) {
+		var own = ACTIVE.some(function (k) { var m = c.findMethod(k); return m && !m.cls.native; });
+		c.$brain = own;
+	}
+	if (c.$brain) return true;
+	var lists = [o[':tasks'] && o[':tasks'].$list, o[':targetTasks'] && o[':targetTasks'].$list];
+	return lists.some(function (l) { return (l || []).some(function (t) { return t && t.cls && !t.cls.native; }); });
+}
+
+JVM.mobTick = function (vm) {
+	if (!JVM.liveMob || !JVM.entityFor) return;
+	var B = vm.$brainState || (vm.$brainState = { tick: 0, seen: {} });
+	B.tick++;
+	var world = JVM.mc152.worldObj(vm);
+	if (B.tick % 100 === 1 || world[':difficultySetting'] == null) {
+		var wi = op(vm, 'world');
+		world[':difficultySetting'] = wi && wi.difficulty != null ? wi.difficulty | 0 : 2;
+	}
+	var list = op(vm, 'mobs', 48);
+	if (!Array.isArray(list) || !list.length) return;
+	var me = op(vm, 'player');
+	var live = vm.mcReg && vm.mcReg.mobs && vm.mcReg.mobs.live;
+	list.forEach(function (i) { B.seen[i.id] = B.tick; });
+	if (live && B.tick % 200 === 0) live.forEach(function (o, id) { if (B.tick - (B.seen[id] || 0) > 400) { live.delete(id); delete B.seen[id]; } });
+	var t0 = Date.now(), budgetMs = 6, n = list.length, start = (B.next | 0) % n, done = 0;
+	var order = list.slice(start).concat(list.slice(0, start));
+	order.forEach(function (info) {
+		if (done < 0) return;
+		if (Date.now() - t0 > budgetMs) { B.next = start + done; done = -1; return; }
+		done++;
+		if (me && (info.id + B.tick) % 2) {
+			var dx = info.x - me.x, dz = info.z - me.z;
+			if (dx * dx + dz * dz > 24 * 24) return;
+		}
+		var o = JVM.liveMob(vm, info);
+		if (!o || o.cls.$brainOff || !brainOf(vm, o)) return;
+		var avg = o.cls.$brainRuns > 4 ? o.cls.$brainMs / o.cls.$brainRuns : 0;
+		if (avg > 2) { var every = Math.min(10, Math.ceil(avg / 2)); if ((B.tick + info.id) % every) return; }
+		o.$brain = true; o.$brainInfo = info; o.$entityId = info.id; o[':entityId'] = info.id;
+		o[':prevPosX'] = o[':posX']; o[':prevPosY'] = o[':posY']; o[':prevPosZ'] = o[':posZ'];
+		o[':posX'] = +info.x; o[':posY'] = +info.y; o[':posZ'] = +info.z;
+		o[':motionX'] = +info.vx; o[':motionY'] = +info.vy; o[':motionZ'] = +info.vz;
+		o[':rotationYaw'] = +info.yaw; o[':rotationPitch'] = +info.pitch;
+		o[':rotationYawHead'] = +info.yaw; o[':renderYawOffset'] = +info.yaw;
+		o[':onGround'] = info.onGround ? 1 : 0; o[':inWater'] = info.inWater ? 1 : 0;
+		o[':ticksExisted'] = info.age | 0; o[':hurtTime'] = info.hurt | 0;
+		o[':health'] = +info.health; o[':isDead'] = 0;
+		o[':worldObj'] = JVM.mc152.worldObj(vm);
+		if (JVM.mc152.entityInit && !o[':boundingBox']) JVM.mc152.entityInit(vm, o);
+		var tgt = null;
+		if (info.target) {
+			var ti = me && info.target === me.id ? me : op(vm, 'ent', info.target);
+			if (ti) tgt = JVM.entityFor(vm, ti);
+		}
+		o[':attackTarget'] = tgt; o[':entityToAttack'] = tgt;
+		var before = { vx: o[':motionX'], vy: o[':motionY'], vz: o[':motionZ'], x: o[':posX'], y: o[':posY'], z: o[':posZ'], h: o[':health'], t: tgt };
+		vm.$brainTick = true;
+		B.cur = o.cls.name;
+		var r;
+		var c0 = Date.now();
+		try { r = JVM.run(vm, function () { vm.callVirtual(o, 'onUpdate', '()V', []); }); }
+		finally { vm.$brainTick = false; o.cls.$brainMs = (o.cls.$brainMs || 0) + Date.now() - c0; o.cls.$brainRuns = (o.cls.$brainRuns | 0) + 1; }
+		if (!r.ok) {
+			var c = o.cls;
+			c.$brainErr = (c.$brainErr | 0) + 1;
+			if (c.$brainErr >= 5) { c.$brainOff = true; vm.log('warn', c.name.replace(/[/]/g, '.') + ': its own behaviour stopped after repeated errors - the game\'s carries on'); }
+			return;
+		}
+		var id = info.id, eps = 1e-5;
+		if (o[':isDead']) { op(vm, 'remove', id); return; }
+		if (Math.abs(o[':posX'] - before.x) > 0.01 || Math.abs(o[':posY'] - before.y) > 0.01 || Math.abs(o[':posZ'] - before.z) > 0.01) op(vm, 'entpos', id, o[':posX'], o[':posY'], o[':posZ']);
+		if (Math.abs(o[':motionX'] - before.vx) > eps) op(vm, 'setvel', id, 'x', +o[':motionX']);
+		if (Math.abs(o[':motionY'] - before.vy) > eps) op(vm, 'setvel', id, 'y', +o[':motionY']);
+		if (Math.abs(o[':motionZ'] - before.vz) > eps) op(vm, 'setvel', id, 'z', +o[':motionZ']);
+		if (o[':health'] !== before.h && isFinite(+o[':health'])) op(vm, 'mobhealth', id, Math.round(+o[':health']));
+		var nt = o[':attackTarget'] || o[':entityToAttack'] || null;
+		if (nt !== before.t) op(vm, 'mobtarget', id, nt ? idOf(nt) : 0);
+	});
+};
+
+JVM.mobHit = function (vm, ev) {
+	var o = JVM.liveMob && JVM.liveMob(vm, ev);
+	if (!o || !ev.target) return;
+	var t = JVM.entityFor(vm, ev.target);
+	if (!t) return;
+	o[':posX'] = +ev.x; o[':posY'] = +ev.y; o[':posZ'] = +ev.z;
+	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	JVM.run(vm, function () { vm.callVirtual(o, 'attackEntityAsMob', '(' + E + ')Z', [t]); });
+};
+JVM.mobDeath = function (vm, ev) {
+	var o = JVM.liveMob && JVM.liveMob(vm, ev);
+	if (!o) return;
+	o[':posX'] = +ev.x; o[':posY'] = +ev.y; o[':posZ'] = +ev.z;
+	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	JVM.run(vm, function () {
+		vm.callVirtual(o, 'dropFewItems', '(ZI)V', [1, 0]);
+		if (Math.random() < 0.025) vm.callVirtual(o, 'dropRareDrop', '(I)V', [0]);
+	});
+	var live = vm.mcReg && vm.mcReg.mobs && vm.mcReg.mobs.live;
+	if (live) live.delete(ev.id);
+};
+JVM.installBrain = install;
 })();
 
 (function () {
