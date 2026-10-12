@@ -159,6 +159,8 @@ function VM(opts) {
 }
 
 VM.prototype.warnOnce = function (key, msg) {
+	var by = this.unplugged || (this.unplugged = Object.create(null)), mod = this.currentMod || '';
+	(by[mod] || (by[mod] = Object.create(null)))[key] = msg;
 	if (this.warned[key]) return;
 	this.warned[key] = true;
 	this.log('warn', msg);
@@ -4423,6 +4425,7 @@ function worldObj(vm) {
 		w2[':provider'] = pv;
 	}
 	if (JVM.mc152.onWorld) JVM.mc152.onWorld(vm, w2);
+	if (JVM.mc152.onWorldStorage) JVM.mc152.onWorldStorage(vm, w2);
 	return vm.mcWorld;
 }
 function playerObj(vm, info) {
@@ -4698,7 +4701,7 @@ JVM.collectContent = function (vm, modId) {
 	Object.keys(r.lang).forEach(function (k) { out.lang[k] = r.lang[k]; });
 	if (JVM.collectMobs) {
 		var cm = JVM.collectMobs(vm, modId, ref, safe);
-		out.mobs = cm.mobs; out.mobFiles = cm.files;
+		out.mobs = cm.mobs; out.mobFiles = cm.files; out.mobsSkipped = cm.skipped;
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
 	return out;
@@ -5807,6 +5810,7 @@ function bytesHave(b, s) {
 	}
 	return false;
 }
+JVM.bytesHave = bytesHave;
 JVM.findForgeMods = function (vm, classes) {
 	return classes.filter(function (cn) {
 		var src = vm.sources[cn];
@@ -7282,7 +7286,68 @@ JVM.tileLoad = function (vm, mods) {
 	t.dirty = false;
 };
 
-JVM.installTiles = installTiles;
+function storage(vm) { var r = reg(vm); return r.storage || (r.storage = { data: {}, mods: {} }); }
+function installStorage(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var C = 'Lnet/minecraft/src/NBTTagCompound;';
+	def('WorldSavedData', { fields: { mapName: 'Ljava/lang/String;' }, methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self[':mapName'] = a[0]; self.$dirty = false; },
+		'markDirty()V': function (vm, self) { self.$dirty = true; },
+		'setDirty(Z)V': function (vm, self, a) { self.$dirty = !!a[0]; },
+		'isDirty()Z': function (vm, self) { return self.$dirty ? 1 : 0; },
+	} });
+	def('MapStorage', { methods: {
+		'loadData(Ljava/lang/Class;Ljava/lang/String;)Lnet/minecraft/src/WorldSavedData;': function (vm, self, a) {
+			var st = storage(vm), name = String(a[1]), have = st.data[name];
+			if (have) return have.obj;
+			var cls = a[0] && a[0].$cls;
+			if (!cls || !vm.fs) return null;
+			var mod = cls.source || vm.currentMod, prev = vm.currentMod;
+			vm.currentMod = mod;
+			var b = vm.fs.read('world/data/' + name.replace(/[^\w.-]/g, '_') + '.json');
+			vm.currentMod = prev;
+			if (!b) return null;
+			var obj = vm.newObject(cls), k = cls.findDeclared('<init>(Ljava/lang/String;)V');
+			if (k) vm.invoke(k, obj, [name]); else obj[':mapName'] = name;
+			try { vm.callVirtual(obj, 'readFromNBT', '(' + C + ')V', [JVM.nbtFromJson(vm, JSON.parse(new TextDecoder().decode(b)), '')]); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; vm.log('warn', 'saved data ' + name + ' could not be read'); }
+			st.data[name] = { obj: obj, mod: mod };
+			return obj;
+		},
+		'setData(Ljava/lang/String;Lnet/minecraft/src/WorldSavedData;)V': function (vm, self, a) {
+			if (!a[1]) return;
+			storage(vm).data[String(a[0])] = { obj: a[1], mod: a[1].cls.source || vm.currentMod };
+			a[1].$dirty = true;
+		},
+		'saveAllData()V': function (vm) { JVM.storageSave(vm); },
+		'getUniqueDataId(Ljava/lang/String;)I': function (vm, self, a) { var st = storage(vm); st.ids = st.ids || {}; return (st.ids[a[0]] = (st.ids[a[0]] == null ? 0 : st.ids[a[0]] + 1)); },
+	} });
+	var WS = vm.natives[SRC + 'World'];
+	WS.fields = Object.assign({}, WS.fields || {}, { mapStorage: 'Lnet/minecraft/src/MapStorage;', perWorldStorage: 'Lnet/minecraft/src/MapStorage;' });
+	JVM.mc152.onWorldStorage = function (vm, w) {
+		if (!w[':mapStorage']) { var m = vm.newObject(vm.loadClass(SRC + 'MapStorage')); w[':mapStorage'] = m; w[':perWorldStorage'] = m; }
+	};
+}
+JVM.storageSave = function (vm) {
+	var st = vm.mcReg && vm.mcReg.storage;
+	if (!st || !vm.fs) return;
+	var prev = vm.currentMod;
+	Object.keys(st.data).forEach(function (name) {
+		var d = st.data[name];
+		if (!d.obj.$dirty) return;
+		vm.currentMod = d.mod;
+		JVM.run(vm, function () {
+			var c = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound'));
+			c.$t = 10; c.$v = new Map(); c.$name = '';
+			vm.callVirtual(d.obj, 'writeToNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [c]);
+			vm.fs.write('world/data/' + name.replace(/[^\w.-]/g, '_') + '.json', new TextEncoder().encode(JSON.stringify(JVM.nbtToJson(c))));
+			d.obj.$dirty = false;
+		});
+	});
+	vm.currentMod = prev;
+};
+JVM.storageReset = function (vm) { var r = vm.mcReg; if (r) r.storage = { data: {}, mods: {} }; };
+
+JVM.installTiles = function (vm) { installTiles(vm); installStorage(vm); };
 })();
 
 (function () {
@@ -7781,6 +7846,7 @@ function openModGui(vm, player, modObj, id, world, x, y, z) {
 	openScreen(vm, client, server && vm.isInstance(server, vm.loadClass(SRC + 'Container')) ? server : null);
 }
 function openScreen(vm, screen, server) {
+	if (vm.mcActor) { vm.warnOnce('gui:joined', "mod screens for joined players aren't available yet"); return; }
 	if (vm.mcGui && vm.mcGui.screen !== screen) closeScreen(vm, true);
 	var g = vm.mcGui = { screen: screen, server: server, mod: screen.cls.source || vm.currentMod };
 	if (server) {
@@ -7850,6 +7916,130 @@ JVM.guiTexture = function (vm, path) {
 };
 
 JVM.installGui = installGui;
+})();
+
+(function () {
+'use strict';
+
+var FEATURES = [
+	[/Enchantment/, 'enchantments'],
+	[/Potion/, 'potion effects'],
+	[/Achievement|StatBase|StatList/, 'achievements'],
+	[/ICommand|CommandBase|registerServerCommand|addCommand/, 'chat commands'],
+	[/BiomeGenBase|addBiome|BiomeDictionary|BiomeManager/, 'new biomes'],
+	[/registerDimension|registerProviderType|Teleporter/, 'new dimensions'],
+	[/EntityFX|EffectRenderer|spawnParticle/, 'custom particles'],
+	[/EntityThrowable|IProjectile|EntityArrow|EntityFireball/, 'projectiles'],
+	[/Render(?!Item|Helper|Engine|Living|Biped)|Tessellator|RenderBlocks|SpecialRenderer|ISimpleBlockRenderingHandler|IItemRenderer|MinecraftForgeClient|ModelBase\.render/, 'custom-drawn blocks and items'],
+	[/SoundManager|SoundPool|playSound|addSound|SoundLoadEvent/, 'custom sounds'],
+	[/VillagerRegistry|MerchantRecipe|IVillageTradeHandler/, 'villager trades'],
+	[/ChestGenHooks|DungeonHooks|WeightedRandomChestContent/, 'dungeon loot'],
+	[/IDispenserHandler|dispenser|BehaviorDispense/, 'dispenser behaviour'],
+	[/IFuelHandler|getFuelValue/, 'fuel'],
+	[/GuiIngame|RenderGameOverlayEvent|ScaledResolution/, 'on-screen overlays'],
+	[/displayGUIChest/, 'its chest screen'],
+	[/background thread|java\.lang\.Thread/, null],
+	[/ObjectOutputStream|ObjectInputStream/, 'some saved data'],
+	[/ItemRenderer|EntityRenderer/, 'first-person effects'],
+	[/addWeatherEffect|lightning/, 'lightning'],
+	[/EntityAI|PathNavigate|EntityMoveHelper|EntityLookHelper/, null],
+	[/Packet|NetworkRegistry|PacketDispatcher|INetworkManager|NetHandler/, null],
+	[/Logger|FMLLog|Level\b/, null],
+];
+var LIBS = [
+	[/^api[/]player|PlayerAPI|PlayerBase|^net[/]minecraft[/]src[/]Player(Base|API)/, 'Player API'],
+	[/^ic2[/]/, 'IndustrialCraft 2'],
+	[/^buildcraft[/]/, 'BuildCraft'],
+	[/^codechicken[/]/, 'CodeChickenCore'],
+	[/^universalelectricity[/]/, 'Universal Electricity'],
+	[/^cofh[/]/, 'CoFH Core'],
+	[/^thaumcraft[/]/, 'Thaumcraft'],
+	[/^forestry[/]/, 'Forestry'],
+	[/^thermalexpansion[/]/, 'Thermal Expansion'],
+	[/^appeng[/]/, 'Applied Energistics'],
+	[/^powercrystals[/]/, 'PowerCrystals Core'],
+	[/^mods[/]tinker|^tconstruct[/]/, "Tinkers' Construct"],
+	[/^net[/]minecraft[/]src[/](ModLoaderMp|BaseModMp)/, 'ModLoaderMP'],
+	[/^net[/]minecraft[/]src[/](GuiAPI|WidgetSimplewindow)/, 'GuiAPI'],
+	[/^shadersmod|^optifine/i, 'OptiFine'],
+	[/^paulscode[/]sound|^ibxm[/]/, null],
+];
+var OWN = /^(java|javax|org[/]lwjgl|net[/]minecraft|cpw[/]mods[/]fml|net[/]minecraftforge|mcre|sun|com[/]google[/]common|argo|org[/]bouncycastle)[/]/;
+
+JVM.javaReport = function (vm, modId, o) {
+	o = o || {};
+	var rep = { loader: o.loader || '', version: o.version || '', status: 'works', missing: [], needs: [], reason: '', errors: o.errors || 0 };
+	if (o.cant) { rep.status = 'cant'; rep.reason = o.cant; return rep; }
+	var un = vm.unplugged && vm.unplugged[modId] || {};
+	var feats = {}, libs = {};
+	var own = o.classes ? new Set(o.classes) : null;
+	Object.keys(un).forEach(function (key) {
+		var text = key + ' ' + un[key];
+		var cm = /^class:(.+)$/.exec(key);
+		if (cm && !OWN.test(cm[1]) && !(own && own.has(cm[1]))) {
+			var lib = null;
+			for (var i = 0; i < LIBS.length; i++) if (LIBS[i][0].test(cm[1])) { lib = LIBS[i][1]; break; }
+			if (lib === null && i < LIBS.length) return;
+			if (!lib) {
+				var parts = cm[1].split('/');
+				lib = parts.length > 2 ? parts.slice(0, 2).join('.') : parts[0];
+			}
+			libs[lib] = true;
+			return;
+		}
+		for (var f = 0; f < FEATURES.length; f++) if (FEATURES[f][0].test(text)) { if (FEATURES[f][1]) feats[FEATURES[f][1]] = true; return; }
+	});
+	(o.extraMissing || []).forEach(function (m) { feats[m] = true; });
+	rep.missing = Object.keys(feats);
+	rep.needs = Object.keys(libs);
+	if (o.errors && o.loadFailed) { rep.status = 'cant'; rep.reason = 'it stopped with an error while loading'; return rep; }
+	if (rep.missing.length || rep.needs.length || o.errors) rep.status = 'partly';
+	return rep;
+};
+JVM.javaReportText = function (rep) {
+	var head = (rep.loader ? rep.loader + ' mod' : 'Java mod') + (rep.version ? ' for Minecraft ' + rep.version : '');
+	if (rep.status === 'cant') return head + ' - Can\'t run: ' + rep.reason;
+	if (rep.status === 'works') return head + ' - Works';
+	var bits = [];
+	if (rep.missing.length) bits.push('not here yet: ' + rep.missing.join(', '));
+	if (rep.needs.length) bits.push('needs ' + rep.needs.join(', '));
+	if (!bits.length && rep.errors) bits.push('some of it stopped with errors');
+	return head + ' - Partly works (' + bits.join('; ') + ')';
+};
+
+JVM.javaKind = function (vm, classes, files) {
+	var text = function (n) { var b = files[n]; try { return b ? new TextDecoder().decode(b).replace(/^﻿/, '') : null; } catch (e) { return null; } };
+	var out = { loader: '', version: '', cant: '' };
+	var fj = null, mi = null;
+	try { fj = text('fabric.mod.json') && JSON.parse(text('fabric.mod.json')); } catch (e) { fj = null; }
+	try { mi = text('mcmod.info') && JSON.parse(text('mcmod.info')); } catch (e) { mi = null; }
+	if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
+	if (fj) {
+		var dep = fj.depends && fj.depends.minecraft;
+		var babric = (typeof dep === 'string' && /b1[.]7|beta|1[.]0[.]0-beta/.test(dep)) || !!(fj.depends && (fj.depends.stationapi || fj.depends['station-api']));
+		out.loader = babric ? 'Babric' : 'Fabric';
+		out.version = babric ? 'Beta 1.7.3' : (typeof dep === 'string' ? dep.replace(/[~^>=<*\s]/g, '') : '');
+		if (!babric) out.cant = 'made for Fabric on Minecraft ' + (out.version || 'a newer version') + ' (only Beta 1.7.3 Babric mods can be supported)';
+		return out;
+	}
+	var mlEntry = classes.some(function (c) { return /^mod_[^/$]+$/.test(c); });
+	var forge = classes.some(function (c) { var s = vm.sources[c]; return s && JVM.bytesHave ? JVM.bytesHave(s.bytes, 'Lcpw/mods/fml/common/Mod;') : false; });
+	out.loader = forge ? 'Forge' : mlEntry ? 'ModLoader' : '';
+	var ver = mi && mi[0] && mi[0].mcversion;
+	if (ver) out.version = String(ver).replace(/^Minecraft\s*/i, '');
+	if (!out.version && (forge || mlEntry)) out.version = '1.5.2';
+	var map = vm.nameMap;
+	var vanilla = map ? classes.filter(function (c) { return c.indexOf('/') < 0 && map.cls[c] !== undefined; }).length : 0;
+	if (!forge && !mlEntry) {
+		out.loader = vanilla ? 'Jar' : '';
+		out.cant = vanilla ? 'it replaces Minecraft\'s own game files (a "jar mod"), which can\'t be done here' : 'no ModLoader or Forge mod was found in it';
+		return out;
+	}
+	if (out.version && !/^1[.]5([.][0-2])?$/.test(out.version) && out.version !== '1.5.x') {
+		out.cant = 'made for Minecraft ' + out.version + ' (Minecraft 1.5.2 mods run here)';
+	}
+	return out;
+};
 })();
 
 (function () {

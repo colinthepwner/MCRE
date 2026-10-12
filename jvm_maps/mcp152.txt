@@ -1545,6 +1545,7 @@ F	aab	s	field_73012_v	rand
 F	aab	t	field_73011_w	provider
 F	aab	v	field_73020_y	chunkProvider
 F	aab	x	field_72986_A	worldInfo
+F	aab	z	field_72988_C	mapStorage
 F	aav	N	field_76756_M	biomeID
 F	aav	a	field_76773_a	biomeList
 F	aav	b	field_76771_b	ocean
@@ -1613,6 +1614,8 @@ F	aif	w	field_76259_v	snow
 F	aif	x	field_76258_w	craftedSnow
 F	aif	y	field_76268_x	cactus
 F	aif	z	field_76267_y	clay
+F	ajo	a	field_76189_a	dirty
+F	ajo	h	field_76190_i	mapName
 F	ajv	l	field_76105_j	dimension
 F	apa	A	field_71978_w	cobblestone
 F	apa	B	field_71988_x	planks
@@ -2393,6 +2396,7 @@ M	aab	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
 M	aab	b	(IIIII)Z	func_72921_c	setBlockMetadata
 M	aab	b	(IIILaqp;)V	func_72944_b	updateTileEntityChunkAndDoNothing
 M	aab	b	(J)V	func_72877_b	setWorldTime
+M	aab	b	(Ljava/lang/String;)I	func_72841_b	getUniqueDataId
 M	aab	b	(Lmp;Laqx;)Ljava/util/List;	func_72839_b	getEntitiesWithinAABBExcludingEntity
 M	aab	c	(III)Z	func_72799_c	isAirBlock
 M	aab	c	(IIII)Z	func_94575_c	setBlock
@@ -2445,6 +2449,11 @@ M	aif	f	()Laif;	func_76221_f	setRequiresTool
 M	aif	h	()Z	func_76217_h	getCanBurn
 M	aif	k	()Z	func_76218_k	isOpaque
 M	aif	l	()Z	func_76229_l	isToolNotRequired
+M	ajo	a	(Lbs;)V	func_76184_a	readFromNBT
+M	ajo	a	(Z)V	func_76186_a	setDirty
+M	ajo	b	(Lbs;)V	func_76187_b	writeToNBT
+M	ajo	c	()V	func_76185_a	markDirty
+M	ajo	d	()Z	func_76188_b	isDirty
 M	ajt	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
 M	ajt	b	()Ljava/io/File;	func_75765_b	getWorldDirectory
 M	ajt	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
@@ -2469,6 +2478,10 @@ M	akf	a	(Lacn;)Lacb;	func_75763_a	getChunkLoader
 M	akf	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
 M	akf	c	()V	func_75762_c	checkSessionLock
 M	akf	g	()Ljava/lang/String;	func_75760_g	getWorldDirectoryName
+M	aku	a	()V	func_75744_a	saveAllData
+M	aku	a	(Ljava/lang/Class;Ljava/lang/String;)Lajo;	func_75742_a	loadData
+M	aku	a	(Ljava/lang/String;)I	func_75743_a	getUniqueDataId
+M	aku	a	(Ljava/lang/String;Lajo;)V	func_75745_a	setData
 M	akz	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	akz	a	(Laab;IIIII)V	func_71852_a	breakBlock
 M	akz	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived

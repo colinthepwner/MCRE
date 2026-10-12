@@ -1612,6 +1612,9 @@
                 return m ? +m[1] : 0;
             }
             function player() { return mp('player'); }
+            var actor = null;
+            function toActor(msg) { if (actor && actor.guid && Module.mcNet && Module.mcNet.sendCtlTo) Module.mcNet.sendCtlTo(actor.guid, msg); }
+            function actorOnly(what) { if (vm) vm.warnOnce('mp:' + what, "a joined player's " + what + " can't be reached by Java mods here (left out)"); }
             var tiles = null;
             function forget(x, y, z) { if (tiles) delete tiles[(x | 0) + ',' + (y | 0) + ',' + (z | 0)]; }
             var bridge = {
@@ -1637,25 +1640,42 @@
                     case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
                     case 'player': {
+                        if (actor) return { x: +actor.x, y: +actor.y + 1.62, z: +actor.z, yaw: 0, pitch: 0, name: actor.name, health: actor.health | 0, food: 20,
+                                            creative: 0, flying: 0, sneaking: 0, onGround: 1, id: actor.id, slot: 0 };
                         var p = player();
                         if (!p) return null;
                         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, name: p.name, health: p.health, food: p.food,
                                  creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot };
                     }
-                    case 'held': { var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; return { id: refToJava(hp.carried[0]), count: hp.carried[1], data: hp.carried[2] }; }
-                    case 'give': return mp(['give', itemRef(a[0]), a[1] | 0, a[2] | 0].join('\t'));
+                    case 'held': {
+                        if (actor) return actor.held || null;
+                        var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; return { id: refToJava(hp.carried[0]), count: hp.carried[1], data: hp.carried[2] }; }
+                    case 'give':
+                        if (actor) { toActor({ t: 'give', ref: itemRef(a[0]) + (a[2] ? ':' + (a[2] | 0) : ''), n: a[1] | 0 }); return 1; }
+                        return mp(['give', itemRef(a[0]), a[1] | 0, a[2] | 0].join('\t'));
                     case 'drop': return mp(['drop', +a[0], +a[1], +a[2], itemRef(a[3]), a[4] | 0, a[5] | 0].join('\t'));
-                    case 'msg': return mp('msg\t' + clean(a[0]));
+                    case 'msg':
+                        if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
+                        return mp('msg\t' + clean(a[0]));
                     case 'sound': return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
                     case 'particle': return mp(['particle', clean(a[0]), +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
                     case 'explode': if (tiles) tiles = {}; return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
                     case 'time': return mp('time');
                     case 'settime': return mp('settime\t' + (a[0] | 0));
-                    case 'setpos': { var sp = player(); return sp ? mp(['setpos', sp.id, +a[0], +a[1], +a[2]].join('\t')) : null; }
-                    case 'sethealth': { var sh = player(); return sh ? mp(['sethealth', sh.id, a[0] | 0].join('\t')) : null; }
-                    case 'heal': { var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
-                    case 'setslot': return mp(['setslot', a[0] | 0, a[1] ? itemRef(a[1]) : 'id:0', a[2] | 0, a[3] | 0].join('\t'));
+                    case 'setpos': {
+                        if (actor) { toActor({ t: 'tp', x: +a[0], y: +a[1], z: +a[2] }); return 1; }
+                        var sp = player(); return sp ? mp(['setpos', sp.id, +a[0], +a[1], +a[2]].join('\t')) : null; }
+                    case 'sethealth': {
+                        if (actor) { toActor({ t: 'heal', n: (a[0] | 0) - (actor.health | 0) }); return 1; }
+                        var sh = player(); return sh ? mp(['sethealth', sh.id, a[0] | 0].join('\t')) : null; }
+                    case 'heal': {
+                        if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
+                        var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
+                    case 'setslot':
+                        if (actor) { actorOnly('inventory'); return 0; }
+                        return mp(['setslot', a[0] | 0, a[1] ? itemRef(a[1]) : 'id:0', a[2] | 0, a[3] | 0].join('\t'));
                     case 'slot': {
+                        if (actor) { actorOnly('inventory'); return null; }
                         var sl = mp('slot\t' + (a[0] | 0));
                         return sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0 ? { id: refToJava(sl[0]), count: sl[1], data: sl[2] | 0 } : null;
                     }
@@ -1664,6 +1684,7 @@
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
+                        if (actor) { actorOnly('inventory'); return 0; }
                         var want = itemRef(a[0]);
                         for (var s = 0; s < 36; s++) {
                             var st = mp('slot\t' + s);
@@ -1704,6 +1725,7 @@
                 };
                 running = true;
                 if (window.JVM.tileLoad) window.JVM.tileLoad(vm, Object.keys(javaMods));
+                if (window.JVM.storageReset) window.JVM.storageReset(vm);
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
                 return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
@@ -1799,6 +1821,7 @@
             J.worldStop = function () {
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
+                if (running && vm && window.JVM.storageSave) { vm.steps = 0; window.JVM.storageSave(vm); }
                 worldDir = null;
                 if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
                 jgClose(true);
@@ -1824,7 +1847,14 @@
             J.handle = function (e) {
                 if (!running || !WANTS[e.t]) return;
                 tiles = {};
-                try { handle(e); } finally { tiles = null; }
+                var me0 = e.player ? player() : null;
+                actor = e.player && me0 && e.player.id !== me0.id ? e.player : null;
+                if (actor) {
+                    actor.held = e.item ? { id: refToJava(e.item), count: e.count != null ? e.count | 0 : 1, data: e.data | 0 } : null;
+                    vm.mcPlayer = null;
+                }
+                vm.mcActor = actor;
+                try { handle(e); } finally { tiles = null; if (actor) vm.mcPlayer = null; actor = null; vm.mcActor = null; }
             };
             function handle(e) {
                 var JV = window.JVM, M = JV.mc152, r = reg();
@@ -1841,6 +1871,7 @@
                     if (JV.tileTick) {
                         JV.tileTick(vm);
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
+                        if (vm.mcTicks % 600 === 0 && JV.storageSave) JV.storageSave(vm);
                     }
                     return;
                 }
@@ -1869,6 +1900,10 @@
                     else if (!out) bridge.op('setslot', slot, 0, 0, 0);
                 }
             };
+            J.reports = {};
+            var errorCount = 0;
+            J.reportOf = function (modId) { return J.reports[modId] || null; };
+            J.reportText = function (modId) { var r = J.reports[modId]; return r && window.JVM && window.JVM.javaReportText ? window.JVM.javaReportText(r) : ''; };
             J.decls = {};
             J.settingsOf = function (modId) { return J.decls[modId] || null; };
             J.saveSettings = function (modId, values) {
@@ -2123,13 +2158,14 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            J.begin = function () { J.decls = {}; J.reports = {}; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
             J.define = function (modId, files, problem) {
                 return Promise.all([loadJvm(), loadMap('mcp152')]).then(function (r) {
                     var JVM = r[0], map = r[1];
                     if (!vm) {
                         vm = JVM.create({
                             log: function (level, text) {
+                                if (level === 'error') errorCount++;
                                 if (level === 'error') problem('', String(text).split('\n')[0]);
                                 (level === 'out' ? console.log : console.warn)('[java ' + (vm && vm.currentMod || '') + '] ' + text);
                             },
@@ -2153,11 +2189,14 @@
                     var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;
                     if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
-                    var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
-                    if (!entry.length && !forgeMods.length) {
-                        problem('', 'Java mod without a ModLoader mod_ class or a Forge @Mod class - Fabric mods are not supported yet');
+                    var kind = JVM.javaKind ? JVM.javaKind(vm, classes, files) : { loader: '', version: '', cant: '' };
+                    if (kind.cant) {
+                        J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: kind.cant });
+                        problem('', "Can't run: " + kind.cant);
                         return {};
                     }
+                    var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
+                    var errorsBefore = errorCount;
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
                             if (JVM.mlProps) JVM.mlProps(vm, vm.loadClass(cn));
@@ -2175,6 +2214,8 @@
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
+                    if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes,
+                        errors: errorCount - errorsBefore, extraMissing: c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [] });
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
@@ -2289,6 +2330,12 @@
                         if (!root || r.length < root.length) root = r;
                     }
                 });
+                if (!root) {
+                    var tops = {};
+                    keys.forEach(function (k) { tops[k.split('/')[0]] = true; });
+                    var t = Object.keys(tops);
+                    if (t.length === 1 && keys.some(function (k) { return k.indexOf('/') > 0 && (k === t[0] + '/mcmod.info' || /^[^/]+[/]mod_[^/$]+[.]class$/.test(k)); })) root = t[0] + '/';
+                }
                 var out = {};
                 keys.forEach(function (k) {
                     if (k.indexOf(root) !== 0) return;
@@ -2748,6 +2795,8 @@
                                 if (k === 'lang/en_us.lang' && files[k]) { var a = files[k], b = add[k], m2 = new Uint8Array(a.length + 1 + b.length); m2.set(a); m2[a.length] = 10; m2.set(b, a.length + 1); files[k] = m2; }
                                 else files[k] = add[k];
                             });
+                            var jt = Module.mcJava.reportText(id);
+                            if (jt) { var sum = contentsOf(files); x.contents = jt + (sum ? ' - ' + sum : ''); }
                             var jd = Module.mcJava.settingsOf(id);
                             if (jd && jd.length) {
                                 settingDecls[id] = (settingDecls[id] || []).concat(jd);
@@ -4405,12 +4454,35 @@
                     });
                 }).catch(function (e) { if (!e || e.name !== 'AbortError') bump('Folder: ' + (e && e.message || e)); });
             }
+            function innerArchives(files) {
+                var keys = Object.keys(files);
+                var own = keys.some(function (k) { return /[.]class$/i.test(k) || /(^|[/])(manifest[.]json|pack[.]mcmeta|mcmod[.]info|fabric[.]mod[.]json)$/i.test(k) || /^(blocks|items|textures|scripts|modpe)[/]/i.test(k); });
+                if (own) return [];
+                return keys.filter(function (k) { return /[.](jar|zip)$/i.test(k) && !/(^|[/])META-INF[/]/i.test(k) && files[k] && files[k].length > 22; })
+                    .map(function (k) { return { name: k.split('/').pop(), data: files[k] }; });
+            }
+            api.install = function (file) { return install(file); };
+            window.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) e.preventDefault(); });
+            window.addEventListener('drop', function (e) {
+                if (e.defaultPrevented || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+                e.preventDefault();
+                var inWorld = false;
+                try { inWorld = Module.ccall('mcModpeOp', 'string', ['string'], ['world']) !== 'null'; } catch (x) { }
+                if (inWorld) { bump('Leave the world to add mods'); return; }
+                Array.prototype.slice.call(e.dataTransfer.files).reduce(function (pr, f) { return pr.then(function () { return install(f); }); }, Promise.resolve());
+            });
             function install(file) {
                 if (!file) return Promise.resolve();
                 if (file.size > MAX_ZIP) { bump(file.name + ' is too big (64 MB at most)'); return Promise.resolve(); }
                 bump('Adding ' + file.name + '...');
                 return file.arrayBuffer().then(function (ab) {
                     var bytes = new Uint8Array(ab);
+                    var isRar = bytes[0] === 0x52 && bytes[1] === 0x61 && bytes[2] === 0x72 && bytes[3] === 0x21;
+                    var is7z = bytes[0] === 0x37 && bytes[1] === 0x7a && bytes[2] === 0xbc && bytes[3] === 0xaf;
+                    if (isRar || is7z || /[.](rar|7z)$/i.test(file.name || '')) {
+                        bump(file.name + ' is a ' + (is7z || /[.]7z$/i.test(file.name || '') ? '7-Zip' : 'RAR') + ' archive - unpack it first, then add the .jar or .zip that was inside');
+                        return false;
+                    }
                     if (/[.]js$/i.test(file.name || '')) {
                         var base = String(file.name).replace(/[.]js$/i, '');
                         var enc = new TextEncoder();
@@ -4421,6 +4493,12 @@
                         file = { name: base + '.zip' };
                     }
                     return readZip(bytes).then(function (files) {
+                        var inner = innerArchives(files);
+                        if (inner.length) {
+                            return inner.reduce(function (pr, e) {
+                                return pr.then(function () { return install(new File([e.data], e.name, { type: 'application/zip' })); });
+                            }, Promise.resolve()).then(function () { return true; });
+                        }
                         files = normalise(files);
                         var m = manifestOf(files, file.name);
                         var i = find(m.id);
@@ -4614,11 +4692,11 @@
                 box.innerHTML =
                     '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Add a mod</h2>' +
                     '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Choose a mod file (.zip), or drop it here. ' +
-                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and ModLoader Java mods (.jar) work too.</p>' +
+                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and Java mods for Minecraft 1.5.2 (ModLoader and Forge, .jar or .zip) work too - each one shows how well it runs here.</p>' +
                     '<button data-browse style="display:block;width:100%;padding:12px;margin-bottom:14px;background:#4a8a4a;color:#fff;' +
                     'border:none;cursor:pointer;font-size:14px;font-family:monospace">Browse mods</button>' +
                     '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +
-                    'Choose file<input type="file" accept=".zip,application/zip,.js,.modpkg,.jar,application/java-archive" style="display:none"></label>' +
+                    'Choose file<input type="file" multiple accept=".zip,application/zip,.js,.modpkg,.jar,application/java-archive" style="display:none"></label>' +
                     (api.canFolder() ?
                         '<div style="border-top:1px solid #555;margin:4px 0 14px;padding-top:12px;font-size:12px;color:#aaa;line-height:1.4">' +
                         'Making a mod? Open its folder instead: the game reads it straight from your disk. ' +
@@ -4635,12 +4713,12 @@
                 overlay.addEventListener('dragover', function (e) { e.preventDefault(); });
                 overlay.addEventListener('drop', function (e) {
                     e.preventDefault();
-                    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-                    closeBox(); install(f);
+                    var fs = e.dataTransfer && e.dataTransfer.files ? Array.prototype.slice.call(e.dataTransfer.files) : [];
+                    closeBox(); fs.reduce(function (pr, f) { return pr.then(function () { return install(f); }); }, Promise.resolve());
                 });
                 box.querySelector('input').addEventListener('change', function (e) {
-                    var f = e.target.files && e.target.files[0];
-                    closeBox(); install(f);
+                    var fs = e.target.files ? Array.prototype.slice.call(e.target.files) : [];
+                    closeBox(); fs.reduce(function (pr, f) { return pr.then(function () { return install(f); }); }, Promise.resolve());
                 });
                 box.querySelector('[data-no]').onclick = closeBox;
                 box.querySelector('[data-browse]').onclick = function () { closeBox(); api.browse(); };
@@ -5834,6 +5912,7 @@
                 case 'tp': if (Module._mcScriptTeleport) Module._mcScriptTeleport(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
                 case 'give': if (Module._mcScriptGive) Module.ccall('mcScriptGive', null, ['string', 'number'], [String(msg.ref || ''), msg.n | 0]); break;
                 case 'heal': if (Module._mcScriptHeal) Module._mcScriptHeal(msg.n | 0); break;
+                case 'chat': chat(msg.text); break;
                 case 'sound': if (Module._mcScriptSound) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [String(msg.name || ''), +msg.x, +msg.y, +msg.z, +msg.v || 1, +msg.p || 1]); break;
                 case 'effect': if (Module._mcScriptEffect) Module._mcScriptEffect(msg.id | 0, msg.ticks | 0, msg.amp | 0); break;
                 case 'push': if (Module._mcScriptPush) Module._mcScriptPush(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
