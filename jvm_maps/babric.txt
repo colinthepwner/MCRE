@@ -685,6 +685,8 @@ F	net/minecraft/class_6	field_8	field_8	xSize
 F	net/minecraft/class_6	field_9	field_9	ySize
 F	net/minecraft/class_6	field_11	field_11	chunk
 F	net/minecraft/class_7	field_21	field_21	dimension
+F	net/minecraft/class_7	field_24	field_24	raining
+F	net/minecraft/class_7	field_26	field_26	thundering
 F	net/minecraft/class_23	field_108	field_108	minDisplayColumn
 F	net/minecraft/class_23	field_109	field_109	minDisplayRow
 F	net/minecraft/class_23	field_110	field_110	maxDisplayColumn
@@ -909,6 +911,7 @@ F	net/minecraft/class_184	field_638	field_638	zPosition
 F	net/minecraft/class_184	field_640	field_640	yaw
 F	net/minecraft/class_184	field_641	field_641	pitch
 F	net/minecraft/class_184	field_642	field_642	onGround
+F	net/minecraft/class_184	field_643	field_643	moving
 F	net/minecraft/class_184	field_644	field_644	rotating
 F	net/minecraft/class_186	field_647	field_647	worldObj
 F	net/minecraft/class_186	field_650	field_650	height
@@ -1116,6 +1119,7 @@ F	net/minecraft/class_374	field_1424	field_1424	yaw
 F	net/minecraft/class_374	field_1425	field_1425	pitch
 F	net/minecraft/class_173	field_1427	field_1427	onGround
 F	net/minecraft/class_173	field_1428	field_1428	isRiding
+F	net/minecraft/class_379	field_1429	field_1429	cache
 F	net/minecraft/class_322	field_1450	field_1450	guiScale
 F	net/minecraft/class_322	field_1465	field_1465	fancyGraphics
 F	net/minecraft/class_322	field_1468	field_1468	keyBindForward
@@ -1174,13 +1178,16 @@ F	net/minecraft/class_57	field_1607	field_1607	rotationPitch
 F	net/minecraft/class_57	field_1608	field_1608	prevRotationYaw
 F	net/minecraft/class_57	field_1609	field_1609	prevRotationPitch
 F	net/minecraft/class_57	field_1610	field_1610	boundingBox
+F	net/minecraft/class_57	field_1612	field_1612	inWater
 F	net/minecraft/class_57	field_1614	field_1614	air
 F	net/minecraft/class_57	field_1615	field_1615	isImmuneToFire
 F	net/minecraft/class_57	field_1616	field_1616	dataWatcher
 F	net/minecraft/class_57	field_1623	field_1623	onGround
+F	net/minecraft/class_57	field_1628	field_1628	isInWeb
 F	net/minecraft/class_57	field_1631	field_1631	yOffset
 F	net/minecraft/class_57	field_1632	field_1632	width
 F	net/minecraft/class_57	field_1633	field_1633	height
+F	net/minecraft/class_57	field_1636	field_1636	fallDistance
 F	net/minecraft/class_57	field_1640	field_1640	ySize
 F	net/minecraft/class_57	field_1644	field_1644	rand
 F	net/minecraft/class_57	field_1646	field_1646	fireResistance
@@ -1436,6 +1443,7 @@ F	net/minecraft/class_554	field_2325	field_2325	healAmount
 F	net/minecraft/class_554	field_2326	field_2326	isWolfsFavoriteMeat
 F	net/minecraft/class_555	field_2336	field_2336	random
 F	net/minecraft/class_557	field_2367	field_2367	thePlayer
+F	net/minecraft/class_515	field_2378	field_2378	chunkXPos
 F	net/minecraft/class_386	field_2380	field_2380	keyDescription
 F	net/minecraft/class_386	field_2381	field_2381	keyCode
 F	net/minecraft/class_478	field_2411	field_2411	worldObj
@@ -1568,10 +1576,12 @@ M	net/minecraft/class_18	method_186	(Lnet/minecraft/class_57;D)Lnet/minecraft/cl
 M	net/minecraft/class_18	method_190	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_190	getCollidingBoundingBoxes
 M	net/minecraft/class_18	method_191	(Lnet/minecraft/class_57;Ljava/lang/String;FF)V	method_191	playSoundAtEntity
 M	net/minecraft/class_18	method_197	()Lnet/minecraft/class_51;	method_197	getChunkProvider
+M	net/minecraft/class_18	method_199	(II)Lnet/minecraft/class_43;	method_199	getChunkFromBlockCoords
 M	net/minecraft/class_18	method_200	(IIII)Z	method_200	setBlock
 M	net/minecraft/class_18	method_201	(IIIII)Z	method_201	setBlock
 M	net/minecraft/class_18	method_208	(Ljava/lang/String;)I	method_208	getUniqueDataId
 M	net/minecraft/class_18	method_211	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_211	getEntitiesWithinAABBExcludingEntity
+M	net/minecraft/class_18	method_214	(II)Lnet/minecraft/class_43;	method_214	getChunkFromChunkCoords
 M	net/minecraft/class_18	method_216	(IIIII)V	method_216	scheduleBlockUpdate
 M	net/minecraft/class_18	method_220	()Z	method_220	isDaytime
 M	net/minecraft/class_18	method_222	(II)I	method_222	getHeightValue
@@ -1794,6 +1804,7 @@ M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
 M	net/minecraft/class_26	method_1301	(DDD)Lnet/minecraft/class_26;	method_1301	addVector
 M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
 M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
+M	net/minecraft/class_57	method_1322	(DDD)V	method_1322	addVelocity
 M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
 M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
 M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet

@@ -1722,6 +1722,12 @@
                         return { id: sj.id, count: sl[1], data: sj.data, ench: enchOf(sl[3]) };
                     }
                     case 'world': return mp('world');
+                    case 'ent': return mp(['ent', a[0] | 0].join('\t'));
+                    case 'players': return mp('players');
+                    case 'setvel': return mp(['setvel', a[0] | 0, String(a[1]).charAt(0), +a[2] || 0].join('\t'));
+                    case 'setrot': return mp(['setrot', a[0] | 0, +a[1] || 0, +a[2] || 0].join('\t'));
+                    case 'hurt': return mp(['hurt', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'fire': return mp(['fire', a[0] | 0, a[1] | 0].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
@@ -1744,7 +1750,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1 };
             J.running = function () { return running; };
             J.dispense = function (json) {
                 if (!running || !vm || !window.JVM.dispense || !window.JVM.dispenseWanted(vm)) return 0;
@@ -1996,6 +2002,7 @@
                     else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
                     else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
                     else if (e.t === 'neighbor') call(blk, SIG.neighbor, [world, x, y, z, e.neighbor ? javaOf(e.neighbor, 0).id : 0]);
+                    else if (e.t === 'inside' && JV.entityInside) JV.entityInside(vm, blk, world, x, y, z, e, e.player ? pl : null);
                     return;
                 }
                 if (e.item && (e.t === 'useItem' || e.t === 'useItemOn')) {
@@ -3878,6 +3885,9 @@
                         else problem(b.mod, b.file, '"portal_to": no dimension "' + j.portal_to + '" (dimensions/<name>.json)');
                     }
                     if (j.neighbor_updates === true) lines.push(['neighbors', key].join('\t'));
+                    if (j.entity_inside === true) lines.push(['inside', key].join('\t'));
+                    if (Array.isArray(j.collision_box) && j.collision_box.length === 6 && j.collision_box.every(function (v) { return isFinite(+v); }))
+                        lines.push(['collisionbox', key].concat(j.collision_box.map(function (v) { return Math.max(0, Math.min(16, +v)); })).join('\t'));
                     var st = states[b.mod + ':' + b.name], rot = String(j.rotate || '').toLowerCase();
                     var mref = j.model;
                     if (mref === undefined && st && st.j.variants && typeof st.j.variants === 'object') {

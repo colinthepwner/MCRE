@@ -1540,6 +1540,8 @@ C	zw	net/minecraft/src/Explosion
 C	zx	net/minecraft/src/ColorizerFoliage
 C	zy	net/minecraft/src/GameRules
 C	zz	net/minecraft/src/GameRuleValue
+F	aab	C	field_72984_F	theProfiler
+F	aab	G	field_72993_I	activeChunkSet
 F	aab	I	field_72995_K	isRemote
 F	aab	e	field_72996_f	loadedEntityList
 F	aab	h	field_73010_i	playerEntities
@@ -1679,6 +1681,8 @@ F	aih	c	field_76280_c	grassColor
 F	ajo	a	field_76189_a	dirty
 F	ajo	h	field_76190_i	mapName
 F	ajv	l	field_76105_j	dimension
+F	ajv	o	field_76104_m	raining
+F	ajv	q	field_76102_o	thundering
 F	amb	a	field_82527_a	dispenseBehaviorRegistry
 F	amb	b	field_72284_a	random
 F	apa	A	field_71978_w	cobblestone
@@ -2200,12 +2204,15 @@ F	mp	C	field_70126_B	prevRotationYaw
 F	mp	D	field_70127_C	prevRotationPitch
 F	mp	E	field_70121_D	boundingBox
 F	mp	F	field_70122_E	onGround
+F	mp	K	field_70134_J	isInWeb
 F	mp	N	field_70129_M	yOffset
 F	mp	O	field_70130_N	width
 F	mp	P	field_70131_O	height
+F	mp	T	field_70143_R	fallDistance
 F	mp	X	field_70139_V	ySize
 F	mp	ab	field_70146_Z	rand
 F	mp	ad	field_70174_ab	fireResistance
+F	mp	ae	field_70171_ac	inWater
 F	mp	ag	field_70178_ae	isImmuneToFire
 F	mp	ah	field_70180_af	dataWatcher
 F	mp	ar	field_71093_bK	dimension
@@ -2238,6 +2245,7 @@ F	net/minecraft/client/Minecraft	p	field_71446_o	renderEngine
 F	net/minecraft/client/Minecraft	q	field_71466_p	fontRenderer
 F	net/minecraft/client/Minecraft	s	field_71462_r	currentScreen
 F	net/minecraft/client/Minecraft	z	field_71474_y	gameSettings
+F	net/minecraft/server/MinecraftServer	a	field_71304_b	theProfiler
 F	net/minecraft/server/MinecraftServer	b	field_71305_c	worldServers
 F	net/minecraft/server/MinecraftServer	k	field_71309_l	mcServer
 F	net/minecraft/server/MinecraftServer	u	field_71316_v	serverStopped
@@ -2258,6 +2266,7 @@ F	nn	a	monster	monster
 F	nn	b	creature	creature
 F	nn	c	ambient	ambient
 F	nn	d	waterCreature	waterCreature
+F	on	c	field_75781_c	theProfiler
 F	rh	a	field_70292_b	age
 F	rh	d	field_70291_e	health
 F	s	b	field_71586_b	offsetsXForSide
@@ -2571,8 +2580,11 @@ M	aab	b	(Lmp;Laqx;)Ljava/util/List;	func_72839_b	getEntitiesWithinAABBExcludingE
 M	aab	c	(III)Z	func_72799_c	isAirBlock
 M	aab	c	(IIII)Z	func_94575_c	setBlock
 M	aab	c	(Lmp;)Z	func_72942_c	addWeatherEffect
+M	aab	d	(II)Labw;	func_72938_d	getChunkFromBlockCoords
 M	aab	d	(IIIIII)V	func_72965_b	addBlockEvent
+M	aab	d	(IIIZ)Z	func_72834_c	canBlockFreeze
 M	aab	d	(Lmp;)Z	func_72838_d	spawnEntityInWorld
+M	aab	e	(II)Labw;	func_72964_e	getChunkFromChunkCoords
 M	aab	e	(IIIII)V	func_72926_e	playAuxSFX
 M	aab	e	(IIIIII)Z	func_72904_c	checkChunksExist
 M	aab	f	(II)I	func_72976_f	getHeightValue
@@ -2593,6 +2605,8 @@ M	aab	r	(III)Laqp;	func_72796_p	getBlockTileEntity
 M	aab	s	(III)V	func_72932_q	removeBlockTileEntity
 M	aab	t	()Laba;	func_72959_q	getWorldChunkManager
 M	aab	u	()Z	func_72935_r	isDaytime
+M	aab	x	(III)Z	func_72884_u	isBlockFreezable
+M	aab	z	(III)Z	func_72858_w	canSnowAt
 M	aak	P	()I	func_72800_K	getHeight
 M	aak	T	()Lard;	func_82732_R	getWorldVec3Pool
 M	aak	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
@@ -3002,6 +3016,7 @@ M	bdj	b	(F)V	func_78791_b	renderWithRotation
 M	bdj	b	(II)Lbdj;	func_78787_b	setTextureSize
 M	bdj	c	(F)V	func_78794_c	postRender
 M	bdw	a	(Lka;I)V	func_71064_a	addStat
+M	bdw	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	bdw	h	()V	func_71053_j	closeScreen
 M	bdw	j	(I)V	func_70691_i	heal
 M	bf	a	(I)Lbf;	func_82600_a	getFront
@@ -3198,6 +3213,7 @@ M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	jc	a	(Lka;I)V	func_71064_a	addStat
 M	jc	a	(Llt;)V	func_71007_a	displayGUIChest
+M	jc	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	jc	a	(Ltj;II)V	func_71112_a	sendProgressBarUpdate
 M	jc	a	(Ltj;ILwm;)V	func_71111_a	sendSlotContents
 M	jc	b	(I)V	func_70606_j	setEntityHealth
@@ -3284,9 +3300,11 @@ M	mp	G	()Z	func_70090_H	isInWater
 M	mp	N	()Ljava/lang/String;	func_70073_O	getTexture
 M	mp	R	()Z	func_70089_S	isEntityAlive
 M	mp	a	(FF)V	func_70105_a	setSize
+M	mp	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	mp	a_	(Lsq;)Z	func_70085_c	interact
 M	mp	ae	()Z	func_70027_ad	isBurning
 M	mp	ag	()Z	func_70093_af	isSneaking
+M	mp	al	()V	func_70110_aj	setInWeb
 M	mp	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	mp	b	(DDD)V	func_70107_b	setPosition
 M	mp	b	(DDDFF)V	func_70012_b	setLocationAndAngles
@@ -3300,6 +3318,7 @@ M	mp	e	(Lbs;)V	func_70109_d	writeToNBT
 M	mp	equals	(Ljava/lang/Object;)Z	equals	equals
 M	mp	f	(DDD)D	func_70011_f	getDistance
 M	mp	f	(Lbs;)V	func_70020_e	readFromNBT
+M	mp	g	(DDD)V	func_70024_g	addVelocity
 M	mp	hashCode	()I	hashCode	hashCode
 M	mp	toString	()Ljava/lang/String;	toString	toString
 M	mp	u	()Lns;	func_70096_w	getDataWatcher
@@ -3340,6 +3359,7 @@ M	net/minecraft/server/MinecraftServer	z	()I	func_71275_y	getMaxPlayers
 M	ng	N	()Ljava/lang/String;	func_70073_O	getTexture
 M	ng	R	()Z	func_70089_S	isEntityAlive
 M	ng	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	ng	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	ng	a	(Lmk;)Z	func_70644_a	isPotionActive
 M	ng	aA	()Lnz;	func_70605_aq	getMoveHelper
 M	ng	aB	()Lnx;	func_70683_ar	getJumpHelper
@@ -3381,11 +3401,14 @@ M	nn	values	()[Lnn;	values	values
 M	on	a	()V	func_75774_a	onUpdateTasks
 M	on	a	(ILom;)V	func_75776_a	addTask
 M	on	a	(Lom;)V	func_85156_a	removeTask
+M	qh	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	qh	aQ	()I	func_70627_aG	getTalkInterval
 M	qh	a_	(Lsq;)Z	func_70085_c	interact
 M	qh	bm	()Z	func_70692_ba	canDespawn
+M	rh	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	rh	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	rh	d	()Lwm;	func_92059_d	getEntityItem
+M	sb	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	sb	c	(Lmp;)I	func_82193_c	getAttackStrength
 M	so	a	(I)Lwm;	func_70301_a	getStackInSlot
 M	so	a	(II)Lwm;	func_70298_a	decrStackSize
@@ -3417,8 +3440,10 @@ M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
 M	sq	a	(Lka;)V	func_71029_a	triggerAchievement
 M	sq	a	(Lka;I)V	func_71064_a	addStat
 M	sq	a	(Llt;)V	func_71007_a	displayGUIChest
+M	sq	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	sq	aW	()I	func_70667_aM	getMaxHealth
 M	sq	aZ	()I	func_70658_aO	getTotalArmorValue
+M	sq	al	()V	func_70110_aj	setInWeb
 M	sq	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	sq	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	sq	bG	()Lwm;	func_70694_bm	getHeldItem
@@ -3644,6 +3669,7 @@ R	field_76923_d	blockID
 R	field_76930_a	x
 R	field_76928_b	y
 R	field_76929_c	z
+R	field_76841_d	cache
 R	field_76891_c	biomes
 R	field_76888_d	xPosition
 R	field_76889_e	zPosition
@@ -3739,6 +3765,7 @@ R	field_70416_a	note
 R	field_70344_d	extending
 R	field_70342_f	progress
 R	field_71611_a	identifier
+R	field_71610_b	cache
 R	field_71595_a	bc
 R	field_71621_M	data
 R	field_71788_a	random
@@ -3809,6 +3836,7 @@ R	field_74216_x	rand
 R	field_74207_v	theItemStack
 R	field_73749_j	mirrored
 R	field_71513_a	description
+R	field_71511_b	cause
 R	field_78071_a	posX
 R	field_78069_b	posY
 R	field_78080_s	rand
@@ -3969,6 +3997,7 @@ R	field_73544_c	zPosition
 R	field_73542_e	yaw
 R	field_73539_f	pitch
 R	field_73540_g	onGround
+R	field_73546_h	moving
 R	field_73547_i	rotating
 R	field_73360_b	isFlying
 R	field_73361_c	allowFlying
@@ -4075,11 +4104,24 @@ R	field_76297_b	theItemId
 R	field_76295_d	theMinimumChanceToGenerateItem
 R	field_76296_e	theMaximumChanceToGenerateItem
 R	field_70479_a	name
+R	field_76372_a	inFire
+R	field_76370_b	onFire
 R	field_76371_c	lava
+R	field_76368_d	inWall
+R	field_76369_e	drown
+R	field_76366_f	starve
 R	field_76367_g	cactus
+R	field_76379_h	fall
+R	field_76380_i	outOfWorld
 R	field_76377_j	generic
+R	field_76376_m	magic
 R	field_82727_n	wither
 R	field_82728_o	anvil
+R	field_82729_p	fallingBlock
+R	field_76373_n	damageType
+R	field_76374_o	isUnblockable
+R	field_76382_s	projectile
+R	field_76378_k	explosion
 R	field_76415_H	id
 R	field_76416_I	name
 R	field_76418_K	isBadEffect
@@ -4215,12 +4257,15 @@ R	bow	bow
 R	field_77606_a	smeltingBase
 R	field_77598_a	instance
 R	field_77597_b	recipes
+R	field_77361_a	damageType
 R	field_77494_b	entityLiving
 R	field_77496_b	source
+R	field_77276_a	chunkXPos
 R	field_77287_j	worldObj
 R	toString	toString
 R	values	values
 R	func_77480_a	getGrassColor
+R	func_72903_x	setActivePlayerChunksAndCheckLight
 R	func_72980_b	playSound
 R	func_72963_a	initialize
 R	func_72835_b	tick
@@ -4252,6 +4297,7 @@ R	func_72800_K	getHeight
 R	func_82732_R	getWorldVec3Pool
 R	func_72807_a	getBiomeGenForCoords
 R	func_72798_a	getBlockId
+R	func_72811_b	getLightValue
 R	func_72799_c	isAirBlock
 R	func_72803_f	getBlockMaterial
 R	func_72805_g	getBlockMetadata
@@ -4296,6 +4342,7 @@ R	func_76623_d	onChunkUnload
 R	func_76619_d	canBlockSeeTheSky
 R	func_76630_e	setChunkModified
 R	func_76621_g	isEmpty
+R	func_76591_a	getBiomeGenForWorldCoords
 R	func_76626_d	getPrecipitationHeight
 R	func_76663_a	isEmpty
 R	func_76686_a	get
@@ -4386,6 +4433,7 @@ R	func_71885_a	idDropped
 R	func_71914_a	dropBlockAsItemWithChance
 R	func_72227_n	setBounds
 R	func_71862_a	randomDisplayTick
+R	func_72262_c	checkFlowerChange
 R	func_71854_d	canBlockStay
 R	func_72263_d_	canThisPlantGrowOnThisBlockID
 R	func_85104_a	onBlockPlaced
@@ -4396,12 +4444,14 @@ R	func_71893_a	harvestBlock
 R	func_71898_d	onBlockDestroyedByPlayer
 R	func_82526_n	dispense
 R	func_71895_b	getBlockTexture
+R	func_71906_q_	canSilkHarvest
 R	func_71935_l	isCollidable
 R	func_71856_s_	getRenderBlockPass
 R	func_71889_f_	getRenderColor
 R	func_71920_b	colorMultiplier
 R	func_71933_m	getBlockColor
 R	func_71910_a	quantityDroppedWithBonus
+R	func_72216_n	isFlammable
 R	func_70307_a	readFromNBT
 R	func_70310_b	writeToNBT
 R	func_71891_b	onEntityWalking
@@ -4441,7 +4491,9 @@ R	compare	compare
 R	func_71612_a	branch
 R	func_71609_b	getId
 R	func_71805_a	init
+R	func_71803_c	reset
 R	init	init
+R	func_71794_b	reset
 R	func_71819_a	shift
 R	available	available
 R	read	read
@@ -4518,11 +4570,14 @@ R	func_70046_E	getBoundingBox
 R	func_70088_a	entityInit
 R	func_85030_a	playSound
 R	func_71001_a	onItemPickup
+R	func_70091_d	moveEntity
+R	func_70097_a	attackEntityFrom
 R	func_70062_b	setCurrentItemOrArmor
 R	func_70047_e	getEyeHeight
 R	func_78913_a	setPosition
 R	func_78914_f	markDirty
 R	func_78381_a	draw
+R	func_78379_d	reset
 R	func_78547_a	setPosition
 R	func_78558_a	getInstance
 R	func_78559_a	normalize
@@ -4609,6 +4664,7 @@ R	func_72688_a	getMinecraftServer
 R	func_73254_a	onUpdate
 R	func_73043_a	onBlockEventReceived
 R	func_73081_b	getGameType
+R	func_72669_b	reset
 R	func_72609_b	logInfo
 R	func_72606_c	logWarning
 R	func_72610_d	logSevere
@@ -4630,7 +4686,30 @@ R	func_76163_a	add
 R	func_76159_d	remove
 R	func_76146_a	getKey
 R	func_76130_a	abs
+R	func_76317_a	clearProfiling
+R	func_76320_a	startSection
+R	func_76319_b	endSection
+R	func_76322_c	getNameOfLastSection
+R	func_76318_c	endStartSection
 R	func_76316_a	onInventoryChanged
+R	func_76352_a	isProjectile
+R	func_76356_a	causeThrownDamage
+R	func_76358_a	causeMobDamage
+R	func_76365_a	causePlayerDamage
+R	func_76353_a	causeArrowDamage
+R	func_94539_a	setExplosionSource
+R	func_76349_b	setProjectile
+R	func_76354_b	causeIndirectMagicDamage
+R	func_94540_d	setExplosion
+R	func_76363_c	isUnblockable
+R	func_76364_f	getSourceOfDamage
+R	func_76346_g	getEntity
+R	func_76348_h	setDamageBypassesArmor
+R	func_76359_i	setDamageAllowedInCreativeMode
+R	func_76361_j	setFireDamage
+R	func_76347_k	isFireDamage
+R	func_76355_l	getDamageType
+R	func_82726_p	setMagicDamage
 R	func_76403_b	isInstant
 R	func_76393_a	getName
 R	func_76399_b	setIconIndex
@@ -4647,9 +4726,11 @@ R	func_70085_c	interact
 R	func_70631_g_	isChild
 R	func_70076_C	kill
 R	func_70022_Q	getEntityString
+R	func_70069_a	fall
 R	func_70035_c	getInventory
 R	func_70115_ae	isRiding
 R	func_82704_a	isEntityApplicable
+R	func_70024_g	addVelocity
 R	main	main
 R	destroy	destroy
 R	start	start
@@ -4706,6 +4787,7 @@ R	func_70023_ak	getEntityName
 R	func_70090_H	isInWater
 R	func_82372_a	getMovementDirection
 R	func_70658_aO	getTotalArmorValue
+R	func_70110_aj	setInWeb
 R	func_70668_bt	getCreatureAttribute
 R	func_70690_d	addPotionEffect
 R	func_70283_d	getWorld
@@ -4780,7 +4862,9 @@ R	func_77323_a	calcModifierLiving
 R	func_92089_a	func_92089_a
 R	func_77326_a	canApplyTogether
 R	func_77318_a	calcModifierDamage
+R	func_77273_a	getCenterXPos
 R	func_77271_a	getChunkPosition
+R	func_77274_b	getCenterZPosition
 R	func_77466_a	getFoliageColorPine
 R	func_77470_a	getFoliageColor
 R	func_77469_b	getFoliageColorBirch

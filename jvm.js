@@ -5389,7 +5389,10 @@ function installMc152(vm) {
 				if (id > 0) dropStack(vm, a[1] + 0.5, a[2] + 0.5, a[3] + 0.5, JVM.mc152.newStack(vm, id, 1, vm.callVirtual(self, 'damageDropped', '(I)I', [a[4]])));
 			}
 		},
-		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) {
+			return vm.callStatic(SRC + 'AxisAlignedBB', 'getBoundingBox', '(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;',
+				[a[1] + self[':minX'], a[2] + self[':minY'], a[3] + self[':minZ'], a[1] + self[':maxX'], a[2] + self[':maxY'], a[3] + self[':maxZ']]);
+		},
 		'isCollidable()Z': function () { return 1; },
 		'getMobilityFlag()I': function () { return 0; },
 		'getEnableStats()Z': function () { return 1; },
@@ -5549,6 +5552,13 @@ function installMc152(vm) {
 		'getUnlocalizedName()Ljava/lang/String;': function (vm, self) { var b = blockById(vm, self[':blockID']); return b ? vm.callVirtual(b, 'getUnlocalizedName', '()Ljava/lang/String;', []) : 'tile.null'; },
 		'getUnlocalizedName(Lnet/minecraft/src/ItemStack;)Ljava/lang/String;': function (vm, self) { var b = blockById(vm, self[':blockID']); return b ? vm.callVirtual(b, 'getUnlocalizedName', '()Ljava/lang/String;', []) : 'tile.null'; },
 	} });
+	vm.natives[SRC + 'ItemBlock'].anyInit = function (vm, self, args, desc) {
+		var sig = JVM.parseDesc(desc), id = null;
+		for (var i = 0; i < sig.args.length && id === null; i++) if (sig.args[i] === 'I') id = args[i];
+		if (id === null) return;
+		self.$blockItem = true; initItem(vm, self, id + 256); self[':blockID'] = id + 256;
+		for (var k = 0; k < sig.args.length; k++) if (sig.args[k] === 'Z' && args[k]) self[':hasSubtypes'] = 1;
+	};
 	function blockById(vm, id) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); return c.statics.blocksList.a[id] || null; }
 	def('ItemFood', { super: SRC + 'Item', methods: {
 		'<init>(IIFZ)V': function (vm, self, a) { initItem(vm, self, 256 + a[0]); self.$food = [a[1], a[2]]; self[':healAmount'] = a[1]; self[':saturationModifier'] = a[2]; self[':isWolfsFavoriteMeat'] = a[3]; },
@@ -5692,7 +5702,9 @@ function installMc152(vm) {
 	if (JVM.installWorldGen16) JVM.installWorldGen16(vm);
 	if (JVM.installForge16) JVM.installForge16(vm);
 	if (JVM.installLiving16) JVM.installLiving16(vm);
+	if (JVM.installContact) JVM.installContact(vm);
 	if (JVM.installDims) JVM.installDims(vm);
+	if (JVM.installWorldServices) JVM.installWorldServices(vm);
 }
 
 var SIN_TABLE = null;
@@ -5854,7 +5866,12 @@ var LIGHT0 = Object.create(null), NOMOVE = Object.create(null);
 
 function installWorld(vm, def) {
 	var g = function (vm) { return vm.game || { blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; }, itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } }; };
-	var tile = function (vm, x, y, z) { var t = op(vm, 'tile', x, y, z); return t ? t : { id: 0, data: 0 }; };
+	var tile = function (vm, x, y, z) {
+		var t = op(vm, 'tile', x, y, z);
+		if (t) return t;
+		var d = vm.$defTile;
+		return d && d.x === x && d.y === y && d.z === z ? { id: d.id, data: d.data } : { id: 0, data: 0 };
+	};
 	def('IBlockAccess', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
 	def('World', { interfaces: [SRC + 'IBlockAccess'], methods: {
 		'getBlockId(III)I': function (vm, self, a) { return g(vm).blockToJava(tile(vm, a[0], a[1], a[2]).id); },
@@ -6144,6 +6161,19 @@ JVM.collectContent = function (vm, modId) {
 		var bf = fuelOf(id, meta);
 		if (bf > 0) json.fuel = bf;
 		if (overrides(b, ['onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V'])) json.neighbor_updates = true;
+		var flc = vm.natives[SRC + 'BlockFlower'] ? vm.loadClass(SRC + 'BlockFlower') : null;
+		if (flc && vm.isInstance(b, flc)) json.neighbor_updates = true;
+		if (overrides(b, ['onEntityCollidedWithBlock(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V'])) json.entity_inside = true;
+		if (overrides(b, ['getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;'])) {
+			vm.$defTile = { x: 0, y: 64, z: 0, id: id, data: meta };
+			var cbb = safe(function () { return vm.callVirtual(b, 'getCollisionBoundingBoxFromPool', '(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;', [JVM.mc152.worldObj(vm), 0, 64, 0]); }, undefined);
+			vm.$defTile = null;
+			if (cbb === null) json.collision = false;
+			else if (cbb && cbb[':maxY'] != null) {
+				var cb = [cbb[':minX'], cbb[':minY'] - 64, cbb[':minZ'], cbb[':maxX'], cbb[':maxY'] - 64, cbb[':maxZ']].map(function (v) { return Math.round(v * 16 * 100) / 100; });
+				if (cb.join() !== (json.shape || [0, 0, 0, 16, 16, 16]).join() && cb.every(function (v) { return isFinite(v); })) json.collision_box = cb;
+			}
+		}
 		out.blocks[JVM.contentName(vm, id, meta)] = json;
 	}
 	Object.keys(r.items).forEach(function (idS) {
@@ -8266,6 +8296,14 @@ function install(vm) {
 			if (vm.callVirtual(self, 'canThisPlantGrowOnThisBlockID', '(I)Z', [below])) return 1;
 			return sustains(a[0], below, a[1], a[2] - 1, a[3], self[':blockID']) ? 1 : 0;
 		},
+		'checkFlowerChange(Lnet/minecraft/src/World;III)V': function (vm, self, a) {
+			if (vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) return;
+			var m = meta(a[0], a[1], a[2], a[3]);
+			vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [a[0], a[1], a[2], a[3], m, 0]);
+			put(a[0], a[1], a[2], a[3], 0, 0, 2);
+		},
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) { vm.callVirtual(self, 'checkFlowerChange', '(Lnet/minecraft/src/World;III)V', [a[0], a[1], a[2], a[3]]); },
+		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V': function (vm, self, a) { vm.callVirtual(self, 'checkFlowerChange', '(Lnet/minecraft/src/World;III)V', [a[0], a[1], a[2], a[3]]); },
 		'isOpaqueCube()Z': function () { return 0; },
 		'renderAsNormalBlock()Z': function () { return 0; },
 		'getRenderType()I': function () { return 1; },
@@ -9178,6 +9216,260 @@ function install(vm) {
 	} });
 }
 JVM.installLiving16 = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var SOURCES = ['inFire', 'onFire', 'lava', 'inWall', 'drown', 'starve', 'cactus', 'fall', 'outOfWorld', 'generic', 'magic', 'wither', 'anvil', 'fallingBlock'];
+
+function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function idOf(o) { return o ? (o.$info && o.$info.id != null ? o.$info.id : o.$entityId != null ? o.$entityId : null) : null; }
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, s); };
+	var st = {};
+	SOURCES.forEach(function (n) { st[n] = null; });
+	var src = function (vm, name) { var o = vm.newObject(vm.loadClass(SRC + 'DamageSource')); o[':damageType'] = name; return o; };
+	var chain = function (k) { return function (vm, self) { self['$' + k] = true; return self; }; };
+	def('DamageSource', { statics: st, fields: { damageType: 'Ljava/lang/String;' }, clinit: function (vm, c) {
+		SOURCES.forEach(function (n) { c.statics[n] = src(vm, n); });
+	}, methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self[':damageType'] = a[0]; },
+		'getDamageType()Ljava/lang/String;': function (vm, self) { return self[':damageType']; },
+		'setDamageBypassesArmor()Lnet/minecraft/src/DamageSource;': chain('bypass'),
+		'setDamageAllowedInCreativeMode()Lnet/minecraft/src/DamageSource;': chain('creative'),
+		'setFireDamage()Lnet/minecraft/src/DamageSource;': chain('fire'),
+		'setProjectile()Lnet/minecraft/src/DamageSource;': chain('projectile'),
+		'setExplosion()Lnet/minecraft/src/DamageSource;': chain('explosion'),
+		'setMagicDamage()Lnet/minecraft/src/DamageSource;': chain('magic'),
+		'isUnblockable()Z': function (vm, self) { return self.$bypass ? 1 : 0; },
+		'isFireDamage()Z': function (vm, self) { return self.$fire ? 1 : 0; },
+		'isProjectile()Z': function (vm, self) { return self.$projectile ? 1 : 0; },
+		'getEntity()Lnet/minecraft/src/Entity;': function (vm, self) { return self.$entity || null; },
+		'getSourceOfDamage()Lnet/minecraft/src/Entity;': function (vm, self) { return self.$entity || null; },
+	}, staticMethods: {
+		'causeMobDamage(Lnet/minecraft/src/EntityLiving;)Lnet/minecraft/src/DamageSource;': function (vm, n, a) { var o = src(vm, 'mob'); o.$entity = a[0]; return o; },
+		'causePlayerDamage(Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/DamageSource;': function (vm, n, a) { var o = src(vm, 'player'); o.$entity = a[0]; return o; },
+		'causeArrowDamage(Lnet/minecraft/src/EntityArrow;Lnet/minecraft/src/Entity;)Lnet/minecraft/src/DamageSource;': function (vm, n, a) { var o = src(vm, 'arrow'); o.$entity = a[1]; o.$projectile = true; return o; },
+		'causeThrownDamage(Lnet/minecraft/src/Entity;Lnet/minecraft/src/Entity;)Lnet/minecraft/src/DamageSource;': function (vm, n, a) { var o = src(vm, 'thrown'); o.$entity = a[1]; o.$projectile = true; return o; },
+		'causeIndirectMagicDamage(Lnet/minecraft/src/Entity;Lnet/minecraft/src/Entity;)Lnet/minecraft/src/DamageSource;': function (vm, n, a) { var o = src(vm, 'indirectMagic'); o.$entity = a[1]; o.$magic = true; return o; },
+		'setExplosionSource(Lnet/minecraft/src/Explosion;)Lnet/minecraft/src/DamageSource;': function (vm) { var o = src(vm, 'explosion'); o.$explosion = true; return o; },
+	} });
+
+	var hurt = function (vm, self, a) {
+		var id = idOf(self), n = Math.max(0, Math.round(+a[1] || 0));
+		if (id == null || !n) return 0;
+		op(vm, 'hurt', id, n);
+		return 1;
+	};
+	var add = function (n, m) {
+		var spec = vm.natives[SRC + n];
+		if (!spec) return;
+		Object.keys(m).forEach(function (k) { if (!spec.methods[k] || spec.methods[k].$weak) spec.methods[k] = m[k]; });
+	};
+	var entityMethods = {
+		'setInWeb()V': function (vm, self) { self.$inWeb = true; },
+		'attackEntityFrom(Lnet/minecraft/src/DamageSource;I)Z': hurt,
+		'attackEntityFrom(Lnet/minecraft/src/DamageSource;F)Z': hurt,
+		'setFire(I)V': function (vm, self, a) { var id = idOf(self); if (id != null && a[0] > 0) op(vm, 'fire', id, (a[0] | 0) * 20); },
+		'extinguish()V': function (vm, self) { var id = idOf(self); if (id != null) op(vm, 'fire', id, 0); },
+		'addVelocity(DDD)V': function (vm, self, a) { self[':motionX'] = (+self[':motionX'] || 0) + a[0]; self[':motionY'] = (+self[':motionY'] || 0) + a[1]; self[':motionZ'] = (+self[':motionZ'] || 0) + a[2]; },
+		'isBurning()Z': function (vm, self) { return self.$info && self.$info.fire > 0 ? 1 : 0; },
+		'isInWater()Z': function (vm, self) { return self.$info && self.$info.inWater ? 1 : 0; },
+	};
+	add('Entity', entityMethods);
+
+	var W = 'Lnet/minecraft/src/World;', IBA = 'Lnet/minecraft/src/IBlockAccess;', FD = 'Lnet/minecraftforge/common/ForgeDirection;';
+	var matOf = function (b) { return b[':blockMaterial'] && b[':blockMaterial'].$name || 'rock'; };
+	var idAt = function (vm, w, x, y, z) { return vm.callVirtual(w, 'getBlockId', '(III)I', [x, y, z]); };
+	var waterAt = function (vm, w, x, y, z) { var i = idAt(vm, w, x, y, z); return i === 8 || i === 9; };
+	var plantType = function (vm, w, x, y, z, plant) {
+		if (!plant) return 'Plains';
+		var t = null;
+		JVM.run(vm, function () { t = vm.callVirtual(plant, 'getPlantType', '(' + W + 'III)Lnet/minecraftforge/common/EnumPlantType;', [w, x, y, z]); });
+		return t && t.$name || 'Plains';
+	};
+	var B = vm.natives[SRC + 'Block'];
+	if (B) {
+		var dflt = {};
+		dflt['isLeaves(' + W + 'III)Z'] = function (vm, self) { return matOf(self) === 'leaves' ? 1 : 0; };
+		dflt['isLeaves(' + IBA + 'III)Z'] = dflt['isLeaves(' + W + 'III)Z'];
+		dflt['isWood(' + W + 'III)Z'] = function (vm, self) { return self[':blockID'] === 17 ? 1 : 0; };
+		dflt['isWood(' + IBA + 'III)Z'] = dflt['isWood(' + W + 'III)Z'];
+		dflt['canBeReplacedByLeaves(' + W + 'III)Z'] = function (vm, self) { return vm.callVirtual(self, 'isOpaqueCube', '()Z', []) ? 0 : 1; };
+		dflt['isGenMineableReplaceable(' + W + 'IIII)Z'] = function (vm, self, a) { return self[':blockID'] === a[4] ? 1 : 0; };
+		dflt['isAirBlock(' + W + 'III)Z'] = function () { return 0; };
+		dflt['beginLeavesDecay(' + W + 'III)V'] = function (vm, self, a) {
+			if (matOf(self) !== 'leaves') return;
+			var m = vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]);
+			vm.callVirtual(a[0], 'setBlockMetadataWithNotify', '(IIIII)Z', [a[1], a[2], a[3], m | 8, 4]);
+		};
+		dflt['isBlockReplaceable(' + W + 'III)Z'] = function (vm, self) { var m = matOf(self); return m === 'vine' || m === 'snow' || m === 'water' || m === 'lava' || m === 'fire' ? 1 : 0; };
+		dflt['isBlockSolidOnSide(' + W + 'III' + FD + ')Z'] = function (vm, self) { return vm.callVirtual(self, 'isOpaqueCube', '()Z', []) ? 1 : 0; };
+		dflt['isLadder(' + W + 'III)Z'] = function (vm, self) { return self[':blockID'] === 65 ? 1 : 0; };
+		dflt['isLadder(' + W + 'IIILnet/minecraft/src/EntityLivingBase;)Z'] = dflt['isLadder(' + W + 'III)Z'];
+		dflt['isBed(' + W + 'IIILnet/minecraft/src/EntityLiving;)Z'] = function (vm, self) { return self[':blockID'] === 26 ? 1 : 0; };
+		dflt['isFireSource(' + W + 'IIII' + FD + ')Z'] = function (vm, self) { return self[':blockID'] === 87 ? 1 : 0; };
+		dflt['isFlammable(' + IBA + 'IIII' + FD + ')Z'] = function (vm, self) { var r = JVM.mc152.reg(vm); return r.burn && r.burn[self[':blockID']] && r.burn[self[':blockID']][1] > 0 ? 1 : 0; };
+		dflt['getFlammability(' + IBA + 'IIII' + FD + ')I'] = function (vm, self) { var r = JVM.mc152.reg(vm); return r.burn && r.burn[self[':blockID']] ? r.burn[self[':blockID']][1] : 0; };
+		dflt['getFireSpreadSpeed(' + W + 'IIII' + FD + ')I'] = function (vm, self) { var r = JVM.mc152.reg(vm); return r.burn && r.burn[self[':blockID']] ? r.burn[self[':blockID']][0] : 0; };
+		dflt['canCreatureSpawn(Lnet/minecraft/src/EnumCreatureType;' + W + 'III)Z'] = function (vm, self) { return vm.callVirtual(self, 'isOpaqueCube', '()Z', []) ? 1 : 0; };
+		dflt['isBeaconBase(' + W + 'IIIIII)Z'] = function (vm, self) { var i = self[':blockID']; return i === 41 || i === 42 || i === 57 || i === 133 ? 1 : 0; };
+		dflt['canHarvestBlock(Lnet/minecraft/src/EntityPlayer;I)Z'] = function () { return 1; };
+		dflt['canSilkHarvest(' + W + 'Lnet/minecraft/src/EntityPlayer;IIII)Z'] = function (vm, self) { return vm.callVirtual(self, 'renderAsNormalBlock', '()Z', []) ? 1 : 0; };
+		dflt['getLightValue(' + IBA + 'III)I'] = function (vm, self) { var bc = vm.loadClass(SRC + 'Block'); vm.initClass(bc); return bc.statics.lightValue.a[self[':blockID']] | 0; };
+		dflt['isFertile(' + W + 'III)Z'] = function (vm, self, a) { return self[':blockID'] === 60 && vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]) > 0 ? 1 : 0; };
+		dflt['onPlantGrow(' + W + 'IIIIII)V'] = function (vm, self, a) { if (self[':blockID'] === 2) vm.callVirtual(a[0], 'setBlock', '(IIII)Z', [a[1], a[2], a[3], 3]); };
+		dflt['canSustainPlant(' + W + 'III' + FD + 'Lnet/minecraftforge/common/IPlantable;)Z'] = function (vm, self, a) {
+			var id = self[':blockID'], w = a[0], x = a[1], y = a[2], z = a[3], t = plantType(vm, w, x, y + 1, z, a[5]);
+			var m = matOf(self);
+			if (a[5] && a[5][':blockID'] === 81) return id === 81 || id === 12 ? 1 : 0;
+			if (a[5] && a[5][':blockID'] === 83) return id === 83 ? 1 : 0;
+			switch (t) {
+				case 'Desert': return id === 12 || m === 'sand' ? 1 : 0;
+				case 'Nether': return id === 88 ? 1 : 0;
+				case 'Crop': return id === 60 ? 1 : 0;
+				case 'Cave': return vm.callVirtual(self, 'isOpaqueCube', '()Z', []) ? 1 : 0;
+				case 'Plains': return id === 2 || id === 3 || id === 60 || m === 'grass' || m === 'ground' ? 1 : 0;
+				case 'Water': return m === 'water' ? 1 : 0;
+				case 'Beach':
+					return (id === 2 || id === 3 || id === 12 || m === 'grass' || m === 'ground' || m === 'sand') &&
+						(waterAt(vm, w, x - 1, y, z) || waterAt(vm, w, x + 1, y, z) || waterAt(vm, w, x, y, z - 1) || waterAt(vm, w, x, y, z + 1)) ? 1 : 0;
+			}
+			return 0;
+		};
+		Object.keys(dflt).forEach(function (k) { if (!B.methods[k]) B.methods[k] = dflt[k]; });
+	}
+	add('EntityLiving', { 'attackEntityFrom(Lnet/minecraft/src/DamageSource;I)Z': hurt, 'attackEntityFrom(Lnet/minecraft/src/DamageSource;F)Z': hurt });
+}
+JVM.installContact = install;
+
+function installWorldServices(vm) {
+	var def = function (n, s) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, s); };
+	def('ChunkCoordIntPair', { fields: { chunkXPos: 'I', chunkZPosition: 'I' }, methods: {
+		'<init>(II)V': function (vm, self, a) { self[':chunkXPos'] = a[0]; self[':chunkZPosition'] = a[1]; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0][':chunkXPos'] === self[':chunkXPos'] && a[0][':chunkZPosition'] === self[':chunkZPosition'] ? 1 : 0; },
+		'hashCode()I': function (vm, self) { var x = self[':chunkXPos'] | 0, z = self[':chunkZPosition'] | 0; return ((1664525 * x + 1013904223) ^ (1664525 * (z ^ -559038737) + 1013904223)) | 0; },
+		'getCenterXPos()I': function (vm, self) { return (self[':chunkXPos'] << 4) + 8; },
+		'getCenterZPosition()I': function (vm, self) { return (self[':chunkZPosition'] << 4) + 8; },
+		'toString()Ljava/lang/String;': function (vm, self) { return '[' + self[':chunkXPos'] + ', ' + self[':chunkZPosition'] + ']'; },
+	} });
+	def('Profiler', { methods: {
+		'<init>()V': function () {},
+		'startSection(Ljava/lang/String;)V': function () {}, 'endSection()V': function () {}, 'endStartSection(Ljava/lang/String;)V': function () {},
+		'clearProfiling()V': function () {}, 'getNameOfLastSection()Ljava/lang/String;': function () { return 'root'; },
+	} });
+	var weather = function (vm) { var w = op(vm, 'world'); return w || {}; };
+	var addTo = function (n, m) { var s = vm.natives[SRC + n]; if (s) Object.keys(m).forEach(function (k) { s.methods[k] = m[k]; }); };
+	var rain = { 'isRaining()Z': function (vm) { return weather(vm).raining ? 1 : 0; }, 'isThundering()Z': function (vm) { return weather(vm).thundering ? 1 : 0; } };
+	addTo('WorldInfo', rain);
+	addTo('World', Object.assign({}, rain, {
+		'getRainStrength(F)F': function (vm) { return weather(vm).raining ? 1 : 0; },
+		'getChunkFromChunkCoords(II)Lnet/minecraft/src/Chunk;': function (vm, self, a) { return liveChunk(vm, self, a[0], a[1]); },
+		'getChunkFromBlockCoords(II)Lnet/minecraft/src/Chunk;': function (vm, self, a) { return liveChunk(vm, self, a[0] >> 4, a[1] >> 4); },
+		'canBlockFreeze(IIIZ)Z': function () { return 0; },
+		'isBlockFreezable(III)Z': function () { return 0; },
+		'canSnowAt(III)Z': function () { return 0; },
+	}));
+	addTo('WorldProvider', { 'canDoRainSnowIce(Lnet/minecraft/src/Chunk;)Z': function () { return 1; }, 'canDoLightning(Lnet/minecraft/src/Chunk;)Z': function () { return 1; } });
+	function liveChunk(vm, world, cx, cz) {
+		var cache = vm.$liveChunks || (vm.$liveChunks = {}), k = cx + ',' + cz;
+		if (cache[k]) return cache[k];
+		var c = vm.newObject(vm.loadClass(SRC + 'Chunk'));
+		c.$live = world; c[':xPosition'] = cx; c[':zPosition'] = cz; c[':worldObj'] = world; c[':isTerrainPopulated'] = 1;
+		return (cache[k] = c);
+	}
+	var CH = vm.natives[SRC + 'Chunk'];
+	if (CH) {
+		var live = function (name, desc, fn) {
+			var key = name + desc, orig = CH.methods[key];
+			CH.methods[key] = function (vm, self, a) { return self.$live ? fn(vm, self, a) : orig ? orig(vm, self, a) : 0; };
+		};
+		var W = function (self) { return self.$live; }, bx = function (self, x) { return (self[':xPosition'] << 4) + (x & 15); }, bz = function (self, z) { return (self[':zPosition'] << 4) + (z & 15); };
+		live('getBlockID', '(III)I', function (vm, self, a) { return vm.callVirtual(W(self), 'getBlockId', '(III)I', [bx(self, a[0]), a[1], bz(self, a[2])]); });
+		live('getBlockMetadata', '(III)I', function (vm, self, a) { return vm.callVirtual(W(self), 'getBlockMetadata', '(III)I', [bx(self, a[0]), a[1], bz(self, a[2])]); });
+		live('setBlockID', '(IIII)Z', function (vm, self, a) { return vm.callVirtual(W(self), 'setBlock', '(IIII)Z', [bx(self, a[0]), a[1], bz(self, a[2]), a[3]]); });
+		live('setBlockIDWithMetadata', '(IIIII)Z', function (vm, self, a) { return vm.callVirtual(W(self), 'setBlock', '(IIIIII)Z', [bx(self, a[0]), a[1], bz(self, a[2]), a[3], a[4], 3]); });
+		live('setBlockMetadata', '(IIII)V', function (vm, self, a) { vm.callVirtual(W(self), 'setBlockMetadataWithNotify', '(IIIII)Z', [bx(self, a[0]), a[1], bz(self, a[2]), a[3], 3]); });
+		live('getHeightValue', '(II)I', function (vm, self, a) { return vm.callVirtual(W(self), 'getHeightValue', '(II)I', [bx(self, a[0]), bz(self, a[1])]); });
+		live('getChunkPosition', '()Lnet/minecraft/src/ChunkCoordIntPair;', function (vm, self) { var p = vm.newObject(vm.loadClass(SRC + 'ChunkCoordIntPair')); p[':chunkXPos'] = self[':xPosition']; p[':chunkZPosition'] = self[':zPosition']; return p; });
+		live('getBiomeGenForWorldCoords', '(IILnet/minecraft/src/WorldChunkManager;)Lnet/minecraft/src/BiomeGenBase;', function (vm, self, a) { return JVM.biomeAt ? JVM.biomeAt(vm, bx(self, a[0]), bz(self, a[1])) : null; });
+	}
+	var world = JVM.mc152.worldObj(vm);
+	if (!world[':theProfiler']) world[':theProfiler'] = vm.newObject(vm.loadClass(SRC + 'Profiler'));
+	var ft = JVM.forgeTick;
+	if (ft && !ft.$chunks) {
+		JVM.forgeTick = function (vm) {
+			if (((vm.mcTicks | 0) % 20) === 1 || !vm.mcWorld || !vm.mcWorld[':activeChunkSet']) refreshActive(vm);
+			return ft.apply(this, arguments);
+		};
+		JVM.forgeTick.$chunks = true;
+	}
+}
+function refreshActive(vm) {
+	var w = JVM.mc152.worldObj(vm);
+	if (!w[':theProfiler']) w[':theProfiler'] = vm.newObject(vm.loadClass(SRC + 'Profiler'));
+	var set = w[':activeChunkSet'];
+	JVM.run(vm, function () {
+		if (!set) { set = vm.newObject(vm.loadClass('java/util/HashSet')); vm.callVirtual(set, '<init>', '()V', []); w[':activeChunkSet'] = set; }
+		vm.callVirtual(set, 'clear', '()V', []);
+		var ps = op(vm, 'players') || [], seen = {};
+		ps.forEach(function (pp) {
+			var info = op(vm, 'ent', pp[0]);
+			if (!info) return;
+			var cx = Math.floor(info.x / 16), cz = Math.floor(info.z / 16);
+			for (var dx = -7; dx <= 7; dx++) for (var dz = -7; dz <= 7; dz++) {
+				var k = (cx + dx) + ',' + (cz + dz);
+				if (seen[k]) continue;
+				seen[k] = 1;
+				var p = vm.newObject(vm.loadClass(SRC + 'ChunkCoordIntPair'));
+				p[':chunkXPos'] = cx + dx; p[':chunkZPosition'] = cz + dz;
+				vm.callVirtual(set, 'add', '(Ljava/lang/Object;)Z', [p]);
+			}
+		});
+	});
+}
+JVM.installWorldServices = installWorldServices;
+
+JVM.entityInside = function (vm, blk, world, x, y, z, e, playerObj) {
+	var info = e.entity || e.player;
+	if (!info) return;
+	var o = playerObj;
+	if (!o) {
+		o = vm.$insideEnts && vm.$insideEnts[info.id];
+		if (!o) {
+			o = vm.newObject(vm.loadClass(SRC + 'EntityLiving'));
+			(vm.$insideEnts || (vm.$insideEnts = {}))[info.id] = o;
+		}
+		o.$entityId = info.id;
+		o[':worldObj'] = world;
+	}
+	o.$info = Object.assign({}, o.$info || {}, info);
+	var vx = +e.vx || 0, vy = +e.vy || 0, vz = +e.vz || 0;
+	o[':posX'] = +info.x || 0; o[':posY'] = +info.y || 0; o[':posZ'] = +info.z || 0;
+	o[':motionX'] = vx; o[':motionY'] = vy; o[':motionZ'] = vz;
+	o[':fallDistance'] = +e.fall || 0;
+	o.$inWeb = false;
+	var res = JVM.run(vm, function () { vm.callVirtual(blk, 'onEntityCollidedWithBlock', '(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V', [world, x, y, z, o]); });
+	if (!res.ok) return;
+	var id = info.id;
+	var nx = +o[':motionX'], ny = +o[':motionY'], nz = +o[':motionZ'];
+	if (o.$inWeb) {
+		var webs = vm.$webSet || (vm.$webSet = {});
+		nx *= 0.25; nz *= 0.25;
+		if (webs[id] !== undefined && Math.abs(vy - webs[id]) < 1e-6) ny = vy;
+		else { var target = (vy > 0.05 ? vy : -0.0784) * 0.05; ny = target / 0.98 + 0.08; webs[id] = ny; }
+		if (Math.abs(vx - (webs['x' + id] || 0)) < 1e-6) nx = vx;
+		if (Math.abs(vz - (webs['z' + id] || 0)) < 1e-6) nz = vz;
+		webs['x' + id] = nx; webs['z' + id] = nz;
+	}
+	var eps = 1e-6;
+	if (Math.abs(nx - vx) > eps) op(vm, 'setvel', id, 'x', nx);
+	if (Math.abs(ny - vy) > eps) op(vm, 'setvel', id, 'y', ny);
+	if (Math.abs(nz - vz) > eps) op(vm, 'setvel', id, 'z', nz);
+};
 })();
 
 (function () {
