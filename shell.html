@@ -2040,7 +2040,9 @@
                     case 'fullbright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 1) : undefined;
                     case 'bright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 2) : undefined;
                     case 'gentick': if (Module._mcJavaGenTick) Module._mcJavaGenTick(x, y, z); return 0;
-                    case 'biome': return mp(['biome', x, y].join('\t'));
+                    case 'biome':
+                        if (Module._mcJavaGenBiome) { var gb = Module.ccall('mcJavaGenBiome', 'string', ['number', 'number'], [x, y]); if (gb) return gb; }
+                        return mp(['biome', x, y].join('\t'));
                     default:
                         if (vm) vm.warnOnce('gen:' + name, 'game action "' + name + '" is not available while the world generates (left unplugged)');
                         return undefined;
