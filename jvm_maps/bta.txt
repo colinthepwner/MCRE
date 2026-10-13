@@ -22,10 +22,108 @@ C	net/minecraft/core/entity/EntityItem	net/minecraft/src/EntityItem
 C	net/minecraft/core/block/entity/TileEntity	net/minecraft/src/TileEntity
 C	com/mojang/nbt/tags/CompoundTag	net/minecraft/src/NBTTagCompound
 C	com/mojang/nbt/tags/ListTag	net/minecraft/src/NBTTagList
-F	net/minecraft/core/item/Item	id	id	itemID
-F	net/minecraft/core/item/Item	maxStackSize	maxStackSize	maxStackSize
-F	net/minecraft/core/item/Item	hasSubtypes	hasSubtypes	hasSubtypes
-F	net/minecraft/core/block/Block	blockHardness	blockHardness	blockHardness
+F	net/minecraft/core/item/Item	id	-	itemID
+F	net/minecraft/core/item/Item	maxStackSize	-	maxStackSize
+F	net/minecraft/core/item/Item	hasSubtypes	-	hasSubtypes
+F	net/minecraft/core/block/Block	blockHardness	-	blockHardness
+F	net/minecraft/core/entity/Entity	random	-	rand
+F	net/minecraft/core/entity/Entity	world	-	worldObj
+F	net/minecraft/core/entity/Entity	x	-	posX
+F	net/minecraft/core/entity/Entity	y	-	posY
+F	net/minecraft/core/entity/Entity	z	-	posZ
+F	net/minecraft/core/entity/Entity	xo	-	prevPosX
+F	net/minecraft/core/entity/Entity	yo	-	prevPosY
+F	net/minecraft/core/entity/Entity	zo	-	prevPosZ
+F	net/minecraft/core/entity/Entity	xd	-	motionX
+F	net/minecraft/core/entity/Entity	yd	-	motionY
+F	net/minecraft/core/entity/Entity	zd	-	motionZ
+F	net/minecraft/core/entity/Entity	yRot	-	rotationYaw
+F	net/minecraft/core/entity/Entity	xRot	-	rotationPitch
+F	net/minecraft/core/entity/Entity	yRotO	-	prevRotationYaw
+F	net/minecraft/core/entity/Entity	xRotO	-	prevRotationPitch
+F	net/minecraft/core/entity/Entity	removed	-	isDead
+F	net/minecraft/core/entity/Entity	id	-	entityId
+F	net/minecraft/core/entity/Entity	passenger	-	riddenByEntity
+F	net/minecraft/core/entity/Entity	bbWidth	-	width
+F	net/minecraft/core/entity/Entity	bbHeight	-	height
+F	net/minecraft/core/entity/Entity	heightOffset	-	yOffset
+F	net/minecraft/core/entity/Entity	horizontalCollision	-	isCollidedHorizontally
+F	net/minecraft/core/entity/Entity	verticalCollision	-	isCollidedVertically
+F	net/minecraft/core/entity/Entity	collision	-	isCollided
+F	net/minecraft/core/entity/Entity	walkDistO	-	prevDistanceWalkedModified
+F	net/minecraft/core/entity/Entity	walkDist	-	distanceWalkedModified
+F	net/minecraft/core/entity/Entity	remainingFireTicks	-	fire
+F	net/minecraft/core/entity/Entity	airSupply	-	air
+F	net/minecraft/core/entity/Entity	fireImmune	-	isImmuneToFire
+F	net/minecraft/core/entity/Entity	tickCount	-	ticksExisted
+F	net/minecraft/core/block/Block	blastResistance	-	blockResistance
+F	net/minecraft/core/block/Block	emission	-	lightValue
+F	net/minecraft/core/block/Block	shouldTick	-	needsRandomTick
+F	net/minecraft/core/block/Block	blockSound	-	stepSound
+S	net/minecraft/client/sound/NamedSoundRepository	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/client/sound/SoundRepository	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/client/sound/MusicCategory	java/lang/Enum	
+S	net/minecraft/client/sound/CodecMus$DecoderInputStream	java/io/InputStream	
+S	net/minecraft/client/sound/CodecMus	paulscode/sound/codecs/CodecJOrbis	
+S	net/minecraft/client/sound/SoundEntry$Type	java/lang/Enum	
+S	net/minecraft/client/sound/Soundtrack	java/lang/Enum	
+S	net/minecraft/client/entity/player/PlayerRemote	net/minecraft/core/entity/player/Player	
+S	net/minecraft/client/entity/player/PlayerLocal	net/minecraft/core/entity/player/Player	
+S	net/minecraft/client/entity/player/PlayerLocalMultiplayer	net/minecraft/client/entity/player/PlayerLocal	net/minecraft/core/entity/player/Player$PlayerConfig$PlayerConfigListener
+S	net/minecraft/client/entity/ClientSkinVariantList	net/minecraft/core/entity/SkinVariantList	
+S	net/minecraft/client/entity/ClientSkinVariantList$EntityVariants$VariantEntry	java/lang/Record	
+S	net/minecraft/client/discord/RichPresenceHandlerThread	java/lang/Thread	
+S	net/minecraft/client/option/OptionInteger	net/minecraft/client/option/Option	
+S	net/minecraft/client/option/OptionGuiScaleOverride	net/minecraft/client/option/OptionToggleable	
+S	net/minecraft/client/option/OptionBoolean	net/minecraft/client/option/OptionToggleable	net/minecraft/core/util/helper/Toggleable
+S	net/minecraft/client/option/OptionTooltip	net/minecraft/client/option/OptionToggleable	net/minecraft/core/util/helper/Toggleable
+S	net/minecraft/client/option/OptionGuiScale	net/minecraft/client/option/OptionToggleable	
+S	net/minecraft/client/option/OptionString	net/minecraft/client/option/Option	
+S	net/minecraft/client/option/OptionFloat	net/minecraft/client/option/Option	
+S	net/minecraft/client/option/OptionToggleable	net/minecraft/client/option/Option	net/minecraft/core/util/helper/Toggleable
+S	net/minecraft/client/option/OptionImmersiveMode	net/minecraft/client/option/OptionInteger	
+S	net/minecraft/client/option/OptionColor	net/minecraft/client/option/Option	
+S	net/minecraft/client/option/OptionVolume	net/minecraft/client/option/OptionFloat	
+S	net/minecraft/client/option/OptionFont	net/minecraft/client/option/OptionToggleable	net/minecraft/core/util/helper/Toggleable
+S	net/minecraft/client/option/enums/RenderScale	java/lang/Enum	
+S	net/minecraft/client/option/enums/MSAA	java/lang/Enum	
+S	net/minecraft/client/option/enums/LeavesQuality	java/lang/Enum	
+S	net/minecraft/client/option/enums/ParticlesQuality	java/lang/Enum	
+S	net/minecraft/client/option/enums/Colorblindness	java/lang/Enum	
+S	net/minecraft/client/option/enums/DescriptionPromptEnum	java/lang/Enum	
+S	net/minecraft/client/option/enums/MipmapType	java/lang/Enum	
+S	net/minecraft/client/option/enums/LightmapStyle	java/lang/Enum	
+S	net/minecraft/client/option/enums/TooltipStyle	java/lang/Enum	
+S	net/minecraft/client/option/enums/RenderDistance	java/lang/Enum	
+S	net/minecraft/client/option/enums/TextureAnimation	java/lang/Enum	
+S	net/minecraft/client/option/enums/TextOutlineQuality	java/lang/Enum	
+S	net/minecraft/client/option/enums/CloudQuality	java/lang/Enum	
+S	net/minecraft/client/option/OptionRange	net/minecraft/client/option/OptionToggleable	
+S	net/minecraft/client/option/OptionEnum	net/minecraft/client/option/OptionToggleable	net/minecraft/core/util/helper/Toggleable
+S	net/minecraft/client/input/controller/ControllerType$Layout	java/lang/Enum	
+S	net/minecraft/client/input/controller/Button	java/lang/Object	net/minecraft/client/input/controller/IButton
+S	net/minecraft/client/input/controller/ControllerType	java/lang/Enum	
+S	net/minecraft/client/input/glfw/GlfwGamepad	java/lang/Object	net/minecraft/client/input/Gamepad
+S	net/minecraft/client/input/glfw/FakeGamepad	net/minecraft/client/input/glfw/GlfwGamepad	
+S	net/minecraft/client/input/InputDeviceKeyboard	net/minecraft/client/input/InputDevice	
+S	net/minecraft/client/input/InputDeviceMouse	net/minecraft/client/input/InputDevice	
+S	net/minecraft/client/input/InputType	java/lang/Enum	
+S	net/minecraft/client/console/LogMessage$Level	java/lang/Enum	
+S	net/minecraft/client/console/syntax/RendererFactory	java/lang/Object	com/codewaves/codehighlight/core/StyleRendererFactory
+S	net/minecraft/client/console/syntax/HighlightedRenderer	java/lang/Object	com/codewaves/codehighlight/core/StyleRenderer
+S	net/minecraft/client/Minecraft$1	java/lang/Thread	
+S	net/minecraft/client/Minecraft$2$1	java/awt/event/MouseAdapter	
+S	net/minecraft/client/net/handler/PacketHandlerClient	net/minecraft/core/net/handler/PacketHandler	
+S	net/minecraft/client/net/handler/PingPacketHandler	net/minecraft/core/net/handler/PacketHandler	
+S	net/minecraft/client/net/thread/ThreadPingServer	java/lang/Thread	
+S	net/minecraft/client/net/thread/ThreadDownloadResources$ThreadDownloadState	java/lang/Enum	
+S	net/minecraft/client/net/thread/ThreadDownloadResources$SoundEntry	java/lang/Record	
+S	net/minecraft/client/net/thread/ThreadDownloadResources	java/lang/Thread	
+S	net/minecraft/client/net/thread/ThreadDownloadImage	java/lang/Thread	
+S	net/minecraft/client/net/command/ClientCommandSource	java/lang/Object	net/minecraft/core/net/command/CommandSource
+S	net/minecraft/client/Minecraft	java/lang/Object	net/minecraft/core/MinecraftAccessor
+S	net/minecraft/client/player/controller/PlayerControllerMP	net/minecraft/client/player/controller/PlayerController	
+S	net/minecraft/client/player/controller/PlayerControllerSP	net/minecraft/client/player/controller/PlayerController	
 S	net/minecraft/client/render/particle/ParticleFirefly	net/minecraft/client/render/particle/Particle	
 S	net/minecraft/client/render/particle/ParticleHeart	net/minecraft/client/render/particle/Particle	
 S	net/minecraft/client/render/particle/ParticlePuffRGB	net/minecraft/client/render/particle/Particle	
@@ -327,6 +425,331 @@ S	net/minecraft/client/render/RenderGlobal	java/lang/Object	net/minecraft/core/w
 S	net/minecraft/client/render/FogManager$FogState$Mode	java/lang/Enum	
 S	net/minecraft/client/render/FrameBufferMultisampled	net/minecraft/client/render/FrameBuffer	
 S	net/minecraft/client/render/LoadingScreenRenderer	java/lang/Object	net/minecraft/core/world/ProgressListener
+S	net/minecraft/client/enums/EnumGPUVendor	java/lang/Enum	
+S	net/minecraft/client/enums/SelectedSoundtrack	java/lang/Enum	net/minecraft/core/util/helper/ITranslatable
+S	net/minecraft/client/enums/MusicFrequency	java/lang/Enum	net/minecraft/core/util/helper/ITranslatable
+S	net/minecraft/client/util/helper/ItemDragHandler	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/util/debug/OpenGLLoggerCallback	java/lang/Object	org/lwjgl/opengl/GLDebugMessageCallbackI
+S	net/minecraft/client/util/debug/GLFWLoggerCallback	java/lang/Object	org/lwjgl/glfw/GLFWErrorCallbackI
+S	net/minecraft/client/gui/guidebook/search/GuidebookSectionSearch	net/minecraft/client/gui/guidebook/GuidebookSection	
+S	net/minecraft/client/gui/guidebook/search/GuidebookPageSearch	net/minecraft/client/gui/guidebook/GuidebookPage	
+S	net/minecraft/client/gui/guidebook/cover/GuidebookSectionCover	net/minecraft/client/gui/guidebook/GuidebookSection	
+S	net/minecraft/client/gui/guidebook/cover/GuidebookPageCover	net/minecraft/client/gui/guidebook/GuidebookPage	
+S	net/minecraft/client/gui/guidebook/smelting/RecipePageSmelting	net/minecraft/client/gui/guidebook/RecipePage	
+S	net/minecraft/client/gui/guidebook/smelting/RecipePageBlastSmelting	net/minecraft/client/gui/guidebook/RecipePage	
+S	net/minecraft/client/gui/guidebook/smelting/GuidebookSectionBlastSmelting	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	
+S	net/minecraft/client/gui/guidebook/smelting/GuidebookSectionSmelting	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	
+S	net/minecraft/client/gui/guidebook/trommeling/RecipePageTrommel	net/minecraft/client/gui/guidebook/RecipePage	
+S	net/minecraft/client/gui/guidebook/trommeling/GuidebookSectionTrommel	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	
+S	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	net/minecraft/client/gui/guidebook/GuidebookSection	
+S	net/minecraft/client/gui/guidebook/crafting/GuidebookSectionCrafting	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabel$SlotGuidebookNamedOutput	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterMapDuplication	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterRepairable	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterShaped	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterDyeing	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabelDye$SlotGuidebookLabel	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterTool	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterShapeless	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/displayAdapterScrap$SlotGuidebookScrapYield	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabelDye$SlotGuidebookNamedOutput	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterDyeing$SlotGuidebookDyeResult	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterRepairable$SlotGuidebookMaterial	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabel	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/displayAdapterScrap$SlotGuidebookToScrap	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabelDye$SlotGuidebookDye	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabelDye	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterCraftingGroup	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterRepairable$SlotGuidebookRepairOutput	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterDyeing$SlotGuidebookDye	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabel$SlotGuidebookUnnamedInput	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/displayAdapterScrap	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterCraftingGroup$SlotGuidebookCraftingGroup	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterRepairable$SlotGuidebookRepairable	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterUndye	java/lang/Object	net/minecraft/client/gui/guidebook/crafting/displays/RecipeDisplayAdapter
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterLabel$SlotGuidebookLabel	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/displays/DisplayAdapterTool$SlotGuidebookTool	net/minecraft/client/gui/guidebook/SlotGuidebook	
+S	net/minecraft/client/gui/guidebook/crafting/RecipeEntryCraftingGroup	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCrafting	
+S	net/minecraft/client/gui/guidebook/crafting/RecipePageCrafting	net/minecraft/client/gui/guidebook/RecipePage	
+S	net/minecraft/client/gui/guidebook/SlotGuidebook	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/client/gui/guidebook/ScreenGuidebook	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/guidebook/mobs/GuidebookPageMob	net/minecraft/client/gui/guidebook/GuidebookPage	
+S	net/minecraft/client/gui/guidebook/mobs/GuidebookSectionMob	net/minecraft/client/gui/guidebook/SearchableGuidebookSection	
+S	net/minecraft/client/gui/guidebook/mobs/GuidebookSectionMob$Index	net/minecraft/client/gui/guidebook/GuidebookSection$Index	
+S	net/minecraft/client/gui/guidebook/GuidebookPage	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/guidebook/RecipePage	net/minecraft/client/gui/guidebook/GuidebookPage	
+S	net/minecraft/client/gui/guidebook/index/GuidebookSectionIndex	net/minecraft/client/gui/guidebook/GuidebookSection	
+S	net/minecraft/client/gui/guidebook/index/GuidebookPageIndex	net/minecraft/client/gui/guidebook/GuidebookPage	
+S	net/minecraft/client/gui/guidebook/ScreenGuidebook$Tab	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/toasts/GuiElementToastsHud$ToastEntry	java/lang/Record	
+S	net/minecraft/client/gui/toasts/GuiElementToastsHud	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/toasts/MusicToast	java/lang/Object	net/minecraft/client/gui/toasts/IToastable
+S	net/minecraft/client/gui/toasts/AchievementToast	java/lang/Object	net/minecraft/client/gui/toasts/IToastable
+S	net/minecraft/client/gui/nbteditor/ScreenNBTEditor	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	net/minecraft/client/gui/nbteditor/components/AbstractTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/AbstractTagComponent	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/nbteditor/components/DoubleArrayTagComponent	net/minecraft/client/gui/nbteditor/components/ArrayTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ByteArrayTagComponent	net/minecraft/client/gui/nbteditor/components/ArrayTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/LongArrayTagComponent	net/minecraft/client/gui/nbteditor/components/ArrayTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/IntTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ShortTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/StringTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/FloatTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ArrayTagComponent	net/minecraft/client/gui/nbteditor/components/AbstractTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ByteTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ListTagComponent	net/minecraft/client/gui/nbteditor/components/AbstractTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/ShortArrayTagComponent	net/minecraft/client/gui/nbteditor/components/ArrayTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/CompoundTagComponent	net/minecraft/client/gui/nbteditor/components/AbstractTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/LongTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/nbteditor/components/DoubleTagComponent	net/minecraft/client/gui/nbteditor/components/ValueTagComponent	
+S	net/minecraft/client/gui/ScreenStats$ItemStatisticsList	net/minecraft/client/gui/ScreenStats$StatsSelectionList	
+S	net/minecraft/client/gui/ScreenSleepSP	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ControllerGlyphElement	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/Screen	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/IntegerSliderElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/ScreenHudEditor	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenConnectFailed	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ExceptionPopupElement$PopupListener	java/lang/Object	net/minecraft/client/gui/popup/PopupCloseListener
+S	net/minecraft/client/gui/DrawableSurfaceElement	net/minecraft/client/gui/Gui	net/minecraft/client/gui/drawing/IDrawableSurface
+S	net/minecraft/client/gui/ScreenFontTest	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/CycleButtonElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/ScreenConsole	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/SwitchElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/keyboard/ScreenKeyboard	net/minecraft/client/gui/Screen	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/keyboard/keys/GroupKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/ModifierKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/EnterKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/GroupKey$Mode	java/lang/Enum	
+S	net/minecraft/client/gui/keyboard/keys/Key	net/minecraft/client/gui/Gui	net/minecraft/client/gui/GuiElement
+S	net/minecraft/client/gui/keyboard/keys/BackspaceKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/ModifierKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/keyboard/keys/EnterKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/keyboard/keys/Key$ButtonEnum	java/lang/Enum	
+S	net/minecraft/client/gui/keyboard/keys/CursorKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/CharKey$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/CursorKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/keyboard/keys/GroupKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/keyboard/keys/Key$Serializer	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/client/gui/keyboard/keys/BackspaceKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/keyboard/keys/CharKey	net/minecraft/client/gui/keyboard/keys/Key	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryBlock$BlockRenderInfo	net/minecraft/client/gui/modelviewer/categories/ModelViewerCategory$Info	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryBlock$2	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryBlock	net/minecraft/client/gui/modelviewer/categories/ModelViewerCategory	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryBlock$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryEntity$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryGeneric	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryBubble	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryGeneric	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryRedstone$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryBlock$2	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryItem$2	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryNote$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryLeaf	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryGeneric	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryItem$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryBlock$3	net/minecraft/client/gui/modelviewer/elements/ListSelectorButtonElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryBlock	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryGeneric	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryNote	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryItem	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryRedstone	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/particle/ParticleEntryBlock$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryBoat$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryWolf$3	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryItem$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryFallingBlock$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryFallingBlock	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryMinecart	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryCreeper	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryMinecart$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryTNT	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryDispatcher	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryFallingBlock$2	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryWolf$2	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryPainting	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryPainting$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryTNT$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntrySlime	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryBlank	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntrySheep	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryWolf	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryBoat	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryItem$2	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryWolf$1	net/minecraft/client/gui/modelviewer/elements/ListSelectorButtonElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryFirefly	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryItem	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryFirefly$1	net/minecraft/client/gui/modelviewer/elements/ListSelectorButtonElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntryArmoredZombie	net/minecraft/client/gui/modelviewer/categories/entries/entity/EntityEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryMobSpawner	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryJar	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryJar$2	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryJar$1	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntrySign$1	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntrySign	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntry	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryMobSpawner$1	net/minecraft/client/gui/modelviewer/elements/ListSelectorButtonElement	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryMobSpawner$2	java/util/ArrayList	
+S	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntryBasic	net/minecraft/client/gui/modelviewer/categories/entries/block/BlockEntry	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryParticle	net/minecraft/client/gui/modelviewer/categories/ModelViewerCategory	
+S	net/minecraft/client/gui/modelviewer/categories/ViewerCategoryEntity	net/minecraft/client/gui/modelviewer/categories/ModelViewerCategory	
+S	net/minecraft/client/gui/modelviewer/elements/ListenerTextFieldElement	net/minecraft/client/gui/modelviewer/elements/ListenerButtonElement	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/modelviewer/elements/ListSelectorButtonElement	net/minecraft/client/gui/modelviewer/elements/ListenerButtonElement	
+S	net/minecraft/client/gui/modelviewer/elements/ListenerSliderElement	net/minecraft/client/gui/SliderElement	net/minecraft/client/gui/modelviewer/elements/IListenerElement
+S	net/minecraft/client/gui/modelviewer/elements/TextCycleElement	net/minecraft/client/gui/modelviewer/elements/ListenerButtonElement	
+S	net/minecraft/client/gui/modelviewer/elements/ListenerButtonElement	net/minecraft/client/gui/ButtonElement	net/minecraft/client/gui/modelviewer/elements/IListenerElement
+S	net/minecraft/client/gui/modelviewer/ScreenModelViewer	net/minecraft/client/gui/ScreenPhotoMode	net/minecraft/client/gui/modelviewer/elements/ListenerTextFieldElement$ITextChangeListener
+S	net/minecraft/client/gui/ScreenSoundTest	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenWandMobPicker	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenStats	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/paged/ScreenPaged	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/paged/CallbackComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/ScreenCreateWorld	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenMobPicker	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenStats$StatsSelectionList	net/minecraft/client/gui/ScrolledSelectionList	
+S	net/minecraft/client/gui/ScreenLabelEditor	net/minecraft/client/gui/Screen	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/ScreenControllerSetup	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenPaintingPicker	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenStats$GeneralStatisticsList	net/minecraft/client/gui/ScrolledSelectionList	
+S	net/minecraft/client/gui/TooltipElement	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/ScreenAddServer	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenPause	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/worldsettings/gamerule/EnumGameRuleComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/worldsettings/gamerule/IntegerGameRuleComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/worldsettings/gamerule/BooleanGameRuleComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/worldsettings/CategoryMobSpawningComponent$Type	java/lang/Enum	
+S	net/minecraft/client/gui/worldsettings/ButtonComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/worldsettings/settingnode/RangeIntegerNodeComponent	net/minecraft/client/gui/worldsettings/settingnode/ValueNodeComponent	
+S	net/minecraft/client/gui/worldsettings/settingnode/ListValueNodeComponent	net/minecraft/client/gui/worldsettings/settingnode/ValueNodeComponent	
+S	net/minecraft/client/gui/worldsettings/settingnode/RangeIntegerNodeComponent$IntegerSliderElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/worldsettings/settingnode/BooleanValueNodeComponent	net/minecraft/client/gui/worldsettings/settingnode/ValueNodeComponent	
+S	net/minecraft/client/gui/worldsettings/settingnode/CategoryComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/worldsettings/settingnode/ValueNodeComponent	net/minecraft/client/gui/worldsettings/settingnode/NestedNodeComponent	
+S	net/minecraft/client/gui/worldsettings/settingnode/NestedNodeComponent	java/lang/Object	net/minecraft/client/gui/worldsettings/NodeComponent
+S	net/minecraft/client/gui/worldsettings/CategoryMobSpawningComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/worldsettings/NodeComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/worldsettings/EntryMobSpawningComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/worldsettings/ScreenWorldSettings	net/minecraft/client/gui/paged/ScreenPaged	net/minecraft/core/world/settings/WorldConfiguration$ChangeListener
+S	net/minecraft/client/gui/worldsettings/WorldTypeButtonComponent	net/minecraft/client/gui/worldsettings/ButtonComponent	
+S	net/minecraft/client/gui/TexturedButtonElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/ControllerGlyphElement$Glyph	java/lang/Enum	
+S	net/minecraft/client/gui/ScreenStats$BlockStatisticsList	net/minecraft/client/gui/ScreenStats$StatsSelectionList	
+S	net/minecraft/client/gui/ScreenSelectWorld	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenConsole$LogRenderer	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/popup/MessageBoxComponent	net/minecraft/client/gui/popup/PopupComponent	
+S	net/minecraft/client/gui/popup/PopupScreen	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/popup/ButtonComponent	net/minecraft/client/gui/popup/InteractivePopupComponent	
+S	net/minecraft/client/gui/popup/TextInputComponent	net/minecraft/client/gui/popup/InteractivePopupComponent	
+S	net/minecraft/client/gui/popup/ButtonGroupComponent	net/minecraft/client/gui/popup/PopupComponent	
+S	net/minecraft/client/gui/popup/ListComponent	net/minecraft/client/gui/popup/InteractivePopupComponent	
+S	net/minecraft/client/gui/popup/SwitchComponent	net/minecraft/client/gui/popup/InteractivePopupComponent	
+S	net/minecraft/client/gui/popup/InteractivePopupComponent	net/minecraft/client/gui/popup/PopupComponent	
+S	net/minecraft/client/gui/popup/LabelComponent	net/minecraft/client/gui/popup/PopupComponent	
+S	net/minecraft/client/gui/HeldItemTooltipElement	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/ButtonElement	net/minecraft/client/gui/Gui	net/minecraft/client/gui/GuiElement
+S	net/minecraft/client/gui/ScreenDownloadTerrain	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/achievements/pages/AchievementPageOverworld	net/minecraft/client/gui/achievements/data/AchievementPage	
+S	net/minecraft/client/gui/achievements/pages/AchievementPageNether	net/minecraft/client/gui/achievements/data/AchievementPage	
+S	net/minecraft/client/gui/achievements/ScreenAchievements	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenCredits$Thanks	java/lang/Object	net/minecraft/client/gui/ScreenCredits$CreditElement
+S	net/minecraft/client/gui/ScreenBlank	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenPhotoMode	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenCredits	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ClickableLabelElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/server/ServerListenerThread	java/lang/Thread	
+S	net/minecraft/client/gui/server/SeverDirectConnectComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/server/ScreenSelectServer	net/minecraft/client/gui/paged/ScreenPaged	
+S	net/minecraft/client/gui/server/ServerEntryComponent	java/lang/Object	net/minecraft/client/gui/paged/PageComponent
+S	net/minecraft/client/gui/SliderElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/ScreenMainMenu	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenCredits$Credit	java/lang/Record	net/minecraft/client/gui/ScreenCredits$CreditElement
+S	net/minecraft/client/gui/ScreenCredits$Category	java/lang/Record	net/minecraft/client/gui/ScreenCredits$CreditElement
+S	net/minecraft/client/gui/TextFieldElement	net/minecraft/client/gui/Gui	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/hud/HudIngameDoom	net/minecraft/client/gui/hud/HudIngame	
+S	net/minecraft/client/gui/hud/component/HudComponentInfoOverlay	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentCrosshair	net/minecraft/client/gui/hud/component/HudComponent	
+S	net/minecraft/client/gui/hud/component/HudComponentVehicleHealthBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentAcidBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentSubtitles	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/ComponentAnchor	java/lang/Enum	
+S	net/minecraft/client/gui/hud/component/HudComponentArmorBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentLog	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentOxygenBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentFireBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/layout/LayoutSnap	net/minecraft/client/gui/hud/component/layout/Layout	
+S	net/minecraft/client/gui/hud/component/layout/LayoutAbsolute	net/minecraft/client/gui/hud/component/layout/Layout	
+S	net/minecraft/client/gui/hud/component/HudComponentHealthBar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentChatInput	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentRotationLock	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentHeldItemCount	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentArmorDurability	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentArmorBar$ArmorState	java/lang/Enum	
+S	net/minecraft/client/gui/hud/component/HudComponentHotbar	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentMovable	net/minecraft/client/gui/hud/component/HudComponent	
+S	net/minecraft/client/gui/hud/component/HudComponentDynamicTooltip	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/component/HudComponentChat	net/minecraft/client/gui/hud/component/HudComponentMovable	
+S	net/minecraft/client/gui/hud/HudIngameDoom$Face	java/lang/Enum	
+S	net/minecraft/client/gui/hud/HudIngame	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/chat/GuiElementChatSuggestions	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/chat/GuiElementChatEmotePicker	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/chat/ScreenChat	net/minecraft/client/gui/Screen	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/chat/ScreenSleepMP	net/minecraft/client/gui/chat/ScreenChat	
+S	net/minecraft/client/gui/ScreenConsole$InputRenderer	net/minecraft/client/gui/Gui	net/minecraft/client/gui/text/ITextField
+S	net/minecraft/client/gui/container/ScreenActivator	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenFurnace	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenContainerAbstract	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/container/ScreenInventory	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenDispenser	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenFurnaceBlast	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenTrommel	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenInventoryCreative	net/minecraft/client/gui/container/ScreenInventory	net/minecraft/client/gui/TextFieldElement$ITextChangeListener
+S	net/minecraft/client/gui/container/ScreenActivator$ItemDragHandlerActivator	net/minecraft/client/util/helper/ItemDragHandler	
+S	net/minecraft/client/gui/container/ScreenCrafting	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/container/ScreenFlagEditor	net/minecraft/client/gui/container/ScreenContainerAbstract	net/minecraft/client/gui/drawing/IDrawableSurface
+S	net/minecraft/client/gui/container/ScreenContainer	net/minecraft/client/gui/container/ScreenContainerAbstract	
+S	net/minecraft/client/gui/ScreenSelectWorld$WorldSlot	net/minecraft/client/gui/ScrolledSelectionList	
+S	net/minecraft/client/gui/options/ScreenOptions	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/options/OverlayButtonElement	net/minecraft/client/gui/ButtonElement	net/minecraft/core/util/helper/Listener
+S	net/minecraft/client/gui/options/data/OptionsPages$4	net/minecraft/client/gui/options/components/ShortcutComponent	
+S	net/minecraft/client/gui/options/data/OptionsPages$2	net/minecraft/client/gui/options/components/ShortcutComponent	
+S	net/minecraft/client/gui/options/data/OptionsPages$3	net/minecraft/client/gui/options/components/ShortcutComponent	
+S	net/minecraft/client/gui/options/data/OptionsPages$1	net/minecraft/client/gui/options/components/ShortcutComponent	
+S	net/minecraft/client/gui/options/data/OptionsPages$5	net/minecraft/client/gui/options/components/ShortcutComponent	
+S	net/minecraft/client/gui/options/data/OptionsPageDebug	net/minecraft/client/gui/options/data/OptionsPage	
+S	net/minecraft/client/gui/options/OptionsButtonElement	net/minecraft/client/gui/ButtonElement	
+S	net/minecraft/client/gui/options/components/ToggleableOptionComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/FloatOptionComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/SearchFieldComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent,net/minecraft/client/gui/TextFieldElement$ITextChangeListener
+S	net/minecraft/client/gui/options/components/FloatSliderComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/ButtonComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/OptionsCategory	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/DifficultyOptionComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/ShortcutComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/BooleanOptionComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/AvailableTexturePackListComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/LanguagePackListComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/TooltipPickerComponent	net/minecraft/client/gui/options/components/ToggleableOptionComponent	
+S	net/minecraft/client/gui/options/components/FramerateOptionComponent	net/minecraft/client/gui/options/components/ToggleableOptionComponent	
+S	net/minecraft/client/gui/options/components/IntegerOptionComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/SelectedTexturePackListComponent	java/lang/Object	net/minecraft/client/gui/options/components/OptionsComponent
+S	net/minecraft/client/gui/options/components/KeyBindingComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/options/components/BooleanToggleComponent	net/minecraft/client/gui/options/components/ButtonComponent	
+S	net/minecraft/client/gui/error/ScreenMissingJCE	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/error/ScreenBadJavaArch	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/error/ScreenMissingMinecraft	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/error/ScreenOutOfMemory	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/error/ScreenConflictWarning	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenConnecting	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenSignEditor	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ScreenTextureViewer	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/gui/ItemElement	net/minecraft/client/gui/Gui	
+S	net/minecraft/client/gui/ScreenGameOver	net/minecraft/client/gui/Screen	
+S	net/minecraft/client/Minecraft$2	javax/swing/JLabel	
+S	net/minecraft/client/world/save/LevelStorageClientSP	net/minecraft/core/world/save/LevelStorageBase	
+S	net/minecraft/client/world/WorldClientMP	net/minecraft/client/world/WorldClient	
+S	net/minecraft/client/world/chunk/provider/ChunkProviderDynamic	java/lang/Object	net/minecraft/core/world/chunk/provider/ChunkProvider
+S	net/minecraft/client/world/chunk/provider/ChunkProviderThreadedClient	net/minecraft/core/world/chunk/provider/ChunkProviderThreaded	
+S	net/minecraft/client/world/chunk/provider/ChunkProviderStatic	java/lang/Object	net/minecraft/core/world/chunk/provider/ChunkProvider
+S	net/minecraft/client/world/chunk/provider/ChunkProviderClient	java/lang/Object	net/minecraft/core/world/chunk/provider/ChunkProvider
+S	net/minecraft/client/world/chunk/provider/ChunkProviderViewer	java/lang/Object	net/minecraft/core/world/chunk/provider/ChunkProvider
+S	net/minecraft/client/world/chunk/provider/SelectedProvider	java/lang/Enum	
+S	net/minecraft/client/world/WorldClient	net/minecraft/core/world/World	
+S	net/minecraft/client/world/WorldEmpty	net/minecraft/client/world/WorldClient	
 S	net/minecraft/core/sound/SoundCategory	java/lang/Enum	
 S	net/minecraft/core/current/wire/SimpleQueue	java/util/AbstractQueue	
 S	net/minecraft/core/current/wire/SimpleQueue$SimpleIterator	java/lang/Object	java/util/Iterator

@@ -1621,6 +1621,36 @@
             };
         })();
 
+        function mcLenientJson(text) {
+            var s = String(text == null ? '' : text);
+            if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+            try { return JSON.parse(s); } catch (e) { }
+            var out = [], i = 0, n = s.length, inStr = false;
+            var nextReal = function (j) {
+                for (;;) {
+                    while (j < n && /\s/.test(s[j])) j++;
+                    if (s.charCodeAt(j) === 47 && s.charCodeAt(j + 1) === 47) { while (j < n && s[j] !== '\n') j++; continue; }
+                    if (s.charCodeAt(j) === 47 && s.charCodeAt(j + 1) === 42) { var e = s.indexOf('*' + String.fromCharCode(47), j + 2); j = e < 0 ? n : e + 2; continue; }
+                    return s[j];
+                }
+            };
+            while (i < n) {
+                var ch = s[i], c = s.charCodeAt(i);
+                if (inStr) {
+                    if (c === 92) { out.push(ch, s[i + 1] || ''); i += 2; continue; }
+                    if (c === 34) { inStr = false; out.push(ch); i++; continue; }
+                    if (c < 0x20) { out.push(c === 10 ? '\\n' : c === 13 ? '\\r' : c === 9 ? '\\t' : '\\u' + ('000' + c.toString(16)).slice(-4)); i++; continue; }
+                    out.push(ch); i++; continue;
+                }
+                if (c === 34) { inStr = true; out.push(ch); i++; continue; }
+                if (c === 47 && s.charCodeAt(i + 1) === 47) { while (i < n && s[i] !== '\n') i++; continue; }
+                if (c === 47 && s.charCodeAt(i + 1) === 42) { var e2 = s.indexOf('*' + String.fromCharCode(47), i + 2); i = e2 < 0 ? n : e2 + 2; continue; }
+                if (ch === ',') { var nx = nextReal(i + 1); if (nx === '}' || nx === ']') { i++; continue; } }
+                out.push(ch); i++;
+            }
+            return JSON.parse(out.join(''));
+        }
+
         (function () {
             var J = Module.mcJava = {};
             var jvmPromise = null, maps = {}, vm = null;
@@ -1635,6 +1665,7 @@
                 });
                 return jvmPromise;
             }
+            J.loadJvm = loadJvm;
             function loadMap(name) {
                 if (maps[name] !== undefined) return Promise.resolve(maps[name]);
                 return fetch('jvm_maps/' + name + '.txt').then(function (r) { return r.ok ? r.text() : ''; }, function () { return ''; })
@@ -1742,7 +1773,19 @@
                         var sref = a[3] ? blockRef(a[3], a[4]) : 'id:0';
                         return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : gameData(a[3], a[4] | 0), a[5] ? 1 : 0].join('\t'));
                     }
-                    case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    case 'setdata': {
+                        forget(a[0], a[1], a[2]);
+                        if (Module._mcJavaRunTile && typeof genJava === 'function') {
+                            var dcur = genJava(Module._mcJavaRunTile(a[0] | 0, a[1] | 0, a[2] | 0));
+                            if (dcur.mod) {
+                                var dob = reg() && reg().blocks[dcur.id], dref = blockRef(dcur.id, a[3] | 0);
+                                if (dob && window.JVM.variantsOf(vm, dob).indexOf(a[3] | 0) >= 0 && dref !== blockRef(dcur.id, dcur.data))
+                                    return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, dref, '', 0].join('\t'));
+                                return 0;
+                            }
+                        }
+                        return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    }
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
                     case 'player': {
                         if (actor) return { x: +actor.x, y: +actor.y + 1.62, z: +actor.z, yaw: 0, pitch: 0, name: actor.name, health: actor.health | 0, food: 20,
@@ -1750,8 +1793,10 @@
                         var p = player();
                         if (!p) return null;
                         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, name: p.name, health: p.health, food: p.food,
-                                 creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot };
+                                 creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot,
+                                 fwd: +p.fwd || 0, strafe: +p.strafe || 0, jump: p.jump | 0, riding: p.riding | 0 };
                     }
+                    case 'ride': return mp(['ride', a[0] | 0, a[1] == null ? -1 : a[1] | 0].join('\t'));
                     case 'held': {
                         if (actor) return actor.held || null;
                         var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data, ench: enchOf(hp.carried[3]) }; }
@@ -1823,6 +1868,12 @@
                     case 'hurt': return mp(['hurt', a[0] | 0, a[1] | 0].join('\t'));
                     case 'fire': return mp(['fire', a[0] | 0, a[1] | 0].join('\t'));
                     case 'travel': return mp(['travel', clean(String(a[0]))].join('\t'));
+                    case 'setweather': return mp(['setweather', a[0] == null ? -1 : a[0] | 0, a[1] == null ? -1 : a[1] | 0, a[2] | 0].join('\t'));
+                    case 'lightning': return mp(['lightning', +a[0], +a[1], +a[2]].join('\t'));
+                    case 'xporb': return mp(['xporb', +a[0], +a[1], +a[2], a[3] | 0].join('\t'));
+                    case 'xp':
+                        if (actor) { actorOnly('experience'); return 0; }
+                        return mp(['xp', a[0] | 0].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
                     case 'remove': return mp(['remove', a[0] | 0].join('\t'));
@@ -1858,8 +1909,11 @@
                     }
                     case 'extrahp': return mp(a.length && a[0] != null ? ['extrahp', a[0] | 0].join('\t') : 'extrahp');
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
+                    case 'enttex': return mp(['enttex', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'entjava': return mp(['entjava', a[0] | 0].concat(a.length > 1 && a[1] != null ? [String(a[1]).replace(/[\t\r\n]/g, ' ')] : []).join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                    case 'fullbright': return mp(['fullbright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
                         if (actor) { actorOnly('inventory'); return 0; }
                         var want = itemRef(a[0]);
@@ -1878,7 +1932,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, release: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -1891,7 +1945,28 @@
                 catch (x) { console.warn('[java] dispense', x); return 0; }
                 finally { tiles = null; }
             };
+            J.dropsWanted = function () { try { return !!(running && vm && window.JVM.dropsWanted && window.JVM.dropsWanted(vm)); } catch (x) { return false; } };
+            J.drops = function (json) {
+                if (!running || !vm || !window.JVM.hookDrops) return 0;
+                var e; try { e = JSON.parse(json); } catch (x) { return 0; }
+                var j = javaOf(e.block, e.data);
+                if (!j.id) return 0;
+                tiles = {}; vm.steps = 0;
+                if (e.mod) {
+                    try { return window.JVM.modBlockDrops ? window.JVM.modBlockDrops(vm, { id: j.id, data: j.data, x: e.x, y: e.y, z: e.z, chance: e.chance }) | 0 : 0; }
+                    catch (x) { console.warn('[java] mod drops', x); return 0; }
+                    finally { tiles = null; }
+                }
+                try { return window.JVM.hookDrops(vm, { id: j.id, data: j.data, x: e.x, y: e.y, z: e.z, chance: e.chance, player: e.player, count: e.count, res: e.res, aux: e.aux }) | 0; }
+                catch (x) { console.warn('[java] drops', x); return 0; }
+                finally { tiles = null; }
+            };
             J.wants = function (type) { return running && !!WANTS[type]; };
+            J.dimension = function (d) {
+                if (!vm) return;
+                vm.mcDim = d | 0;
+                vm.mcWorld = null; vm.mcPlayer = null;
+            };
             J.worldStart = function () {
                 running = false;
                 var r = reg();
@@ -1961,6 +2036,10 @@
                         return 0;
                     }
                     case 'destroy': Module._mcJavaGenSet(x, y, z, 0, 0); return 0;
+                    case 'sky': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 0) : undefined;
+                    case 'fullbright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 1) : undefined;
+                    case 'bright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 2) : undefined;
+                    case 'gentick': if (Module._mcJavaGenTick) Module._mcJavaGenTick(x, y, z); return 0;
                     case 'biome': return mp(['biome', x, y].join('\t'));
                     default:
                         if (vm) vm.warnOnce('gen:' + name, 'game action "' + name + '" is not available while the world generates (left unplugged)');
@@ -1989,11 +2068,17 @@
                 for (var k in md) if (md[k].id === dim && md[k].java) return k;
                 return null;
             }
+            var dimSeeds = {};
             Module.mcDims = {
-                chunk: function (key, cx, cz, blocksPtr, dataPtr) {
+                chunk: function (key, cx, cz, blocksPtr, dataPtr, seed) {
                     var r = reg();
                     if (!vm || !r || !window.JVM || !window.JVM.dimChunk) return false;
                     var JV = window.JVM, prev = vm.game, out = null, prevDim = vm.mcDim;
+                    if (seed != null && dimSeeds[key] !== (seed | 0)) {
+                        if (JV.dimsLive) JV.dimsLive(vm);
+                        dimSeeds[key] = seed | 0;
+                    }
+                    if (seed != null) vm.mcSeed = seed | 0;
                     vm.game = genBridge; vm.steps = 0;
                     var mdk = (Module.mcModDims || {})[key];
                     if (mdk && mdk.id != null) vm.mcDim = mdk.id;
@@ -2132,6 +2217,14 @@
                     return;
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
+                if (e.t === 'release') {
+                    if (!e.item || !JV.itemReleased) return;
+                    var rj = javaOf(e.item, e.data), rc = e.count != null ? e.count | 0 : 1, rpl = M.playerObj(vm, null), rslot = rpl.$info ? rpl.$info.slot : 0;
+                    var rout = JV.itemReleased(vm, rj.id, rc, rj.data, e.left | 0);
+                    if (rout && (rout[':itemID'] !== rj.id || rout[':stackSize'] !== rc || rout[':itemDamage'] !== rj.data))
+                        bridge.op('setslot', rslot, rout[':stackSize'] > 0 ? rout[':itemID'] : 0, Math.max(0, rout[':stackSize']), rout[':itemDamage']);
+                    return;
+                }
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
                 if (e.t === 'javahit') { if (JV.mobHit) JV.mobHit(vm, e); return; }
                 if (e.t === 'javadeath') { if (JV.mobDeath) JV.mobDeath(vm, e); return; }
@@ -2505,7 +2598,7 @@
                     return { tag: tag, tags: tags, losers: [], versionOf: function (t) { return window.JVM && window.JVM.versionOfTag ? window.JVM.versionOfTag[t] : t; } };
                 });
             };
-            var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164'];
+            var MAP_TAGS = ['mcp152', 'mcp151', 'mcp147', 'mcp164', 'mcpb173'];
             function versionTag(JVM, files) {
                 var said = null;
                 if (files['fabric.mod.json']) {
@@ -2514,7 +2607,7 @@
                     if (fk.loader === 'BTA') return Promise.resolve({ tag: 'bta', said: 'Better Than Adventure' });
                 }
                 try {
-                    var mi = files['mcmod.info'] && JSON.parse(new TextDecoder().decode(files['mcmod.info']).replace(/^\uFEFF/, ''));
+                    var mi = files['mcmod.info'] && mcLenientJson(new TextDecoder().decode(files['mcmod.info']));
                     if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
                     said = mi && mi[0] && mi[0].mcversion ? String(mi[0].mcversion).replace(/^Minecraft\s*/i, '') : null;
                     if (said && !/^\d+\.\d+/.test(said)) said = null;
@@ -2534,7 +2627,7 @@
             J.preload = function (modId, files, problem) {
                 if (J.pre[modId]) return Promise.resolve(J.pre[modId]);
                 try {
-                    var fmj = files['fabric.mod.json'] && JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, ''));
+                    var fmj = files['fabric.mod.json'] && mcLenientJson(new TextDecoder().decode(files['fabric.mod.json']));
                     J.deps[modId] = fmj && fmj.depends && typeof fmj.depends === 'object' ? Object.keys(fmj.depends).map(function (k) { return String(k).toLowerCase(); }) : [];
                 } catch (e) { J.deps[modId] = []; }
                 var JVM = null;
@@ -2595,8 +2688,15 @@
                     if (!st || st.skip) return {};
                     files = st.files || files;
                     var JVM = window.JVM, ver = st.ver, classes = st.classes;
-                    var entry = classes.filter(function (c) { return /^mod_[^\/$]+$/.test(c); });
+                    var entry = classes.filter(function (c) { return /^(net[/]minecraft[/]src[/])?mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;
+                    var mcFs = null;
+                    Object.keys(files).forEach(function (k) {
+                        if (k.indexOf('.minecraft/') !== 0 || !files[k] || /[/]$/.test(k)) return;
+                        mcFs = mcFs || folderFs(modId);
+                        var p = k.slice(11);
+                        if (!mcFs.exists(p)) mcFs.write(p, files[k]);
+                    });
                     if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
                     var kind = JVM.javaKind ? JVM.javaKind(vm, classes, files) : { loader: '', version: '', cant: '' };
                     if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag] || '1.5.2';
@@ -2615,11 +2715,16 @@
                     var errorsBefore = errorCount;
                     if ((kind.loader === 'Babric' && JVM.babricLoad) || (kind.loader === 'BTA' && JVM.btaLoad)) {
                         var fjson = null;
-                        try { fjson = JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, '')); } catch (e) { fjson = {}; }
+                        try { fjson = mcLenientJson(new TextDecoder().decode(files['fabric.mod.json'])); } catch (e) { fjson = {}; }
                         (vm.$stFiles = vm.$stFiles || {})[modId] = files;
                         (vm.$stSaved = vm.$stSaved || {})[modId] = Module.mcMods && Module.mcMods.savedSettings ? Module.mcMods.savedSettings(modId) : null;
                         if (kind.loader === 'BTA') JVM.btaLoad(vm, modId, fjson, files, classes);
                         else JVM.babricLoad(vm, modId, fjson, files, classes);
+                        if (kind.mixinOnly && !((vm.$mixinsInjected || {})[modId] | 0)) {
+                            J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: JVM.MIXIN_ONLY_CANT });
+                            problem('', "Can't run: " + JVM.MIXIN_ONLY_CANT);
+                            return {};
+                        }
                     }
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
@@ -2631,7 +2736,7 @@
                     });
                     if (forgeMods.length) {
                         var info = null;
-                        try { var mi = files['mcmod.info']; if (mi) info = JSON.parse(new TextDecoder().decode(mi).replace(/^﻿/, '')); } catch (e) { info = null; }
+                        try { var mi = files['mcmod.info']; if (mi) info = mcLenientJson(new TextDecoder().decode(mi)); } catch (e) { info = null; }
                         if (info && !Array.isArray(info)) info = info.modList || info.modlist || [info];
                         JVM.forgeLoad(vm, forgeMods, classes, info);
                     }
@@ -2823,6 +2928,45 @@
                 return Promise.all(jobs).then(function () { return out; });
             }
 
+            function classNameOf(b) {
+                if (!b || b.length < 10 || b[0] !== 0xCA || b[1] !== 0xFE || b[2] !== 0xBA || b[3] !== 0xBE) return null;
+                var n = (b[8] << 8) | b[9], p = 10, utf = {}, cls = {};
+                for (var i = 1; i < n; i++) {
+                    var t = b[p++];
+                    if (t === 1) { var l = (b[p] << 8) | b[p + 1]; utf[i] = [p + 2, l]; p += 2 + l; }
+                    else if (t === 7) { cls[i] = (b[p] << 8) | b[p + 1]; p += 2; }
+                    else if (t === 8 || t === 16 || t === 19 || t === 20) p += 2;
+                    else if (t === 3 || t === 4 || t === 9 || t === 10 || t === 11 || t === 12 || t === 17 || t === 18) p += 4;
+                    else if (t === 5 || t === 6) { p += 8; i++; }
+                    else if (t === 15) p += 3;
+                    else return null;
+                    if (p > b.length) return null;
+                }
+                var u = utf[cls[(b[p + 2] << 8) | b[p + 3]]];
+                return u ? new TextDecoder().decode(b.subarray(u[0], u[0] + u[1])) : null;
+            }
+            function javaRoot(files) {
+                var keys = Object.keys(files);
+                if (keys.some(function (k) { return /^mod_[^/$]+[.]class$/.test(k) || k === 'mcmod.info' || k === 'fabric.mod.json'; })) return null;
+                var root = null;
+                keys.forEach(function (k) {
+                    if (!/[/]mod_[^/$]+[.]class$/.test(k)) return;
+                    var cn = classNameOf(files[k]);
+                    if (!cn || k.slice(-(cn.length + 6)) !== cn + '.class') return;
+                    var r = k.slice(0, k.length - cn.length - 6);
+                    if (r && r[r.length - 1] !== '/') return;
+                    if (root === null || r.length < root.length) root = r;
+                });
+                if (!root) return null;
+                var carry = {};
+                keys.forEach(function (k) {
+                    if (k.indexOf(root) === 0 || !files[k]) return;
+                    var m = /^resources[/](.+[^/])$/i.exec(k);
+                    if (m) { carry['resources/' + m[1]] = files[k]; return; }
+                    if (/^[^/]+[.](properties|cfg|conf|ini)$/i.test(k) || /^config[/].+[^/]$/i.test(k)) carry['.minecraft/' + k] = files[k];
+                });
+                return { root: root, carry: carry };
+            }
             function normalise(files) {
                 var keys = Object.keys(files), root = '';
                 keys.forEach(function (k) {
@@ -2838,6 +2982,8 @@
                     var t = Object.keys(tops);
                     if (t.length === 1 && keys.some(function (k) { return k.indexOf('/') > 0 && (k === t[0] + '/mcmod.info' || /^[^/]+[/]mod_[^/$]+[.]class$/.test(k)); })) root = t[0] + '/';
                 }
+                var carry = null;
+                if (!root) { var jr = javaRoot(files); if (jr) { root = jr.root; carry = jr.carry; } }
                 var out = {};
                 keys.forEach(function (k) {
                     if (k.indexOf(root) !== 0) return;
@@ -2846,6 +2992,7 @@
                     else if (/^assets[/][a-z0-9_.-]+[/](textures|models|blockstates|sounds|lang)[/]/i.test(r)) r = r.replace(/^assets[/][^/]+[/]/, '');
                     out[r] = files[k];
                 });
+                if (carry) Object.keys(carry).forEach(function (k) { if (!out[k]) out[k] = carry[k]; });
                 var hasManifest = !!out['manifest.json'];
                 Object.keys(out).forEach(function (k) {
                     var m = /^script[/]([^/]+[.]js)$/i.exec(k) || (!hasManifest && /^([^/]+[.]js)$/i.exec(k));
@@ -2898,10 +3045,10 @@
                 var base = String(fallbackName || 'mod').replace(/\.(zip|modpkg|mcpack|mcaddon|jar)$/i, '');
                 if (!files['manifest.json']) {
                     try {
-                        var jm = files['mcmod.info'] ? JSON.parse(dec.decode(files['mcmod.info'])) : null;
-                        if (jm && !Array.isArray(jm) && jm.modList) jm = jm.modList;
+                        var jm = files['mcmod.info'] ? mcLenientJson(dec.decode(files['mcmod.info'])) : null;
+                        if (jm && !Array.isArray(jm)) jm = jm.modList || jm.modlist || [jm];
                         jm = Array.isArray(jm) ? jm[0] : null;
-                        var fm = files['fabric.mod.json'] ? JSON.parse(dec.decode(files['fabric.mod.json'])) : null;
+                        var fm = files['fabric.mod.json'] ? mcLenientJson(dec.decode(files['fabric.mod.json'])) : null;
                         var src = fm || jm;
                         if (src) {
                             var auth = (fm && fm.authors) || (jm && (jm.authorList || jm.authors)) || [];
@@ -3017,11 +3164,31 @@
                 return String(v).slice(0, 200);
             }
 
+            var pow2Square = function (s) { return s && s.w === s.h && s.w >= 1 && s.w <= 512 && (s.w & (s.w - 1)) === 0; };
+            function fitIcon(bytes) {
+                return createImageBitmap(new Blob([bytes], { type: 'image/png' })).then(function (img) {
+                    var S = 128, k = Math.min(S / img.width, S / img.height), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+                    var cv = document.createElement('canvas'); cv.width = cv.height = S;
+                    var g = cv.getContext('2d');
+                    g.imageSmoothingEnabled = k < 1;
+                    g.imageSmoothingQuality = 'high';
+                    g.drawImage(img, Math.floor((S - w) / 2), Math.floor((S - h) / 2), w, h);
+                    return new Promise(function (res) { cv.toBlob(function (b) { res(b ? b.arrayBuffer() : null); }, 'image/png'); });
+                }).then(function (ab) { return ab ? new Uint8Array(ab) : null; }, function () { return null; });
+            }
             function iconOf(id, files, m) {
                 var pic = modLogo(files) || modTexture(files);
                 var bytes = pic ? files[pic] : modTile((m && m.name) || id).bytes;
                 if (!bytes) return '';
                 var p = 'web_mods/' + id + '.png';
+                if (pic && !pow2Square(pngSize(bytes))) {
+                    var src = bytes, tex = modTexture(files);
+                    bytes = tex && tex !== pic && pow2Square(pngSize(files[tex])) ? files[tex] : modTile((m && m.name) || id).bytes;
+                    fitIcon(src).then(function (png) {
+                        if (!png) return;
+                        try { FS.writeFile('/data/images/' + p, png); bump(); } catch (e) { }
+                    });
+                }
                 try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, bytes); return p; } catch (e) { return ''; }
             }
             function pngSize(b) {
@@ -3032,14 +3199,14 @@
             function modLogo(files) {
                 var dec = new TextDecoder(), c = ['pack.png', 'pack_icon.png', 'icon.png', 'logo.png'];
                 try {
-                    var fm = files['fabric.mod.json'] && JSON.parse(dec.decode(files['fabric.mod.json']));
+                    var fm = files['fabric.mod.json'] && mcLenientJson(dec.decode(files['fabric.mod.json']));
                     var ic = fm && fm.icon;
                     if (ic && typeof ic === 'object') ic = ic[Object.keys(ic).sort(function (a, b) { return b - a; })[0]];
                     if (typeof ic === 'string') c.unshift(ic.replace(/^[/]+/, ''));
                 } catch (e) { }
                 try {
-                    var jm = files['mcmod.info'] && JSON.parse(dec.decode(files['mcmod.info']));
-                    if (jm && !Array.isArray(jm) && jm.modList) jm = jm.modList;
+                    var jm = files['mcmod.info'] && mcLenientJson(dec.decode(files['mcmod.info']));
+                    if (jm && !Array.isArray(jm)) jm = jm.modList || jm.modlist || [jm];
                     jm = Array.isArray(jm) ? jm[0] : null;
                     if (jm && typeof jm.logoFile === 'string' && jm.logoFile) c.push(jm.logoFile.replace(/^[/]+/, ''));
                 } catch (e) { }
@@ -3211,7 +3378,7 @@
                 say(count(/^recipes[/].+[.]json$/i), 'recipe', 'recipes');
                 say(count(/^worldgen[/].+[.](json|schematic|schem|nbt)$/i), 'world generation file', 'world generation files');
                 say(count(/^biomes[/][^/]+[.]json$/i), 'biome', 'biomes');
-                say(count(/^worldtypes[/][^/]+[.]json$/i), 'world type', 'world types');
+                say(count(/^worldtypes[/](?!(default|normal)[.]json$)[^/]+[.]json$/i), 'world type', 'world types');
                 say(count(/^enchantments[/][^/]+[.]json$/i), 'enchantment', 'enchantments');
                 say(count(/^dimensions[/][^/]+[.]json$/i), 'dimension', 'dimensions');
                 say(count(/^(assets[/][^/]+[/])?models[/].+[.]json$/i), 'model', 'models');
@@ -4220,7 +4387,7 @@
                         }
                         faces = [tn0, tn0, tn0, tn0, tn0, tn0];
                     }
-                    var tex = faces.map(function (f) { return cellOf('blocks', b.mod, f, b.file); });
+                    var tex = faces.map(function (f) { return cellOf('blocks', b.mod, f, f || j.creative !== false ? b.file : null); });
                     var tool = ['pickaxe', 'axe', 'shovel', 'none'].indexOf(j.tool) >= 0 ? j.tool : 'pickaxe';
                     var sounds = ['stone', 'wood', 'gravel', 'grass', 'metal', 'glass', 'cloth', 'sand'];
                     var sound = sounds.indexOf(j.sound) >= 0 ? j.sound : ({ axe: 'wood', shovel: 'gravel' }[tool] || 'stone');
@@ -4236,7 +4403,7 @@
                     lines.push(['block', key, desc, tex.join(','), hard, tool, sound, light,
                                 (j.transparent || j.see_through) ? 1 : 0, drop, count,
                                 shape, collide ? 1 : 0, j.gravity ? 1 : 0, friction.toFixed(2), j.flammable ? 1 : 0, j.scripted ? 1 : 0,
-                                j.loot ? lootRef(j.loot, b.mod, b.file) : ''].join('\t'));
+                                j.loot ? lootRef(j.loot, b.mod, b.file) : j.java_drops === true ? '*java' : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
                     if (j.portal_to != null) {
@@ -4245,6 +4412,15 @@
                         else problem(b.mod, b.file, '"portal_to": no dimension "' + j.portal_to + '" (dimensions/<name>.json)');
                     }
                     if (j.neighbor_updates === true) lines.push(['neighbors', key].join('\t'));
+                    if (j.tint != null && j.tint !== false) {
+                        var tk = String(j.tint).toLowerCase();
+                        if (/^(grass|foliage|tallgrass)$/.test(tk)) lines.push(['tint', key, tk].join('\t'));
+                        else {
+                            var tc = typeof j.tint === 'number' ? j.tint : parseInt(tk.replace(/^#/, ''), 16);
+                            if (isFinite(tc) && tc >= 0) lines.push(['tint', key, 'fixed', ('00000' + (tc & 0xffffff).toString(16)).slice(-6)].join('\t'));
+                            else bad(b.mod, b.file, '"tint": "' + j.tint + '" - use grass, foliage, tallgrass or a colour like "#7fb238"');
+                        }
+                    }
                     if (j.entity_inside === true) lines.push(['inside', key].join('\t'));
                     if (Array.isArray(j.collision_box) && j.collision_box.length === 6 && j.collision_box.every(function (v) { return isFinite(+v); }))
                         lines.push(['collisionbox', key].concat(j.collision_box.map(function (v) { return Math.max(0, Math.min(16, +v)); })).join('\t'));
@@ -4364,7 +4540,8 @@
                         var th = typeof j.throwable === 'object' ? j.throwable : {};
                         out.push('throw=' + [Math.max(0.1, num(th.speed, 1.5)), Math.max(0, num(th.gravity, 0.03)), Math.max(0, num(th.damage, 0) | 0)].join(','));
                     }
-                    if (j.ranged) {
+                    if (j.java_bow === true) out.push('ranged=' + ['*java', 1, Math.max(0, num(j.durability, 0) | 0)].join(','));
+                    else if (j.ranged) {
                         var rg = typeof j.ranged === 'object' ? j.ranged : {};
                         var ammo = ref(rg.ammo || 'minecraft:arrow', it.mod, it.file);
                         if (ammo) out.push('ranged=' + [ammo, Math.max(0.1, num(rg.power, 1)), Math.max(0, num(rg.durability, 384) | 0)].join(','));
@@ -4618,12 +4795,25 @@
                                 inc.join(';') || '-', n(j.damage, 0, 0, 100), Math.round(n(j.protection, 0, 0, 25)), Math.round(n(j.knockback, 0, 0, 10)),
                                 Math.round(n(j.fire, 0, 0, 60)), eff, j.treasure ? 1 : 0].join('\t'));
                 });
+                var REMOVABLE = ['plains', 'desert', 'extreme_hills', 'forest', 'taiga', 'swampland', 'jungle', 'ice_plains', 'ice_mountains',
+                    'desert_hills', 'forest_hills', 'taiga_hills', 'jungle_hills', 'extreme_hills_edge'];
+                var REMOVE_ALIAS = { swamp: 'swampland', windswept_hills: 'extreme_hills', mountains: 'extreme_hills', snowy_plains: 'ice_plains',
+                    snowy_tundra: 'ice_plains', tundra: 'ice_plains', snowy_mountains: 'ice_mountains', rainforest: 'jungle', seasonal_forest: 'forest',
+                    savanna: 'plains', shrubland: 'extreme_hills', ice_desert: 'ice_plains' };
+                var isDefaultType = function (n) { n = String(n).toLowerCase(); return n === 'default' || n === 'normal'; };
                 typeFiles.forEach(function (t) {
-                    var tj = t.j || {};
-                    lines.push(['worldtype', t.mod + ':' + t.name, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].join('\t'));
+                    var tj = t.j || {}, key = isDefaultType(t.name) ? 'default' : t.mod + ':' + t.name;
+                    if (key !== 'default') lines.push(['worldtype', key, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].join('\t'));
+                    if (tj.remove_biomes === undefined) return;
+                    (Array.isArray(tj.remove_biomes) ? tj.remove_biomes : [tj.remove_biomes]).forEach(function (r) {
+                        var n = String(r).toLowerCase().replace(/^minecraft:/, '').trim().replace(/[\s-]+/g, '_');
+                        n = REMOVE_ALIAS[n] || n;
+                        if (REMOVABLE.indexOf(n) < 0) { bad(t.mod, t.file, '"remove_biomes": "' + r + '" isn\'t one of ' + REMOVABLE.join(', ')); return; }
+                        lines.push(['biomeremove', key, n].join('\t'));
+                    });
                 });
                 var typeKeys = {};
-                typeFiles.forEach(function (t) { typeKeys[t.mod + ':' + t.name] = true; });
+                typeFiles.forEach(function (t) { if (!isDefaultType(t.name)) typeKeys[t.mod + ':' + t.name] = true; });
                 var LEGACY_TO_MODERN = { rainforest: 'jungle', seasonal_forest: 'forest', savanna: 'plains', shrubland: 'extreme_hills',
                     ice_desert: 'ice_plains', tundra: 'ice_plains' };
                 var hexColor = function (v, mod, file, what) {
@@ -4926,6 +5116,14 @@
                     if (!tf) { bad(mb.mod, file, 'no texture "' + (j.texture || mb.name + '.png') + '" in the mod' + (gameTex ? ' or the game' : '')); return; }
                     var texPath = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '.png';
                     try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + texPath, tf.data); } catch (e) { }
+                    var variants = [];
+                    (Array.isArray(j.textures) ? j.textures : []).slice(0, 64).forEach(function (t, vi) {
+                        var vf = texFiles[mb.mod + ':' + String(t || '').replace(/^[/]+/, '')];
+                        if (!vf) { problem(mb.mod, file, '"textures": no picture "' + t + '" in the mod'); vf = tf; }
+                        var vp = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '__' + (vi + 1) + '.png';
+                        try { FS.writeFile('/data/images/' + vp, vf.data); } catch (e) { }
+                        variants.push(vp);
+                    });
                     var beh = BEHAVIOURS[String(j.behaviour || j.behavior || 'passive').toLowerCase()];
                     if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying, swimming or segment)'); beh = 0; }
                     var num = function (v, d, lo, hi) { v = Number(v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
@@ -4946,9 +5144,10 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(mb.name)));
                     lines.push(['mob', key, desc, beh, num(j.health, 10, 1, 1000), num(j.speed, 0.25, 0, 2), num(j.damage, 2, 0, 100),
                                 num(size[0], 0.9, 0.1, 8), num(size[1], 0.9, 0.1, 8), texPath, model.tw, model.th, num(j.scale, 1, 0.1, 8),
-                                (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0) | (j.java_hit ? 8 : 0) | (j.java_drops ? 16 : 0), drops,
+                                (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0) | (j.java_hit ? 8 : 0) | (j.java_drops ? 16 : 0) |
+                                (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
-                                egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : ''].join('\t'));
+                                egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';')].join('\t'));
                     var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8 };
                     var legs = 0, arms = 0, wings = 0, headDone = false, given = j.animations || {};
                     var isUnder = function (p, re) { for (var q = p.parent, n = 0; q >= 0 && n < 64; q = model.parts[q].parent, n++) if (re.test(model.parts[q].name)) return true; return false; };
@@ -4983,6 +5182,7 @@
                     (Array.isArray(j.spawn) ? j.spawn : (j.spawn ? [j.spawn] : [])).forEach(function (s) {
                         if (!s || typeof s !== 'object') return;
                         var dim = DIMS[String(s.dimension || 'overworld').toLowerCase()];
+                        if (dim === undefined && s.dimension) dim = dimRef(s.dimension, mb.mod) || undefined;
                         if (dim === undefined) { bad(mb.mod, file, 'spawn: unknown dimension "' + s.dimension + '"'); return; }
                         var light = range(s.light, beh === 1 ? [0, 7] : [9, 15]), h = range(s.height, [1, 126]), g = range(s.group, [1, beh === 1 ? 1 : 4]);
                         var on = (s.on === undefined ? [] : (Array.isArray(s.on) ? s.on : [s.on])).map(function (r) { return ref(r, mb.mod, file); });
@@ -5594,7 +5794,17 @@
                         file = { name: base + '.zip' };
                     }
                     return readZip(bytes).then(function (files) {
+                        return packKind(files).then(function (dk) {
+                        if (dk) return packFrom(file, dk, files);
                         var inner = innerArchives(files);
+                        var resKeys = Object.keys(files).filter(function (k) { return /^resources[/].+[^/]$/i.test(k) && files[k]; });
+                        if (inner.length === 1 && resKeys.length) {
+                            var one = inner[0];
+                            return readZip(one.data).then(function (inf) {
+                                resKeys.forEach(function (k) { if (!inf[k]) inf[k] = files[k]; });
+                                return install(new File([makeZip(inf)], one.name, { type: 'application/zip' }));
+                            }).then(function () { return true; });
+                        }
                         if (inner.length) {
                             return inner.reduce(function (pr, e) {
                                 return pr.then(function () { return install(new File([e.data], e.name, { type: 'application/zip' })); });
@@ -5625,8 +5835,39 @@
                         mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m), justAdded: true, onAt: Date.now() });
                         writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
                         return Promise.resolve(reapply(true)).then(function () { return true; });
+                        });
                     });
                 }).catch(function (e) { bump(file.name + ' ' + (e && e.message || 'could not be added')); return false; });
+            }
+            function packKind(files) {
+                var keys = Object.keys(files), mj = '';
+                try { mj = files['manifest.json'] ? new TextDecoder().decode(files['manifest.json'].subarray(0, 4096)) : ''; } catch (e) { mj = ''; }
+                var maybe = !!files['modrinth.index.json'] || /minecraftModpack|"modLoaders"/.test(mj) ||
+                    keys.some(function (k) { return /(^|[/])(mmc-pack[.]json|build[.]gradle(?:[.]kts)?|settings[.]gradle(?:[.]kts)?|gradlew|pom[.]xml|build[.]xml)$|[.](java|kt|scala|groovy)$/i.test(k); });
+                if (!maybe || !Module.mcJava || !Module.mcJava.loadJvm) return Promise.resolve(null);
+                return Module.mcJava.loadJvm().then(function (JVM) { return JVM.downloadKind ? JVM.downloadKind(files) : null; }, function () { return null; });
+            }
+            function packFrom(file, dk, files) {
+                var JVM = window.JVM, ok = [];
+                return dk.jars.reduce(function (pr, k) {
+                    return pr.then(function () {
+                        return readZip(files[k]).then(function (f) {
+                            var kd = JVM && JVM.quickKind ? JVM.quickKind(f) : { cant: 'unknown' };
+                            if (!kd.cant) ok.push(k);
+                        }, function () { });
+                    });
+                }, Promise.resolve()).then(function () {
+                    var msg = file.name + ' is ' + dk.text;
+                    if (ok.length) msg += ' - adding ' + (ok.length === 1 ? 'the one mod' : 'the ' + ok.length + ' mods') + ' in it that can run here';
+                    else if (dk.jars.length) msg += dk.jars.length === 1 ? ' - the one mod file in it can\'t run here either' : ' - none of the ' + dk.jars.length + ' mod files in it can run here';
+                    bump(msg);
+                    return ok.reduce(function (pr, k) {
+                        return pr.then(function () { return install(new File([files[k]], k.split('/').pop(), { type: 'application/zip' })); });
+                    }, Promise.resolve()).then(function () {
+                        if (ok.length) bump(msg.replace(/ - adding /, ' - added '));
+                        return ok.length > 0;
+                    });
+                });
             }
             function sha(bytes) {
                 return crypto.subtle.digest('SHA-256', bytes).then(function (h) {
@@ -5799,7 +6040,7 @@
                     '<button data-browse style="display:block;width:100%;padding:12px;margin-bottom:14px;background:#4a8a4a;color:#fff;' +
                     'border:none;cursor:pointer;font-size:14px;font-family:monospace">Browse mods</button>' +
                     '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +
-                    'Choose file<input type="file" multiple accept=".zip,application/zip,.js,.modpkg,.jar,application/java-archive" style="display:none"></label>' +
+                    'Choose file<input type="file" multiple accept=".zip,application/zip,.js,.modpkg,.jar,application/java-archive,.mrpack" style="display:none"></label>' +
                     (api.canFolder() ?
                         '<div style="border-top:1px solid #555;margin:4px 0 14px;padding-top:12px;font-size:12px;color:#aaa;line-height:1.4">' +
                         'Making a mod? Open its folder instead: the game reads it straight from your disk. ' +
@@ -6299,6 +6540,7 @@
                                 var names = (Array.isArray(part) ? part : [part]).map(function (n) { return String(n).toLowerCase().replace(/[\t,]/g, ''); }).filter(Boolean);
                                 if (names.length) act(mod, ['entparts', pid(id) | 0, names.join(','), visible === false ? 0 : 1]);
                             },
+                            setMobTexture: function (id, n) { act(mod, ['enttex', pid(id) | 0, Math.max(0, n | 0)]); },
                             addEffect: function (id, effect, seconds, level) {
                                 act(mod, ['enteffect', pid(id) | 0, effectId(effect, 'world.addEffect'), Math.max(1, Math.round((seconds == null ? 30 : +seconds) * 20)), Math.max(0, Math.min(9, (level == null ? 1 : level | 0) - 1))]);
                             },
@@ -6880,6 +7122,7 @@
                     me = e.player || null;
                     if (me) known[me.id] = me;
                     if (stopTimer) { clearTimeout(stopTimer); stopTimer = 0; }
+                    if (Module.mcJava && Module.mcJava.dimension && !e.client) Module.mcJava.dimension(e.dimension);
                     if (worker && side === newSide && folder === (e.folder || '')) {
                         if (side === 'host') toWorker({ t: 'dimension', dimension: e.dimension, player: me });
                         toWorker({ t: 'dimension', client: true, dimension: e.dimension, player: me });
