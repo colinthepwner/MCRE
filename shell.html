@@ -991,7 +991,10 @@
             logo.src = 'icons/logo.png';
             ov.appendChild(logo);
             var gap = document.createElement('div'); gap.style.height = (big * 6) + 'px'; ov.appendChild(gap);
-            var title = pix('Loading', Math.max(2, big - 2), '#ffffff'); ov.appendChild(title);
+            var title = document.createElement('div');
+            title.style.cssText = 'font:bold ' + (big * 5) + 'px monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f';
+            title.textContent = 'Loading';
+            ov.appendChild(title);
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-top:' + (big * 3) + 'px;width:min(400px,70vw);height:' + Math.max(4, big) + 'px;background:#808080;border:0';
             var fill = document.createElement('div');
