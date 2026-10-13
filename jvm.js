@@ -5963,6 +5963,8 @@ function installMc152(vm) {
 		self[':isBlockContainer'] = 0;
 		if (id < 0 || id >= 4096) return;
 		var list = c.statics.blocksList.a;
+		var asked0 = JVM.forgeAskedId ? JVM.forgeAskedId(vm, vm.currentMod, id) : null;
+		self.$askId = asked0 != null ? asked0 : id;
 		var prev = list[id];
 		var onItem = id >= 256 && VANILLA_ITEM_IDS[id] && !reg(vm).vanilla && !self.$vanilla;
 		if (onItem) {
@@ -6065,6 +6067,8 @@ function installMc152(vm) {
 		self[':bFull3D'] = 0;
 		if (id < 0 || id >= 32000) return;
 		var list = c.statics.itemsList.a;
+		var askedI = JVM.forgeAskedId ? JVM.forgeAskedId(vm, vm.currentMod, id) : null;
+		self.$askId = askedI != null ? askedI : id;
 		var prevI = list[id];
 		if (prevI && prevI !== self && !prevI.$vanilla && !reg(vm).vanilla && !prevI.$blockItem && !self.$blockItem && prevI.$mod && prevI.$mod !== (vm.currentMod || '')) {
 			var nidI = 0;
@@ -6759,7 +6763,7 @@ JVM.collectContent = function (vm, modId) {
 		}
 		var uniq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
 		var given = langOf(b, meta) || keyName(b);
-		var json = { name: given || ('Block ' + id + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
+		var json = { name: given || ('Block ' + (b.$askId != null ? b.$askId : id) + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
 		if (!given && !uniq.length) json.creative = false;
 		json.hardness = b[':blockHardness'];
 		var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
@@ -7031,7 +7035,10 @@ JVM.contentName = function (vm, id, meta) {
 	var r = reg(vm), o = r.blocks[id] || r.items[id];
 	var isBlock = !!r.blocks[id];
 	var st = o && o.$stId;
-	var n = st ? String(st).split(':').pop().toLowerCase().replace(/[^a-z0-9_]+/g, '_') : (isBlock ? 'b' : 'i') + id;
+	var nid = o && o.$askId != null ? o.$askId : id;
+	var n = st ? String(st).split(':').pop().toLowerCase().replace(/[^a-z0-9_]+/g, '_') : (isBlock ? 'b' : 'i') + nid;
+	var map0 = vm.$cnames || (vm.$cnames = Object.create(null));
+	if (!st && o && nid !== id) { var e0 = map0[(o.$mod || '') + ':' + n]; if (e0 && e0.id !== id) n += 'x' + id; }
 	meta = meta | 0;
 	if (meta && o && JVM.variantsOf(vm, o).indexOf(meta) >= 0) n += '_' + meta;
 	else meta = 0;
@@ -7040,9 +7047,13 @@ JVM.contentName = function (vm, id, meta) {
 	return n;
 };
 JVM.contentId = function (vm, mod, name) {
-	var m = /^[bi](\d+)(?:_\d+)?$/.exec(name);
+	var m = /^[bi](\d+)(?:x(\d+))?(?:_\d+)?$/.exec(name);
 	var e = vm.$cnames && vm.$cnames[mod + ':' + name];
 	if (e) return e.id;
+	if (m && m[2]) return +m[2];
+	if (m) { var r0 = reg(vm), want = +m[1], hit = null;
+		var lst = name[0] === 'b' ? r0.blocks : r0.items; Object.keys(lst).some(function (k) { var o = lst[k]; if (o && o.$mod === mod && o.$askId === want) { hit = +k; return true; } return false; });
+		if (hit != null) return hit; }
 	return m ? +m[1] : null;
 };
 JVM.contentMeta = function (vm, mod, name) {
@@ -7590,7 +7601,20 @@ JVM.forgeConfigs = function (vm, modId) {
 		}) };
 	});
 };
+function cfgAsk(vm, prop, ask, shift) {
+	var f = forge(vm), got = javaInt(propString(prop));
+	if (got === null || got === -1) return prop;
+	(f.askIds || (f.askIds = {}))[(vm.currentMod || '') + ':' + (got + shift)] = ask + shift;
+	return prop;
+}
+JVM.forgeAskedId = function (vm, mod, id) {
+	var f = vm.mcReg && vm.mcReg.forge, a = f && f.askIds;
+	return a && a[(mod || '') + ':' + id] != null ? a[(mod || '') + ':' + id] : null;
+};
 function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
+	return cfgAsk(vm, cfgBlockId0(vm, self, category, key, dflt, comment, lower, upper), dflt, 0);
+}
+function cfgBlockId0(vm, self, category, key, dflt, comment, lower, upper) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
 	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
@@ -7605,6 +7629,9 @@ function cfgBlockId(vm, self, category, key, dflt, comment, lower, upper) {
 	vm.throwNew('java/lang/RuntimeException', 'No more block ids available for ' + key);
 }
 function cfgItemId(vm, self, category, key, dflt, comment) {
+	return cfgAsk(vm, cfgItemId0(vm, self, category, key, dflt, comment), dflt, 256);
+}
+function cfgItemId0(vm, self, category, key, dflt, comment) {
 	var f = forge(vm), prop = cfgGet(vm, self, category, key, '-1', comment, 'I');
 	prop.$isId = true;
 	if (javaInt(propString(prop)) === null) propSet(prop, '-1');
