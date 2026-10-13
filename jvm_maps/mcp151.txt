@@ -1873,8 +1873,10 @@ F	ajv	o	field_76104_m	raining
 F	ajv	p	field_76101_n	rainTime
 F	ajv	q	field_76102_o	thundering
 F	ajv	r	field_76114_p	thunderTime
+F	ali	a	field_82537_a	sensible
 F	amb	a	field_82527_a	dispenseBehaviorRegistry
 F	amb	b	field_72284_a	random
+F	aoq	b	field_72157_b	modelBlock
 F	apa	A	field_71978_w	cobblestone
 F	apa	B	field_71988_x	planks
 F	apa	C	field_71987_y	sapling
@@ -2069,7 +2071,19 @@ F	apa	z	field_71979_v	dirt
 F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
+F	apy	a	field_70425_a	adjacentChestChecked
+F	apy	b	field_70423_b	adjacentChestZNeg
+F	apy	c	field_70424_c	adjacentChestXPos
+F	apy	d	field_70421_d	adjacentChestXNeg
+F	apy	e	field_70422_e	adjacentChestZPosition
+F	apy	f	field_70419_f	lidAngle
+F	apy	g	field_70420_g	prevLidAngle
+F	apy	h	field_70427_h	numUsingPlayers
+F	apy	s	field_94045_s	customName
 F	aqc	a	field_94050_c	customName
+F	aqg	a	field_70407_a	furnaceBurnTime
+F	aqg	b	field_70405_b	currentItemBurnTime
+F	aqg	c	field_70406_c	furnaceCookTime
 F	aqp	a	field_70326_a	nameToClassMap
 F	aqp	b	field_70323_b	classToNameMap
 F	aqp	k	field_70331_k	worldObj
@@ -2263,6 +2277,9 @@ F	bcm	a	field_78171_a	silverfishBodyParts
 F	bcm	b	field_78169_b	silverfishWings
 F	bcn	a	field_82896_a	skeletonHead
 F	bcq	a	field_78200_a	slimeBodies
+F	bcq	b	field_78198_b	slimeRightEye
+F	bcq	c	field_78199_c	slimeLeftEye
+F	bcq	d	field_78197_d	slimeMouth
 F	bcr	a	field_78196_a	body
 F	bcr	b	field_78194_b	bottomBody
 F	bcr	c	field_78195_c	head
@@ -3511,6 +3528,25 @@ M	alh	d	()I	func_71857_b	getRenderType
 M	alh	e	(Laab;III)V	func_72262_c	checkFlowerChange
 M	alh	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	alh	f_	(I)Z	func_72263_d_	canThisPlantGrowOnThisBlockID
+M	ali	a	(Laab;)I	func_71859_p_	tickRate
+M	ali	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	ali	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	ali	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	ali	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ali	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
+M	ali	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
+M	ali	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	ali	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	ali	a	(Lly;)V	func_94332_a	registerIcons
+M	ali	b	()Z	func_71886_c	renderAsNormalBlock
+M	ali	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	ali	b	(Laak;IIII)I	func_71865_a	isProvidingWeakPower
+M	ali	c	()Z	func_71926_d	isOpaqueCube
+M	ali	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	ali	c	(Laab;IIII)Z	func_71850_a_	canPlaceBlockOnSide
+M	ali	c	(Laak;IIII)I	func_71855_c	isProvidingStrongPower
+M	ali	f	()Z	func_71853_i	canProvidePower
+M	ali	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	alj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	alj	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	alj	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
@@ -3521,6 +3557,7 @@ M	alj	c	()Z	func_71926_d	isOpaqueCube
 M	alj	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	alj	d	()I	func_71857_b	getRenderType
 M	alj	f	(Laab;III)Z	func_71854_d	canBlockStay
+M	alz	j	(I)I	func_72217_d	getDirection
 M	amb	a	(Laab;)I	func_71859_p_	tickRate
 M	amb	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	amb	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -3532,7 +3569,56 @@ M	amb	a	(Laz;)Lbi;	func_82525_a	getIPositionFromBlockSource
 M	amb	a	(Lly;)V	func_94332_a	registerIcons
 M	amb	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
 M	amb	j_	(I)Lbf;	func_100009_j_	getFacing
+M	amc	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	amc	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	amc	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
+M	amc	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	amc	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amc	a	(Lly;)V	func_94332_a	registerIcons
+M	amc	b	()Z	func_71886_c	renderAsNormalBlock
+M	amc	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	amc	b_	(Laak;IIII)Llx;	func_71895_b	getBlockTexture
+M	amc	c	()Z	func_71926_d	isOpaqueCube
+M	amc	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	amc	c_	(Laak;III)I	func_72234_b_	getFullMetadata
+M	amc	d	()I	func_71857_b	getRenderType
+M	amc	h	()I	func_71915_e	getMobilityFlag
 M	amh	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	amj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	amj	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	amj	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	amj	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amj	a	(Lly;)V	func_94332_a	registerIcons
+M	amj	b	()Z	func_71886_c	renderAsNormalBlock
+M	amj	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	amj	c	()Z	func_71926_d	isOpaqueCube
+M	amj	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	amj	d	()I	func_71857_b	getRenderType
+M	amj	k_	(I)Z	func_72224_c	isFenceGateOpen
+M	amz	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	amz	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	amz	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amz	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	amz	b	()Z	func_71886_c	renderAsNormalBlock
+M	amz	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	amz	c	()Z	func_71926_d	isOpaqueCube
+M	amz	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	amz	d	()I	func_71857_b	getRenderType
+M	anc	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	anc	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	anc	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	anc	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	anc	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	anc	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	anc	b	()Z	func_71886_c	renderAsNormalBlock
+M	anc	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	anc	b	(Laak;IIII)I	func_71865_a	isProvidingWeakPower
+M	anc	c	()Z	func_71926_d	isOpaqueCube
+M	anc	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	anc	c	(Laab;IIII)Z	func_71850_a_	canPlaceBlockOnSide
+M	anc	c	(Laak;IIII)I	func_71855_c	isProvidingStrongPower
+M	anc	d	()I	func_71857_b	getRenderType
+M	anc	f	()Z	func_71853_i	canProvidePower
 M	aoh	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	aoh	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	aoh	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
@@ -3542,6 +3628,26 @@ M	aoh	c	()Z	func_71926_d	isOpaqueCube
 M	aoh	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	aoh	d	()I	func_71857_b	getRenderType
 M	aoh	f	(Laab;III)Z	func_71854_d	canBlockStay
+M	aoq	a	(IZ)Z	func_71913_a	canCollideCheck
+M	aoq	a	(Laab;)I	func_71859_p_	tickRate
+M	aoq	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	aoq	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	aoq	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	aoq	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aoq	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
+M	aoq	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
+M	aoq	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aoq	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	aoq	a	(Lly;)V	func_94332_a	registerIcons
+M	aoq	b	()Z	func_71886_c	renderAsNormalBlock
+M	aoq	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	aoq	b	(Laab;IIILmp;)V	func_71891_b	onEntityWalking
+M	aoq	c	()Z	func_71926_d	isOpaqueCube
+M	aoq	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	aoq	d	()I	func_71857_b	getRenderType
+M	aoq	g	(Laab;IIII)V	func_71898_d	onBlockDestroyedByPlayer
+M	aoq	m	()Z	func_71935_l	isCollidable
+M	aoq	n	()I	func_71856_s_	getRenderBlockPass
 M	apa	A	()Ljava/lang/String;	func_71931_t	getLocalizedName
 M	apa	C	()Z	func_71876_u	getEnableStats
 M	apa	D	()Lapa;	func_71896_v	disableStats
@@ -3565,6 +3671,7 @@ M	apa	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
 M	apa	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
 M	apa	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
 M	apa	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
+M	apa	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
 M	apa	a	(Lape;)Lapa;	func_71884_a	setStepSound
 M	apa	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
 M	apa	a	(Lly;)V	func_94332_a	registerIcons
@@ -3577,6 +3684,7 @@ M	apa	b	(Laab;IIIII)Z	func_71883_b	onBlockEventReceived
 M	apa	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
 M	apa	b	(Laab;IIILmp;)V	func_71891_b	onEntityWalking
 M	apa	b	(Laab;IIILwm;)V	func_71929_a	dropBlockAsItem_do
+M	apa	b	(Laak;IIII)I	func_71865_a	isProvidingWeakPower
 M	apa	b	(Z)Lapa;	func_71907_b	setTickRandomly
 M	apa	b_	(Laak;IIII)Llx;	func_71895_b	getBlockTexture
 M	apa	c	()Z	func_71926_d	isOpaqueCube
@@ -3585,7 +3693,9 @@ M	apa	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	apa	c	(Laab;IIII)Z	func_71850_a_	canPlaceBlockOnSide
 M	apa	c	(Laab;IIIII)V	func_71897_c	dropBlockAsItem
 M	apa	c	(Laak;III)I	func_71920_b	colorMultiplier
+M	apa	c	(Laak;IIII)I	func_71855_c	isProvidingStrongPower
 M	apa	d	()I	func_71857_b	getRenderType
+M	apa	f	()Z	func_71853_i	canProvidePower
 M	apa	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	apa	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	apa	g	(Laab;IIII)V	func_71898_d	onBlockDestroyedByPlayer
@@ -3604,11 +3714,35 @@ M	ape	a	()Ljava/lang/String;	func_72676_a	getBreakSound
 M	ape	c	()F	func_72677_b	getVolume
 M	ape	d	()F	func_72678_c	getPitch
 M	ape	e	()Ljava/lang/String;	func_72675_d	getStepSound
+M	aph	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	aph	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	aph	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	aph	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aph	b	()Z	func_71886_c	renderAsNormalBlock
+M	aph	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aph	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	aph	c	()Z	func_71926_d	isOpaqueCube
+M	aph	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	aph	d	()I	func_71857_b	getRenderType
+M	apj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	apj	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	apj	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
+M	apj	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	apj	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	apj	b	()Z	func_71886_c	renderAsNormalBlock
+M	apj	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	apj	c	()Z	func_71926_d	isOpaqueCube
+M	apj	c	(Laab;IIII)Z	func_71850_a_	canPlaceBlockOnSide
+M	apj	d	()I	func_71857_b	getRenderType
+M	apj	d	(I)V	func_72139_e	setBlockBoundsForBlockRender
+M	apj	f	(I)Z	func_72137_g	isTrapdoorOpen
+M	apj	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	apn	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	apn	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	apn	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
 M	apn	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	apn	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
+M	apn	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
 M	apn	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
 M	apn	b	()Z	func_71886_c	renderAsNormalBlock
 M	apn	b	(I)I	func_71889_f_	getRenderColor
@@ -3619,6 +3753,42 @@ M	apn	c	(Laak;III)I	func_71920_b	colorMultiplier
 M	apn	d	()I	func_71857_b	getRenderType
 M	apn	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	apn	o	()I	func_71933_m	getBlockColor
+M	apx	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	apx	a	(II)Lwm;	func_70298_a	decrStackSize
+M	apx	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	apx	a	(Lbs;)V	func_70307_a	readFromNBT
+M	apx	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	apx	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	apx	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	apx	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	apx	b	(Lbs;)V	func_70310_b	writeToNBT
+M	apx	c	()Z	func_94042_c	isInvNameLocalized
+M	apx	d	()I	func_70297_j_	getInventoryStackLimit
+M	apx	f	()V	func_70295_k_	openChest
+M	apx	g	()V	func_70305_f	closeChest
+M	apx	h	()V	func_70316_g	updateEntity
+M	apx	j_	()I	func_70302_i_	getSizeInventory
+M	apx	x_	()I	func_70355_t_	getBrewTime
+M	apy	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	apy	a	(II)Lwm;	func_70298_a	decrStackSize
+M	apy	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	apy	a	(Lbs;)V	func_70307_a	readFromNBT
+M	apy	a	(Ljava/lang/String;)V	func_94043_a	setChestGuiName
+M	apy	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	apy	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	apy	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	apy	b	(II)Z	func_70315_b	receiveClientEvent
+M	apy	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	apy	b	(Lbs;)V	func_70310_b	writeToNBT
+M	apy	c	()Z	func_94042_c	isInvNameLocalized
+M	apy	d	()I	func_70297_j_	getInventoryStackLimit
+M	apy	f	()V	func_70295_k_	openChest
+M	apy	g	()V	func_70305_f	closeChest
+M	apy	h	()V	func_70316_g	updateEntity
+M	apy	i	()V	func_70321_h	updateContainingBlockInfo
+M	apy	j	()V	func_70418_i	checkForAdjacentChests
+M	apy	j_	()I	func_70302_i_	getSizeInventory
+M	apy	w_	()V	func_70313_j	invalidate
 M	aqc	a	(I)Lwm;	func_70301_a	getStackInSlot
 M	aqc	a	(II)Lwm;	func_70298_a	decrStackSize
 M	aqc	a	(ILwm;)V	func_70299_a	setInventorySlotContents
@@ -3635,6 +3805,42 @@ M	aqc	f	()V	func_70295_k_	openChest
 M	aqc	g	()V	func_70305_f	closeChest
 M	aqc	j	()I	func_70361_i	getRandomStackFromInventory
 M	aqc	j_	()I	func_70302_i_	getSizeInventory
+M	aqd	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	aqg	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	aqg	a	(II)Lwm;	func_70298_a	decrStackSize
+M	aqg	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	aqg	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aqg	a	(Ljava/lang/String;)V	func_94129_a	setGuiDisplayName
+M	aqg	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	aqg	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	aqg	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	aqg	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	aqg	b	(Lbs;)V	func_70310_b	writeToNBT
+M	aqg	c	()Z	func_94042_c	isInvNameLocalized
+M	aqg	d	()I	func_70297_j_	getInventoryStackLimit
+M	aqg	d	(I)I	func_70397_c	getCookProgressScaled
+M	aqg	e	(I)I	func_70403_d	getBurnTimeRemainingScaled
+M	aqg	f	()V	func_70295_k_	openChest
+M	aqg	g	()V	func_70305_f	closeChest
+M	aqg	h	()V	func_70316_g	updateEntity
+M	aqg	j	()Z	func_70400_i	isBurning
+M	aqg	j_	()I	func_70302_i_	getSizeInventory
+M	aqi	a	(I)Lwm;	func_70301_a	getStackInSlot
+M	aqi	a	(II)Lwm;	func_70298_a	decrStackSize
+M	aqi	a	(ILwm;)V	func_70299_a	setInventorySlotContents
+M	aqi	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aqi	a	(Lsq;)Z	func_70300_a	isUseableByPlayer
+M	aqi	b	()Ljava/lang/String;	func_70303_b	getInvName
+M	aqi	b	(I)Lwm;	func_70304_b	getStackInSlotOnClosing
+M	aqi	b	(ILwm;)Z	func_94041_b	isStackValidForSlot
+M	aqi	b	(Lbs;)V	func_70310_b	writeToNBT
+M	aqi	c	()Z	func_94042_c	isInvNameLocalized
+M	aqi	d	()I	func_70297_j_	getInventoryStackLimit
+M	aqi	f	()V	func_70295_k_	openChest
+M	aqi	g	()V	func_70305_f	closeChest
+M	aqi	h	()V	func_70316_g	updateEntity
+M	aqi	j_	()I	func_70302_i_	getSizeInventory
+M	aqi	k_	()V	func_70296_d	onInventoryChanged
 M	aqp	a	(DDD)D	func_70318_a	getDistanceFrom
 M	aqp	a	(Lbs;)V	func_70307_a	readFromNBT
 M	aqp	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
@@ -3658,6 +3864,7 @@ M	aqt	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	aqt	a	(Laab;IIILng;)I	func_72116_b	determineOrientation
 M	aqt	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
 M	aqt	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aqt	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
 M	aqt	a	(Lly;)V	func_94332_a	registerIcons
 M	aqt	b	()Z	func_71886_c	renderAsNormalBlock
 M	aqt	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
@@ -5426,6 +5633,8 @@ M	vr	a	(Lwm;Lapa;)F	func_77638_a	getStrVsBlock
 M	vr	a	(Lwm;Lng;Lng;)Z	func_77644_a	hitEntity
 M	vr	c	()I	func_77619_b	getItemEnchantability
 M	vr	n_	()Z	func_77662_d	isFull3D
+M	vs	a	(Laab;IIIILapa;)V	func_77869_a	placeDoorBlock
+M	vs	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	vt	a	(ILve;Ljava/util/List;)V	func_77633_a	getSubItems
 M	vt	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	vt	a_	(I)Llx;	func_77617_a	getIconFromDamage
@@ -5559,8 +5768,10 @@ M	za	values	()[Lza;	values	values
 M	zb	a	(ILwm;)I	func_77506_a	getEnchantmentLevel
 M	zb	a	(I[Lwm;)I	func_77511_a	getMaxEnchantmentLevel
 M	zb	a	(Ljava/util/Map;Lwm;)V	func_82782_a	setEnchantments
+M	zb	a	(Ljava/util/Random;Lwm;I)Lwm;	func_77504_a	addRandomEnchantment
 M	zb	a	(Lng;)I	func_90036_a	getFireAspectModifier
 M	zb	a	(Lwm;)Ljava/util/Map;	func_82781_a	getEnchantments
+M	zb	b	(Ljava/util/Random;Lwm;I)Ljava/util/List;	func_77513_b	buildEnchantmentList
 M	zb	b	(Lng;)I	func_77501_a	getRespiration
 M	zb	b	(Lng;Lng;)I	func_77507_b	getKnockbackModifier
 M	zb	c	(Lng;)I	func_77509_b	getEfficiencyModifier
@@ -5670,9 +5881,11 @@ R	field_72178_a	glowing
 R	field_72166_a	powered
 R	field_82539_a	types
 R	field_82136_e	levels
-R	field_94045_s	customName
 R	field_82354_a	command
 R	field_70376_r	rand
+R	field_70370_a	lidAngle
+R	field_70368_b	prevLidAngle
+R	field_70369_c	numUsingPlayers
 R	field_70416_a	note
 R	field_70344_d	extending
 R	field_70342_f	progress
@@ -5689,6 +5902,7 @@ R	field_71844_b	strength
 R	field_71830_a	S
 R	field_71784_a	key
 R	field_71781_b	parameters
+R	field_74843_a	actions
 R	field_74827_c	info
 R	field_74619_a	elements
 R	field_74730_a	elements
@@ -5807,6 +6021,7 @@ R	field_78941_z	tessellator
 R	field_78545_a	instance
 R	field_78462_a	image
 R	field_78458_a	location
+R	field_78456_b	buffer
 R	field_78455_a	mc
 R	field_85101_a	posX
 R	field_85099_b	posY
@@ -5831,6 +6046,7 @@ R	field_71349_l	mc
 R	field_77527_e	address
 R	field_77312_b	mc
 R	field_77311_e	availableTexturePacks
+R	field_77389_a	buffer
 R	field_77388_c	hash
 R	field_82476_c	thePlayer
 R	field_82472_g	silent
@@ -6033,8 +6249,10 @@ R	field_71750_c	mcServer
 R	field_72673_b	output
 R	field_72619_a	running
 R	field_72617_b	server
+R	field_72630_n	buffer
 R	field_72640_t	time
 R	field_72639_u	output
+R	field_72660_i	buffer
 R	field_75983_a	itemID
 R	field_75964_a	instance
 R	field_75900_a	salt
@@ -6188,6 +6406,8 @@ R	func_96439_d	notifyBlocksOfNeighborChange
 R	func_72948_g	getFogColor
 R	func_72870_g	updateEntity
 R	func_72808_j	getBrightness
+R	func_72809_s	isBlockNormalCube
+R	func_72797_t	doesBlockHaveSolidTopSurface
 R	call	call
 R	func_77439_a	getChunkProvider
 R	func_72710_a	markBlockForUpdate
@@ -6380,6 +6600,7 @@ R	func_71858_a	getBlockTextureFromSideAndMetadata
 R	func_71879_a	getSubBlocks
 R	func_71860_a	onBlockPlacedBy
 R	func_71903_a	onBlockActivated
+R	func_71902_a	setBlockBoundsBasedOnState
 R	func_94332_a	registerIcons
 R	func_71886_c	renderAsNormalBlock
 R	func_71926_d	isOpaqueCube
@@ -6390,7 +6611,10 @@ R	func_71852_a	breakBlock
 R	func_71847_b	updateTick
 R	func_71869_a	onEntityCollidedWithBlock
 R	func_71872_e	getCollisionBoundingBoxFromPool
+R	func_71865_a	isProvidingWeakPower
 R	func_71930_b	canPlaceBlockAt
+R	func_71855_c	isProvidingStrongPower
+R	func_71853_i	canProvidePower
 R	func_71919_f	setBlockBoundsForItemRender
 R	func_71915_e	getMobilityFlag
 R	func_71861_g	onBlockAdded
@@ -6400,23 +6624,22 @@ R	func_71885_a	idDropped
 R	func_71914_a	dropBlockAsItemWithChance
 R	func_72227_n	setBounds
 R	func_71862_a	randomDisplayTick
-R	func_85104_a	onBlockPlaced
-R	func_71921_a	onBlockClicked
-R	func_71850_a_	canPlaceBlockOnSide
 R	func_72260_l	getOrientation
+R	func_71921_a	onBlockClicked
 R	func_71854_d	canBlockStay
 R	func_94442_h_	getInventory
+R	func_85104_a	onBlockPlaced
 R	func_71883_b	onBlockEventReceived
 R	func_72263_d_	canThisPlantGrowOnThisBlockID
 R	func_71893_a	harvestBlock
 R	func_71898_d	onBlockDestroyedByPlayer
 R	func_82526_n	dispense
-R	func_71895_b	getBlockTexture
 R	func_71906_q_	canSilkHarvest
 R	func_71935_l	isCollidable
 R	func_71928_r_	initializeBlock
 R	func_71856_s_	getRenderBlockPass
 R	func_71889_f_	getRenderColor
+R	func_71895_b	getBlockTexture
 R	func_71920_b	colorMultiplier
 R	func_71933_m	getBlockColor
 R	func_71910_a	quantityDroppedWithBonus
@@ -6431,7 +6654,10 @@ R	func_72265_d	getState
 R	func_94331_a	canPlaceBlockOnSide
 R	func_71932_i	isNormalCube
 R	func_72676_a	getBreakSound
+R	func_72125_l	canPlaceTorchOn
+R	func_72140_j	isValidSupportBlock
 R	func_72145_a	playSoundEffect
+R	func_71850_a_	canPlaceBlockOnSide
 R	func_72151_e	canBePlacedOn
 R	func_72150_l	canVineStay
 R	func_70301_a	getStackInSlot
@@ -6448,15 +6674,14 @@ R	func_70305_f	closeChest
 R	func_70316_g	updateEntity
 R	func_70302_i_	getSizeInventory
 R	func_70319_e	getDescriptionPacket
-R	func_70315_b	receiveClientEvent
-R	func_70321_h	updateContainingBlockInfo
-R	func_70313_j	invalidate
 R	func_70364_a	openChest
 R	func_70365_a	isUseableByPlayer
 R	func_70366_b	closeChest
-R	func_70400_i	isBurning
+R	func_70315_b	receiveClientEvent
+R	func_70313_j	invalidate
+R	func_70398_a	getItemBurnTime
+R	func_70401_b	isItemFuel
 R	func_70314_l	getWorldObj
-R	func_70296_d	onInventoryChanged
 R	func_70337_b	getOffsetX
 R	func_70334_c	getOffsetY
 R	func_70332_d	getOffsetZ
@@ -6668,6 +6893,7 @@ R	func_73573_j	getPitch
 R	func_73346_h	isCreativeMode
 R	func_73391_d	getMetadata
 R	func_73322_d	getEntityId
+R	func_73401_h	getDirection
 R	func_73405_i	getItemStack
 R	func_73688_c	parse
 R	func_73706_a	put
@@ -6728,6 +6954,7 @@ R	func_76273_a	getRandomItem
 R	func_76274_a	getRandomItem
 R	func_76269_a	getRandomItem
 R	func_76270_a	getTotalWeight
+R	func_70296_d	onInventoryChanged
 R	func_76316_a	onInventoryChanged
 R	func_76346_g	getEntity
 R	func_76364_f	getSourceOfDamage
@@ -6834,7 +7061,6 @@ R	func_77667_c	getUnlocalizedName
 R	func_77633_a	getSubItems
 R	func_82790_a	getColorFromItemStack
 R	func_78012_e	getTabIconItemIndex
-R	func_77869_a	placeDoorBlock
 R	func_92112_a	func_92112_a
 R	func_92115_a	addEnchantment
 R	func_92111_a	getEnchantedItemStack
@@ -6874,6 +7100,7 @@ R	func_77320_a	getName
 R	func_77323_a	calcModifierLiving
 R	func_92089_a	canApply
 R	func_77326_a	canApplyTogether
+R	func_77505_b	mapEnchantmentData
 R	func_77318_a	calcModifierDamage
 R	func_98270_a	readFromNBT
 R	func_98280_b	writeToNBT

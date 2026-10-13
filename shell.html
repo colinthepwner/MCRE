@@ -643,6 +643,62 @@
                 return true;
             }
 
+            (function () {
+                var recs = {}, lx = 0, ly = 0, lz = 0, lvol = 1, heard = false;
+                function key(x, y, z) { return x + ',' + y + ',' + z; }
+                function range() { var r = Module.mcGameRules && Module.mcGameRules.get('jukeboxRange'); return r > 0 ? r : 64; }
+                function volOf(r) {
+                    if (!heard) return lvol;
+                    var dx = r.x + 0.5 - lx, dy = r.y + 0.5 - ly, dz = r.z + 0.5 - lz;
+                    return Math.max(0, Math.min(1, lvol * (1 - Math.sqrt(dx * dx + dy * dy + dz * dz) / range())));
+                }
+                function setVol(r, v) {
+                    if (r.g) { if (Math.abs(r.g.gain.value - v) > 0.005) r.g.gain.value = v; }
+                    else if (Math.abs(r.a.volume - v) > 0.005) r.a.volume = v;
+                }
+                function stop(k) {
+                    var r = recs[k];
+                    if (!r) return;
+                    delete recs[k];
+                    try { r.a.pause(); r.a.removeAttribute('src'); r.a.load(); } catch (e) { }
+                    try { if (r.src) r.src.disconnect(); if (r.g) r.g.disconnect(); } catch (e) { }
+                }
+                Module.mcRecord = {
+                    play: function (x, y, z, name) {
+                        var k = key(x, y, z);
+                        stop(k);
+                        var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name];
+                        if (!list || !list.length) { console.warn('[jukebox] no sound "' + name + '" (the disc\'s music is missing)'); return; }
+                        var a = new Audio();
+                        a.preload = 'auto';
+                        a.src = list[(Math.random() * list.length) | 0];
+                        var r = recs[k] = { a: a, x: x, y: y, z: z, name: name };
+                        if (actx && actx.createMediaElementSource) {
+                            try { r.src = actx.createMediaElementSource(a); r.g = actx.createGain(); r.src.connect(r.g); r.g.connect(actx.destination); }
+                            catch (e) { r.src = r.g = null; }
+                        }
+                        setVol(r, volOf(r));
+                        var gone = function () { if (recs[k] === r) stop(k); };
+                        a.addEventListener('ended', gone);
+                        a.addEventListener('error', function () { console.warn('[jukebox] "' + name + '" could not be played'); gone(); });
+                        if (actx && actx.state !== 'running' && actx.resume) actx.resume().catch(function () {});
+                        var p = a.play();
+                        if (p && p.catch) p.catch(function (e) { console.warn('[jukebox] "' + name + '" not started:', e && e.name); });
+                        if (music) { try { music.pause(); } catch (e) { } music = null; nextAt = Date.now() + (10 + Math.random() * 10) * 60 * 1000; }
+                    },
+                    stop: function (x, y, z) { stop(key(x, y, z)); },
+                    stopAll: function () { Object.keys(recs).forEach(stop); },
+                    listen: function (x, y, z, vol) {
+                        lx = x; ly = y; lz = z; lvol = Math.max(0, Math.min(1, +vol || 0)); heard = true;
+                        var n = 0;
+                        Object.keys(recs).forEach(function (k) { setVol(recs[k], volOf(recs[k])); n++; });
+                        return n;
+                    },
+                    playing: function () { return Object.keys(recs).map(function (k) { var r = recs[k]; return { x: r.x, y: r.y, z: r.z, sound: r.name, volume: r.g ? r.g.gain.value : r.a.volume }; }); }
+                };
+                setInterval(function () { if (Module.mcInWorld !== 1 && Object.keys(recs).length) Module.mcRecord.stopAll(); }, 1000);
+            })();
+
             var music = null, nextAt = Date.now() + (30 + Math.random() * 60) * 1000;
             setInterval(function () {
                 var vol = typeof Module.mcMusicVolume === 'number' ? Module.mcMusicVolume : 1;
@@ -1197,8 +1253,12 @@
                     setTimeout(function () { try { c.close(); } catch (e) { } }, 200);
                     return;
                 }
-                if (msg && msg.json && { cmd: 1, guiev: 1, sact: 1, sgui: 1, ssend: 1, csend: 1, sev: 1 }[msg.json.t]) {
+                if (msg && msg.json && { cmd: 1, guiev: 1, sact: 1, sgui: 1, ssend: 1, csend: 1, sev: 1, invr: 1 }[msg.json.t]) {
                     if (Module.mcScripts) Module.mcScripts.fromJoiner(id, msg.json);
+                    return;
+                }
+                if (msg && msg.json && (msg.json.t === 'jinv' || msg.json.t === 'jgin')) {
+                    if (Module.mcJava && Module.mcJava.fromJoiner) Module.mcJava.fromJoiner(id, msg.json);
                     return;
                 }
                 if (msg && msg.json && msg.json.t === 'get' && Array.isArray(msg.json.ids) && Module.mcMods) {
@@ -1251,6 +1311,8 @@
             Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
             Module.mcGameRules.define('edgeAssistDrop', 3, 'How deep (blocks) a drop has to be for Edge Assist; smaller steps are just terrain', [1, 64]);
             Module.mcGameRules.define('edgeAssistHoldSeconds', 1, 'How long a touch player backing or strafing off an edge is held before they go over (walking at it: a moment)', [0, 10]);
+            Module.mcGameRules.define('jukeboxRange', 64, 'How far (blocks) a jukebox\'s record can be heard; it fades out linearly to there (Java: 64)', [8, 256]);
+            Module.mcGameRules.define('jukeboxNowPlaying', true, 'A record starting shows "Now playing: <disc>" above the hotbar');
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
             function rule(n) { return Module.mcGameRules.get(n); }
             function afkRules() {
@@ -1519,6 +1581,7 @@
                                 }
                                 if (hm && hm.json && hm.json.t === 'setafk') { setMyAfk(!!hm.json.on); return; }
                                 if (hm && hm.json && hm.json.t === 'kick') { net.kickReason = String(hm.json.why || 'Disconnected').slice(0, 150); return; }
+                                if (hm && hm.json && { jinvwatch: 1, jinvop: 1, jgui: 1, jop: 1 }[hm.json.t]) { if (Module.mcJava && Module.mcJava.fromHost) Module.mcJava.fromHost(hm.json); return; }
                                 if (hm && hm.json && Module.mcScripts) Module.mcScripts.fromHost(hm.json);
                                 return;
                             }
@@ -1751,10 +1814,90 @@
             var actor = null;
             function toActor(msg) { if (actor && actor.guid && Module.mcNet && Module.mcNet.sendCtlTo) Module.mcNet.sendCtlTo(actor.guid, msg); }
             function actorOnly(what) { if (vm) vm.warnOnce('mp:' + what, "a joined player's " + what + " can't be reached by Java mods here (left out)"); }
+            var jinv = {};
+            function jmirror(guid) { return jinv[guid] || (jinv[guid] = { slots: [], armor: [], sel: 0, sent: 0, got: false, watch: false }); }
+            function jwatch(guid) {
+                var m = jmirror(guid);
+                if (!m.watch && Module.mcNet && Module.mcNet.sendCtlTo) { m.watch = true; Module.mcNet.sendCtlTo(guid, { t: 'jinvwatch' }); }
+                return m;
+            }
+            function jstack(st) {
+                if (!st || !st.item || !(st.count > 0)) return null;
+                var e = Array.isArray(st.enchantments) ? st.enchantments.map(function (x) { return (x.id | 0) + ':' + (x.level | 0); }).join(',') : '';
+                return [String(st.item), st.count | 0, st.data | 0, e];
+            }
+            function jslot(slot) {
+                var m = actor && actor.guid ? jwatch(actor.guid) : null;
+                if (!m || !m.got) { if (vm) vm.warnOnce('mp:invwait', "a joined player's inventory wasn't on the host yet when a Java mod looked (it comes a moment after they join)"); return null; }
+                return (slot < 0 ? m.armor[-slot - 1] : m.slots[slot]) || null;
+            }
+            function jsel() { var m = actor && actor.guid ? jinv[actor.guid] : null; return m ? m.sel | 0 : 0; }
+            function jset(slot, ref, base, n, data, ench) {
+                var m = jwatch(actor.guid), st = base && base !== 'id:0' && n > 0 ? [base, n | 0, data | 0, ench || ''] : null;
+                if (slot < 0) { if (slot >= -4) m.armor[-slot - 1] = st; } else if (slot < 36) m.slots[slot] = st;
+                toActor({ t: 'jinvop', a: ['setslot', slot, st ? ref : '', st ? n | 0 : 0, data | 0], seq: ++m.sent });
+            }
+            var jlist = { t: 0, l: [] };
+            function joinersNow() {
+                var N = Module.mcNet;
+                if (!N || N.state !== 'open' || !N.eachConn || !Module._mcPlayerByGuid) return [];
+                var now = Date.now();
+                if (now - jlist.t < 500) return jlist.l;
+                var l = [];
+                N.eachConn(function (g) { var p = null; try { p = JSON.parse(UTF8ToString(Module._mcPlayerByGuid(g))); } catch (x) { } if (p && p.guid) l.push(p); });
+                jlist = { t: now, l: l };
+                return l;
+            }
+            function joinerByGuid(guid) {
+                if (!Module._mcPlayerByGuid || !Module.mcNet || !Module.mcNet.isOpen || !Module.mcNet.isOpen(guid)) return null;
+                try { var p = JSON.parse(UTF8ToString(Module._mcPlayerByGuid(guid))); return p && p.guid ? p : null; } catch (x) { return null; }
+            }
+            var nearBudget = { t: 0, n: {} };
+            function toNear(x, y, z, msg) {
+                var now = Date.now(), cap = msg.t === 'jop';
+                if (cap && now - nearBudget.t >= 50) nearBudget = { t: now, n: {} };
+                joinersNow().forEach(function (p) {
+                    var dx = p.x - x, dy = p.y - y, dz = p.z - z;
+                    if (dx * dx + dy * dy + dz * dz > 64 * 64) return;
+                    if (cap && (nearBudget.n[p.guid] = (nearBudget.n[p.guid] | 0) + 1) > 30) return;
+                    Module.mcNet.sendCtlTo(p.guid, msg);
+                });
+            }
+            function withActor(guid, fn) {
+                var who = joinerByGuid(guid);
+                if (!who || !vm) return undefined;
+                var pa = actor, pva = vm.mcActor, pm = vm.mcPlayer, pt = tiles;
+                if (pa && pa.guid === guid) { who.held = pa.held; }
+                else vm.mcPlayer = null;
+                actor = who; vm.mcActor = who;
+                if (!tiles) tiles = {};
+                jwatch(guid);
+                try { return fn(); }
+                finally { actor = pa; vm.mcActor = pva; vm.mcPlayer = pm; tiles = pt; }
+            }
+            var jgTimer = 0;
+            var mcMp = {
+                joiners: joinersNow,
+                has: function (guid) { return !!(Module.mcNet && Module.mcNet.isOpen && Module.mcNet.isOpen(guid)); },
+                withActor: withActor,
+                send: function (guid, msg) { if (Module.mcNet && Module.mcNet.sendCtlTo) Module.mcNet.sendCtlTo(guid, msg); },
+                wake: function () {
+                    if (jgTimer) return;
+                    jgTimer = setInterval(function () {
+                        var left = 0;
+                        try { if (running && vm && window.JVM.remoteGuiPump) left = window.JVM.remoteGuiPump(vm); } catch (x) { console.warn('[java] joined screens', x); }
+                        if (!left) { clearInterval(jgTimer); jgTimer = 0; }
+                    }, 100);
+                },
+            };
             var tiles = null;
             function forget(x, y, z) { if (tiles) delete tiles[(x | 0) + ',' + (y | 0) + ',' + (z | 0)]; }
             var bridge = {
                 mode: 'run',
+                tileFast: function (x, y, z) {
+                    if (tiles || !Module._mcJavaRunTile || typeof genJava !== 'function') return null;
+                    return genJava(Module._mcJavaRunTile(x, y, z));
+                },
                 blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; },
                 itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; },
                 op: function (name) {
@@ -1793,16 +1936,24 @@
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
                     case 'player': {
                         if (actor) return { x: +actor.x, y: +actor.y + 1.62, z: +actor.z, yaw: 0, pitch: 0, name: actor.name, health: actor.health | 0, food: 20,
-                                            creative: 0, flying: 0, sneaking: 0, onGround: 1, id: actor.id, slot: 0 };
+                                            creative: 0, flying: 0, sneaking: 0, onGround: 1, id: actor.id, slot: jsel(), guid: actor.guid, remote: 1 };
                         var p = player();
                         if (!p) return null;
                         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, name: p.name, health: p.health, food: p.food,
                                  creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot,
                                  fwd: +p.fwd || 0, strafe: +p.strafe || 0, jump: p.jump | 0, riding: p.riding | 0 };
                     }
-                    case 'ride': return mp(['ride', a[0] | 0, a[1] == null ? -1 : a[1] | 0].join('\t'));
+                    case 'ride':
+                        if (actor && (a[0] | 0) === (actor.id | 0)) { actorOnly('riding'); return 0; }
+                        return mp(['ride', a[0] | 0, a[1] == null ? -1 : a[1] | 0].join('\t'));
                     case 'held': {
-                        if (actor) return actor.held || null;
+                        if (actor) {
+                            if (actor.held !== undefined) return actor.held || null;
+                            var ah = jslot(jsel());
+                            if (!ah) return null;
+                            var ahj = javaOf(ah[0], ah[2]);
+                            return { id: ahj.id, count: ah[1], data: ahj.data, ench: enchOf(ah[3]) };
+                        }
                         var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data, ench: enchOf(hp.carried[3]) }; }
                     case 'give':
                         var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
@@ -1823,13 +1974,15 @@
                     }
                     case 'setchest': {
                         var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
-                        return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref, a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
+                        return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref === 'id:0' ? cref : cref + enchSpec(a[7]), a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
                     }
-                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : gameData(a[3], a[5] | 0), a[6] == null ? '' : a[6] | 0].join('\t')); }
+                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref + enchSpec(a[7]), a[4] | 0, variantRef(dref) ? 0 : gameData(a[3], a[5] | 0), a[6] == null ? '' : a[6] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
                         return mp('msg\t' + clean(a[0]));
-                    case 'sound': return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
+                    case 'sound':
+                        toNear(+a[0], +a[1], +a[2], { t: 'sound', name: clean(a[3]), x: +a[0], y: +a[1], z: +a[2], v: a[4] == null ? 1 : +a[4], p: a[5] == null ? 1 : +a[5] });
+                        return mp(['sound', +a[0], +a[1], +a[2], clean(a[3]), a[4] == null ? 1 : +a[4], a[5] == null ? 1 : +a[5]].join('\t'));
                     case 'effect': return mp(['effect', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
                     case 'rmeffect': return mp(['rmeffect', a[0] | 0, a[1] | 0].join('\t'));
                     case 'clreffect': return mp(['clreffect', a[0] | 0].join('\t'));
@@ -1837,7 +1990,9 @@
                         var pname = clean(a[0]);
                         var pm = /^javafx[|]i[|](-?\d+):(\d+)([|].*)$/.exec(pname);
                         if (pm) pname = 'javafx|i|' + itemRef(+pm[1], +pm[2]) + pm[3];
-                        return mp(['particle', pname, +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t'));
+                        var pline = ['particle', pname, +a[1], +a[2], +a[3], +a[4] || 0, +a[5] || 0, +a[6] || 0, 0].join('\t');
+                        toNear(+a[1], +a[2], +a[3], { t: 'jop', line: pline });
+                        return mp(pline);
                     }
                     case 'explode': if (tiles) tiles = {}; return mp(['explode', +a[0], +a[1], +a[2], +a[3] || 3, a[4] ? 1 : 0].join('\t'));
                     case 'time': return mp('time');
@@ -1852,12 +2007,11 @@
                         if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
                     case 'setslot':
-                        if (actor) { actorOnly('inventory'); return 0; }
                         var sbase = a[1] ? itemRef(a[1], a[3]) : 'id:0', sref2 = a[1] ? sbase + enchSpec(a[4]) : 'id:0';
+                        if (actor) { jset(a[0] | 0, sref2, sbase, a[1] ? a[2] | 0 : 0, variantRef(sbase) ? 0 : gameData(a[1], a[3] | 0), enchSpec(a[4]).slice(2)); return 1; }
                         return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sbase) ? 0 : gameData(a[1], a[3] | 0)].join('\t'));
                     case 'slot': {
-                        if (actor) { actorOnly('inventory'); return null; }
-                        var sl = mp('slot\t' + (a[0] | 0));
+                        var sl = actor ? jslot(a[0] | 0) : mp('slot\t' + (a[0] | 0));
                         if (!(sl && sl[0] && sl[0] !== 'id:0' && sl[1] > 0)) return null;
                         var sj = javaOf(sl[0], sl[2]);
                         return { id: sj.id, count: sl[1], data: sj.data, ench: enchOf(sl[3]) };
@@ -1871,7 +2025,9 @@
                     case 'setrot': return mp(['setrot', a[0] | 0, +a[1] || 0, +a[2] || 0].join('\t'));
                     case 'hurt': return mp(['hurt', a[0] | 0, a[1] | 0].join('\t'));
                     case 'fire': return mp(['fire', a[0] | 0, a[1] | 0].join('\t'));
-                    case 'travel': return mp(['travel', clean(String(a[0]))].join('\t'));
+                    case 'travel':
+                        if (actor) return mp(['travel', clean(String(a[0])), +actor.x, +actor.y, +actor.z].join('\t'));
+                        return mp(['travel', clean(String(a[0]))].join('\t'));
                     case 'setweather': return mp(['setweather', a[0] == null ? -1 : a[0] | 0, a[1] == null ? -1 : a[1] | 0, a[2] | 0].join('\t'));
                     case 'lightning': return mp(['lightning', +a[0], +a[1], +a[2]].join('\t'));
                     case 'xporb': return mp(['xporb', +a[0], +a[1], +a[2], a[3] | 0].join('\t'));
@@ -1921,10 +2077,10 @@
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'fullbright': return mp(['fullbright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
-                        if (actor) { actorOnly('inventory'); return 0; }
                         var want = itemRef(a[0]);
                         for (var s = 0; s < 36; s++) {
-                            var st = mp('slot\t' + s);
+                            var st = actor ? jslot(s) : mp('slot\t' + s);
+                            if (actor && st && st[0] === want && st[1] > 0) { if (name === 'takeitem') jset(s, want, want, st[1] - 1, st[2], st[3]); return 1; }
                             if (st && st[0] === want && st[1] > 0) {
                                 if (name === 'takeitem') mp(['setslot', s, st[1] > 1 ? want : 'id:0', st[1] - 1, st[2]].join('\t'));
                                 return 1;
@@ -1996,6 +2152,8 @@
                 Object.keys(r.blocks).forEach(function (k) { javaMods[r.blocks[k].$mod] = true; });
                 Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
                 vm.game = bridge;
+                vm.mcMp = mcMp;
+                jinv = {};
                 vm.mcPlayer = null; vm.mcWorld = null; vm.mcTicks = 0;
                 if (window.JVM.playerDataLoad) window.JVM.playerDataLoad(vm);
                 var gameLang = null;
@@ -2170,6 +2328,10 @@
                 if (running && vm && window.JVM.playerDataSave) { vm.steps = 0; window.JVM.playerDataSave(vm); }
                 if (running && vm && window.JVM.storageSave) { vm.steps = 0; window.JVM.storageSave(vm); }
                 worldDir = null;
+                if (running && vm && window.JVM.remoteGuiCloseAll) { try { window.JVM.remoteGuiCloseAll(vm); } catch (x) { console.warn('[java] joined screens', x); } }
+                if (jgTimer) { clearInterval(jgTimer); jgTimer = 0; }
+                jinv = {};
+                if (vm) vm.mcMp = null;
                 if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
                 jgClose(true);
                 hudShow(null);
@@ -2199,9 +2361,11 @@
                 var me0 = e.player ? player() : null;
                 actor = e.player && me0 && e.player.id !== me0.id ? e.player : null;
                 if (actor) {
-                    actor.held = e.item ? { id: refToJava(e.item), count: e.count != null ? e.count | 0 : 1, data: e.data | 0 } : null;
+                    actor.held = e.item ? { id: refToJava(e.item), count: e.count != null ? e.count | 0 : 1, data: e.data | 0 } : Object.prototype.hasOwnProperty.call(e, 'item') ? null : undefined;
                     vm.mcPlayer = null;
+                    if (actor.guid) jwatch(actor.guid);
                 }
+                else if (Module.mcNet && Module.mcNet.state === 'open') joinersNow().forEach(function (p) { if (!jinv[p.guid] || !jinv[p.guid].watch) jwatch(p.guid); });
                 vm.mcActor = actor;
                 try { handle(e); } finally { tiles = null; if (actor) vm.mcPlayer = null; actor = null; vm.mcActor = null; }
             };
@@ -2225,6 +2389,7 @@
                     if (JV.mobTick) JV.mobTick(vm);
                     if (JV.accessoryTick) JV.accessoryTick(vm);
                     if (JV.guiTick) JV.guiTick(vm);
+                    if (JV.remoteGuiTick) JV.remoteGuiTick(vm);
                     if (JV.tileTick) {
                         JV.tileTick(vm);
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
@@ -2249,7 +2414,8 @@
                     var rout = JV.itemReleased(vm, rj.id, rc, rj.data, e.left | 0);
                     if (rout && (rout[':itemID'] !== rj.id || rout[':stackSize'] !== rc || rout[':itemDamage'] !== rj.data)) {
                         var rid = rout[':stackSize'] > 0 ? rout[':itemID'] : 0, rn = Math.max(0, rout[':stackSize']), rd = rout[':itemDamage'];
-                        Promise.resolve().then(function () { try { bridge.op('setslot', rslot, rid, rn, rd); } catch (x) { console.warn('[java] hand', x); } });
+                        var rby = actor && actor.guid;
+                        Promise.resolve().then(function () { try { var rput = function () { bridge.op('setslot', rslot, rid, rn, rd); }; if (rby) withActor(rby, rput); else rput(); } catch (x) { console.warn('[java] hand', x); } });
                     }
                     return;
                 }
@@ -2285,12 +2451,56 @@
                     var stack = M.newStack(vm, iid, count, dmg);
                     var res = e.t === 'useItem' ? call(it, SIG.rightClick, [stack, world, pl2]) : call(it, SIG.itemUse, [stack, pl2, world, x, y, z, e.face | 0, 0.5, 0.5, 0.5]);
                     var out = e.t === 'useItem' && res.ok ? res.value : stack;
-                    var put = null;
+                    var put = null, by = actor && actor.guid;
                     if (out && (out[':itemID'] !== iid || out[':stackSize'] !== count || out[':itemDamage'] !== dmg)) {
                         var oid = out[':stackSize'] > 0 ? out[':itemID'] : 0, on = out[':stackSize'], od = out[':itemDamage'];
                         put = function () { bridge.op('setslot', slot, oid, on, od); };
                     } else if (!out) put = function () { bridge.op('setslot', slot, 0, 0, 0); };
-                    if (put) Promise.resolve().then(function () { try { put(); } catch (x) { console.warn('[java] hand', x); } });
+                    if (put) Promise.resolve().then(function () { try { if (by) withActor(by, put); else put(); } catch (x) { console.warn('[java] hand', x); } });
+                }
+            };
+            J.fromJoiner = function (guid, msg) {
+                if (!msg || !running || !vm) return;
+                if (msg.t === 'jinv') {
+                    var m = jmirror(guid), inv = msg.inv;
+                    if ((msg.seq | 0) < m.sent || !inv || !Array.isArray(inv.slots)) return;
+                    m.slots = inv.slots.slice(0, 36).map(jstack);
+                    m.armor = Array.isArray(inv.armor) ? inv.armor.slice(0, 4).map(jstack) : [];
+                    m.sel = Math.max(0, Math.min(8, inv.selected | 0));
+                    m.got = true;
+                } else if (msg.t === 'jgin' && window.JVM.remoteGuiInput) {
+                    try { window.JVM.remoteGuiInput(vm, guid, msg.m || {}); } catch (x) { console.warn('[java] joined screen', x); }
+                }
+            };
+            var jw = null;
+            function jwPush(force) {
+                var N = Module.mcNet;
+                if (!N || N.state !== 'in' || !Module._mcInvJson) { if (jw) { clearInterval(jw.timer); jw = null; } return; }
+                var t = '';
+                try { t = UTF8ToString(Module._mcInvJson()); } catch (x) { return; }
+                if (!t || t === 'null' || (!force && t === jw.last)) return;
+                jw.last = t;
+                var inv = null;
+                try { inv = JSON.parse(t); } catch (x) { return; }
+                N.sendCtlHost({ t: 'jinv', inv: inv, seq: jw.seq });
+            }
+            J.fromHost = function (msg) {
+                if (!msg) return;
+                if (msg.t === 'jinvwatch') {
+                    if (!jw) jw = { timer: setInterval(function () { jwPush(false); }, 250), last: '', seq: 0 };
+                    jwPush(true);
+                } else if (msg.t === 'jinvop') {
+                    var a = msg.a;
+                    if (Array.isArray(a) && a[0] === 'setslot' && Module._mcInvSet)
+                        Module.ccall('mcInvSet', 'number', ['number', 'string', 'number', 'number'], [a[1] | 0, String(a[2] || ''), a[3] | 0, a[4] == null ? -1 : a[4] | 0]);
+                    if (!jw) jw = { timer: setInterval(function () { jwPush(false); }, 250), last: '', seq: 0 };
+                    jw.seq = Math.max(jw.seq, msg.seq | 0);
+                    jwPush(true);
+                } else if (msg.t === 'jgui') {
+                    if (msg.close) { if (jg && jg.remote) jgClose(true); }
+                    else jgRemote(msg);
+                } else if (msg.t === 'jop') {
+                    if (typeof msg.line === 'string' && /^particle\t/.test(msg.line)) { try { Module.ccall('mcModpeOp', 'string', ['string'], [msg.line]); } catch (x) { } }
                 }
             };
             J.reports = {};
@@ -2446,8 +2656,7 @@
             }
             function jgDraw() {
                 if (!jg || !vm) return;
-                var JV = window.JVM;
-                var ops = JV.guiFrame(vm, jg.mx, jg.my);
+                var ops = jg.io.frame();
                 if (!ops) { jgClose(true); return; }
                 var ctx = jg.ctx, s = jg.scale;
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2457,7 +2666,7 @@
                 jgPaint(ctx, ops, jg.w, jg.h);
             }
             function jgPaint(ctx, ops, W, H) {
-                var standIn = false;
+                var standIn = false, JV = window.JVM;
                 ops.forEach(function (o) {
                     switch (o.k) {
                     case 'dim': { var gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(16,16,16,.75)'); gr.addColorStop(1, 'rgba(16,16,16,.82)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); break; }
@@ -2543,9 +2752,43 @@
                 jg.scale = s;
                 jg.w = Math.ceil(window.innerWidth / s); jg.h = Math.ceil(window.innerHeight / s);
                 jg.cv.width = window.innerWidth; jg.cv.height = window.innerHeight;
-                window.JVM.guiLayout(vm, jg.w, jg.h);
+                jg.io.layout(jg.w, jg.h);
             }
-            function jgOpen() {
+            function jgLocalIo() {
+                var JV = window.JVM;
+                return {
+                    frame: function () { return JV.guiFrame(vm, jg.mx, jg.my); },
+                    layout: function (w, h) { JV.guiLayout(vm, w, h); },
+                    move: function () { },
+                    mouse: function (x, y, b, down) { JV.guiMouse(vm, x, y, b, down); },
+                    drag: function (on) { if (JV.guiDrag) JV.guiDrag(vm, on); },
+                    wheel: function (d) { if (JV.guiWheel) JV.guiWheel(vm, d); },
+                    key: function (ch, code, down) { JV.guiKey(vm, ch, code, down); },
+                    close: function () { if (vm) JV.guiClose(vm); },
+                };
+            }
+            function jgRemoteIo() {
+                var send = function (m) { if (Module.mcNet && Module.mcNet.sendCtlHost) Module.mcNet.sendCtlHost({ t: 'jgin', m: m }); }, lastMove = 0;
+                return {
+                    remote: true,
+                    frame: function () { return Module.mcNet && Module.mcNet.state === 'in' ? jg.ops || [] : null; },
+                    layout: function (w, h) { send({ k: 'layout', w: w, h: h }); },
+                    move: function (x, y) { var t = Date.now(); if (t - lastMove < 80) return; lastMove = t; send({ k: 'move', x: x, y: y }); },
+                    mouse: function (x, y, b, down) { send({ k: 'mouse', x: x, y: y, b: b, down: !!down }); },
+                    drag: function (on) { send({ k: 'drag', on: !!on }); },
+                    wheel: function (d) { send({ k: 'wheel', d: d }); },
+                    key: function (ch, code, down) { send({ k: 'key', ch: ch, code: code, down: !!down }); },
+                    close: function () { send({ k: 'close' }); jgClose(true); },
+                };
+            }
+            function jgRemote(msg) {
+                if (!Array.isArray(msg.ops)) return;
+                if (!vm) { if (Module.mcNet && Module.mcNet.sendCtlHost) Module.mcNet.sendCtlHost({ t: 'jgin', m: { k: 'close' } }); return; }
+                if (!jg || !jg.remote) jgOpen(true);
+                jg.ops = msg.ops;
+                jgDraw();
+            }
+            function jgOpen(remote) {
                 if (jg) jgClose(true);
                 if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
                 var ov = document.createElement('div');
@@ -2555,33 +2798,34 @@
                 cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated';
                 ov.appendChild(cv);
                 document.body.appendChild(ov);
-                jg = { ov: ov, cv: cv, ctx: cv.getContext('2d'), mx: -1, my: -1, scale: 1, w: JGUI_W, h: JGUI_H };
+                jg = { ov: ov, cv: cv, ctx: cv.getContext('2d'), mx: -1, my: -1, scale: 1, w: JGUI_W, h: JGUI_H, remote: !!remote, ops: null };
+                jg.io = remote ? jgRemoteIo() : jgLocalIo();
                 jgLayout();
-                var JV = window.JVM;
+                var io = jg.io;
                 var stop = function (e) { e.stopPropagation(); };
                 ['mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'keypress'].forEach(function (t) { ov.addEventListener(t, stop); });
                 ov.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-                ov.addEventListener('mousemove', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; });
-                ov.addEventListener('mousedown', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, true); jgDraw(); });
-                ov.addEventListener('mouseup', function (e) { var p = jgPoint(e); JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, false); });
+                ov.addEventListener('mousemove', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; io.move(p[0], p[1]); });
+                ov.addEventListener('mousedown', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; io.mouse(p[0], p[1], e.button === 2 ? 1 : 0, true); jgDraw(); });
+                ov.addEventListener('mouseup', function (e) { var p = jgPoint(e); io.mouse(p[0], p[1], e.button === 2 ? 1 : 0, false); });
                 var tStart = 0;
                 var tFrom = null, tDrag = false;
                 ov.addEventListener('touchstart', function (e) { e.preventDefault(); tStart = Date.now(); var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; tFrom = p; tDrag = false; });
                 ov.addEventListener('touchmove', function (e) {
                     e.preventDefault(); var p = jgPoint(e);
-                    if (!tDrag && tFrom && Math.abs(p[0] - tFrom[0]) + Math.abs(p[1] - tFrom[1]) > 6) { tDrag = true; if (JV.guiDrag) JV.guiDrag(vm, true); }
-                    jg.mx = p[0]; jg.my = p[1];
+                    if (!tDrag && tFrom && Math.abs(p[0] - tFrom[0]) + Math.abs(p[1] - tFrom[1]) > 6) { tDrag = true; io.drag(true); }
+                    jg.mx = p[0]; jg.my = p[1]; io.move(p[0], p[1]);
                 });
                 ov.addEventListener('touchend', function (e) {
                     e.preventDefault(); var p = jgPoint(e), b = Date.now() - tStart > 500 ? 1 : 0;
-                    if (tDrag) { if (JV.guiDrag) JV.guiDrag(vm, false); tDrag = false; jg.mx = -1; jgDraw(); return; }
-                    JV.guiMouse(vm, p[0], p[1], b, true); JV.guiMouse(vm, p[0], p[1], b, false); jg.mx = -1; jgDraw();
+                    if (tDrag) { io.drag(false); tDrag = false; jg.mx = -1; jgDraw(); return; }
+                    io.mouse(p[0], p[1], b, true); io.mouse(p[0], p[1], b, false); jg.mx = -1; jgDraw();
                 });
-                ov.addEventListener('wheel', function (e) { e.preventDefault(); if (JV.guiWheel) JV.guiWheel(vm, -e.deltaY); jgDraw(); }, { passive: false });
+                ov.addEventListener('wheel', function (e) { e.preventDefault(); io.wheel(-e.deltaY); jgDraw(); }, { passive: false });
                 jg.onResize = function () { jgLayout(); };
                 window.addEventListener('resize', jg.onResize);
                 jg.timer = setInterval(jgDraw, 50);
-                if (Module.mcTopX) Module.mcTopX.add(ov, function () { if (vm) JV.guiClose(vm); });
+                if (Module.mcTopX) Module.mcTopX.add(ov, function () { io.close(); });
                 setTimeout(function () { try { ov.focus(); } catch (x) { } }, 20);
                 jgDraw();
             }
@@ -2598,7 +2842,7 @@
                 if (!jg || !vm) return;
                 e.stopPropagation(); e.preventDefault();
                 var code = window.JVM.keyToLwjgl(e.code) || 0, ch = e.key && e.key.length === 1 ? e.key.charCodeAt(0) : e.key === 'Escape' ? 27 : e.key === 'Backspace' ? 8 : e.key === 'Enter' ? 13 : 0;
-                window.JVM.guiKey(vm, ch, code, down);
+                jg.io.key(ch, code, down);
                 jgDraw();
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
@@ -3773,7 +4017,7 @@
             }
 
             var VANILLA = {};
-            'stone:1,grass:2,dirt:3,cobblestone:4,planks:5,sapling:6,bedrock:7,sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,log:17,leaves:18,sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,noteblock:25,golden_rail:27,detector_rail:28,sticky_piston:29,web:30,tallgrass:31,deadbush:32,piston:33,wool:35,yellow_flower:37,red_flower:38,brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,brick_block:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,torch:50,mob_spawner:52,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,farmland:60,furnace:61,ladder:65,rail:66,stone_stairs:67,lever:69,stone_pressure_plate:70,wooden_pressure_plate:72,redstone_ore:73,redstone_torch:76,stone_button:77,snow_layer:78,ice:79,snow:80,cactus:81,clay:82,fence:85,pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,lit_pumpkin:91,trapdoor:96,stonebrick:98,iron_bars:101,glass_pane:102,melon_block:103,vine:106,fence_gate:107,brick_stairs:108,stone_brick_stairs:109,mycelium:110,waterlily:111,nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,enchanting_table:116,end_stone:121,redstone_lamp:123,wooden_slab:126,sandstone_stairs:128,emerald_ore:129,ender_chest:130,emerald_block:133,spruce_stairs:134,birch_stairs:135,jungle_stairs:136,cobblestone_wall:139,wooden_button:143,anvil:145,trapped_chest:146,redstone_block:152,quartz_ore:153,hopper:154,quartz_block:155,quartz_stairs:156,activator_rail:157,dropper:158,hay_block:170,carpet:171,hardened_clay:172,coal_block:173,iron_shovel:256,iron_pickaxe:257,iron_axe:258,flint_and_steel:259,apple:260,bow:261,arrow:262,coal:263,diamond:264,iron_ingot:265,gold_ingot:266,iron_sword:267,wooden_sword:268,wooden_shovel:269,wooden_pickaxe:270,wooden_axe:271,stone_sword:272,stone_shovel:273,stone_pickaxe:274,stone_axe:275,diamond_sword:276,diamond_shovel:277,diamond_pickaxe:278,diamond_axe:279,stick:280,bowl:281,mushroom_stew:282,golden_sword:283,golden_shovel:284,golden_pickaxe:285,golden_axe:286,string:287,feather:288,gunpowder:289,wooden_hoe:290,stone_hoe:291,iron_hoe:292,diamond_hoe:293,golden_hoe:294,wheat_seeds:295,wheat:296,bread:297,leather_helmet:298,leather_chestplate:299,leather_leggings:300,leather_boots:301,chainmail_helmet:302,chainmail_chestplate:303,chainmail_leggings:304,chainmail_boots:305,iron_helmet:306,iron_chestplate:307,iron_leggings:308,iron_boots:309,diamond_helmet:310,diamond_chestplate:311,diamond_leggings:312,diamond_boots:313,golden_helmet:314,golden_chestplate:315,golden_leggings:316,golden_boots:317,flint:318,porkchop:319,cooked_porkchop:320,painting:321,golden_apple:322,sign:323,wooden_door:324,bucket:325,water_bucket:326,lava_bucket:327,minecart:328,saddle:329,iron_door:330,redstone:331,snowball:332,boat:333,leather:334,milk_bucket:335,brick:336,clay_ball:337,reeds:338,paper:339,book:340,slime_ball:341,egg:344,compass:345,fishing_rod:346,clock:347,glowstone_dust:348,fish:349,cooked_fished:350,dye:351,bone:352,sugar:353,cake:354,bed:355,repeater:356,cookie:357,filled_map:358,shears:359,melon:360,pumpkin_seeds:361,melon_seeds:362,beef:363,cooked_beef:364,chicken:365,cooked_chicken:366,rotten_flesh:367,ender_pearl:368,blaze_rod:369,ghast_tear:370,gold_nugget:371,nether_wart:372,potion:373,glass_bottle:374,spider_eye:375,fermented_spider_eye:376,blaze_powder:377,magma_cream:378,brewing_stand:379,cauldron:380,ender_eye:381,speckled_melon:382,experience_bottle:384,fire_charge:385,emerald:388,item_frame:389,flower_pot:390,carrot:391,potato:392,baked_potato:393,poisonous_potato:394,map:395,golden_carrot:396,skull:397,carrot_on_a_stick:398,nether_star:399,pumpkin_pie:400,comparator:404,netherbrick:405,quartz:406'.split(',').forEach(function (kv) { var p = kv.split(':'); VANILLA[p[0]] = parseInt(p[1], 10); });
+            'stone:1,grass:2,dirt:3,cobblestone:4,planks:5,sapling:6,bedrock:7,sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,log:17,leaves:18,sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,noteblock:25,golden_rail:27,detector_rail:28,sticky_piston:29,web:30,tallgrass:31,deadbush:32,piston:33,wool:35,yellow_flower:37,red_flower:38,brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,brick_block:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,torch:50,mob_spawner:52,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,farmland:60,furnace:61,ladder:65,rail:66,stone_stairs:67,lever:69,stone_pressure_plate:70,wooden_pressure_plate:72,redstone_ore:73,redstone_torch:76,stone_button:77,snow_layer:78,ice:79,snow:80,cactus:81,clay:82,jukebox:84,fence:85,pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,lit_pumpkin:91,trapdoor:96,stonebrick:98,iron_bars:101,glass_pane:102,melon_block:103,vine:106,fence_gate:107,brick_stairs:108,stone_brick_stairs:109,mycelium:110,waterlily:111,nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,enchanting_table:116,end_stone:121,redstone_lamp:123,wooden_slab:126,sandstone_stairs:128,emerald_ore:129,ender_chest:130,emerald_block:133,spruce_stairs:134,birch_stairs:135,jungle_stairs:136,cobblestone_wall:139,wooden_button:143,anvil:145,trapped_chest:146,redstone_block:152,quartz_ore:153,hopper:154,quartz_block:155,quartz_stairs:156,activator_rail:157,dropper:158,hay_block:170,carpet:171,hardened_clay:172,coal_block:173,iron_shovel:256,iron_pickaxe:257,iron_axe:258,flint_and_steel:259,apple:260,bow:261,arrow:262,coal:263,diamond:264,iron_ingot:265,gold_ingot:266,iron_sword:267,wooden_sword:268,wooden_shovel:269,wooden_pickaxe:270,wooden_axe:271,stone_sword:272,stone_shovel:273,stone_pickaxe:274,stone_axe:275,diamond_sword:276,diamond_shovel:277,diamond_pickaxe:278,diamond_axe:279,stick:280,bowl:281,mushroom_stew:282,golden_sword:283,golden_shovel:284,golden_pickaxe:285,golden_axe:286,string:287,feather:288,gunpowder:289,wooden_hoe:290,stone_hoe:291,iron_hoe:292,diamond_hoe:293,golden_hoe:294,wheat_seeds:295,wheat:296,bread:297,leather_helmet:298,leather_chestplate:299,leather_leggings:300,leather_boots:301,chainmail_helmet:302,chainmail_chestplate:303,chainmail_leggings:304,chainmail_boots:305,iron_helmet:306,iron_chestplate:307,iron_leggings:308,iron_boots:309,diamond_helmet:310,diamond_chestplate:311,diamond_leggings:312,diamond_boots:313,golden_helmet:314,golden_chestplate:315,golden_leggings:316,golden_boots:317,flint:318,porkchop:319,cooked_porkchop:320,painting:321,golden_apple:322,sign:323,wooden_door:324,bucket:325,water_bucket:326,lava_bucket:327,minecart:328,saddle:329,iron_door:330,redstone:331,snowball:332,boat:333,leather:334,milk_bucket:335,brick:336,clay_ball:337,reeds:338,paper:339,book:340,slime_ball:341,egg:344,compass:345,fishing_rod:346,clock:347,glowstone_dust:348,fish:349,cooked_fished:350,dye:351,bone:352,sugar:353,cake:354,bed:355,repeater:356,cookie:357,filled_map:358,shears:359,melon:360,pumpkin_seeds:361,melon_seeds:362,beef:363,cooked_beef:364,chicken:365,cooked_chicken:366,rotten_flesh:367,ender_pearl:368,blaze_rod:369,ghast_tear:370,gold_nugget:371,nether_wart:372,potion:373,glass_bottle:374,spider_eye:375,fermented_spider_eye:376,blaze_powder:377,magma_cream:378,brewing_stand:379,cauldron:380,ender_eye:381,speckled_melon:382,experience_bottle:384,fire_charge:385,emerald:388,item_frame:389,flower_pot:390,carrot:391,potato:392,baked_potato:393,poisonous_potato:394,map:395,golden_carrot:396,skull:397,carrot_on_a_stick:398,nether_star:399,pumpkin_pie:400,comparator:404,netherbrick:405,quartz:406'.split(',').forEach(function (kv) { var p = kv.split(':'); VANILLA[p[0]] = parseInt(p[1], 10); });
             ('flowing_water:8,water:9,flowing_lava:10,lava:11,bed_block:26,double_stone_slab:43,fire:51,redstone_wire:55,wheat_block:59,lit_furnace:62,standing_sign:63,' +
              'wooden_door_block:64,wall_sign:68,iron_door_block:71,lit_redstone_ore:74,unlit_redstone_torch:75,reeds_block:83,portal:90,cake_block:92,' +
              'unpowered_repeater:93,powered_repeater:94,pumpkin_stem:104,melon_stem:105,nether_wart_block:115,brewing_stand_block:117,cauldron_block:118,' +
@@ -3785,7 +4029,8 @@
                 carpet: '0,0,0,16,1,16', layer: '0,0,0,16,2,16', plate: '1,0,1,15,1,15',
                 path: '0,0,0,16,15,16', cactus: '1,0,1,15,16,15', post: '6,0,6,10,16,10',
                 pillar: '4,0,4,12,16,12', table: '0,12,0,16,16,16', button: '5,0,6,11,2,10',
-                vine: 'vine', ladder: 'ladder', torch: 'torch'
+                vine: 'vine', ladder: 'ladder', torch: 'torch', stairs: 'stairs', lever: 'lever', wallbutton: 'wallbutton',
+                fencegate: 'fencegate', trapdoor: 'trapdoor', door: 'door'
             };
             function shapeOf(s) {
                 if (Array.isArray(s) && s.length === 6 && s.every(function (v) { return typeof v === 'number'; })) {
@@ -4465,7 +4710,7 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(b.name)));
                     var light = j.light === true ? 15 : Math.max(0, Math.min(15, Math.round(+j.light || 0)));
                     var shape = shapeOf(j.shape);
-                    var collide = j.collision === undefined && j.collide === undefined ? ['cross', 'vine', 'torch'].indexOf(shape) < 0 : !!(j.collision === undefined ? j.collide : j.collision);
+                    var collide = j.collision === undefined && j.collide === undefined ? ['cross', 'vine', 'torch', 'lever', 'wallbutton'].indexOf(shape) < 0 : !!(j.collision === undefined ? j.collide : j.collision);
                     var friction = typeof j.friction === 'number' ? Math.max(0.1, Math.min(1.2, j.friction)) : (j.slippery ? 0.98 : 0.6);
                     lines.push(['block', key, desc, tex.join(','), hard, tool, sound, light,
                                 (j.transparent || j.see_through) ? 1 : 0, drop, count,
@@ -4479,6 +4724,7 @@
                         else problem(b.mod, b.file, '"portal_to": no dimension "' + j.portal_to + '" (dimensions/<name>.json)');
                     }
                     if (j.neighbor_updates === true) lines.push(['neighbors', key].join('\t'));
+                    if (j.own_use === true) lines.push(['ownuse', key].join('\t'));
                     if (j.tint != null && j.tint !== false) {
                         var tk = String(j.tint).toLowerCase();
                         if (/^(grass|foliage|tallgrass)$/.test(tk)) lines.push(['tint', key, tk].join('\t'));
@@ -4529,7 +4775,7 @@
                         if (im && im.textures && im.textures.layer0) itex = texName(im.textures.layer0, im.textures);
                     }
                     lines.push(['item', key, desc, cellOf('items', it.mod, itex || it.name, it.file),
-                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
+                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || (j.record ? 1 : 64))), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
                     if (j.display_block) {
@@ -4614,6 +4860,11 @@
                         if (ammo) out.push('ranged=' + [ammo, Math.max(0.1, num(rg.power, 1)), Math.max(0, num(rg.durability, 384) | 0)].join(','));
                     }
                     if (j.damage !== undefined && j.tool === undefined) out.push('damage=' + Math.max(0, num(j.damage, 1) | 0));
+                    if (j.record !== undefined && j.record !== false && j.record !== null) {
+                        var rs = String(typeof j.record === 'object' ? j.record.sound || '' : j.record).replace(/[\t,|\r\n]/g, '').trim();
+                        if (!rs || j.record === true) say('"record": the name of the sound the jukebox plays, like "records.my_song" (sounds/records/my_song.ogg)');
+                        else out.push('record=' + rs);
+                    }
                     return out;
                 }
                 function findModel(r, mod) {
@@ -6552,6 +6803,10 @@
                             setBlock: function (x, y, z, block, data) { act(mod, ['setblock', x | 0, y | 0, z | 0, block, data == null ? '' : data | 0]); },
                             setData: function (x, y, z, data) { act(mod, ['setdata', x | 0, y | 0, z | 0, data | 0]); },
                             getBlock: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return { block: r.block, data: r.data }; }); },
+                            jukebox: function (x, y, z) { return ask(mod, ['jukebox', x | 0, y | 0, z | 0]).then(function (r) { return r.jukebox === undefined ? false : r.jukebox; }); },
+                            setJukebox: function (x, y, z, disc, data) { act(mod, ['setjukebox', x | 0, y | 0, z | 0, disc == null || disc === false ? 'none' : itemArg(disc), data == null ? (disc && disc.data != null ? disc.data : '') : data | 0]); },
+                            playRecord: function (x, y, z, disc) { act(mod, ['playrecord', x | 0, y | 0, z | 0, disc == null ? 'none' : itemArg(disc)]); },
+                            stopRecord: function (x, y, z) { act(mod, ['playrecord', x | 0, y | 0, z | 0, 'none']); },
                             scheduleTick: function (x, y, z, ticks) { act(mod, ['tickat', x | 0, y | 0, z | 0, Math.max(1, ticks | 0)]); },
                             spawnItem: function (x, y, z, item, n) { act(mod, ['spawnitem', +x, +y, +z, item, Math.max(1, n | 0 || 1)]); },
                             explode: function (x, y, z, power, fire) { act(mod, ['explode', +x, +y, +z, +power || 2, fire ? 1 : 0]); },
@@ -6981,13 +7236,14 @@
                     eachJoiner(function (c) { net().sendCtlTo(c, { t: 'particle', a: pa }); });
                 }
                 if ((k === 'getblock' || k === 'players' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
-                     k === 'entities' || k === 'entity' || k === 'signtext') && fromGuid) {
+                     k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox') && fromGuid) {
                     var id = nextRemoteReq++;
                     remoteReq[id] = { guid: fromGuid, req: a[1] };
                     a = a.slice(); a[1] = id;
                 }
                 if (k === 'setblock') a[4] = named(a[4], 'world.setBlock');
                 if (k === 'spawnitem') a[4] = named(a[4], 'world.spawnItem');
+                if (k === 'setjukebox' || k === 'playrecord') { a = a.slice(); a[4] = a[4] === 'none' ? 'none' : named(a[4], k === 'setjukebox' ? 'world.setJukebox' : 'world.playRecord'); }
                 if (k === 'give' || k === 'heal') {
                     var g = remote(known[a[1]]);
                     if (k === 'give') a[2] = named(a[2], 'players.give');
@@ -7121,6 +7377,7 @@
                 ['entity', 'source'].forEach(function (k) { var x = e[k]; if (x && x.guid !== undefined && x.id != null) known[x.id] = x; });
                 var named = function (list) { return list.map(stackForScript); };
                 if (Array.isArray(e.items)) e.items = named(e.items);
+                if (e.jukebox && typeof e.jukebox === 'object') e.jukebox = stackForScript(e.jukebox);
                 if (e.inv && Array.isArray(e.inv.slots)) { e.inv.slots = named(e.inv.slots); e.inv.armor = named(e.inv.armor || []); }
                 worker.postMessage({ t: 'event', e: e });
             }

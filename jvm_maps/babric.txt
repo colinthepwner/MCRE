@@ -896,6 +896,7 @@ F	net/minecraft/class_124	field_490	field_490	shovelDiamond
 F	net/minecraft/class_124	field_491	field_491	pickaxeDiamond
 F	net/minecraft/class_130	field_492	field_492	image
 F	net/minecraft/class_130$1	field_496	field_496	location
+F	net/minecraft/class_130$1	field_497	field_497	buffer
 F	net/minecraft/class_133	field_499	field_499	slotNumber
 F	net/minecraft/class_133	field_500	field_500	xDisplayPosition
 F	net/minecraft/class_133	field_501	field_501	yDisplayPosition
@@ -1082,6 +1083,7 @@ F	net/minecraft/class_15	field_1000	field_1000	cactus
 F	net/minecraft/class_15	field_1001	field_1001	clay
 F	net/minecraft/class_15	field_1002	field_1002	pumpkin
 F	net/minecraft/class_15	field_1003	field_1003	portal
+F	net/minecraft/class_260	field_1006	field_1006	buffer
 F	net/minecraft/class_127	field_1012	field_1012	renderYawOffset
 F	net/minecraft/class_127	field_1019	field_1019	texture
 F	net/minecraft/class_127	field_1029	field_1029	moveForward
@@ -1146,6 +1148,7 @@ F	net/minecraft/class_304	field_1187	field_1187	leg3
 F	net/minecraft/class_304	field_1188	field_1188	leg4
 F	net/minecraft/class_305	field_1189	field_1189	entityId
 F	net/minecraft/class_308	field_1193	field_1193	entityId
+F	net/minecraft/class_309$class_310	field_1195	field_1195	buffer
 F	net/minecraft/class_309$class_310	field_1197	field_1197	hash
 F	net/minecraft/class_24	field_1202	field_1202	displayColumn
 F	net/minecraft/class_24	field_1203	field_1203	displayRow
@@ -1170,6 +1173,7 @@ F	net/minecraft/class_55	field_1241	field_1241	zCoord
 F	net/minecraft/class_76	field_1246	field_1246	textureMap
 F	net/minecraft/class_76	field_1253	field_1253	options
 F	net/minecraft/class_337	field_1258	field_1258	furnace
+F	net/minecraft/class_337	field_1260	field_1260	burnTime
 F	net/minecraft/class_16$class_338	field_1263	field_1263	rail
 F	net/minecraft/class_16$class_338	field_1264	field_1264	worldObj
 F	net/minecraft/class_16$class_338	field_1269	field_1269	connectedTracks
@@ -1300,6 +1304,9 @@ F	net/minecraft/class_331	field_1561	field_1561	playerX
 F	net/minecraft/class_331	field_1562	field_1562	playerY
 F	net/minecraft/class_331	field_1563	field_1563	playerZ
 F	net/minecraft/class_331	field_1565	field_1565	fontRenderer
+F	net/minecraft/class_138	field_1566	field_1566	furnaceBurnTime
+F	net/minecraft/class_138	field_1567	field_1567	currentItemBurnTime
+F	net/minecraft/class_138	field_1568	field_1568	furnaceCookTime
 F	net/minecraft/class_409	field_1572	field_1572	body
 F	net/minecraft/class_409	field_1573	field_1573	tentacles
 F	net/minecraft/class_410	field_1575	field_1575	arrowShake
@@ -1354,6 +1361,7 @@ F	net/minecraft/class_414	field_1664	field_1664	xPosition
 F	net/minecraft/class_414	field_1665	field_1665	yPosition
 F	net/minecraft/class_414	field_1666	field_1666	zPosition
 F	net/minecraft/class_414	field_1670	field_1670	type
+F	net/minecraft/class_416	field_1672	field_1672	modelBlock
 F	net/minecraft/class_419	field_1680	field_1680	doubleValue
 F	net/minecraft/class_428	field_1688	field_1688	WOOD
 F	net/minecraft/class_428	field_1689	field_1689	STONE
@@ -1540,6 +1548,9 @@ F	net/minecraft/class_491	field_2013	field_2013	leg2
 F	net/minecraft/class_491	field_2014	field_2014	leg3
 F	net/minecraft/class_491	field_2015	field_2015	leg4
 F	net/minecraft/class_493	field_2016	field_2016	slimeBodies
+F	net/minecraft/class_493	field_2017	field_2017	slimeRightEye
+F	net/minecraft/class_493	field_2018	field_2018	slimeLeftEye
+F	net/minecraft/class_493	field_2019	field_2019	slimeMouth
 F	net/minecraft/class_496	field_2020	field_2020	sideModels
 F	net/minecraft/class_497	field_2021	field_2021	thePlayer
 F	net/minecraft/class_139	field_2025	field_2025	statId
@@ -1653,6 +1664,7 @@ F	net/minecraft/class_571	field_2456	field_2456	spiderLeg6
 F	net/minecraft/class_571	field_2457	field_2457	spiderLeg7
 F	net/minecraft/class_571	field_2458	field_2458	spiderLeg8
 F	net/minecraft/class_34	field_2462	field_2462	charWidth
+F	net/minecraft/class_34	field_2464	field_2464	buffer
 F	net/minecraft/class_573	field_2466	field_2466	xPosition
 F	net/minecraft/class_573	field_2467	field_2467	yPosition
 F	net/minecraft/class_573	field_2468	field_2468	zPosition
@@ -2109,6 +2121,8 @@ M	net/minecraft/class_24	method_1041	()Lnet/minecraft/class_24;	method_1041	regi
 M	net/minecraft/class_24	method_1042	(Lnet/minecraft/class_241;)Lnet/minecraft/class_24;	method_1042	setStatStringFormatter
 M	net/minecraft/class_24	method_1043	()Ljava/lang/String;	method_1043	getDescription
 M	net/minecraft/class_24	method_1044	()Z	method_1044	getSpecial
+M	net/minecraft/class_328	method_1060	(I)V	method_1060	setBlockBoundsForBlockRender
+M	net/minecraft/class_328	method_1061	(I)Z	method_1061	isTrapdoorOpen
 M	net/minecraft/class_330	method_1063	()Lnet/minecraft/class_34;	method_1063	getFontRenderer
 M	net/minecraft/class_330	method_1064	(Ljava/lang/String;)V	method_1064	bindTextureByName
 M	net/minecraft/class_330	method_1065	(Lnet/minecraft/class_331;)V	method_1065	setTileEntityRenderer
@@ -2176,6 +2190,8 @@ M	net/minecraft/class_331	method_1277	(Lnet/minecraft/class_55;DDDF)V	method_127
 M	net/minecraft/class_331	method_1278	(Lnet/minecraft/class_55;F)V	method_1278	renderTileEntity
 M	net/minecraft/class_331	method_1279	(Lnet/minecraft/class_55;)Lnet/minecraft/class_330;	method_1279	getSpecialRendererForEntity
 M	net/minecraft/class_138	method_1281	()Z	method_1281	isBurning
+M	net/minecraft/class_138	method_1284	(I)I	method_1284	getCookProgressScaled
+M	net/minecraft/class_138	method_1285	(I)I	method_1285	getBurnTimeRemainingScaled
 M	net/minecraft/class_26	method_1292	()V	method_1292	initialize
 M	net/minecraft/class_26	method_1293	(DDD)Lnet/minecraft/class_26;	method_1293	createVectorHelper
 M	net/minecraft/class_26	method_1297	(DDD)Lnet/minecraft/class_26;	method_1297	createVector
@@ -2248,6 +2264,7 @@ M	net/minecraft/class_17	method_1561	(Lnet/minecraft/class_18;IIII)Z	method_1561
 M	net/minecraft/class_17	method_1565	()I	method_1565	tickRate
 M	net/minecraft/class_17	method_1566	(Lnet/minecraft/class_18;III)Z	method_1566	canBlockStay
 M	net/minecraft/class_17	method_1567	(Lnet/minecraft/class_18;III)Z	method_1567	canPlaceBlockAt
+M	net/minecraft/class_17	method_1569	()Z	method_1569	canProvidePower
 M	net/minecraft/class_17	method_1571	(IZ)Z	method_1571	canCollideCheck
 M	net/minecraft/class_17	method_1574	()I	method_1574	getMobilityFlag
 M	net/minecraft/class_17	method_1576	()Z	method_1576	isCollidable
@@ -2283,6 +2300,7 @@ M	net/minecraft/class_17	method_1611	(Lnet/minecraft/class_18;III)V	method_1611	
 M	net/minecraft/class_17	method_1612	(Lnet/minecraft/class_18;IIII)V	method_1612	onBlockDestroyedByPlayer
 M	net/minecraft/class_17	method_1614	(Lnet/minecraft/class_18;IIILnet/minecraft/class_127;)V	method_1614	onBlockPlacedBy
 M	net/minecraft/class_17	method_1615	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1615	onEntityCollidedWithBlock
+M	net/minecraft/class_17	method_1616	(Lnet/minecraft/class_14;III)V	method_1616	setBlockBoundsBasedOnState
 M	net/minecraft/class_17	method_1617	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1617	randomDisplayTick
 M	net/minecraft/class_17	method_1619	()I	method_1619	getRenderBlockPass
 M	net/minecraft/class_17	method_1620	()Z	method_1620	isOpaqueCube

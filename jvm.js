@@ -7165,7 +7165,8 @@ function installWorldGen(vm, def) {
 function iconObj(vm, name) { var o = new JObject(vm.loadClass('mcre/Icon')); o.$name = String(name); return o; }
 function dropStack(vm, x, y, z, stack, pickupDelay) {
 	if (!stack) return;
-	return op(vm, 'drop', x, y, z, vm.game ? vm.game.itemToGame(stack[':itemID']) : stack[':itemID'], stack[':stackSize'], stack[':itemDamage'], pickupDelay);
+	return op(vm, 'drop', x, y, z, vm.game ? vm.game.itemToGame(stack[':itemID']) : stack[':itemID'], stack[':stackSize'], stack[':itemDamage'], pickupDelay,
+		JVM.stackEnch ? JVM.stackEnch(stack) : stack.$ench || null);
 }
 
 function worldObj(vm) {
@@ -7243,7 +7244,9 @@ var LIGHT0 = Object.create(null), NOMOVE = Object.create(null);
 function installWorld(vm, def) {
 	var g = function (vm) { return vm.game || { blockToGame: function (x) { return x; }, blockToJava: function (x) { return x; }, itemToGame: function (x) { return x; }, itemToJava: function (x) { return x; } }; };
 	var tile = function (vm, x, y, z) {
-		var t = op(vm, 'tile', x, y, z);
+		var gm = vm.game, t = gm && gm.tileFast && gm.mode === 'run' ? gm.tileFast(x | 0, y | 0, z | 0) : null;
+		if (t) return t;
+		t = op(vm, 'tile', x, y, z);
 		if (t) return t;
 		var d = vm.$defTile;
 		return d && d.x === x && d.y === y && d.z === z ? { id: d.id, data: d.data } : { id: 0, data: 0 };
@@ -7651,7 +7654,20 @@ JVM.collectContent = function (vm, modId) {
 		}
 		if (rtype === 1) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
 		var sshape = JVM.stateShapeOf(vm, b);
-		if (sshape) { json.shape = sshape; json.collision = sshape === 'ladder'; json.transparent = true; }
+		if (sshape) { json.shape = sshape; json.collision = /^(ladder|stairs|fencegate|trapdoor|door)$/.test(sshape); json.transparent = true; }
+		if (sshape && sshape !== 'vine' && overrides(b, ['onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z'])) json.own_use = true;
+		if (sshape === 'door') {
+			vm.$defTile = { x: 0, y: 65, z: 0, id: id, data: 8 };
+			var dut = tex(safe(function () { return vm.callVirtual(b, 'getBlockTexture', '(Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;', [JVM.mc152.worldObj(vm), 0, 65, 0, 2]); }, null));
+			vm.$defTile = null;
+			var dlo = faces.north || faces.down;
+			if (dlo) {
+				FACE.forEach(function (f) { faces[f] = dlo; });
+				if (dut) { faces.up = dut.name; if (!dut.vanilla) out.textures['blocks/' + dut.name] = dut; }
+				json.texture = Object.assign({}, faces);
+			}
+			json.creative = false;
+		}
 		var tint = blockTint(b, id, meta, json.shape === 'cross');
 		if (tint) json.tint = tint;
 		if (/^(grass|foliage|tallgrass)$/.test(tint || '')) {
@@ -7756,6 +7772,8 @@ JVM.collectContent = function (vm, modId) {
 			var udur = safe(function () { return vm.callVirtual(it, 'getMaxItemUseDuration', '(Lnet/minecraft/src/ItemStack;)I', [JVM.mc152.newStack(vm, id, 1, meta)]); }, 0);
 			if (udur > 0) { json.java_bow = true; if (it[':maxDamage'] > 0) json.durability = it[':maxDamage']; }
 		}
+		var rec = JVM.recordNameOf(vm, it);
+		if (rec) json.record = JVM.recordSound(modId, rec);
 		var itf = fuelOf(id, meta);
 		if (itf > 0) json.fuel = itf;
 		if (JVM.recordItem && vm.mcReg && vm.mcReg.itemRenderers && vm.mcReg.itemRenderers[id]) {
@@ -7868,8 +7886,56 @@ JVM.javaSounds = function (vm, modId, files) {
 		if (!/[.](ogg|wav|mp3)$/i.test(n)) n += s.res.slice(s.res.lastIndexOf('.'));
 		out['sounds/' + n] = vm.resources[s.res];
 	});
+	var r = reg(vm);
+	Object.keys(r.items || {}).forEach(function (idS) {
+		var it = r.items[idS];
+		if (!it || it.$mod !== modId || it.$override) return;
+		var rn = JVM.recordNameOf(vm, it);
+		if (!rn) return;
+		var f = recordFile(vm, modId, files, rn);
+		if (!f) { vm.warnOnce('rec:' + modId + ':' + rn, 'music disc "' + rn + '": no music file for it in the mod'); return; }
+		out['sounds/' + JVM.recordSound(modId, rn).split('.').join('/') + f.ext] = f.data;
+	});
 	return out;
 };
+JVM.recordNameOf = function (vm, it) {
+	if (!it || !vm.natives[SRC + 'ItemRecord']) return null;
+	var rc = vm.loadClass(SRC + 'ItemRecord');
+	if (!vm.isInstance(it, rc)) return null;
+	var n = it[':recordName'];
+	return n ? String(n) : null;
+};
+JVM.recordSound = function (modId, recordName) {
+	var safe = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9_]+/g, '_'); };
+	var n = String(recordName).replace(/[.](ogg|wav|mp3)$/i, '');
+	n = n.slice(Math.max(n.lastIndexOf(':'), n.lastIndexOf('/')) + 1).replace(/^records[.]/i, '');
+	n = safe(n) || 'disc';
+	if (/\d$/.test(n)) n += '_';
+	var m = safe(modId).replace(/\d+$/, function (d) { return d + '_'; }) || 'mod';
+	return 'records.' + m + '.' + n;
+};
+function recordFile(vm, modId, files, recordName) {
+	var base = String(recordName).replace(/[.](ogg|wav|mp3)$/i, '');
+	base = base.slice(Math.max(base.lastIndexOf(':'), base.lastIndexOf('/')) + 1).replace(/^records[.]/i, '').toLowerCase();
+	var best = null, bestRank = 9;
+	Object.keys(files || {}).forEach(function (k) {
+		var m = /([^/]+)([.](?:ogg|wav|mp3))$/i.exec(k);
+		if (!m || m[1].toLowerCase() !== base) return;
+		var rank = /(^|[/])(records|streaming)[/]/i.test(k) ? 0 : 1;
+		if (rank < bestRank) { best = { data: files[k], ext: m[2].toLowerCase() }; bestRank = rank; }
+	});
+	if (best) return best;
+	var hit = null;
+	(reg(vm).sounds || []).some(function (s) {
+		if ((s.mod || '') !== modId || !s.res || !vm.resources[s.res]) return false;
+		var n = String(s.name).replace(/[.](ogg|wav|mp3)$/i, '');
+		n = n.slice(Math.max(n.lastIndexOf(':'), n.lastIndexOf('/')) + 1).toLowerCase();
+		if (n !== base) return false;
+		hit = { data: vm.resources[s.res], ext: (s.res.slice(s.res.lastIndexOf('.')) || '.ogg').toLowerCase() };
+		return true;
+	});
+	return hit;
+}
 function installSounds(vm) {
 	var add = function (pool) { return function (vm, self, a) { (reg(vm).sounds = reg(vm).sounds || []).push({ mod: vm.currentMod, name: a[0], res: a[1] && a[1].$res, pool: self.$pool || pool }); return null; }; };
 	vm.defineNative(SRC + 'SoundPool', { methods: {
@@ -7978,6 +8044,9 @@ JVM.variantsOf = function (vm, o) {
 	}
 	return o.$variants;
 };
+var STATE_KINDS = [['BlockLadder', 'ladder', 8], ['BlockTorch', 'torch', 2], ['BlockLever', 'lever', 12], ['BlockButton', 'wallbutton', 0],
+	['BlockStairs', 'stairs', 10], ['BlockFenceGate', 'fencegate', 21], ['BlockTrapDoor', 'trapdoor', 0], ['BlockDoor', 'door', 7]];
+var STATE_RTYPES = { 8: 'ladder', 2: 'torch', 10: 'stairs', 12: 'lever', 21: 'fencegate', 7: 'door' };
 JVM.stateShapeOf = function (vm, o) {
 	if (!o || o.$stateShape !== undefined) return o ? o.$stateShape : null;
 	o.$stateShape = null;
@@ -7988,9 +8057,30 @@ JVM.stateShapeOf = function (vm, o) {
 	var vine = rt === 20;
 	if (!vine && vm.natives[SRC + 'BlockVine']) vine = vm.isInstance(o, vm.loadClass(SRC + 'BlockVine'));
 	if (vine) return (o.$stateShape = 'vine');
-	if ((rt === 8 || rt === 2) && own('getRenderType()I') && !own('getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V') &&
-		['onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I', 'updateBlockMetadata(Lnet/minecraft/src/World;IIIIFFF)V', 'onBlockAdded(Lnet/minecraft/src/World;III)V'].some(own))
-		o.$stateShape = rt === 8 ? 'ladder' : 'torch';
+	var subs = function () {
+		var m = o.cls.findMethod('getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V'), n = {};
+		if (!m || m.cls.native) return 0;
+		try {
+			JVM.run(vm, function () {
+				var l = JVM.newList(vm, []);
+				vm.invoke(m, o, [o[':blockID'], null, l]);
+				JVM.iterate(vm, l).forEach(function (st) { if (st && st[':itemDamage'] != null) n[st[':itemDamage'] | 0] = 1; });
+			});
+		} catch (e) { return 0; }
+		return Object.keys(n).length;
+	};
+	for (var i = 0; i < STATE_KINDS.length; i++) {
+		var sk = STATE_KINDS[i];
+		if (!vm.natives[SRC + sk[0]] || !vm.isInstance(o, vm.loadClass(SRC + sk[0]))) continue;
+		if (own('getRenderType()I') && rt !== sk[2]) return null;
+		if (subs() > 1) return null;
+		return (o.$stateShape = sk[1]);
+	}
+	if (STATE_RTYPES[rt] && own('getRenderType()I') && !own('getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V') &&
+		['onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I', 'updateBlockMetadata(Lnet/minecraft/src/World;IIIIFFF)V', 'onBlockAdded(Lnet/minecraft/src/World;III)V',
+			'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V',
+			'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', 'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V'].some(own))
+		o.$stateShape = STATE_RTYPES[rt];
 	return o.$stateShape;
 };
 JVM.stateBlockOf = function (vm, mod, name) {
@@ -7999,10 +8089,12 @@ JVM.stateBlockOf = function (vm, mod, name) {
 	return JVM.contentName(vm, id, 0) === name ? o : null;
 };
 JVM.statePlaced = function (vm, blk, world, x, y, z, face) {
-	if (!JVM.stateShapeOf(vm, blk)) return false;
+	var shape = JVM.stateShapeOf(vm, blk);
+	if (!shape) return false;
 	var side = face == null ? 1 : face | 0;
 	JVM.run(vm, function () {
 		var pm = blk.cls.findMethod('onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I');
+		if (pm && shape !== 'vine' && (pm.cls.native || !/^(torch|ladder|lever|wallbutton)$/.test(shape))) pm = null;
 		var m = pm ? vm.invoke(pm, blk, [world, x, y, z, side, 0.5, 0.5, 0.5, 0]) : 0;
 		if (typeof m === 'number' && m > 0) vm.callVirtual(world, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m & 15, 3]);
 		var um = blk.cls.findMethod('updateBlockMetadata(Lnet/minecraft/src/World;IIIIFFF)V');
@@ -8573,12 +8665,21 @@ function installModels(vm) {
 		},
 		'render(Lnet/minecraft/src/Tessellator;F)V': function () {},
 	} });
+	var POSITIVE = {
+		ModelSlime: { '(I)V': { super: 'ModelBase', drawn: ['slimeBodies', 'slimeRightEye', 'slimeLeftEye', 'slimeMouth'], ctors: { '(I)V': { base: { tw: 64, th: 32, parts: {
+			slimeBodies: { field: 'slimeBodies', tex: [0, 16], pivot: [0, 0, 0], boxes: [[-3, 17, -3, 6, 6, 6, 0, [0, 16], 0]] },
+			slimeRightEye: { field: 'slimeRightEye', tex: [32, 0], pivot: [0, 0, 0], boxes: [[-3.25, 18, -3.5, 2, 2, 2, 0, [32, 0], 0]] },
+			slimeLeftEye: { field: 'slimeLeftEye', tex: [32, 4], pivot: [0, 0, 0], boxes: [[1.25, 18, -3.5, 2, 2, 2, 0, [32, 4], 0]] },
+			slimeMouth: { field: 'slimeMouth', tex: [32, 8], pivot: [0, 0, 0], boxes: [[0, 21, -3.5, 1, 1, 1, 0, [32, 8], 0]] },
+		} } } } } },
+	};
 	Object.keys(JVM.vanillaModels || {}).forEach(function (n) {
 		var vmod = JVM.vanillaModels[n], m = {};
 		Object.keys(vmod.ctors).forEach(function (d) {
 			m['<init>' + d] = function (vm, self, a) {
 				self.$model = false;
-				self.$vanilla = { m: vmod, desc: d, args: a };
+				var pos = POSITIVE[n] && POSITIVE[n][d];
+				self.$vanilla = { m: pos && a[0] > 0 ? pos : vmod, desc: d, args: a };
 				modelInit(vm, self);
 			};
 		});
@@ -10636,6 +10737,516 @@ function install(vm) {
 		'quantityDropped(Ljava/util/Random;)I': function () { return 0; },
 	} });
 
+	var normalCube = function (w, x, y, z) { return vineHolds(id(w, x, y, z)); };
+	var solidTop = function (w, x, y, z) { return normalCube(w, x, y, z); };
+	var bounds = function (self, x0, y0, z0, x1, y1, z1) { self[':minX'] = x0; self[':minY'] = y0; self[':minZ'] = z0; self[':maxX'] = x1; self[':maxY'] = y1; self[':maxZ'] = z1; };
+	var boxAt = function (self, x, y, z) {
+		return vm.callStatic(SRC + 'AxisAlignedBB', 'getBoundingBox', '(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;',
+			[x + self[':minX'], y + self[':minY'], z + self[':minZ'], x + self[':maxX'], y + self[':maxY'], z + self[':maxZ']]);
+	};
+	var stateBounds = function (self, w, x, y, z) { vm.callVirtual(self, 'setBlockBoundsBasedOnState', '(Lnet/minecraft/src/IBlockAccess;III)V', [w, x, y, z]); };
+	var yawQuarter = function (e, add) { return Math.floor(((e && e[':rotationYaw']) || 0) * 4 / 360 + (add == null ? 0.5 : add)) & 3; };
+	var dropHere = function (self, w, x, y, z) {
+		vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [w, x, y, z, meta(w, x, y, z), 0]);
+		put(w, x, y, z, 0, 0, 3);
+	};
+	var notify = function (w, x, y, z, bid) { vm.callVirtual(w, 'notifyBlocksOfNeighborChange', '(IIII)V', [x, y, z, bid]); };
+	var openSfx = function (w, x, y, z) { vm.callVirtual(w, 'playAuxSFXAtEntity', '(Lnet/minecraft/src/EntityPlayer;IIIII)V', [null, 1003, x, y, z, 0]); };
+	var blockIcon = function (vm, self, a) { return vm.natives[SRC + 'Block'].methods['getIcon(II)Lnet/minecraft/src/Icon;'](vm, self, a); };
+	var clickSfx = function (w, x, y, z, on) { vm.callVirtual(w, 'playSoundEffect', '(DDDLjava/lang/String;FF)V', [x + 0.5, y + 0.5, z + 0.5, 'random.click', 0.3, on ? 0.6 : 0.5]); };
+	var orientEvent = function (self, key, w, x, y, z) {
+		var m = self.cls.findMethod(key);
+		return !!(m && !m.cls.native) && id(w, x, y, z) === self[':blockID'];
+	};
+	var betaFwd = function (specMethods) {
+		Object.keys(specMethods).forEach(function (k) {
+			var orig = specMethods[k];
+			specMethods[k] = function (vm, self, a) {
+				var B = JVM.STATION_BETA, f = null;
+				if (B) for (var i = 0; i < B.block.length; i++) if (B.block[i][0] === k) { f = B.block[i]; break; }
+				if (f) { var m = self.cls.findMethod(f[1]); if (m && !m.cls.native) return vm.invoke(m, self, f[2](a)); }
+				return orig(vm, self, a);
+			};
+		});
+		return specMethods;
+	};
+	var orientInit = function (name, matName, setup) {
+		return function (vm, self, args, desc) {
+			var sig = JVM.parseDesc(desc), mat = null, ints = [];
+			for (var i = 0; i < sig.args.length; i++) {
+				if (sig.args[i] === 'I') ints.push(args[i]);
+				if (args[i] && args[i].cls && args[i].cls.name === SRC + 'Material') mat = args[i];
+			}
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+			if (k) vm.invoke(k, self, [ints.length ? ints[0] : 0, mat || mc.statics[matName] || mc.statics.rock]);
+			if (ints.length > 1 && desc.indexOf('(II') === 0) self[':blockIndexInTexture'] = ints[1];
+			if (setup) setup(self, args, sig);
+		};
+	};
+	var orientDef = function (name, sup, matName, setup, methods, statics) {
+		var init = orientInit(name, matName, setup);
+		var ms = Object.assign({
+			'isOpaqueCube()Z': function () { return 0; },
+			'renderAsNormalBlock()Z': function () { return 0; },
+		}, methods);
+		['onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z',
+			'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V'].forEach(function (k) { if (ms[k]) { var o = {}; o[k] = ms[k]; ms[k] = betaFwd(o)[k]; } });
+		def(name, { super: SRC + sup, methods: ms, statics: statics || {}, anyInit: init });
+	};
+
+	var LADDER_WALL = { 2: [0, 1], 3: [0, -1], 4: [1, 0], 5: [-1, 0] };
+	orientDef('BlockLadder', 'Block', 'circuits', null, {
+		'<init>(I)V': function (vm, self, a) { orientInit('BlockLadder', 'circuits')(vm, self, a, '(I)V'); },
+		'getRenderType()I': function () { return 8; },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var f = 0.125, m = meta(a[0], a[1], a[2], a[3]);
+			if (m === 2) bounds(self, 0, 0, 1 - f, 1, 1, 1);
+			if (m === 3) bounds(self, 0, 0, 0, 1, 1, f);
+			if (m === 4) bounds(self, 1 - f, 0, 0, 1, 1, 1);
+			if (m === 5) bounds(self, 0, 0, 0, f, 1, 1);
+		},
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { stateBounds(self, a[0], a[1], a[2], a[3]); return boxAt(self, a[1], a[2], a[3]); },
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			return normalCube(w, x - 1, y, z) || normalCube(w, x + 1, y, z) || normalCube(w, x, y, z - 1) || normalCube(w, x, y, z + 1) ? 1 : 0;
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], side = a[4], m = a[8];
+			if ((m === 0 || side === 2) && normalCube(w, x, y, z + 1)) m = 2;
+			if ((m === 0 || side === 3) && normalCube(w, x, y, z - 1)) m = 3;
+			if ((m === 0 || side === 4) && normalCube(w, x + 1, y, z)) m = 4;
+			if ((m === 0 || side === 5) && normalCube(w, x - 1, y, z)) m = 5;
+			return m;
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var wl = LADDER_WALL[meta(a[0], a[1], a[2], a[3])];
+			return wl && normalCube(a[0], a[1] + wl[0], a[2], a[3] + wl[1]) ? 1 : 0;
+		},
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', a[0], a[1], a[2], a[3])) return;
+			if (!vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) dropHere(self, a[0], a[1], a[2], a[3]);
+		},
+		'quantityDropped(Ljava/util/Random;)I': function () { return 1; },
+	});
+
+	var TORCH_WALL = { 1: [-1, 0], 2: [1, 0], 3: [0, -1], 4: [0, 1] };
+	var torchOn = function (w, x, y, z) { var i = id(w, x, y, z); return solidTop(w, x, y, z) || i === 85 || i === 113 || i === 20 || i === 139; };
+	var torchStays = function (w, x, y, z, m) { var wl = TORCH_WALL[m]; return wl ? normalCube(w, x + wl[0], y, z + wl[1]) : torchOn(w, x, y - 1, z); };
+	orientDef('BlockTorch', 'Block', 'circuits', null, {
+		'<init>(I)V': function (vm, self, a) { orientInit('BlockTorch', 'circuits')(vm, self, a, '(I)V'); },
+		'getRenderType()I': function () { return 2; },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]) & 7, f = 0.15;
+			if (m === 1) bounds(self, 0, 0.2, 0.5 - f, f * 2, 0.8, 0.5 + f);
+			else if (m === 2) bounds(self, 1 - f * 2, 0.2, 0.5 - f, 1, 0.8, 0.5 + f);
+			else if (m === 3) bounds(self, 0.5 - f, 0.2, 0, 0.5 + f, 0.8, f * 2);
+			else if (m === 4) bounds(self, 0.5 - f, 0.2, 1 - f * 2, 0.5 + f, 0.8, 1);
+			else { f = 0.1; bounds(self, 0.5 - f, 0, 0.5 - f, 0.5 + f, 0.6, 0.5 + f); }
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			return normalCube(w, x - 1, y, z) || normalCube(w, x + 1, y, z) || normalCube(w, x, y, z - 1) || normalCube(w, x, y, z + 1) || torchOn(w, x, y - 1, z) ? 1 : 0;
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], side = a[4], m = a[8];
+			if (side === 1 && torchOn(w, x, y - 1, z)) m = 5;
+			if (side === 2 && normalCube(w, x, y, z + 1)) m = 4;
+			if (side === 3 && normalCube(w, x, y, z - 1)) m = 3;
+			if (side === 4 && normalCube(w, x + 1, y, z)) m = 2;
+			if (side === 5 && normalCube(w, x - 1, y, z)) m = 1;
+			return m;
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { var m = meta(a[0], a[1], a[2], a[3]); return m === 0 ? vm.callVirtual(self, 'canPlaceBlockAt', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]]) : torchStays(a[0], a[1], a[2], a[3], m) ? 1 : 0; },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', a[0], a[1], a[2], a[3])) return;
+			if (!vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) dropHere(self, a[0], a[1], a[2], a[3]);
+		},
+	});
+
+	var leverWall = function (w, x, y, z, m) {
+		var wl = TORCH_WALL[m & 7];
+		if (wl) return normalCube(w, x + wl[0], y, z + wl[1]);
+		if ((m & 7) === 5 || (m & 7) === 6) return solidTop(w, x, y - 1, z);
+		return normalCube(w, x, y + 1, z);
+	};
+	orientDef('BlockLever', 'Block', 'circuits', null, {
+		'<init>(I)V': function (vm, self, a) { orientInit('BlockLever', 'circuits')(vm, self, a, '(I)V'); },
+		'getRenderType()I': function () { return 12; },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'canProvidePower()Z': function () { return 1; },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]) & 7, f = 0.1875;
+			if (m === 1) bounds(self, 0, 0.2, 0.5 - f, f * 2, 0.8, 0.5 + f);
+			else if (m === 2) bounds(self, 1 - f * 2, 0.2, 0.5 - f, 1, 0.8, 0.5 + f);
+			else if (m === 3) bounds(self, 0.5 - f, 0.2, 0, 0.5 + f, 0.8, f * 2);
+			else if (m === 4) bounds(self, 0.5 - f, 0.2, 1 - f * 2, 0.5 + f, 0.8, 1);
+			else if (m === 5 || m === 6) { f = 0.25; bounds(self, 0.5 - f, 0, 0.5 - f, 0.5 + f, 0.6, 0.5 + f); }
+			else { f = 0.25; bounds(self, 0.5 - f, 0.4, 0.5 - f, 0.5 + f, 1, 0.5 + f); }
+		},
+		'canPlaceBlockOnSide(Lnet/minecraft/src/World;IIII)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			switch (a[4]) {
+			case 0: return normalCube(w, x, y + 1, z) ? 1 : 0;
+			case 1: return solidTop(w, x, y - 1, z) ? 1 : 0;
+			case 2: return normalCube(w, x, y, z + 1) ? 1 : 0;
+			case 3: return normalCube(w, x, y, z - 1) ? 1 : 0;
+			case 4: return normalCube(w, x + 1, y, z) ? 1 : 0;
+			case 5: return normalCube(w, x - 1, y, z) ? 1 : 0;
+			}
+			return 0;
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			return normalCube(w, x - 1, y, z) || normalCube(w, x + 1, y, z) || normalCube(w, x, y, z - 1) || normalCube(w, x, y, z + 1) || solidTop(w, x, y - 1, z) || normalCube(w, x, y + 1, z) ? 1 : 0;
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], side = a[4], on = a[8] & 8, b = -1;
+			if (side === 0 && normalCube(w, x, y + 1, z)) b = 0;
+			if (side === 1 && solidTop(w, x, y - 1, z)) b = 5;
+			if (side === 2 && normalCube(w, x, y, z + 1)) b = 4;
+			if (side === 3 && normalCube(w, x, y, z - 1)) b = 3;
+			if (side === 4 && normalCube(w, x + 1, y, z)) b = 2;
+			if (side === 5 && normalCube(w, x - 1, y, z)) b = 1;
+			return b + on;
+		},
+		'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V', w, x, y, z)) return;
+			var m = meta(w, x, y, z), k = m & 7, on = m & 8, q = yawQuarter(a[4]) & 1;
+			if (k === 5 || k === 6) vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, (q === 0 ? 5 : 6) | on, 2]);
+			else if (k === 0 || k === 7) vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, (q === 0 ? 7 : 0) | on, 2]);
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { return leverWall(a[0], a[1], a[2], a[3], meta(a[0], a[1], a[2], a[3])) ? 1 : 0; },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', a[0], a[1], a[2], a[3])) return;
+			if (!vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) dropHere(self, a[0], a[1], a[2], a[3]);
+		},
+		'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', w, x, y, z)) return 1;
+			var m = meta(w, x, y, z) ^ 8;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m, 3]);
+			clickSfx(w, x, y, z, m & 8);
+			notify(w, x, y, z, self[':blockID']);
+			return 1;
+		},
+		'isProvidingWeakPower(Lnet/minecraft/src/IBlockAccess;IIII)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]) & 8 ? 15 : 0; },
+		'isProvidingStrongPower(Lnet/minecraft/src/IBlockAccess;IIII)I': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]);
+			if (!(m & 8)) return 0;
+			var k = m & 7, s = a[4];
+			return (k === 0 && s === 0) || (k === 7 && s === 0) || (k === 6 && s === 1) || (k === 5 && s === 1) || (k === 4 && s === 2) || (k === 3 && s === 3) || (k === 2 && s === 4) || (k === 1 && s === 5) ? 15 : 0;
+		},
+	});
+
+	orientDef('BlockButton', 'Block', 'circuits', function (self, args, sig) {
+		for (var i = 0; i < sig.args.length; i++) if (sig.args[i] === 'Z') self.$sensible = !!args[i];
+	}, {
+		'<init>(IZ)V': function (vm, self, a) { orientInit('BlockButton', 'circuits', function (s) { s.$sensible = !!a[1]; })(vm, self, a, '(IZ)V'); },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'tickRate(Lnet/minecraft/src/World;)I': function (vm, self) { return self.$sensible ? 30 : 20; },
+		'canProvidePower()Z': function () { return 1; },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]), k = m & 7, f = 0.375, f1 = 0.625, f2 = 0.1875, f3 = m & 8 ? 0.0625 : 0.125;
+			if (k === 1) bounds(self, 0, f, 0.5 - f2, f3, f1, 0.5 + f2);
+			else if (k === 2) bounds(self, 1 - f3, f, 0.5 - f2, 1, f1, 0.5 + f2);
+			else if (k === 3) bounds(self, 0.5 - f2, f, 0, 0.5 + f2, f1, f3);
+			else if (k === 4) bounds(self, 0.5 - f2, f, 1 - f3, 0.5 + f2, f1, 1);
+		},
+		'setBlockBoundsForItemRender()V': function (vm, self) { bounds(self, 0.5 - 0.1875, 0.5 - 0.125, 0.5 - 0.125, 0.5 + 0.1875, 0.5 + 0.125, 0.5 + 0.125); },
+		'canPlaceBlockOnSide(Lnet/minecraft/src/World;IIII)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			switch (a[4]) {
+			case 2: return normalCube(w, x, y, z + 1) ? 1 : 0;
+			case 3: return normalCube(w, x, y, z - 1) ? 1 : 0;
+			case 4: return normalCube(w, x + 1, y, z) ? 1 : 0;
+			case 5: return normalCube(w, x - 1, y, z) ? 1 : 0;
+			}
+			return 0;
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			return normalCube(w, x - 1, y, z) || normalCube(w, x + 1, y, z) || normalCube(w, x, y, z - 1) || normalCube(w, x, y, z + 1) ? 1 : 0;
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], side = a[4], k = 0;
+			if (side === 2 && normalCube(w, x, y, z + 1)) k = 4;
+			else if (side === 3 && normalCube(w, x, y, z - 1)) k = 3;
+			else if (side === 4 && normalCube(w, x + 1, y, z)) k = 2;
+			else if (side === 5 && normalCube(w, x - 1, y, z)) k = 1;
+			else k = normalCube(w, x - 1, y, z) ? 1 : normalCube(w, x + 1, y, z) ? 2 : normalCube(w, x, y, z - 1) ? 3 : normalCube(w, x, y, z + 1) ? 4 : 1;
+			return k + (a[8] & 8);
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { var wl = TORCH_WALL[meta(a[0], a[1], a[2], a[3]) & 7]; return wl && normalCube(a[0], a[1] + wl[0], a[2], a[3] + wl[1]) ? 1 : 0; },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', a[0], a[1], a[2], a[3])) return;
+			if (!vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) dropHere(self, a[0], a[1], a[2], a[3]);
+		},
+		'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', w, x, y, z)) return 1;
+			var m = meta(w, x, y, z);
+			if (m & 8) return 1;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m | 8, 3]);
+			clickSfx(w, x, y, z, true);
+			notify(w, x, y, z, self[':blockID']);
+			vm.callVirtual(w, 'scheduleBlockUpdate', '(IIIII)V', [x, y, z, self[':blockID'], vm.callVirtual(self, 'tickRate', '(Lnet/minecraft/src/World;)I', [w])]);
+			return 1;
+		},
+		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V', w, x, y, z)) return;
+			var m = meta(w, x, y, z);
+			if (!(m & 8)) return;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m & 7, 3]);
+			clickSfx(w, x, y, z, false);
+			notify(w, x, y, z, self[':blockID']);
+		},
+		'isProvidingWeakPower(Lnet/minecraft/src/IBlockAccess;IIII)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]) & 8 ? 15 : 0; },
+		'isProvidingStrongPower(Lnet/minecraft/src/IBlockAccess;IIII)I': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]);
+			if (!(m & 8)) return 0;
+			var k = m & 7, s = a[4];
+			return (k === 4 && s === 2) || (k === 3 && s === 3) || (k === 2 && s === 4) || (k === 1 && s === 5) ? 15 : 0;
+		},
+	});
+	def('BlockButtonStone', { super: SRC + 'BlockButton', methods: { '<init>(I)V': function (vm, self, a) { vm.invoke(vm.loadClass(SRC + 'BlockButton').findDeclared('<init>(IZ)V'), self, [a[0], 0]); } } });
+	def('BlockButtonWood', { super: SRC + 'BlockButton', methods: { '<init>(I)V': function (vm, self, a) { vm.invoke(vm.loadClass(SRC + 'BlockButton').findDeclared('<init>(IZ)V'), self, [a[0], 1]); } } });
+
+	orientDef('BlockStairs', 'Block', 'wood', function (self, args) {
+		for (var i = 0; i < args.length; i++) if (args[i] && args[i].cls && vm.isInstance(args[i], vm.loadClass(SRC + 'Block'))) { self.$model = args[i]; self.$modelMeta = typeof args[i + 1] === 'number' ? args[i + 1] : 0; break; }
+		var mb = self.$model;
+		if (mb) {
+			self[':blockMaterial'] = mb[':blockMaterial'] || self[':blockMaterial'];
+			self[':blockHardness'] = mb[':blockHardness'];
+			self[':blockResistance'] = (mb[':blockResistance'] || 0) / 3;
+			if (mb[':stepSound']) self[':stepSound'] = mb[':stepSound'];
+			if (mb[':blockIndexInTexture'] != null && self[':blockIndexInTexture'] == null) self[':blockIndexInTexture'] = mb[':blockIndexInTexture'];
+		}
+		self.$opacity = 255;
+	}, {
+		'<init>(ILnet/minecraft/src/Block;I)V': function (vm, self, a) { orientInit('BlockStairs', 'wood', function (s) { s.$model = a[1]; s.$modelMeta = a[2] | 0; })(vm, self, [a[0], a[1], a[2]], '(ILnet/minecraft/src/Block;I)V'); vm.natives[SRC + 'BlockStairs'].$setup(self); },
+		'getRenderType()I': function () { return 10; },
+		'getIcon(II)Lnet/minecraft/src/Icon;': function (vm, self, a) { if (self.$vanilla) return blockIcon(vm, self, a); return self.$model ? vm.callVirtual(self.$model, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[0], self.$modelMeta | 0]) : self[':blockIcon']; },
+		'getBlockTextureFromSideAndMetadata(II)I': function (vm, self, a) { return self.$model ? vm.callVirtual(self.$model, 'getBlockTextureFromSideAndMetadata', '(II)I', [a[0], self.$modelMeta | 0]) : self[':blockIndexInTexture'] | 0; },
+		'registerIcons(Lnet/minecraft/src/IconRegister;)V': function (vm, self, a) { if (!self.$model) vm.invoke(vm.loadClass(SRC + 'Block').findDeclared('registerIcons(Lnet/minecraft/src/IconRegister;)V'), self, a); },
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) { return a[4] !== 0 && (a[4] === 1 || a[6] <= 0.5) ? a[8] : a[8] | 4; },
+		'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V', w, x, y, z)) return;
+			var l = yawQuarter(a[4]), up = meta(w, x, y, z) & 4;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, [2, 1, 3, 0][l] | up, 2]);
+		},
+	});
+	vm.natives[SRC + 'BlockStairs'].$setup = function (self) {
+		var mb = self.$model;
+		if (!mb) return;
+		self[':blockMaterial'] = mb[':blockMaterial'] || self[':blockMaterial'];
+		self[':blockHardness'] = mb[':blockHardness'];
+		self[':blockResistance'] = (mb[':blockResistance'] || 0) / 3;
+		if (mb[':stepSound']) self[':stepSound'] = mb[':stepSound'];
+		if (mb[':blockIndexInTexture'] != null) self[':blockIndexInTexture'] = mb[':blockIndexInTexture'];
+		self.$opacity = 255;
+	};
+
+	def('BlockDirectional', { super: SRC + 'Block', anyInit: orientInit('BlockDirectional', 'rock'),
+		staticMethods: { 'getDirection(I)I': function (vm, n, a) { return a[0] & 3; } } });
+
+	orientDef('BlockFenceGate', 'BlockDirectional', 'wood', null, {
+		'<init>(I)V': function (vm, self, a) { orientInit('BlockFenceGate', 'wood')(vm, self, a, '(I)V'); },
+		'getRenderType()I': function () { return 21; },
+		'getIcon(II)Lnet/minecraft/src/Icon;': function (vm, self, a) { if (self.$vanilla) return blockIcon(vm, self, a); var pl = blockOf(5); return pl ? vm.callVirtual(pl, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[0], 0]) : self[':blockIcon']; },
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var mt = vm.callVirtual(a[0], 'getBlockMaterial', '(III)Lnet/minecraft/src/Material;', [a[1], a[2] - 1, a[3]]);
+			return mt && vm.callVirtual(mt, 'isSolid', '()Z', []) ? 1 : 0;
+		},
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) {
+			var m = meta(a[0], a[1], a[2], a[3]), x = a[1], y = a[2], z = a[3];
+			if (m & 4) return null;
+			var bb = (m & 3) === 2 || (m & 3) === 0 ? [x, y, z + 0.375, x + 1, y + 1.5, z + 0.625] : [x + 0.375, y, z, x + 0.625, y + 1.5, z + 1];
+			return vm.callStatic(SRC + 'AxisAlignedBB', 'getBoundingBox', '(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;', bb);
+		},
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var d = meta(a[0], a[1], a[2], a[3]) & 3;
+			if (d === 2 || d === 0) bounds(self, 0, 0, 0.375, 1, 1, 0.625); else bounds(self, 0.375, 0, 0, 0.625, 1, 1);
+		},
+		'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V', w, x, y, z)) return;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, yawQuarter(a[4]) % 4, 2]);
+		},
+		'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!orientEvent(self, 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', w, x, y, z)) return 1;
+			var m = meta(w, x, y, z);
+			if (m & 4) m &= ~4;
+			else { var l = yawQuarter(a[4]) % 4; if ((m & 3) === (l + 2) % 4) m = l; m |= 4; }
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m, 2]);
+			openSfx(w, x, y, z);
+			return 1;
+		},
+	}, null);
+	vm.natives[SRC + 'BlockFenceGate'].staticMethods = { 'isFenceGateOpen(I)Z': function (vm, n, a) { return a[0] & 4 ? 1 : 0; } };
+
+	var TRAP_WALL = { 0: [0, 1], 1: [0, -1], 2: [1, 0], 3: [-1, 0] };
+	var trapHolds = function (w, x, y, z) {
+		var i = id(w, x, y, z);
+		if (i === 89 || i === 44 || i === 126) return true;
+		var b = blockOf(i);
+		if (b && !b.$vanilla && vm.natives[SRC + 'BlockStairs'] && vm.isInstance(b, vm.loadClass(SRC + 'BlockStairs'))) return true;
+		return [53, 67, 108, 109, 114, 128, 134, 135, 136, 156].indexOf(i) >= 0 || normalCube(w, x, y, z);
+	};
+	orientDef('BlockTrapDoor', 'Block', 'wood', function (self) { bounds(self, 0, 0, 0, 1, 1, 1); }, {
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { stateBounds(self, a[0], a[1], a[2], a[3]); return boxAt(self, a[1], a[2], a[3]); },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) { vm.callVirtual(self, 'setBlockBoundsForBlockRender', '(I)V', [meta(a[0], a[1], a[2], a[3])]); },
+		'setBlockBoundsForItemRender()V': function (vm, self) { var f = 0.1875; bounds(self, 0, 0.5 - f / 2, 0, 1, 0.5 + f / 2, 1); },
+		'setBlockBoundsForBlockRender(I)V': function (vm, self, a) {
+			var m = a[0], f = 0.1875;
+			if (m & 8) bounds(self, 0, 1 - f, 0, 1, 1, 1); else bounds(self, 0, 0, 0, 1, f, 1);
+			if (m & 4) {
+				var d = m & 3;
+				if (d === 0) bounds(self, 0, 0, 1 - f, 1, 1, 1);
+				if (d === 1) bounds(self, 0, 0, 0, 1, 1, f);
+				if (d === 2) bounds(self, 1 - f, 0, 0, 1, 1, 1);
+				if (d === 3) bounds(self, 0, 0, 0, f, 1, 1);
+			}
+		},
+		'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (self[':blockMaterial'] && self[':blockMaterial'].$name === 'iron') return 1;
+			if (!orientEvent(self, 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', w, x, y, z)) return 1;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, meta(w, x, y, z) ^ 4, 2]);
+			openSfx(w, x, y, z);
+			return 1;
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var side = a[4], j = 0;
+			if (side === 2) j = 0; if (side === 3) j = 1; if (side === 4) j = 2; if (side === 5) j = 3;
+			if (side !== 1 && side !== 0 && a[6] > 0.5) j |= 8;
+			return j;
+		},
+		'canPlaceBlockOnSide(Lnet/minecraft/src/World;IIII)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], s = a[4];
+			if (s === 0 || s === 1) return 0;
+			if (s === 2) z++; if (s === 3) z--; if (s === 4) x++; if (s === 5) x--;
+			return trapHolds(w, x, y, z) ? 1 : 0;
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { var wl = TRAP_WALL[meta(a[0], a[1], a[2], a[3]) & 3]; return trapHolds(a[0], a[1] + wl[0], a[2], a[3] + wl[1]) ? 1 : 0; },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', a[0], a[1], a[2], a[3])) return;
+			if (!vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]])) dropHere(self, a[0], a[1], a[2], a[3]);
+		},
+	});
+	vm.natives[SRC + 'BlockTrapDoor'].staticMethods = { 'isTrapdoorOpen(I)Z': function (vm, n, a) { return a[0] & 4 ? 1 : 0; } };
+
+	var doorFull = function (w, x, y, z) {
+		var l = meta(w, x, y, z), upper = (l & 8) !== 0, lo = upper ? meta(w, x, y - 1, z) : l, hi = upper ? l : meta(w, x, y + 1, z);
+		return (lo & 7) | (upper ? 8 : 0) | ((hi & 1) ? 16 : 0);
+	};
+	orientDef('BlockDoor', 'Block', 'wood', function (self) { bounds(self, 0, 0, 0, 1, 1, 1); }, {
+		'getRenderType()I': function () { return 7; },
+		'getMobilityFlag()I': function () { return 1; },
+		'registerIcons(Lnet/minecraft/src/IconRegister;)V': function (vm, self, a) {
+			var iron = self[':blockMaterial'] && self[':blockMaterial'].$name === 'iron', n = iron ? 'doorIron' : 'doorWood';
+			self.$doorIcons = [n + '_lower', n + '_upper'].map(function (s) { return vm.callVirtual(a[0], 'registerIcon', '(Ljava/lang/String;)Lnet/minecraft/src/Icon;', [s]); });
+			self[':blockIcon'] = self.$doorIcons[0];
+		},
+		'getIcon(II)Lnet/minecraft/src/Icon;': function (vm, self, a) { if (self.$vanilla) return blockIcon(vm, self, a); return self.$doorIcons ? self.$doorIcons[0] : self[':blockIcon']; },
+		'getBlockTexture(Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;': function (vm, self, a) {
+			var up = (doorFull(a[0], a[1], a[2], a[3]) & 8) !== 0 && a[4] !== 0 && a[4] !== 1;
+			return self.$doorIcons ? self.$doorIcons[up ? 1 : 0] : vm.callVirtual(self, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[4], up ? 8 : 0]);
+		},
+		'getFullMetadata(Lnet/minecraft/src/IBlockAccess;III)I': function (vm, self, a) { return doorFull(a[0], a[1], a[2], a[3]); },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function (vm, self, a) { stateBounds(self, a[0], a[1], a[2], a[3]); return boxAt(self, a[1], a[2], a[3]); },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			var full = doorFull(a[0], a[1], a[2], a[3]), f = 0.1875, j = full & 3, open = (full & 4) !== 0, hinge = (full & 16) !== 0;
+			bounds(self, 0, 0, 0, 1, 2, 1);
+			var S = { n: [0, 0, 0, 1, 1, f], s: [0, 0, 1 - f, 1, 1, 1], w: [0, 0, 0, f, 1, 1], e: [1 - f, 0, 0, 1, 1, 1] }, k;
+			if (j === 0) k = open ? (hinge ? 's' : 'n') : 'w';
+			else if (j === 1) k = open ? (hinge ? 'w' : 'e') : 'n';
+			else if (j === 2) k = open ? (hinge ? 'n' : 's') : 'e';
+			else k = open ? (hinge ? 'e' : 'w') : 's';
+			bounds.apply(null, [self].concat(S[k]));
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			return y < 255 && solidTop(w, x, y - 1, z) && replaceable(id(w, x, y, z)) && replaceable(id(w, x, y + 1, z)) ? 1 : 0;
+		},
+		'idDropped(ILjava/util/Random;I)I': function (vm, self, a) { return a[0] & 8 ? 0 : (self[':blockMaterial'] && self[':blockMaterial'].$name === 'iron' ? 330 : 324); },
+		'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (self[':blockMaterial'] && self[':blockMaterial'].$name === 'iron') return 1;
+			if (!orientEvent(self, 'onBlockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;IFFF)Z', w, x, y, z)) return 1;
+			var full = doorFull(w, x, y, z), k = (full & 7) ^ 4;
+			vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', (full & 8) ? [x, y - 1, z, k, 2] : [x, y, z, k, 2]);
+			openSfx(w, x, y, z);
+			return 1;
+		},
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], bid = self[':blockID'];
+			if (!orientEvent(self, 'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V', w, x, y, z)) return;
+			var m = meta(w, x, y, z);
+			if (m & 8) { if (id(w, x, y - 1, z) !== bid) put(w, x, y, z, 0, 0, 3); return; }
+			if (id(w, x, y + 1, z) === bid && solidTop(w, x, y - 1, z)) return;
+			put(w, x, y, z, 0, 0, 3);
+			if (id(w, x, y + 1, z) === bid) put(w, x, y + 1, z, 0, 0, 3);
+			vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [w, x, y, z, m, 0]);
+		},
+	});
+
+	var placeDoor = function (w, x, y, z, dir, blk) {
+		var bid = blk ? blk[':blockID'] : 64, b0 = 0, b1 = 0;
+		if (dir === 0) b1 = 1; if (dir === 1) b0 = -1; if (dir === 2) b1 = -1; if (dir === 3) b0 = 1;
+		var i1 = (normalCube(w, x - b0, y, z - b1) ? 1 : 0) + (normalCube(w, x - b0, y + 1, z - b1) ? 1 : 0);
+		var j1 = (normalCube(w, x + b0, y, z + b1) ? 1 : 0) + (normalCube(w, x + b0, y + 1, z + b1) ? 1 : 0);
+		var f = id(w, x - b0, y, z - b1) === bid || id(w, x - b0, y + 1, z - b1) === bid;
+		var f1 = id(w, x + b0, y, z + b1) === bid || id(w, x + b0, y + 1, z + b1) === bid;
+		var right = (f && !f1) || j1 > i1;
+		put(w, x, y, z, bid, dir, 2);
+		put(w, x, y + 1, z, bid, 8 | (right ? 1 : 0), 2);
+		notify(w, x, y, z, bid); notify(w, x, y + 1, z, bid);
+	};
+	def('ItemDoor', { super: SRC + 'Item', methods: {
+		'<init>(ILnet/minecraft/src/Material;)V': function (vm, self, a) {
+			vm.invoke(vm.loadClass(SRC + 'Item').findDeclared('<init>(I)V'), self, [a[0]]);
+			self.$doorMat = a[1]; self[':maxStackSize'] = 1; self.$scriptedUse = true;
+		},
+		'onItemUse(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;IIIIFFF)Z': function (vm, self, a) {
+			var st = a[0], pl = a[1], w = a[2], x = a[3], y = a[4] + 1, z = a[5];
+			if (a[6] !== 1) return 0;
+			var blk = blockOf(self.$doorMat && self.$doorMat.$name === 'iron' ? 71 : 64);
+			if (!blk || !vm.callVirtual(blk, 'canPlaceBlockAt', '(Lnet/minecraft/src/World;III)Z', [w, x, y, z])) return 0;
+			placeDoor(w, x, y, z, yawQuarter(pl, 180 * 4 / 360 - 0.5), blk);
+			st[':stackSize']--;
+			return 1;
+		},
+	}, staticMethods: {
+		'placeDoorBlock(Lnet/minecraft/src/World;IIIILnet/minecraft/src/Block;)V': function (vm, n, a) { placeDoor(a[0], a[1], a[2], a[3], a[4] & 3, a[5]); },
+	} });
+	var VANILLA_ORIENT = { 65: 'BlockLadder', 50: 'BlockTorch', 75: 'BlockTorch', 76: 'BlockTorch', 69: 'BlockLever', 77: 'BlockButtonStone', 143: 'BlockButtonWood',
+		53: 'BlockStairs', 67: 'BlockStairs', 108: 'BlockStairs', 109: 'BlockStairs', 114: 'BlockStairs', 128: 'BlockStairs', 134: 'BlockStairs', 135: 'BlockStairs',
+		136: 'BlockStairs', 156: 'BlockStairs', 107: 'BlockFenceGate', 96: 'BlockTrapDoor', 64: 'BlockDoor', 71: 'BlockDoor' };
+	var reclass = function (list, table) {
+		Object.keys(table).forEach(function (i) { var o = list[i]; if (o && o.$vanilla && o.cls && o.cls.name !== SRC + table[i]) o.cls = vm.loadClass(SRC + table[i]); });
+	};
+	if (BL && !BL.$orientWrapped) {
+		BL.$orientWrapped = true;
+		var ci2 = BL.clinit;
+		BL.clinit = function (vm, c) { ci2(vm, c); reclass(c.statics.blocksList.a, VANILLA_ORIENT); };
+	}
+	var IT = vm.natives[SRC + 'Item'];
+	if (IT && IT.clinit && !IT.$orientWrapped) {
+		IT.$orientWrapped = true;
+		var ci3 = IT.clinit;
+		IT.clinit = function (vm, c) { ci3(vm, c); if (c.statics.itemsList) reclass(c.statics.itemsList.a, { 324: 'ItemDoor', 330: 'ItemDoor' }); };
+	}
+	[['Block', 'blocksList', VANILLA_ORIENT], ['Item', 'itemsList', { 324: 'ItemDoor', 330: 'ItemDoor' }]].forEach(function (e) {
+		var c = vm.natives[SRC + e[0]] && vm.loadClass(SRC + e[0]);
+		if (c && c.initState === 2 && c.statics[e[1]]) reclass(c.statics[e[1]].a, e[2]);
+	});
+
 	var WG = SRC + 'WorldGenerator';
 	var superInit = function (self, notify) { self[':doBlockNotify'] = notify ? 1 : 0; };
 	var gset = function (self, w, x, y, z, b, m) { put(w, x, y, z, b, m, self[':doBlockNotify'] ? 3 : 2); };
@@ -12612,7 +13223,7 @@ function install(vm, H) {
 	};
 	var sendInv = function (e) {
 		var ok = true;
-		e.slots.forEach(function (s, i) { if (s && vm.game.op('setchest', e.x, e.y, e.z, i, s.id, s.n, s.d) === undefined) ok = false; });
+		e.slots.forEach(function (s, i) { if (s && vm.game.op('setchest', e.x, e.y, e.z, i, s.id, s.n, s.d, s.ench || null) === undefined) ok = false; });
 		return ok;
 	};
 	var LWRI = 'Lnet/minecraft/src/WeightedRandomItem;', LCOL = 'Ljava/util/Collection;';
@@ -12690,7 +13301,7 @@ function install(vm, H) {
 		q.forEach(function (e) {
 			if (e.dim != null && vm.mcDim != null && e.dim !== vm.mcDim) { r.structPending.push(e); return; }
 			var t = vm.game.op('tile', e.x | 0, e.k === 'mob' ? Math.floor(e.y) - 1 : e.y, e.z | 0);
-			var ready = e.k === 'inv' ? t && (t.id === B.chest || t.id === B.dispenser) : t && t.id !== 0;
+			var ready = e.k === 'inv' ? t && (e.want ? e.want.indexOf(t.id) >= 0 : t.id === B.chest || t.id === B.dispenser) : t && t.id !== 0;
 			if (!ready) { if ((e.tries = (e.tries | 0) + 1) < 1200) r.structPending.push(e); return; }
 			if (e.k === 'inv') sendInv(e);
 			else if (e.k === 'mob') vm.game.op('spawnmob', e.name, e.x, e.y, e.z);
@@ -16074,7 +16685,9 @@ var RENDER_MODEL = {
 function vanillaModel(vm, name) {
 	var c = vm.loadClass(SRC + name);
 	var o = vm.newObject(c);
-	var m = c.findDeclared('<init>()V') || c.findDeclared('<init>(F)V') || c.findDeclared('<init>(I)V');
+	var rec = JVM.vanillaModels && JVM.vanillaModels[name], m = null;
+	if (rec) ['()V', '(F)V', '(I)V'].some(function (d) { return rec.ctors[d] && (m = c.findDeclared('<init>' + d)); });
+	m = m || c.findDeclared('<init>()V') || c.findDeclared('<init>(F)V') || c.findDeclared('<init>(I)V');
 	if (m) vm.invoke(m, o, m.sig.args.length ? [m.desc === '(I)V' ? 16 : 0] : []);
 	return o;
 }
@@ -16723,7 +17336,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		var behaviour = has('EntityFlying') || has('EntityGhast') || has('EntityBat') || has('EntityBlaze') ? 'flying'
 			: has('EntityWaterMob') || has('EntitySquid') || stype === 'waterCreature' ? 'swimming'
 			: has('EntityTameable') || has('EntityIronGolem') || has('EntityPigZombie') || has('EntityWolf') ? 'neutral'
-			: has('EntityMob') || stype === 'monster' || tasks.indexOf('EntityAIAttackOnCollide') >= 0 || tasks.indexOf('EntityAIArrowAttack') >= 0 ? 'hostile' : 'passive';
+			: has('EntityMob') || has('EntitySlime') || stype === 'monster' || tasks.indexOf('EntityAIAttackOnCollide') >= 0 || tasks.indexOf('EntityAIArrowAttack') >= 0 ? 'hostile' : 'passive';
 		var air = safe(function () { return airOf(e.cls); }, { flies: false, noFall: false, noStep: false });
 		var groundFlyer = air.flies && behaviour === 'passive';
 		if (groundFlyer) behaviour = 'flying';
@@ -16747,6 +17360,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (JVM.betaTag && JVM.betaTag(JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag) && !own('getMaxHealth()I') && ent[':health'] != null && +ent[':health'] > 0) json.health = +ent[':health'] | 0;
 		if (behaviour === 'hostile' || behaviour === 'neutral') {
 			var dmg = e.cls.findMethod('getAttackStrength(Lnet/minecraft/src/Entity;)I') ? safe(function () { return vm.callVirtual(ent, 'getAttackStrength', '(Lnet/minecraft/src/Entity;)I', [null]); }, 2) : (ent[':attackStrength'] || 2);
+			if (has('EntitySlime')) dmg = safe(function () { return vm.callVirtual(ent, 'getAttackStrength', '()I', []); }, dmg) || dmg;
 			json.damage = dmg;
 			var ad = JVM.attrValue && own('applyEntityAttributes()V') ? JVM.attrValue(ent, 'generic.attackDamage') : null;
 			if (ad != null) json.damage = Math.round(ad);
@@ -16796,6 +17410,14 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (look.invisible) { json.invisible = true; out.mobs[key] = json; (mb.keys || (mb.keys = new Map())).set(e.cls, modId + ':' + key); return; }
 		if (look.skip) { out.skipped.push(e.name + ' (' + look.skip + ')'); return; }
 		json.model = look.model; json.texture = look.texture;
+		if (has('EntitySlime')) safe(function () {
+			var rs = null;
+			for (var rk = e.cls; !rs && rk; rk = rk.superClass) rs = renderers.get(rk) || null;
+			var RSc = vm.natives[SRC + 'RenderSlime'] ? vm.loadClass(SRC + 'RenderSlime') : null;
+			if (rs && !(RSc && vm.isInstance(rs, RSc))) return;
+			var sz = vm.callVirtual(ent, 'getSlimeSize', '()I', []) | 0;
+			if (sz > 1) json.scale = Math.min(8, sz);
+		});
 		if (look.res) {
 			var tv = safe(function () { return probeTextures(vm, e.cls, look.res); }, null);
 			if (tv && tv.list.length) {
@@ -16957,10 +17579,23 @@ function liveMob(vm, ent) {
 		o.$texShown = ent.tex != null ? ent.tex | 0 : undefined;
 		if (vm.game && vm.game.mode === 'run') { JVM.mobLook(vm, o, ent.id); JVM.mobSaveState(vm, o, ent.id); }
 	}
-	if (ent.x != null) { o[':posX'] = +ent.x; o[':posY'] = +ent.y; o[':posZ'] = +ent.z; }
+	if (ent.x != null) { o[':posX'] = +ent.x; o[':posY'] = +ent.y; o[':posZ'] = +ent.z; JVM.entityBoxSync(vm, o); }
 	if (ent.health != null) o[':health'] = ent.health | 0;
 	return o;
 }
+JVM.entityBoxSync = function (vm, o) {
+	if (!o || typeof o !== 'object') return;
+	var b = o[':boundingBox'];
+	if (!b) {
+		var r = JVM.run(vm, function () { return vm.callStatic(SRC + 'AxisAlignedBB', 'getBoundingBox', '(DDDDDD)Lnet/minecraft/src/AxisAlignedBB;', [0, 0, 0, 0, 0, 0]); });
+		if (!r.ok || !r.value) return;
+		b = o[':boundingBox'] = r.value;
+	}
+	var x = +o[':posX'] || 0, z = +o[':posZ'] || 0, f = (+o[':width'] || 0) / 2;
+	var y = (+o[':posY'] || 0) - (+o[':yOffset'] || 0) + (+o[':ySize'] || 0);
+	b[':minX'] = x - f; b[':minY'] = y; b[':minZ'] = z - f;
+	b[':maxX'] = x + f; b[':maxY'] = y + (+o[':height'] || 0); b[':maxZ'] = z + f;
+};
 function rendererOf(vm, cls) {
 	var mb = mobs(vm), f = vm.mcReg && vm.mcReg.forge;
 	for (var c = cls; c; c = c.superClass) {
@@ -17401,6 +18036,7 @@ function entityFor(vm, info) {
 	if (info.vx != null) { o[':motionX'] = +info.vx; o[':motionY'] = +info.vy; o[':motionZ'] = +info.vz; }
 	o.$info = Object.assign({}, o.$info || {}, info);
 	o[':posX'] = +info.x || 0; o[':posY'] = +info.y || 0; o[':posZ'] = +info.z || 0;
+	if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
 	return o;
 }
 
@@ -17978,6 +18614,21 @@ function keepCheck(vm, o, id) {
 	if (k !== o.$keep) { if (op(vm, 'entkeep', id, k)) o.$keep = k; }
 }
 
+function heldPush(vm, o, info) {
+	var p = o.$push;
+	if (!p || JVM.$noHeldPush) return;
+	if (info.onGround || info.inWater) { o.$push = null; return; }
+	var id = info.id, cap = o.$pushCap || [0, 0, 0];
+	var held = function (v, push, c) {
+		var nv = v + push;
+		if (push > 0) return Math.min(nv, Math.max(v, c));
+		return Math.max(nv, Math.min(v, c));
+	};
+	if (Math.abs(p[0]) > 1e-5) op(vm, 'setvel', id, 'x', held(+info.vx, p[0], cap[0]));
+	if (Math.abs(p[1]) > 1e-5) op(vm, 'setvel', id, 'y', held(+info.vy, p[1], cap[1]));
+	if (Math.abs(p[2]) > 1e-5) op(vm, 'setvel', id, 'z', held(+info.vz, p[2], cap[2]));
+}
+
 JVM.mobTick = function (vm) {
 	if (!JVM.liveMob || !JVM.entityFor) return;
 	var B = vm.$brainState || (vm.$brainState = { tick: 0, seen: {} });
@@ -18009,7 +18660,10 @@ JVM.mobTick = function (vm) {
 		if ((B.tick + info.id) % 40 === 20) keepCheck(vm, o, info.id);
 		if (o.cls.$brainOff || !brainOf(vm, o)) return;
 		var avg = o.cls.$brainRuns > 4 ? o.cls.$brainMs / o.cls.$brainRuns : 0;
-		if (avg > 2) { var every = Math.min(10, Math.ceil(avg / 2)); if ((B.tick + info.id) % every) return; }
+		var every = avg > 2 ? Math.min(10, Math.ceil(avg / 2)) : 1;
+		var aloft = o.$push && !info.onGround && !info.inWater;
+		if (every > 1 && !aloft && (B.tick + info.id) % every) return;
+		o.$every = every;
 		o.$brain = true; o.$brainInfo = info; o.$entityId = info.id; o[':entityId'] = info.id;
 		o[':prevPosX'] = o[':posX']; o[':prevPosY'] = o[':posY']; o[':prevPosZ'] = o[':posZ'];
 		o[':posX'] = +info.x; o[':posY'] = +info.y; o[':posZ'] = +info.z;
@@ -18021,6 +18675,7 @@ JVM.mobTick = function (vm) {
 		o[':health'] = +info.health; o[':isDead'] = 0;
 		o[':worldObj'] = JVM.mc152.worldObj(vm);
 		if (JVM.mc152.entityInit && !o[':boundingBox']) JVM.mc152.entityInit(vm, o);
+		if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
 		var tgt = null;
 		if (info.target) {
 			var ti = me && info.target === me.id ? me : op(vm, 'ent', info.target);
@@ -18065,10 +18720,13 @@ JVM.mobTick = function (vm) {
 		var id = info.id, eps = 1e-5;
 		if (o[':isDead']) { op(vm, 'remove', id); return; }
 		if (o.$javaMoved) {
-			op(vm, 'entdrive', id, 3);
+			op(vm, 'entdrive', id, Math.max(3, every + 1));
 			if (Math.abs((+o[':rotationYaw'] || 0) - (+info.yaw || 0)) > 0.5 || Math.abs((+o[':rotationPitch'] || 0) - (+info.pitch || 0)) > 0.5) op(vm, 'setrot', id, +o[':rotationYaw'] || 0, +o[':rotationPitch'] || 0);
 		}
 		if (Math.abs(o[':posX'] - before.x) > 0.01 || Math.abs(o[':posY'] - before.y) > 0.01 || Math.abs(o[':posZ'] - before.z) > 0.01) op(vm, 'entpos', id, o[':posX'], o[':posY'], o[':posZ']);
+		var pushed = every > 1 && !o.$javaMoved && !info.onGround && !info.inWater && !o[':onGround'] && !rider;
+		o.$push = pushed ? [+o[':motionX'] - before.vx, +o[':motionY'] - before.vy, +o[':motionZ'] - before.vz] : null;
+		o.$pushCap = pushed ? [+o[':motionX'], +o[':motionY'], +o[':motionZ']] : null;
 		if (Math.abs(o[':motionX'] - before.vx) > eps) op(vm, 'setvel', id, 'x', +o[':motionX']);
 		if (Math.abs(o[':motionY'] - before.vy) > eps) op(vm, 'setvel', id, 'y', +o[':motionY']);
 		if (Math.abs(o[':motionZ'] - before.vz) > eps) op(vm, 'setvel', id, 'z', +o[':motionZ']);
@@ -18086,6 +18744,7 @@ JVM.mobHit = function (vm, ev) {
 	if (!t) return;
 	o[':posX'] = +ev.x; o[':posY'] = +ev.y; o[':posZ'] = +ev.z;
 	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
 	JVM.run(vm, function () { vm.callVirtual(o, 'attackEntityAsMob', '(' + E + ')Z', [t]); });
 };
 JVM.mobDeath = function (vm, ev) {
@@ -18093,6 +18752,7 @@ JVM.mobDeath = function (vm, ev) {
 	if (!o) return;
 	o[':posX'] = +ev.x; o[':posY'] = +ev.y; o[':posZ'] = +ev.z;
 	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
 	JVM.run(vm, function () {
 		vm.callVirtual(o, 'dropFewItems', '(ZI)V', [1, 0]);
 		if (Math.random() < 0.025) vm.callVirtual(o, 'dropRareDrop', '(I)V', [0]);
@@ -18109,6 +18769,10 @@ JVM.installBrain = install;
 var SRC = 'net/minecraft/src/', NET = 'cpw/mods/fml/common/network/';
 function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
 function net(vm) { return vm.$net || (vm.$net = { client: {}, server: {}, specsDone: false, queue: [], handlers: new Map() }); }
+function mp(vm) { var m = vm.mcMp; return m && m.withActor ? m : null; }
+function joiners(vm) { var m = mp(vm); var l = m && m.joiners ? m.joiners() : null; return Array.isArray(l) ? l : []; }
+function guidOf(p) { var i = p && p.$info; return i && i.remote && i.guid ? i.guid : 0; }
+function fromNow(vm) { var a = vm.mcActor; return a && a.guid ? a.guid : 0; }
 
 function install(vm) {
 	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
@@ -18132,12 +18796,19 @@ function install(vm) {
 	var PD = vm.natives[NET + 'PacketDispatcher'];
 	if (PD) {
 		var P = 'Lnet/minecraft/src/Packet;';
-		var pick = function (i) { return function (vm, n, a) { send(vm, 'client', a[i]); }; };
-		PD.staticMethods['sendPacketToPlayer(' + P + 'Lcpw/mods/fml/common/network/Player;)V'] = pick(0);
-		PD.staticMethods['sendPacketToAllAround(DDDDI' + P + ')V'] = pick(5);
-		PD.staticMethods['sendPacketToAllInDimension(' + P + 'I)V'] = pick(0);
-		PD.staticMethods['sendPacketToAllPlayers(' + P + ')V'] = pick(0);
-		PD.staticMethods['sendPacketToServer(' + P + ')V'] = function (vm, n, a) { send(vm, 'server', a[0]); };
+		var everyone = function (vm) { return [0].concat(joiners(vm).map(function (j) { return j.guid; })); };
+		PD.staticMethods['sendPacketToPlayer(' + P + 'Lcpw/mods/fml/common/network/Player;)V'] = function (vm, n, a) { send(vm, 'client', a[0], guidOf(a[1])); };
+		PD.staticMethods['sendPacketToAllAround(DDDDI' + P + ')V'] = function (vm, n, a) {
+			send(vm, 'client', a[5], 0);
+			var r2 = (+a[3] || 0) * (+a[3] || 0);
+			joiners(vm).forEach(function (j) {
+				var dx = j.x - a[0], dy = j.y - a[1], dz = j.z - a[2];
+				if (dx * dx + dy * dy + dz * dz <= r2) send(vm, 'client', a[5], j.guid);
+			});
+		};
+		PD.staticMethods['sendPacketToAllInDimension(' + P + 'I)V'] = function (vm, n, a) { everyone(vm).forEach(function (g) { send(vm, 'client', a[0], g); }); };
+		PD.staticMethods['sendPacketToAllPlayers(' + P + ')V'] = function (vm, n, a) { everyone(vm).forEach(function (g) { send(vm, 'client', a[0], g); }); };
+		PD.staticMethods['sendPacketToServer(' + P + ')V'] = function (vm, n, a) { send(vm, 'server', a[0], fromNow(vm)); };
 		PD.staticMethods['getPacket(Ljava/lang/String;[B)Lnet/minecraft/src/Packet250CustomPayload;'] = function (vm, n, a) {
 			var p = vm.newObject(vm.loadClass(SRC + 'Packet250CustomPayload'));
 			p[':channel'] = a[0]; p[':data'] = a[1]; p[':length'] = a[1] ? a[1].a.length : 0;
@@ -18145,7 +18816,7 @@ function install(vm) {
 		};
 	}
 	def(SRC + 'NetClientHandler', { methods: {
-		'addToSendQueue(Lnet/minecraft/src/Packet;)V': function (vm, self, a) { send(vm, 'server', a[0]); },
+		'addToSendQueue(Lnet/minecraft/src/Packet;)V': function (vm, self, a) { send(vm, 'server', a[0], fromNow(vm)); },
 	} });
 	var MC = vm.natives['net/minecraft/client/Minecraft'];
 	if (MC && !MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;']) MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;'] = function (vm) { return JVM.netClient(vm); };
@@ -18194,9 +18865,9 @@ function scanSpecs(vm) {
 	});
 }
 
-function send(vm, side, packet) {
+function send(vm, side, packet, who) {
 	if (!packet || packet[':channel'] == null) return;
-	net(vm).queue.push({ side: side, packet: packet });
+	net(vm).queue.push({ side: side, packet: packet, who: who || 0 });
 	if (!vm.$netPending && typeof Promise !== 'undefined') {
 		vm.$netPending = true;
 		Promise.resolve().then(function () { vm.$netPending = false; JVM.netDeliver(vm); });
@@ -18212,27 +18883,132 @@ JVM.netDeliver = function (vm) {
 	if (vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); });
 	pl[':sendQueue'] = JVM.netClient(vm);
 	var live = vm.mcReg && vm.mcReg.mobs && vm.mcReg.mobs.live;
-	JVM.run(vm, function () {
-		var l = world[':loadedEntityList'];
-		if (!l) return;
-		vm.callVirtual(l, 'clear', '()V', []);
-		vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [pl]);
-		if (live) live.forEach(function (o, id) { o[':entityId'] = id; o[':worldObj'] = world; vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [o]); });
-	});
+	var fill = function (also) {
+		JVM.run(vm, function () {
+			var l = world[':loadedEntityList'];
+			if (!l) return;
+			vm.callVirtual(l, 'clear', '()V', []);
+			vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [pl]);
+			if (also && also !== pl) vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [also]);
+			if (live) live.forEach(function (o, id) { o[':entityId'] = id; o[':worldObj'] = world; vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [o]); });
+		});
+	};
+	fill(null);
+	var M = mp(vm), acted = false;
 	q.forEach(function (it) {
 		var ch = String(it.packet[':channel']), hs = N[it.side][ch] || [];
 		if (it.side === 'server') server = true;
-		hs.forEach(function (h) {
-			n++;
-			JVM.run(vm, function () { vm.callVirtual(h, 'onPacketData', '(Lnet/minecraft/src/INetworkManager;Lnet/minecraft/src/Packet250CustomPayload;Lcpw/mods/fml/common/network/Player;)V', [null, it.packet, pl]); });
-		});
+		if (!hs.length) return;
+		var run = function () {
+			var who = it.who ? JVM.mc152.playerObj(vm, null) : pl;
+			if (it.who) {
+				acted = true;
+				who[':sendQueue'] = JVM.netClient(vm);
+				if (vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); });
+				fill(who);
+			}
+			hs.forEach(function (h) {
+				n++;
+				JVM.run(vm, function () { vm.callVirtual(h, 'onPacketData', '(Lnet/minecraft/src/INetworkManager;Lnet/minecraft/src/Packet250CustomPayload;Lcpw/mods/fml/common/network/Player;)V', [null, it.packet, who]); });
+			});
+		};
+		if (!it.who) run();
+		else if (M) M.withActor(it.who, run);
 	});
+	if (acted && vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); });
 	if (server && live && JVM.mobSaveState && vm.game && vm.game.mode === 'run') live.forEach(function (o, id) { JVM.mobSaveState(vm, o, id); });
 	if (N.queue.length && N.queue.length < 1000) return n + JVM.netDeliver(vm);
 	return n;
 };
 JVM.netClient = function (vm) { return vm.$netClient || (vm.$netClient = vm.newObject(vm.loadClass(SRC + 'NetClientHandler'))); };
 JVM.installNet = install;
+
+var STATE = ['mcGui', 'mcHeld', 'mcMouse', 'mcMouseDown', 'mcKeys', 'mcLastKey', 'mcWheel', 'mcDraw'];
+function remotes(vm) { return vm.$remoteGuis || (vm.$remoteGuis = new Map()); }
+function inRemote(vm, rg, fn) {
+	var M = mp(vm);
+	if (!M) return undefined;
+	var saved = {}, prev = vm.$remoteGui, so = JVM.onGuiOpen, sc = JVM.onGuiClose, sg = JVM.onGameScreen;
+	STATE.forEach(function (k) { saved[k] = vm[k]; vm[k] = rg.st[k]; });
+	vm.$remoteGui = rg;
+	JVM.onGuiOpen = function () { };
+	JVM.onGuiClose = function () { };
+	JVM.onGameScreen = function () { vm.warnOnce('gui:joinedgame', "one of the game's own screens a mod opened for a joined player isn't shown on their device"); };
+	try { return M.withActor(rg.guid, fn); }
+	finally {
+		STATE.forEach(function (k) { rg.st[k] = vm[k]; vm[k] = saved[k]; });
+		vm.$remoteGui = prev; JVM.onGuiOpen = so; JVM.onGuiClose = sc; JVM.onGameScreen = sg;
+		var mc = vm.mcInstance;
+		if (!vm.mcActor && mc && vm.mcPlayer && mc[':thePlayer'] !== vm.mcPlayer && vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); });
+	}
+}
+var DEF_W = 427, DEF_H = 240;
+JVM.remoteGuiOpen = function (vm, screen, server) {
+	var who = vm.mcActor, M = mp(vm);
+	if (!who || !who.guid || !M || !M.send || !JVM.guiOpenScreen) return false;
+	var R = remotes(vm), rg = R.get(who.guid), size = (vm.$remoteSizes || {})[who.guid];
+	if (!rg) { rg = { guid: who.guid, st: {}, w: size ? size[0] : DEF_W, h: size ? size[1] : DEF_H, mx: -1, my: -1, last: '' }; R.set(who.guid, rg); }
+	inRemote(vm, rg, function () {
+		JVM.guiOpenScreen(vm, screen, server);
+		if (vm.mcGui) JVM.guiLayout(vm, rg.w, rg.h);
+	});
+	rg.last = '';
+	JVM.remoteGuiPump(vm, who.guid);
+	if (M.wake) M.wake();
+	return true;
+};
+JVM.remoteGuiPump = function (vm, only) {
+	var R = remotes(vm), M = mp(vm);
+	if (!R.size) return 0;
+	R.forEach(function (rg, guid) {
+		if (only && guid !== only) return;
+		if (!M || (M.has && !M.has(guid))) { R.delete(guid); return; }
+		var ops = null;
+		if (rg.st.mcGui) inRemote(vm, rg, function () { ops = JVM.guiFrame(vm, rg.mx, rg.my); });
+		if (!rg.st.mcGui) { R.delete(guid); M.send(guid, { t: 'jgui', close: 1 }); return; }
+		var s = '';
+		try { s = JSON.stringify(ops || []); } catch (x) { return; }
+		if (s === rg.last) return;
+		rg.last = s;
+		M.send(guid, { t: 'jgui', ops: ops || [], w: rg.w, h: rg.h });
+	});
+	return R.size;
+};
+JVM.remoteGuiTick = function (vm) {
+	var R = remotes(vm);
+	if (!R.size || !JVM.guiTick) return;
+	R.forEach(function (rg) { if (rg.st.mcGui) inRemote(vm, rg, function () { JVM.guiTick(vm); }); });
+};
+JVM.remoteGuiInput = function (vm, guid, m) {
+	if (!m || typeof m.k !== 'string') return;
+	var M = mp(vm), R = remotes(vm), rg = R.get(guid);
+	var int = function (v, lo, hi) { v = Math.floor(+v || 0); return v < lo ? lo : v > hi ? hi : v; };
+	if (m.k === 'layout') {
+		var w = int(m.w, 160, 2000), h = int(m.h, 120, 2000);
+		(vm.$remoteSizes || (vm.$remoteSizes = {}))[guid] = [w, h];
+		if (rg) { rg.w = w; rg.h = h; if (rg.st.mcGui) inRemote(vm, rg, function () { JVM.guiLayout(vm, w, h); }); }
+	}
+	if (!rg) { if (M && m.k !== 'layout' && m.k !== 'move') M.send(guid, { t: 'jgui', close: 1 }); return; }
+	var x = int(m.x, -1, 4000), y = int(m.y, -1, 4000);
+	switch (m.k) {
+	case 'move': rg.mx = x; rg.my = y; return;
+	case 'mouse': rg.mx = x; rg.my = y; inRemote(vm, rg, function () { JVM.guiMouse(vm, x, y, m.b === 1 ? 1 : 0, !!m.down); }); break;
+	case 'drag': inRemote(vm, rg, function () { if (JVM.guiDrag) JVM.guiDrag(vm, !!m.on); }); break;
+	case 'wheel': inRemote(vm, rg, function () { if (JVM.guiWheel) JVM.guiWheel(vm, +m.d || 0); }); break;
+	case 'key': inRemote(vm, rg, function () { JVM.guiKey(vm, int(m.ch, 0, 65535), int(m.code, 0, 255), !!m.down); }); break;
+	case 'close': inRemote(vm, rg, function () { JVM.guiClose(vm); }); break;
+	}
+	JVM.remoteGuiPump(vm, guid);
+};
+JVM.remoteGuiCloseAll = function (vm) {
+	var R = remotes(vm), M = mp(vm);
+	R.forEach(function (rg, guid) {
+		if (rg.st.mcGui) inRemote(vm, rg, function () { JVM.guiClose(vm); });
+		if (M) M.send(guid, { t: 'jgui', close: 1 });
+	});
+	R.clear();
+};
+JVM.remoteGuiOf = function (vm, guid) { return remotes(vm).get(guid) || null; };
 })();
 
 (function () {
@@ -18702,6 +19478,7 @@ function makeTile(vm, b, meta, world) {
 function putTile(vm, x, y, z, te) {
 	var t = tiles(vm);
 	if (!te) return;
+	if (vkindOf(te.cls) && bindVanilla(vm, te, x, y, z)) return;
 	te[':worldObj'] = JVM.mc152.worldObj(vm);
 	te[':xCoord'] = x | 0; te[':yCoord'] = y | 0; te[':zCoord'] = z | 0;
 	te[':tileEntityInvalid'] = 0;
@@ -18713,7 +19490,9 @@ function putTile(vm, x, y, z, te) {
 }
 function tileAt(vm, x, y, z, create) {
 	var t = tiles(vm), te = t.at.get(K(x, y, z));
-	if (te || !create || !vm.game || vm.game.mode !== 'run') return te || null;
+	if (te) return te;
+	if (create && vm.game && (vm.game.mode === 'run' || vm.game.mode === 'gen')) { var vt = vanillaTile(vm, x, y, z); if (vt) return vt; }
+	if (!create || !vm.game || vm.game.mode !== 'run') return null;
 	var bm = blockAt(vm, x, y, z);
 	if (!bm) return null;
 	te = makeTile(vm, bm.b, bm.meta, JVM.mc152.worldObj(vm));
@@ -18722,6 +19501,7 @@ function tileAt(vm, x, y, z, create) {
 }
 function removeTile(vm, x, y, z) {
 	var t = tiles(vm), k = K(x, y, z), te = t.at.get(k);
+	if (t.vanilla) t.vanilla.delete(k);
 	if (!te) return;
 	te[':tileEntityInvalid'] = 1;
 	t.at.delete(k);
@@ -18731,13 +19511,176 @@ function removeTile(vm, x, y, z) {
 }
 function loadTile(vm, c) {
 	var idTag = cget(c, 'id'), name = idTag && idTag[':data'];
-	var cls = name && tiles(vm).classes[name];
+	var cls = name && (tiles(vm).classes[name] || (VNAME[name] || VSIZE[name] ? vm.loadClass(SRC + (VNAME[name] || name)) : null));
 	if (!cls) return null;
 	var te = vm.newObject(cls), k = cls.findDeclared('<init>()V');
 	if (k) vm.invoke(k, te, []);
 	vm.callVirtual(te, 'readFromNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [c]);
 	return te;
 }
+
+var VKIND = { 23: 'TileEntityDispenser', 54: 'TileEntityChest', 146: 'TileEntityChest', 61: 'TileEntityFurnace', 62: 'TileEntityFurnace',
+	117: 'TileEntityBrewingStand', 154: 'TileEntityHopper', 158: 'TileEntityDropper' };
+var VSIZE = { TileEntityDispenser: 9, TileEntityDropper: 9, TileEntityChest: 27, TileEntityFurnace: 3, TileEntityBrewingStand: 4, TileEntityHopper: 5 };
+var VWANT = { TileEntityDispenser: [23], TileEntityDropper: [158], TileEntityChest: [54, 146], TileEntityFurnace: [61, 62], TileEntityBrewingStand: [117], TileEntityHopper: [154] };
+function vkindOf(cls) { for (var c = cls; c; c = c.superClass) { var n = c.name.slice(SRC.length); if (c.name.indexOf(SRC) === 0 && VSIZE[n]) return n; } return null; }
+function vsize(te) { return VSIZE[te.$vkind || vkindOf(te.cls)] || 27; }
+function enchOfStack(s) { var e = s && (JVM.stackEnch ? JVM.stackEnch(s) : s.$ench); return e && Object.keys(e).length ? e : null; }
+function stackOf(vm, id, n, d, ench) {
+	if (!id || !(n > 0)) return null;
+	var s = JVM.mc152.newStack(vm, id, n, d | 0);
+	if (ench) s.$ench = Object.assign({}, ench);
+	return s;
+}
+function genEntry(vm, te, make) {
+	if (te.$entry) return te.$entry;
+	var t = tiles(vm), r = reg(vm), q = r.structPending || (r.structPending = []);
+	var key = (vm.mcDim == null ? '' : vm.mcDim) + '/' + K(te[':xCoord'], te[':yCoord'], te[':zCoord']);
+	var map = t.genInv || (t.genInv = new Map()), e = map.get(key);
+	if (e && q.indexOf(e) < 0) { map.delete(key); e = null; }
+	if (!e && make) {
+		e = { k: 'inv', x: te[':xCoord'], y: te[':yCoord'], z: te[':zCoord'], slots: [], dim: vm.mcDim, want: VWANT[te.$vkind] || null };
+		if (map.size > 4096) map.clear();
+		map.set(key, e); q.push(e);
+	}
+	return (te.$entry = e || null);
+}
+function vslotGet(vm, te, i) {
+	i |= 0;
+	if (i < 0 || i >= vsize(te)) return null;
+	if (!te.$bound) return (te.$items && te.$items[i]) || null;
+	var g = vm.game;
+	if (g && g.mode === 'run') { var v = op(vm, 'chest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i); return v ? stackOf(vm, v.id, v.count, v.data, v.ench) : null; }
+	var e = genEntry(vm, te, false), s = e && e.slots[i];
+	return s ? stackOf(vm, s.id, s.n, s.d, s.ench) : null;
+}
+function vslotSet(vm, te, i, s) {
+	i |= 0;
+	if (i < 0 || i >= vsize(te)) return;
+	if (s && !(s[':stackSize'] > 0)) s = null;
+	if (!te.$bound) { (te.$items || (te.$items = []))[i] = s; return; }
+	var g = vm.game, ench = enchOfStack(s);
+	if (g && g.mode === 'run') { op(vm, 'setchest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i, s ? s[':itemID'] : 0, s ? s[':stackSize'] : 0, s ? s[':itemDamage'] : 0, ench); return; }
+	var e = genEntry(vm, te, !!s);
+	if (e) e.slots[i] = s ? { id: s[':itemID'] | 0, n: s[':stackSize'] | 0, d: s[':itemDamage'] | 0, ench: ench } : null;
+}
+JVM.vinvGet = vslotGet;
+JVM.vinvSet = vslotSet;
+function vnew(vm, kind, x, y, z, meta) {
+	var te = vm.newObject(vm.loadClass(SRC + kind));
+	te[':worldObj'] = JVM.mc152.worldObj(vm);
+	te[':xCoord'] = x | 0; te[':yCoord'] = y | 0; te[':zCoord'] = z | 0; te[':blockMetadata'] = meta | 0;
+	te.$vkind = kind; te.$bound = true;
+	return te;
+}
+function vanillaTile(vm, x, y, z) {
+	var tl = op(vm, 'tile', x, y, z), kind = tl && VKIND[tl.id];
+	if (!kind) return null;
+	if (vm.game.mode !== 'run') return vnew(vm, kind, x, y, z, tl.data);
+	var t = tiles(vm), k = K(x, y, z), map = t.vanilla || (t.vanilla = new Map()), te = map.get(k);
+	if (te && te.$vkind === kind && !te[':tileEntityInvalid']) return te;
+	te = vnew(vm, kind, x, y, z, tl.data);
+	if (map.size > 1024) map.clear();
+	map.set(k, te);
+	return te;
+}
+function bindVanilla(vm, te, x, y, z) {
+	var tl = op(vm, 'tile', x, y, z), kind = tl && VKIND[tl.id], own = vkindOf(te.cls);
+	if (!kind || !own || VWANT[own].indexOf(tl.id) < 0) return false;
+	var items = te.$items || [];
+	te[':worldObj'] = JVM.mc152.worldObj(vm);
+	te[':xCoord'] = x | 0; te[':yCoord'] = y | 0; te[':zCoord'] = z | 0; te[':tileEntityInvalid'] = 0;
+	te.$vkind = own; te.$bound = true; te.$items = null; te.$entry = null;
+	for (var i = 0; i < items.length; i++) if (items[i]) vslotSet(vm, te, i, items[i]);
+	if (vm.game && vm.game.mode === 'run') { var t = tiles(vm); (t.vanilla || (t.vanilla = new Map())).set(K(x, y, z), te); }
+	return true;
+}
+var BURN = { 5: 300, 6: 100, 17: 300, 47: 300, 53: 300, 54: 300, 58: 300, 85: 300, 96: 300, 107: 300, 134: 300, 135: 300, 136: 300, 146: 300, 151: 300,
+	126: 150, 173: 16000, 263: 1600, 280: 100, 327: 20000, 369: 2400 };
+function burnTime(vm, s) {
+	if (!s) return 0;
+	var id = s[':itemID'] | 0, n = BURN[id] || 0;
+	var gr = vm.natives['cpw/mods/fml/common/registry/GameRegistry'];
+	if (gr && gr.staticMethods && gr.staticMethods['getFuelValue(Lnet/minecraft/src/ItemStack;)I']) n = Math.max(n, gr.staticMethods['getFuelValue(Lnet/minecraft/src/ItemStack;)I'](vm, null, [s]) | 0);
+	return n;
+}
+function installVanillaInv(vm) {
+	var TEM = vm.natives[SRC + 'TileEntity'].methods, teWrite = TEM['writeToNBT(Lnet/minecraft/src/NBTTagCompound;)V'], teRead = TEM['readFromNBT(Lnet/minecraft/src/NBTTagCompound;)V'];
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var LIS = 'Lnet/minecraft/src/ItemStack;';
+	var inv = {
+		'getSizeInventory()I': function (vm, self) { return vsize(self); },
+		['getStackInSlot(I)' + LIS]: function (vm, self, a) { return vslotGet(vm, self, a[0]); },
+		['setInventorySlotContents(I' + LIS + ')V']: function (vm, self, a) {
+			var s = a[1], lim = 64;
+			if (s && s[':stackSize'] > lim) s[':stackSize'] = lim;
+			vslotSet(vm, self, a[0], s);
+		},
+		['decrStackSize(II)' + LIS]: function (vm, self, a) {
+			var s = vslotGet(vm, self, a[0]);
+			if (!s) return null;
+			if (s[':stackSize'] <= a[1]) { vslotSet(vm, self, a[0], null); return s; }
+			var out = stackOf(vm, s[':itemID'], a[1], s[':itemDamage'], s.$ench);
+			s[':stackSize'] -= a[1]; vslotSet(vm, self, a[0], s);
+			return out;
+		},
+		['getStackInSlotOnClosing(I)' + LIS]: function (vm, self, a) { var s = vslotGet(vm, self, a[0]); if (s) vslotSet(vm, self, a[0], null); return s; },
+		'getInventoryStackLimit()I': function () { return 64; },
+		'isInvNameLocalized()Z': function (vm, self) { return self.$customName ? 1 : 0; },
+		'isUseableByPlayer(Lnet/minecraft/src/EntityPlayer;)Z': function () { return 1; },
+		'openChest()V': function () {}, 'closeChest()V': function () {},
+		['isStackValidForSlot(I' + LIS + ')Z']: function () { return 1; },
+		'onInventoryChanged()V': function () {},
+		'updateEntity()V': function () {},
+		'writeToNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) {
+			teWrite(vm, self, a);
+			var l = tag(vm, 9, null, 'Items');
+			for (var i = 0; i < vsize(self); i++) {
+				var s = vslotGet(vm, self, i);
+				if (!s) continue;
+				var c = compound(vm, ''); cset(vm, c, 'Slot', 1, i);
+				vm.callVirtual(s, 'writeToNBT', '(Lnet/minecraft/src/NBTTagCompound;)Lnet/minecraft/src/NBTTagCompound;', [c]);
+				l.$v.push(c); l.$lt = 10;
+			}
+			a[0].$v.set('Items', l);
+		},
+		'readFromNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) {
+			teRead(vm, self, a);
+			var l = cget(a[0], 'Items');
+			(l && l.$v || []).forEach(function (c) {
+				var sl = cget(c, 'Slot'), s = vm.newObject(vm.loadClass(SRC + 'ItemStack'));
+				vm.callVirtual(s, 'readFromNBT', '(Lnet/minecraft/src/NBTTagCompound;)V', [c]);
+				if (sl && s[':itemID']) vslotSet(vm, self, sl[':data'] & 255, s);
+			});
+		},
+	};
+	var withName = function (name, extra) { return Object.assign({}, inv, { 'getInvName()Ljava/lang/String;': function (vm, self) { return self.$customName || name; },
+		'func_94043_a(Ljava/lang/String;)V': function (vm, self, a) { self.$customName = a[0]; } }, extra || {}); };
+	def('TileEntityChest', { super: SRC + 'TileEntity', interfaces: [SRC + 'IInventory'],
+		fields: { adjacentChestChecked: 'Z', adjacentChestZNeg: 'Lnet/minecraft/src/TileEntityChest;', adjacentChestXPos: 'Lnet/minecraft/src/TileEntityChest;',
+			adjacentChestXNeg: 'Lnet/minecraft/src/TileEntityChest;', adjacentChestZPosition: 'Lnet/minecraft/src/TileEntityChest;', lidAngle: 'F', prevLidAngle: 'F', numUsingPlayers: 'I' },
+		methods: withName('container.chest', {
+			'checkForAdjacentChests()V': function () {},
+			'setChestGuiName(Ljava/lang/String;)V': function (vm, self, a) { self.$customName = a[0]; },
+			'func_98041_l()I': function (vm, self) { var tl = self.$bound && op(vm, 'tile', self[':xCoord'], self[':yCoord'], self[':zCoord']); return tl && tl.id === 146 ? 1 : 0; },
+		}) });
+	def('TileEntityFurnace', { super: SRC + 'TileEntity', interfaces: [SRC + 'IInventory'],
+		fields: { furnaceBurnTime: 'I', currentItemBurnTime: 'I', furnaceCookTime: 'I' },
+		methods: withName('container.furnace', {
+			'isBurning()Z': function (vm, self) { var tl = op(vm, 'tile', self[':xCoord'], self[':yCoord'], self[':zCoord']); return (tl && tl.id === 62) || self[':furnaceBurnTime'] > 0 ? 1 : 0; },
+			'getCookProgressScaled(I)I': function (vm, self, a) { return (self[':furnaceCookTime'] | 0) * a[0] / 200 | 0; },
+			'getBurnTimeRemainingScaled(I)I': function (vm, self, a) { var c = self[':currentItemBurnTime'] || 200; return (self[':furnaceBurnTime'] | 0) * a[0] / c | 0; },
+			'setGuiDisplayName(Ljava/lang/String;)V': function (vm, self, a) { self.$customName = a[0]; },
+		}),
+		staticMethods: {
+			['getItemBurnTime(' + LIS + ')I']: function (vm, n, a) { return burnTime(vm, a[0]); },
+			['isItemFuel(' + LIS + ')Z']: function (vm, n, a) { return burnTime(vm, a[0]) > 0 ? 1 : 0; },
+		} });
+	def('TileEntityBrewingStand', { super: SRC + 'TileEntity', interfaces: [SRC + 'IInventory'], methods: withName('container.brewing', { 'getBrewTime()I': function () { return 0; } }) });
+	def('TileEntityHopper', { super: SRC + 'TileEntity', interfaces: [SRC + 'IInventory'], methods: withName('container.hopper') });
+	def('TileEntityDropper', { super: SRC + 'TileEntityDispenser', methods: { 'getInvName()Ljava/lang/String;': function () { return 'container.dropper'; } } });
+}
+var VNAME = { Chest: 'TileEntityChest', Furnace: 'TileEntityFurnace', Cauldron: 'TileEntityBrewingStand', Hopper: 'TileEntityHopper', Trap: 'TileEntityDispenser', Dropper: 'TileEntityDropper' };
 
 JVM.tilePlaced = function (vm, x, y, z) {
 	if (tiles(vm).at.get(K(x, y, z))) return;
@@ -18863,7 +19806,7 @@ JVM.storageSave = function (vm) {
 };
 JVM.storageReset = function (vm) { var r = vm.mcReg; if (r) r.storage = { data: {}, mods: {} }; };
 
-JVM.installTiles = function (vm) { installTiles(vm); installStorage(vm); };
+JVM.installTiles = function (vm) { installTiles(vm); installVanillaInv(vm); installStorage(vm); };
 })();
 
 (function () {
@@ -19591,7 +20534,7 @@ function slotClick(vm, c, id, button, mode, player) {
 			var dropN = button === 0 ? held[':stackSize'] : 1;
 			var dp = JVM.mc152.newStack(vm, held[':itemID'], dropN, held[':itemDamage']);
 			if (held[':stackTagCompound']) dp[':stackTagCompound'] = held[':stackTagCompound'];
-			op(vm, 'drop', player[':posX'], player[':posY'], player[':posZ'], dp[':itemID'], dropN, dp[':itemDamage']);
+			op(vm, 'drop', player[':posX'], player[':posY'], player[':posZ'], dp[':itemID'], dropN, dp[':itemDamage'], undefined, dp.$ench || null);
 			held[':stackSize'] -= dropN;
 			vm.mcHeld = held[':stackSize'] > 0 ? held : null;
 		}
@@ -19694,7 +20637,10 @@ function openScreen(vm, screen, server) {
 		else vm.warnOnce('gui:vanilla:' + vn, "the game's " + vn + ' is not available here');
 		return;
 	}
-	if (vm.mcActor) { vm.warnOnce('gui:joined', "mod screens for joined players aren't available yet"); return; }
+	if (vm.mcActor && !vm.$remoteGui) {
+		if (!(JVM.remoteGuiOpen && JVM.remoteGuiOpen(vm, screen, server))) vm.warnOnce('gui:joined', "a mod screen for a joined player couldn't be shown on their device");
+		return;
+	}
 	if (vm.mcGui && vm.mcGui.screen !== screen) closeScreen(vm, true);
 	var g = vm.mcGui = { screen: screen, server: server, mod: screen.cls.source || vm.currentMod };
 	if (server) {
@@ -19718,6 +20664,7 @@ function closeScreen(vm, replacing) {
 	if (!replacing && JVM.onGuiClose) JVM.onGuiClose(vm);
 }
 JVM.guiOpen = function (vm) { return !!vm.mcGui; };
+JVM.guiOpenScreen = openScreen;
 JVM.guiClose = function (vm) { closeScreen(vm); };
 JVM.guiLayout = function (vm, w, h) {
 	var g = vm.mcGui;
@@ -19808,13 +20755,18 @@ function auxSfx(vm, id, x, y, z, data) {
 }
 
 function toStack(vm, v) { var s = v && v.id && v.count > 0 ? JVM.mc152.newStack(vm, v.id, v.count, v.data | 0) : null; if (s && v.ench) s.$ench = v.ench; return s; }
-function slotGet(vm, te, i) { return toStack(vm, op(vm, 'chest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i)); }
+function slotGet(vm, te, i) {
+	if (JVM.vinvGet) return JVM.vinvGet(vm, te, i);
+	return toStack(vm, op(vm, 'chest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i));
+}
 function slotSet(vm, te, i, s) {
-	op(vm, 'setchest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i, s && s[':stackSize'] > 0 ? s[':itemID'] : 0, s ? s[':stackSize'] : 0, s ? s[':itemDamage'] : 0);
+	if (JVM.vinvSet) return JVM.vinvSet(vm, te, i, s);
+	op(vm, 'setchest', te[':xCoord'], te[':yCoord'], te[':zCoord'], i, s && s[':stackSize'] > 0 ? s[':itemID'] : 0, s ? s[':stackSize'] : 0, s ? s[':itemDamage'] : 0, s && s.$ench || null);
 }
 function dispenserTile(vm, world, x, y, z) {
 	var te = vm.newObject(vm.loadClass(SRC + 'TileEntityDispenser'));
 	te[':worldObj'] = world; te[':xCoord'] = x; te[':yCoord'] = y; te[':zCoord'] = z;
+	te.$vkind = 'TileEntityDispenser'; te.$bound = true;
 	return te;
 }
 
@@ -19875,6 +20827,7 @@ function installDispense(vm) {
 			var s = slotGet(vm, self, a[0]);
 			if (!s) return null;
 			var n = Math.min(a[1], s[':stackSize']), out = JVM.mc152.newStack(vm, s[':itemID'], n, s[':itemDamage']);
+			if (s.$ench) out.$ench = Object.assign({}, s.$ench);
 			s[':stackSize'] -= n; slotSet(vm, self, a[0], s);
 			return out;
 		},
@@ -19934,7 +20887,7 @@ function installDispense(vm) {
 		'doDispense(Lnet/minecraft/src/World;Lnet/minecraft/src/ItemStack;ILnet/minecraft/src/EnumFacing;Lnet/minecraft/src/IPosition;)V': function (vm, n, a) {
 			var p = a[4], s = a[1];
 			if (!s || s[':stackSize'] <= 0) return;
-			op(vm, 'drop', p.$x, p.$y - (a[3].$off[1] === 0 ? 0.15625 : 0.125), p.$z, s[':itemID'], s[':stackSize'], s[':itemDamage']);
+			op(vm, 'drop', p.$x, p.$y - (a[3].$off[1] === 0 ? 0.15625 : 0.125), p.$z, s[':itemID'], s[':stackSize'], s[':itemDamage'], undefined, s.$ench || null);
 		},
 	} });
 	def('BehaviorProjectileDispense', { super: BDI, access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {
@@ -26500,6 +27453,82 @@ function install(vm) {
 		'getRespiration(Lnet/minecraft/src/EntityLiving;)I': function (vm, n, a) { return maxOf(5, armor(vm, a[0])); },
 		'getAquaAffinityModifier(Lnet/minecraft/src/EntityLiving;)Z': function (vm, n, a) { return maxOf(6, armor(vm, a[0])) > 0 ? 1 : 0; },
 	} });
+	var rnd = function (vm, r, n) { return vm.callVirtual(r, 'nextInt', '(I)I', [n]); };
+	var isA = function (vm, o, n) { try { return !!o && vm.isInstance(o, vm.loadClass(SRC + n)); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; return false; } };
+	var VTYPE = { 0: 'armor', 1: 'armor', 2: 'armor_feet', 3: 'armor', 4: 'armor', 5: 'armor_head', 6: 'armor_head', 7: 'armor_torso',
+		16: 'weapon', 17: 'weapon', 18: 'weapon', 19: 'weapon', 20: 'weapon', 21: 'weapon', 32: 'digger', 33: 'digger', 34: 'digger', 35: 'digger',
+		48: 'bow', 49: 'bow', 50: 'bow', 51: 'bow' };
+	var fits = function (vm, e, item, book) {
+		if (book) return true;
+		var t = e.$vanilla ? VTYPE[e[':effectId']] : e[':type'] && e[':type'].$name || 'all';
+		var slot = isA(vm, item, 'ItemArmor') ? item[':armorType'] | 0 : -1;
+		switch (t) {
+		case 'all': return true;
+		case 'armor': return slot >= 0;
+		case 'armor_head': return slot === 0;
+		case 'armor_torso': return slot === 1;
+		case 'armor_legs': return slot === 2;
+		case 'armor_feet': return slot === 3;
+		case 'weapon': return isA(vm, item, 'ItemSword');
+		case 'digger': return isA(vm, item, 'ItemTool');
+		case 'bow': return isA(vm, item, 'ItemBow');
+		}
+		return false;
+	};
+	var enchantability = function (vm, item, book) {
+		var n = safeCall(vm, function () { return vm.callVirtual(item, 'getItemEnchantability', '()I', []); }) | 0;
+		if (n > 0) return n;
+		if (book) return 1;
+		if (isA(vm, item, 'ItemArmor')) return 9;
+		if (isA(vm, item, 'ItemSword') || isA(vm, item, 'ItemTool')) return 10;
+		if (isA(vm, item, 'ItemBow')) return 1;
+		return 0;
+	};
+	var buildList = function (vm, r, st, level) {
+		var item = st && vm.callVirtual(st, 'getItem', '()Lnet/minecraft/src/Item;', []);
+		if (!item) return null;
+		var book = (st[':itemID'] | 0) === 340, ench = enchantability(vm, item, book);
+		if (ench <= 0) return null;
+		ench = (ench / 2) | 0;
+		ench = 1 + rnd(vm, r, (ench >> 1) + 1) + rnd(vm, r, (ench >> 1) + 1);
+		var k = ench + level, f = (vm.callVirtual(r, 'nextFloat', '()F', []) + vm.callVirtual(r, 'nextFloat', '()F', []) - 1) * 0.15;
+		var l = Math.floor(k * (1 + f) + 0.5);
+		if (l < 1) l = 1;
+		var cand = [];
+		Array.prototype.forEach.call(list(vm).a, function (e) {
+			if (!e || !fits(vm, e, item, book)) return;
+			var max = vm.callVirtual(e, 'getMaxLevel', '()I', []), got = 0;
+			for (var lv = vm.callVirtual(e, 'getMinLevel', '()I', []); lv <= max; lv++)
+				if (l >= vm.callVirtual(e, 'getMinEnchantability', '(I)I', [lv]) && l <= vm.callVirtual(e, 'getMaxEnchantability', '(I)I', [lv])) got = lv;
+			if (got) cand.push({ e: e, lvl: got, w: Math.max(1, vm.callVirtual(e, 'getWeight', '()I', []) | 0) });
+		});
+		if (!cand.length) return null;
+		var pick = function () {
+			var tot = cand.reduce(function (s, c) { return s + c.w; }, 0), n = rnd(vm, r, tot);
+			for (var i = 0; i < cand.length; i++) { n -= cand[i].w; if (n < 0) return cand[i]; }
+			return cand[cand.length - 1];
+		};
+		var out = [pick()];
+		for (var i = l; rnd(vm, r, 50) <= i; i >>= 1) {
+			cand = cand.filter(function (c) { return out.every(function (o) { return o.e !== c.e && vm.callVirtual(o.e, 'canApplyTogether', '(Lnet/minecraft/src/Enchantment;)Z', [c.e]); }); });
+			if (cand.length) out.push(pick());
+		}
+		return out;
+	};
+	var EH = vm.natives[SRC + 'EnchantmentHelper'];
+	EH.staticMethods['addRandomEnchantment(Ljava/util/Random;Lnet/minecraft/src/ItemStack;I)Lnet/minecraft/src/ItemStack;'] = function (vm, n, a) {
+		var st = a[1], got = buildList(vm, a[0], st, a[2] | 0);
+		if (!st) return st;
+		if ((st[':itemID'] | 0) === 340 && got) st[':itemID'] = 403;
+		(got || []).forEach(function (c) { (st.$ench = st.$ench || {})[c.e[':effectId']] = c.lvl; });
+		return st;
+	};
+	EH.staticMethods['buildEnchantmentList(Ljava/util/Random;Lnet/minecraft/src/ItemStack;I)Ljava/util/List;'] = function (vm, n, a) {
+		var got = buildList(vm, a[0], a[1], a[2] | 0);
+		if (!got) return null;
+		var ed = vm.loadClass(SRC + 'EnchantmentData');
+		return JVM.newList(vm, got.map(function (c) { var d = vm.newObject(ed); d[':enchantmentobj'] = c.e; d[':enchantmentLevel'] = c.lvl; d[':itemWeight'] = c.w; return d; }));
+	};
 	var IS = vm.natives[SRC + 'ItemStack'];
 	if (IS) IS.methods = Object.assign({}, IS.methods, {
 		'addEnchantment(Lnet/minecraft/src/Enchantment;I)V': function (vm, self, a) { if (a[0]) (self.$ench = self.$ench || {})[a[0][':effectId']] = a[1] | 0; },
@@ -26509,6 +27538,23 @@ function install(vm) {
 	});
 }
 JVM.installEnchantments = install;
+
+JVM.stackEnch = function (st) {
+	if (!st) return null;
+	var o = {}, n = 0;
+	var fromTag = function (l) {
+		(l && l.$t === 9 && l.$v || []).forEach(function (c) {
+			var id = c && c.$v && c.$v.get('id'), lv = c && c.$v && c.$v.get('lvl');
+			var i = id ? id[':data'] | 0 : -1, v = lv ? lv[':data'] | 0 : 0;
+			if (i >= 0 && v > 0) { o[i] = Math.max(o[i] | 0, v); n++; }
+		});
+	};
+	var t = st[':stackTagCompound'];
+	if (t && t.$v) { fromTag(t.$v.get('ench')); fromTag(t.$v.get('StoredEnchantments')); }
+	var e = st.$ench;
+	if (e) Object.keys(e).forEach(function (k) { if ((e[k] | 0) > 0) { o[k] = e[k] | 0; n++; } });
+	return n ? o : null;
+};
 
 JVM.collectEnchantments = function (vm, modId, safe) {
 	var out = {}, all = reg(vm).enchants || [];

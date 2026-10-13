@@ -753,6 +753,7 @@ F	qy	d	field_1365_d	blockID
 F	ya	a	field_4117_a	angerLevel
 F	ub	k	field_923_k	zLevel
 F	sj	b	field_1307_b	charWidth
+F	sj	d	field_1309_d	buffer
 F	vz	j	field_943_j	dragging
 F	bb	f	field_200_e	random
 F	iz	a	field_1615_a	stackSize
@@ -888,6 +889,7 @@ F	sn	bD	field_21064_bx	dataWatcher
 F	sn	bM	field_28016_bK	ignoreFrustumCheck
 F	v	a	field_4013_a	modelBipedMain
 F	sz	a	field_1089_a	doubleValue
+F	hj	b	field_4286_b	buffer
 F	up	j	field_956_i	options
 F	fp	a	field_20157_a	allowedCharacters
 F	fp	b	field_22286_b	allowedCharactersArray
@@ -1001,6 +1003,7 @@ F	gr	b	field_1666_b	username
 F	mv	a	field_20032_a	windowId
 F	yv	e	field_25015_e	thePlayer
 F	np	c	field_1516_c	hash
+F	np	a	field_1514_a	buffer
 F	ys	b	field_20922_a	blockType
 F	qx	i	field_12249_i	worldObj
 F	qx	g	field_12251_g	destroyedBlockPositions
@@ -1038,6 +1041,9 @@ F	rq	n	field_22100_m	saveList
 F	uv	b	field_886_b	chunkMapping
 F	uv	d	field_888_d	worldObj
 F	p	a	field_1097_a	floatValue
+F	sk	a	field_832_b	furnaceBurnTime
+F	sk	b	field_835_c	currentItemBurnTime
+F	sk	c	field_834_d	furnaceCookTime
 F	ls	H	field_735_n	renderYawOffset
 F	ls	O	field_9357_z	texture
 F	ls	X	field_9339_I	swingProgress
@@ -1275,6 +1281,7 @@ F	am	a	field_1188_a	xCoord
 F	am	b	field_1187_b	yCoord
 F	am	c	field_1190_c	zCoord
 F	tj	a	field_1216_a	location
+F	tj	b	field_1215_b	buffer
 F	rj	a	field_22195_a	cache
 F	lg	a	field_22264_a	mc
 F	lg	b	field_22263_b	width
@@ -1361,6 +1368,7 @@ F	jn	b	solaris	solaris
 F	jn	c	windows	windows
 F	jn	d	macos	macos
 F	jn	e	unknown	unknown
+F	ss	a	field_452_a	modelBlock
 F	nd	a	field_531_a	entityId
 F	nd	b	field_530_b	xPosition
 F	nd	c	field_529_c	yPosition
@@ -1387,6 +1395,9 @@ F	km	bk	field_31002_bk	dyeColors
 F	kb	a	field_20036_a	windowId
 F	kb	b	field_20035_b	itemStack
 F	no	a	field_1258_a	slimeBodies
+F	no	b	field_1257_b	slimeRightEye
+F	no	c	field_1260_c	slimeLeftEye
+F	no	d	field_1259_d	slimeMouth
 F	kg	a	field_1588_a	mc
 F	ns	a	field_6365_a	entityId
 F	se	a	field_505_a	xPosition
@@ -1416,6 +1427,7 @@ F	rt	a	everything	everything
 F	rt	b	mobs	mobs
 F	rt	c	players	players
 F	bm	a	field_20127_a	furnace
+F	bm	c	field_20129_c	burnTime
 F	at	a	OBJECT	OBJECT
 F	at	b	ARRAY	ARRAY
 F	at	c	STRING	STRING
@@ -2023,6 +2035,8 @@ M	nu	j	(Ljava/lang/String;)[B	func_759_j	getByteArray
 M	nu	k	(Ljava/lang/String;)Lnu;	func_743_k	getCompoundTag
 M	nu	l	(Ljava/lang/String;)Lsp;	func_753_l	getTagList
 M	nu	m	(Ljava/lang/String;)Z	func_760_m	getBoolean
+M	sk	b	(I)I	func_490_a	getCookProgressScaled
+M	sk	c	(I)I	func_489_b	getBurnTimeRemainingScaled
 M	sk	b	()Z	func_485_a	isBurning
 M	ls	a_	(FF)V	func_435_b	moveEntityWithHeading
 M	ls	p	()Z	func_429_A	isOnLadder
@@ -2304,6 +2318,8 @@ M	ro	a	(III)V	func_22069_a	mouseClicked
 M	ro	a	(Z)V	func_27106_a	setFocused
 M	ro	c	()V	func_22067_c	drawTextBox
 M	ro	a	(I)V	func_22066_a	setMaxStringLength
+M	oq	d	(I)V	func_28043_c	setBlockBoundsForBlockRender
+M	oq	e	(I)Z	func_28041_d	isTrapdoorOpen
 M	ll	a	(Ljava/lang/Class;)Lje;	func_4144_a	getSpecialRendererForClass
 M	ll	a	(Low;)Z	func_1028_a	hasSpecialRenderer
 M	ll	b	(Low;)Lje;	func_1031_b	getSpecialRendererForEntity
@@ -2343,6 +2359,7 @@ M	uu	b	()I	func_210_f	getRenderType
 M	uu	a	(I)I	func_218_a	getBlockTextureFromSide
 M	uu	b	(Lfd;IIII)V	func_226_a	onNeighborBlockChange
 M	uu	a	(Lfd;IIILgs;)Z	func_250_a	blockActivated
+M	uu	f	()Z	func_209_d	canProvidePower
 M	uu	a	(Lfd;IIILls;)V	func_4026_a	onBlockPlacedBy
 M	uu	c	(Lfd;III)V	func_235_e	onBlockAdded
 M	uu	c	()Z	func_217_b	isOpaqueCube
@@ -2363,6 +2380,7 @@ M	uu	a	(Lfd;IIILsn;)V	func_236_b	onEntityCollidedWithBlock
 M	uu	b_	()I	func_234_g	getRenderBlockPass
 M	uu	h	()I	func_31029_h	getMobilityFlag
 M	uu	e	()I	func_4025_d	tickRate
+M	uu	a	(Lxp;III)V	func_238_a	setBlockBoundsBasedOnState
 M	uu	g	()V	func_237_e	setBlockBoundsForItemRender
 M	uu	a	(IZ)Z	func_224_a	canCollideCheck
 M	uu	a	(Lfd;IIIIF)V	func_216_a	dropBlockAsItemWithChance
