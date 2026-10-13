@@ -187,6 +187,7 @@ function VM(opts) {
 	if (JVM.installAwt) JVM.installAwt(this);
 	if (JVM.installLibs) JVM.installLibs(this);
 	if (JVM.installStreams) JVM.installStreams(this);
+	if (JVM.installFastutil) JVM.installFastutil(this);
 	JVM.installReflect(this);
 	if (opts.install) opts.install(this);
 }
@@ -3555,6 +3556,32 @@ function installUtil(vm) {
 		'hashCode()I': function (vm, self) { var t = BigInt(self.$t); return Number(BigInt.asIntN(32, t ^ (t >> 32n))); },
 		'toString()Ljava/lang/String;': function (vm, self) { return new Date(self.$t).toString(); },
 	} });
+	var bits = function (self) { return self.$bits || (self.$bits = []); };
+	var bitLen = function (self) { var b = bits(self), n = b.length; while (n > 0 && !b[n - 1]) n--; return n; };
+	def('java/util/BitSet', { interfaces: ['java/lang/Cloneable', 'java/io/Serializable'], methods: {
+		'<init>()V': function (vm, self) { self.$bits = []; },
+		'<init>(I)V': function (vm, self, a) { if (a[0] < 0) vm.throwNew('java/lang/NegativeArraySizeException', 'nbits < 0: ' + a[0]); self.$bits = []; },
+		'get(I)Z': function (vm, self, a) { return bits(self)[a[0]] ? 1 : 0; },
+		'set(I)V': function (vm, self, a) { bits(self)[a[0]] = true; },
+		'set(IZ)V': function (vm, self, a) { bits(self)[a[0]] = !!a[1]; },
+		'set(II)V': function (vm, self, a) { for (var i = a[0]; i < a[1]; i++) bits(self)[i] = true; },
+		'clear(I)V': function (vm, self, a) { bits(self)[a[0]] = false; },
+		'clear()V': function (vm, self) { self.$bits = []; },
+		'flip(I)V': function (vm, self, a) { bits(self)[a[0]] = !bits(self)[a[0]]; },
+		'nextClearBit(I)I': function (vm, self, a) { var b = bits(self), i = Math.max(0, a[0]); while (b[i]) i++; return i; },
+		'nextSetBit(I)I': function (vm, self, a) { var b = bits(self), n = b.length; for (var i = Math.max(0, a[0]); i < n; i++) if (b[i]) return i; return -1; },
+		'cardinality()I': function (vm, self) { return bits(self).filter(Boolean).length; },
+		'length()I': function (vm, self) { return bitLen(self); },
+		'size()I': function (vm, self) { return Math.max(64, Math.ceil(bits(self).length / 64) * 64); },
+		'isEmpty()Z': function (vm, self) { return bitLen(self) ? 0 : 1; },
+		'or(Ljava/util/BitSet;)V': function (vm, self, a) { var o = bits(a[0]); for (var i = 0; i < o.length; i++) if (o[i]) bits(self)[i] = true; },
+		'and(Ljava/util/BitSet;)V': function (vm, self, a) { var b = bits(self), o = bits(a[0]); for (var i = 0; i < b.length; i++) b[i] = !!(b[i] && o[i]); },
+		'andNot(Ljava/util/BitSet;)V': function (vm, self, a) { var b = bits(self), o = bits(a[0]); for (var i = 0; i < b.length; i++) if (o[i]) b[i] = false; },
+		'clone()Ljava/lang/Object;': function (vm, self) { var c = vm.newObject(self.cls); c.$bits = bits(self).slice(); return c; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { if (!a[0] || !a[0].$bits && a[0].cls !== self.cls) return 0; var n = Math.max(bitLen(self), bitLen(a[0])); for (var i = 0; i < n; i++) if (!!bits(self)[i] !== !!bits(a[0])[i]) return 0; return 1; },
+		'hashCode()I': function (vm, self) { var h = 1234; bits(self).forEach(function (v, i) { if (v) h = (h * 31 + i) | 0; }); return h; },
+		'toString()Ljava/lang/String;': function (vm, self) { var out = []; bits(self).forEach(function (v, i) { if (v) out.push(i); }); return '{' + out.join(', ') + '}'; },
+	} });
 	def('java/util/PriorityQueue', { super: 'java/util/AbstractCollection', interfaces: ['java/util/Queue'], methods: {
 		'<init>()V': function (vm, self) { self.$list = []; },
 		'<init>(I)V': function (vm, self) { self.$list = []; },
@@ -5751,6 +5778,150 @@ JVM.installLibs = installLibs;
 (function () {
 'use strict';
 
+var FU = 'it/unimi/dsi/fastutil/', OBJ = 'Ljava/lang/Object;';
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	var sub = function (name, sup, extra) {
+		var sp = vm.natives[sup];
+		if (!sp || vm.natives[FU + name]) return;
+		var m = {};
+		Object.keys(sp.methods || {}).forEach(function (k) { if (k.indexOf('<init>') === 0) m[k] = sp.methods[k]; });
+		Object.assign(m, extra || {});
+		vm.defineNative(FU + name, { super: sup, methods: m, staticMethods: (extra && extra.$static) || {} });
+		delete m.$static;
+	};
+	var call = function (vm, self, n, d, a) { return vm.callVirtual(self, n, d, a); };
+	var box = function (vm, v, t) { return JVM.box(vm, v, t); };
+	var unbox = function (v) { return v && typeof v === 'object' && v.$box !== undefined ? JVM.unbox(v) : v; };
+	var HG = '(' + OBJ + ')' + OBJ, HP = '(' + OBJ + OBJ + ')' + OBJ;
+
+	var entrySets = function (names) {
+		var o = {};
+		names.forEach(function (n) { o[n + 'EntrySet()L' + FU + 'objects/ObjectSet;'] = function (vm, self) { return call(vm, self, 'entrySet', '()Ljava/util/Set;', []); }; });
+		o['defaultReturnValue(Ljava/lang/Object;)V'] = function (vm, self, a) { self.$dflt = a[0]; };
+		o['defaultReturnValue()Ljava/lang/Object;'] = function (vm, self) { return self.$dflt === undefined ? null : self.$dflt; };
+		return o;
+	};
+	[['Object2Object', 'java/util/HashMap'], ['Reference2Object', 'java/util/HashMap'], ['Object2Reference', 'java/util/HashMap'], ['Reference2Reference', 'java/util/HashMap']].forEach(function (p) {
+		var es = entrySets([p[0].charAt(0).toLowerCase() + p[0].slice(1)]);
+		sub('objects/' + p[0] + 'OpenHashMap', p[1], es);
+		sub('objects/' + p[0] + 'LinkedOpenHashMap', 'java/util/LinkedHashMap', es);
+		sub('objects/' + p[0] + 'ArrayMap', 'java/util/LinkedHashMap', es);
+	});
+	['Object', 'Reference'].forEach(function (k) {
+		sub('objects/' + k + 'OpenHashSet', 'java/util/HashSet');
+		sub('objects/' + k + 'LinkedOpenHashSet', 'java/util/LinkedHashSet');
+		sub('objects/' + k + 'ArraySet', 'java/util/LinkedHashSet');
+		var LN = FU + 'objects/' + k + 'ArrayList', fromArr = function (vm, arr, n) {
+			var l = vm.newObject(vm.loadClass(LN)); call(vm, l, '<init>', '()V', []);
+			var a = arr ? arr.a : [], len = n == null ? a.length : Math.min(n, a.length);
+			for (var i = 0; i < len; i++) call(vm, l, 'add', '(' + OBJ + ')Z', [a[i]]);
+			return l;
+		};
+		var st = {};
+		st['wrap([Ljava/lang/Object;)L' + LN + ';'] = function (vm, n, a) { return fromArr(vm, a[0]); };
+		st['wrap([Ljava/lang/Object;I)L' + LN + ';'] = function (vm, n, a) { return fromArr(vm, a[0], a[1]); };
+		st['of([Ljava/lang/Object;)L' + LN + ';'] = function (vm, n, a) { return fromArr(vm, a[0]); };
+		sub('objects/' + k + 'ArrayList', 'java/util/ArrayList', { $static: st,
+			'<init>([Ljava/lang/Object;)V': function (vm, self, a) { call(vm, self, '<init>', '()V', []); Array.prototype.forEach.call(a[0] ? a[0].a : [], function (x) { call(vm, self, 'add', '(' + OBJ + ')Z', [x]); }); },
+			'elements()[Ljava/lang/Object;': function (vm, self) { return call(vm, self, 'toArray', '()[Ljava/lang/Object;', []); },
+		});
+	});
+
+	var PRIM = { I: ['Int', 0], J: ['Long', 0], Z: ['Boolean', 0], F: ['Float', 0], D: ['Double', 0] };
+	var dflt = function (self, t) { return self.$dflt !== undefined ? self.$dflt : PRIM[t] ? PRIM[t][1] : null; };
+	var outV = function (self, v, t) { return v == null ? dflt(self, t) : t.length === 1 ? unbox(v) : v; };
+	var inV = function (vm, v, t) { return t.length === 1 ? box(vm, v, t) : v; };
+	var has = function (vm, self, k) { return call(vm, self, 'containsKey', '(' + OBJ + ')Z', [k]); };
+	var primMap = function (kName, kt, vName, vt) {
+		var KD = kt === 'L' ? OBJ : kt, VD = vt === 'L' ? OBJ : vt;
+		var K = function (vm, k) { return kt === 'L' ? k : box(vm, k, kt); };
+		var m = {}, getName = vt === 'L' ? 'get' : 'get' + PRIM[vt][0];
+		var get = function (vm, self, a) { var k = K(vm, a[0]); return has(vm, self, k) ? outV(self, call(vm, self, 'get', HG, [k]), vt === 'L' ? OBJ : vt) : dflt(self, vt); };
+		m[getName + '(' + KD + ')' + VD] = get;
+		if (kt !== 'L') m['get(' + KD + ')' + VD] = get;
+		m['put(' + KD + VD + ')' + VD] = function (vm, self, a) { var k = K(vm, a[0]), had = has(vm, self, k), o = call(vm, self, 'put', HP, [k, inV(vm, a[1], vt === 'L' ? OBJ : vt)]); return had ? outV(self, o, vt === 'L' ? OBJ : vt) : dflt(self, vt); };
+		m['getOrDefault(' + KD + VD + ')' + VD] = function (vm, self, a) { var k = K(vm, a[0]); return has(vm, self, k) ? outV(self, call(vm, self, 'get', HG, [k]), vt === 'L' ? OBJ : vt) : a[1]; };
+		if (kt !== 'L') {
+			m['containsKey(' + KD + ')Z'] = function (vm, self, a) { return has(vm, self, K(vm, a[0])); };
+			m['remove(' + KD + ')' + VD] = function (vm, self, a) { var k = K(vm, a[0]), had = has(vm, self, k), o = call(vm, self, 'remove', HG, [k]); return had ? outV(self, o, vt === 'L' ? OBJ : vt) : dflt(self, vt); };
+		}
+		if (vt !== 'L') {
+			m['remove' + PRIM[vt][0] + '(' + KD + ')' + VD] = function (vm, self, a) { var k = K(vm, a[0]), had = has(vm, self, k), o = call(vm, self, 'remove', HG, [k]); return had ? outV(self, o, vt) : dflt(self, vt); };
+			m['containsValue(' + VD + ')Z'] = function (vm, self, a) { return call(vm, self, 'containsValue', '(' + OBJ + ')Z', [box(vm, a[0], vt)]); };
+			m['addTo(' + KD + VD + ')' + VD] = function (vm, self, a) { var k = K(vm, a[0]), o = has(vm, self, k) ? unbox(call(vm, self, 'get', HG, [k])) : dflt(self, vt); call(vm, self, 'put', HP, [k, box(vm, o + a[1], vt)]); return o; };
+		}
+		m['defaultReturnValue(' + VD + ')V'] = function (vm, self, a) { self.$dflt = a[0]; };
+		m['defaultReturnValue()' + VD] = function (vm, self) { return dflt(self, vt); };
+		var es = kName.charAt(0).toLowerCase() + kName.slice(1) + '2' + vName + 'EntrySet()L' + FU + 'objects/ObjectSet;';
+		m[es] = function (vm, self) { return call(vm, self, 'entrySet', '()Ljava/util/Set;', []); };
+		var pkg = kt === 'L' ? 'objects/' : kName.toLowerCase() + 's/';
+		sub(pkg + kName + '2' + vName + 'OpenHashMap', 'java/util/HashMap', m);
+		sub(pkg + kName + '2' + vName + 'LinkedOpenHashMap', 'java/util/LinkedHashMap', m);
+		sub(pkg + kName + '2' + vName + 'ArrayMap', 'java/util/LinkedHashMap', m);
+	};
+	primMap('Int', 'I', 'Object', 'L'); primMap('Int', 'I', 'Int', 'I'); primMap('Int', 'I', 'Boolean', 'Z'); primMap('Int', 'I', 'Float', 'F');
+	primMap('Int', 'I', 'Double', 'D'); primMap('Int', 'I', 'Long', 'J'); primMap('Long', 'J', 'Object', 'L'); primMap('Long', 'J', 'Int', 'I');
+	primMap('Object', 'L', 'Int', 'I'); primMap('Object', 'L', 'Boolean', 'Z'); primMap('Object', 'L', 'Float', 'F'); primMap('Object', 'L', 'Double', 'D');
+	primMap('Object', 'L', 'Long', 'J'); primMap('Reference', 'L', 'Int', 'I'); primMap('Reference', 'L', 'Boolean', 'Z');
+	[['Int', 'I'], ['Long', 'J'], ['Float', 'F'], ['Double', 'D']].forEach(function (p) {
+		var N = p[0], t = p[1], pkg = N.toLowerCase() + 's/', LN = FU + pkg + N + 'ArrayList';
+		var toArr = function (vm, self) { var a = call(vm, self, 'toArray', '()[Ljava/lang/Object;', []).a, r = vm.newArray(t, a.length); for (var i = 0; i < a.length; i++) r.a[i] = unbox(a[i]); return r; };
+		var addAll = function (vm, self, arr, n) { var a = arr ? arr.a : [], len = n == null ? a.length : Math.min(n, a.length); for (var i = 0; i < len; i++) call(vm, self, 'add', '(' + OBJ + ')Z', [box(vm, a[i], t)]); };
+		var lm = {};
+		lm['<init>([' + t + ')V'] = function (vm, self, a) { call(vm, self, '<init>', '()V', []); addAll(vm, self, a[0]); };
+		lm['add(' + t + ')Z'] = function (vm, self, a) { return call(vm, self, 'add', '(' + OBJ + ')Z', [box(vm, a[0], t)]); };
+		lm['add(I' + t + ')V'] = function (vm, self, a) { call(vm, self, 'add', '(I' + OBJ + ')V', [a[0], box(vm, a[1], t)]); };
+		lm['get' + N + '(I)' + t] = function (vm, self, a) { return unbox(call(vm, self, 'get', '(I)' + OBJ, [a[0]])); };
+		lm['set(I' + t + ')' + t] = function (vm, self, a) { return unbox(call(vm, self, 'set', '(I' + OBJ + ')' + OBJ, [a[0], box(vm, a[1], t)])); };
+		lm['remove' + N + '(I)' + t] = function (vm, self, a) { return unbox(call(vm, self, 'remove', '(I)' + OBJ, [a[0]])); };
+		lm['contains(' + t + ')Z'] = function (vm, self, a) { return call(vm, self, 'contains', '(' + OBJ + ')Z', [box(vm, a[0], t)]); };
+		lm['indexOf(' + t + ')I'] = function (vm, self, a) { return call(vm, self, 'indexOf', '(' + OBJ + ')I', [box(vm, a[0], t)]); };
+		lm['to' + N + 'Array()[' + t] = toArr;
+		lm['toArray()[' + t] = toArr;
+		lm['elements()[' + t] = toArr;
+		lm.$static = {};
+		lm.$static['wrap([' + t + ')L' + LN + ';'] = function (vm, n, a) { var l = vm.newObject(vm.loadClass(LN)); call(vm, l, '<init>', '()V', []); addAll(vm, l, a[0]); return l; };
+		lm.$static['wrap([' + t + 'I)L' + LN + ';'] = function (vm, n, a) { var l = vm.newObject(vm.loadClass(LN)); call(vm, l, '<init>', '()V', []); addAll(vm, l, a[0], a[1]); return l; };
+		lm.$static['of([' + t + ')L' + LN + ';'] = lm.$static['wrap([' + t + ')L' + LN + ';'];
+		sub(pkg + N + 'ArrayList', 'java/util/ArrayList', lm);
+		var sm = {};
+		sm['add(' + t + ')Z'] = function (vm, self, a) { return call(vm, self, 'add', '(' + OBJ + ')Z', [box(vm, a[0], t)]); };
+		sm['contains(' + t + ')Z'] = function (vm, self, a) { return call(vm, self, 'contains', '(' + OBJ + ')Z', [box(vm, a[0], t)]); };
+		sm['remove(' + t + ')Z'] = function (vm, self, a) { return call(vm, self, 'remove', '(' + OBJ + ')Z', [box(vm, a[0], t)]); };
+		sm['rem(' + t + ')Z'] = sm['remove(' + t + ')Z'];
+		sm['to' + N + 'Array()[' + t] = toArr;
+		sm['toArray()[' + t] = toArr;
+		sm['<init>([' + t + ')V'] = function (vm, self, a) { call(vm, self, '<init>', '()V', []); addAll(vm, self, a[0]); };
+		sub(pkg + N + 'OpenHashSet', 'java/util/HashSet', sm);
+		sub(pkg + N + 'LinkedOpenHashSet', 'java/util/LinkedHashSet', sm);
+		sub(pkg + N + 'ArraySet', 'java/util/LinkedHashSet', sm);
+	});
+	var IT = vm.natives['java/util/Iterator'];
+	if (IT) {
+		IT.methods = Object.assign({}, IT.methods || {});
+		Object.keys(PRIM).forEach(function (t) {
+			var k = 'next' + PRIM[t][0] + '()' + t;
+			if (!IT.methods[k]) IT.methods[k] = function (vm, self) { return unbox(call(vm, self, 'next', '()' + OBJ, [])); };
+		});
+	}
+	var EN = vm.natives['java/util/Map$Entry'];
+	if (EN) {
+		EN.methods = Object.assign({}, EN.methods || {});
+		Object.keys(PRIM).forEach(function (t) {
+			var n = PRIM[t][0];
+			if (!EN.methods['get' + n + 'Key()' + t]) EN.methods['get' + n + 'Key()' + t] = function (vm, self) { return unbox(call(vm, self, 'getKey', '()' + OBJ, [])); };
+			if (!EN.methods['get' + n + 'Value()' + t]) EN.methods['get' + n + 'Value()' + t] = function (vm, self) { return unbox(call(vm, self, 'getValue', '()' + OBJ, [])); };
+		});
+	}
+}
+JVM.installFastutil = install;
+})();
+
+(function () {
+'use strict';
+
 var OBJ = 'Ljava/lang/Object;', SC = 'mcre/Stream', S = 'Ljava/util/stream/Stream;';
 var IS = 'Ljava/util/stream/IntStream;', LS = 'Ljava/util/stream/LongStream;', DS = 'Ljava/util/stream/DoubleStream;';
 
@@ -6388,6 +6559,7 @@ function installMc152(vm) {
 			'<init>(Lnet/minecraft/src/MapColor;)V': function (vm, self) { self.$name = self.$name || 'custom'; },
 			'isSolid()Z': function (vm, self) { return ['air', 'water', 'lava', 'plants', 'vine', 'fire', 'circuits', 'snow', 'portal', 'web'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'isLiquid()Z': function (vm, self) { return self.$name === 'water' || self.$name === 'lava' ? 1 : 0; },
+			'blocksMovement()Z': function (vm, self) { return ['air', 'water', 'lava', 'plants', 'vine', 'fire', 'circuits', 'snow', 'portal', 'web'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'isOpaque()Z': function (vm, self) { return ['glass', 'leaves', 'ice', 'air'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'getCanBurn()Z': function (vm, self) { return ['wood', 'leaves', 'cloth', 'tnt', 'plants', 'vine'].indexOf(self.$name) >= 0 ? 1 : 0; },
 			'setRequiresTool()Lnet/minecraft/src/Material;': function (vm, self) { self.$tool = true; return self; },
@@ -7478,12 +7650,20 @@ JVM.collectContent = function (vm, modId) {
 			if (kind.light && !json.light) json.light = kind.light;
 		}
 		if (rtype === 1) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
+		var sshape = JVM.stateShapeOf(vm, b);
+		if (sshape) { json.shape = sshape; json.collision = sshape === 'ladder'; json.transparent = true; }
 		var tint = blockTint(b, id, meta, json.shape === 'cross');
 		if (tint) json.tint = tint;
-		if (JVM.recordBlock) {
+		if (/^(grass|foliage|tallgrass)$/.test(tint || '')) {
+			var unbaked = false;
+			Object.keys(faces).forEach(function (f) { var t0 = out.textures['blocks/' + faces[f]]; if (t0 && t0.base && t0.tint != null) { faces[f] = t0.base; unbaked = true; } });
+			if (unbaked) { var uq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }); json.texture = uq.length === 1 ? uq[0] : faces; }
+		}
+		if (JVM.recordBlock && !sshape) {
 			var rq = safe(function () { return JVM.recordBlock(vm, b, id, meta, modId); }, null);
 			if (rq) {
 				var jq = JVM.quadsJson(vm, rq, function (icon) { var t = tex(icon); if (!t) return null; if (!t.vanilla) out.textures['blocks/' + t.name] = t; return t.name; }, out, 'b' + id, vm.resources);
+				if (rq.$modelQuads) { jq = rq.$modelQuads.concat(jq); (rq.$modelTextures || []).forEach(function (t) { out.textures['blocks/' + t.name] = t; }); }
 				var cube = jq.length === 6 && jq.every(function (q) { var xs = q.p.map(function (v) { return v[0]; }), ys = q.p.map(function (v) { return v[1]; }), zs = q.p.map(function (v) { return v[2]; });
 					var span = function (a) { return Math.max.apply(null, a) - Math.min.apply(null, a); };
 					var flat = [span(xs), span(ys), span(zs)].filter(function (v) { return v < 0.01; }).length === 1;
@@ -7541,7 +7721,7 @@ JVM.collectContent = function (vm, modId) {
 		if (flc && vm.isInstance(b, flc)) json.neighbor_updates = true;
 		['BlockReed', 'BlockCactus'].forEach(function (n) { if (vm.natives[SRC + n] && vm.isInstance(b, vm.loadClass(SRC + n))) json.neighbor_updates = true; });
 		if (overrides(b, ['onEntityCollidedWithBlock(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V'])) json.entity_inside = true;
-		if (overrides(b, ['getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;'])) {
+		if (!sshape && overrides(b, ['getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;'])) {
 			vm.$defTile = { x: 0, y: 64, z: 0, id: id, data: meta };
 			var cbb = safe(function () { return vm.callVirtual(b, 'getCollisionBoundingBoxFromPool', '(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;', [JVM.mc152.worldObj(vm), 0, 64, 0]); }, undefined);
 			vm.$defTile = null;
@@ -7760,6 +7940,7 @@ JVM.variantsOf = function (vm, o) {
 	var out = [0];
 	o.$variants = out;
 	var isBlock = vm.isInstance(o, vm.loadClass(SRC + 'Block'));
+	if (isBlock && JVM.stateShapeOf(vm, o)) return o.$variants;
 	if (isBlock && o.$stId && JVM.stationState && (JVM.tagOf ? JVM.tagOf(vm, o.$mod) : vm.$tag) === 'babric' && !o.$stConnected) {
 		var n = 0;
 		JVM.run(vm, function () { n = JVM.stationState.stateCount(vm, o); });
@@ -7796,6 +7977,38 @@ JVM.variantsOf = function (vm, o) {
 		o.$variants = metas.slice(0, isBlock ? 16 : 64);
 	}
 	return o.$variants;
+};
+JVM.stateShapeOf = function (vm, o) {
+	if (!o || o.$stateShape !== undefined) return o ? o.$stateShape : null;
+	o.$stateShape = null;
+	if (!o.cls || o.$stStates || o.$stConnected || o.$override || typeof o[':blockID'] !== 'number' || !vm.isInstance(o, vm.loadClass(SRC + 'Block'))) return null;
+	var own = function (k) { var m = o.cls.findMethod(k); return !!(m && !m.cls.native); };
+	var rt = 0;
+	JVM.run(vm, function () { rt = vm.callVirtual(o, 'getRenderType', '()I', []); });
+	var vine = rt === 20;
+	if (!vine && vm.natives[SRC + 'BlockVine']) vine = vm.isInstance(o, vm.loadClass(SRC + 'BlockVine'));
+	if (vine) return (o.$stateShape = 'vine');
+	if ((rt === 8 || rt === 2) && own('getRenderType()I') && !own('getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V') &&
+		['onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I', 'updateBlockMetadata(Lnet/minecraft/src/World;IIIIFFF)V', 'onBlockAdded(Lnet/minecraft/src/World;III)V'].some(own))
+		o.$stateShape = rt === 8 ? 'ladder' : 'torch';
+	return o.$stateShape;
+};
+JVM.stateBlockOf = function (vm, mod, name) {
+	var r = reg(vm), id = JVM.contentId(vm, mod, name), o = id != null && r ? r.blocks[id] : null;
+	if (!o || o.$mod !== mod || !JVM.stateShapeOf(vm, o)) return null;
+	return JVM.contentName(vm, id, 0) === name ? o : null;
+};
+JVM.statePlaced = function (vm, blk, world, x, y, z, face) {
+	if (!JVM.stateShapeOf(vm, blk)) return false;
+	var side = face == null ? 1 : face | 0;
+	JVM.run(vm, function () {
+		var pm = blk.cls.findMethod('onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I');
+		var m = pm ? vm.invoke(pm, blk, [world, x, y, z, side, 0.5, 0.5, 0.5, 0]) : 0;
+		if (typeof m === 'number' && m > 0) vm.callVirtual(world, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m & 15, 3]);
+		var um = blk.cls.findMethod('updateBlockMetadata(Lnet/minecraft/src/World;IIIIFFF)V');
+		if (um && !um.cls.native) vm.invoke(um, blk, [world, x, y, z, side, 0.5, 0.5, 0.5]);
+	});
+	return true;
 };
 JVM.installMc152 = installMc152;
 JVM.mc152 = { entityInit: function (vm, self) { if (entityInitOf) entityInitOf(vm, self); }, minecraftObj: function (vm) { return vm.$minecraftObj ? vm.$minecraftObj(vm) : null; }, worldObj: worldObj, playerObj: playerObj, heldStack: heldStack, reg: reg, newStack: function (vm, id, n, d) { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = id; s[':stackSize'] = n; s[':itemDamage'] = d; return s; } };
@@ -10375,6 +10588,54 @@ function install(vm) {
 		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
 	} });
 
+	var vineHolds = function (i) { return i > 0 && opaque(i) && !NONSOLID[matName(i)]; };
+	var VINE_DIRS = [[0, 1], [-1, 0], [0, -1], [1, 0]];
+	def('BlockVine', { super: SRC + 'Block', methods: {
+		'<init>(I)V': function (vm, self, a) {
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+			if (k) vm.invoke(k, self, [a[0], mc.statics.vine || plantsMat()]);
+			self[':needsRandomTick'] = 1;
+		},
+		'getRenderType()I': function () { return 20; },
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'canPlaceBlockOnSide(Lnet/minecraft/src/World;IIII)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			switch (a[4]) {
+			case 1: return vineHolds(id(w, x, y + 1, z)) ? 1 : 0;
+			case 2: return vineHolds(id(w, x, y, z + 1)) ? 1 : 0;
+			case 3: return vineHolds(id(w, x, y, z - 1)) ? 1 : 0;
+			case 4: return vineHolds(id(w, x + 1, y, z)) ? 1 : 0;
+			case 5: return vineHolds(id(w, x - 1, y, z)) ? 1 : 0;
+			default: return 0;
+			}
+		},
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var b = { 2: 1, 3: 4, 4: 8, 5: 2 }[a[4]];
+			return b || a[8];
+		},
+		'func_72150_l(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], m = meta(w, x, y, z), n = m, bid = self[':blockID'];
+			if (n > 0) for (var d = 0; d < 4; ++d) {
+				var bit = 1 << d;
+				if ((m & bit) && !vineHolds(id(w, x + VINE_DIRS[d][0], y, z + VINE_DIRS[d][1])) && (id(w, x, y + 1, z) !== bid || !(meta(w, x, y + 1, z) & bit))) n &= ~bit;
+			}
+			if (n === 0 && !vineHolds(id(w, x, y + 1, z))) return 0;
+			if (n !== m) vm.callVirtual(w, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, n, 2]);
+			return 1;
+		},
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (vm.callVirtual(self, 'func_72150_l', '(Lnet/minecraft/src/World;III)Z', [w, x, y, z])) return;
+			vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [w, x, y, z, meta(w, x, y, z), 0]);
+			put(w, x, y, z, 0, 0, 3);
+		},
+		'idDropped(ILjava/util/Random;I)I': function () { return 0; },
+		'quantityDropped(Ljava/util/Random;)I': function () { return 0; },
+	} });
+
 	var WG = SRC + 'WorldGenerator';
 	var superInit = function (self, notify) { self[':doBlockNotify'] = notify ? 1 : 0; };
 	var gset = function (self, w, x, y, z, b, m) { put(w, x, y, z, b, m, self[':doBlockNotify'] ? 3 : 2); };
@@ -11742,6 +12003,3229 @@ JVM.entityInside = function (vm, blk, world, x, y, z, e, playerObj) {
 'use strict';
 
 var SRC = 'net/minecraft/src/';
+var F = Math.fround;
+var FPI = F(Math.PI), HPI = F(FPI / 2);
+
+var ML = 0xECE66D, MH = 0x5DE, T24 = 16777216, POW = [];
+for (var pb = 0; pb <= 48; pb++) POW[pb] = Math.pow(2, pb);
+var MASK48 = (1n << 48n) - 1n, MULT = 0x5DEECE66Dn;
+var VMR = null;
+function jrSeed(r, s) {
+	s = (BigInt.asIntN(64, s) ^ MULT) & MASK48;
+	r.$hi = Number(s >> 24n); r.$lo = Number(s & 0xFFFFFFn); r.$gauss = undefined;
+}
+function jrNext(r, bits) {
+	var lo = r.$lo * ML + 0xB, carry = Math.floor(lo / T24);
+	lo -= carry * T24;
+	var hi = (r.$hi * ML + r.$lo * MH + carry) % T24;
+	r.$hi = hi; r.$lo = lo;
+	return Math.floor((hi * T24 + lo) / POW[48 - bits]) | 0;
+}
+function fast(r) { return !r.cls || r.cls === VMR; }
+var VMH = null;
+function rInt(r, n) {
+	if (!fast(r)) return VMH.callVirtual(r, 'nextInt', '(I)I', [n]);
+	if (n <= 0) VMH.throwNew('java/lang/IllegalArgumentException', 'n must be positive');
+	if ((n & -n) === n) return Math.floor(jrNext(r, 31) / (2147483648 / n));
+	var bits, val;
+	do { bits = jrNext(r, 31); val = bits % n; } while (bits - val + (n - 1) > 2147483647);
+	return val;
+}
+function rInt0(r) { return fast(r) ? jrNext(r, 32) : VMH.callVirtual(r, 'nextInt', '()I', []); }
+function rFloat(r) { return fast(r) ? jrNext(r, 24) / 16777216 : VMH.callVirtual(r, 'nextFloat', '()F', []); }
+function rDouble(r) { return fast(r) ? (jrNext(r, 26) * 134217728 + jrNext(r, 27)) / 9007199254740992 : VMH.callVirtual(r, 'nextDouble', '()D', []); }
+function rBool(r) { return fast(r) ? jrNext(r, 1) !== 0 : !!VMH.callVirtual(r, 'nextBoolean', '()Z', []); }
+function rLong(r) {
+	if (!fast(r)) return VMH.callVirtual(r, 'nextLong', '()J', []);
+	return BigInt.asIntN(64, (BigInt(jrNext(r, 32)) << 32n) + BigInt(jrNext(r, 32)));
+}
+function rSetSeed(r, s) { if (fast(r)) jrSeed(r, s); else VMH.callVirtual(r, 'setSeed', '(J)V', [s]); }
+function jRandom(seed) { var r = { $hi: 0, $lo: 0 }; jrSeed(r, seed); return r; }
+function rRange(r, a, b) { return a >= b ? a : rInt(r, b - a + 1) + a; }
+
+var SIN = null;
+function mhSin(f) {
+	if (!SIN) { SIN = new Float32Array(65536); for (var i = 0; i < 65536; i++) SIN[i] = Math.sin(i * Math.PI * 2 / 65536); }
+	return SIN[(F(F(f) * F(10430.378)) | 0) & 65535];
+}
+function mhCos(f) { if (!SIN) mhSin(0); return SIN[(F(F(F(f) * F(10430.378)) + 16384) | 0) & 65535]; }
+function floorD(d) { var i = d | 0; return d < i ? i - 1 : i; }
+function idiv(a, b) { return (a / b) | 0; }
+
+function ov(o, key) {
+	var c = o.cls, t = c.$ovs || (c.$ovs = Object.create(null)), m = t[key];
+	if (m === undefined) { var f = c.findMethod(key); m = t[key] = f && !f.cls.native ? f : null; }
+	return m;
+}
+
+function install(vm) {
+	VMH = vm;
+	VMR = vm.loadClass('java/util/Random');
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var newRandom = function () { var r = vm.newObject(VMR); vm.callVirtual(r, '<init>', '()V', []); return r; };
+	var seedOf = function (w) { return BigInt.asIntN(64, BigInt(vm.callVirtual(w, 'getSeed', '()J', []))); };
+	var topBlockAt = function (w, x, z) {
+		var b = vm.callVirtual(w, 'getBiomeGenForCoords', '(II)Lnet/minecraft/src/BiomeGenBase;', [x, z]);
+		var t = b ? b[':topBlock'] : 2;
+		return t == null ? 2 : t;
+	};
+
+	var RG = 'recursiveGenerate(Lnet/minecraft/src/World;IIII[B)V';
+	def('MapGenBase', { fields: { range: 'I', rand: 'Ljava/util/Random;', worldObj: 'L' + SRC + 'World;' }, methods: {
+		'<init>()V': function (vm, self) { self[':range'] = 8; self[':rand'] = newRandom(); },
+		'generate(Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/World;II[B)V': function (vm, self, a) {
+			var w = a[1], cx = a[2], cz = a[3], blocks = a[4], range = self[':range'];
+			self[':worldObj'] = w;
+			var r = self[':rand'], seed = seedOf(w);
+			rSetSeed(r, seed);
+			var l1 = rLong(r), l2 = rLong(r);
+			var m = ov(self, RG), impl = self.cls.$rg || (self.cls.$rg = findImpl(self.cls));
+			for (var x = cx - range; x <= cx + range; x++) for (var z = cz - range; z <= cz + range; z++) {
+				rSetSeed(r, BigInt.asIntN(64, BigInt(x) * l1) ^ BigInt.asIntN(64, BigInt(z) * l2) ^ seed);
+				if (m) vm.invoke(m, self, [w, x, z, cx, cz, blocks]);
+				else if (impl) impl(vm, self, w, x, z, cx, cz, blocks);
+			}
+		},
+		[RG]: function () {},
+	} });
+	var findImpl = function (cls) {
+		for (var c = cls; c; c = c.superClass) if (c.native && c.spec && c.spec.$rg) return c.spec.$rg;
+		return null;
+	};
+
+	var GCN = 'generateCaveNode(JII[BDDDFFFIID)V';
+	var caveNode = function (self, seed, cx, cz, b, x, y, z, size, yaw, pitch, i, end, yScale) {
+		var m = ov(self, GCN);
+		if (m) { vm.invoke(m, self, [seed, cx, cz, b, x, y, z, size, yaw, pitch, i, end, yScale]); return; }
+		var midX = cx * 16 + 8, midZ = cz * 16 + 8;
+		var dYaw = 0, dPitch = 0;
+		var r = jRandom(seed);
+		if (end <= 0) { var span = self[':range'] * 16 - 16; end = span - rInt(r, idiv(span, 4)); }
+		var room = false;
+		if (i === -1) { i = idiv(end, 2); room = true; }
+		var branchAt = rInt(r, idiv(end, 2)) + idiv(end, 4);
+		var steep = rInt(r, 6) === 0;
+		var bytes = b ? b.a : null;
+		for (; i < end; i++) {
+			var w = 1.5 + F(F(mhSin(F(F(i * FPI) / end)) * size) * 1);
+			var h = w * yScale;
+			var cp = mhCos(pitch), sp = mhSin(pitch);
+			x += F(mhCos(yaw) * cp);
+			y += sp;
+			z += F(mhSin(yaw) * cp);
+			pitch = steep ? F(pitch * F(0.92)) : F(pitch * F(0.7));
+			pitch = F(pitch + F(dPitch * F(0.1)));
+			yaw = F(yaw + F(dYaw * F(0.1)));
+			dPitch = F(dPitch * F(0.9));
+			dYaw = F(dYaw * F(0.75));
+			var f1 = rFloat(r), f2 = rFloat(r), f3 = rFloat(r);
+			dPitch = F(dPitch + F(F(F(f1 - f2) * f3) * 2));
+			f1 = rFloat(r); f2 = rFloat(r); f3 = rFloat(r);
+			dYaw = F(dYaw + F(F(F(f1 - f2) * f3) * 4));
+			if (!room && i === branchAt && size > 1 && end > 0) {
+				var s1 = rLong(r), z1 = F(F(rFloat(r) * 0.5) + 0.5);
+				caveNode(self, s1, cx, cz, b, x, y, z, z1, F(yaw - HPI), F(pitch / 3), i, end, 1);
+				var s2 = rLong(r), z2 = F(F(rFloat(r) * 0.5) + 0.5);
+				caveNode(self, s2, cx, cz, b, x, y, z, z2, F(yaw + HPI), F(pitch / 3), i, end, 1);
+				return;
+			}
+			if (!room && rInt(r, 4) === 0) continue;
+			var ddx = x - midX, ddz = z - midZ, left = end - i, reach = F(F(size + 2) + 16);
+			if (ddx * ddx + ddz * ddz - left * left > reach * reach) return;
+			if (x < midX - 16 - w * 2 || z < midZ - 16 - w * 2 || x > midX + 16 + w * 2 || z > midZ + 16 + w * 2) continue;
+			if (!bytes) continue;
+			if (carve(self, bytes, cx, cz, x, y, z, w, h, null) && room) break;
+		}
+	};
+	var carve = function (self, bytes, cx, cz, x, y, z, w, h, rows) {
+		var x0 = floorD(x - w) - cx * 16 - 1, x1 = floorD(x + w) - cx * 16 + 1;
+		var y0 = floorD(y - h) - 1, y1 = floorD(y + h) + 1;
+		var z0 = floorD(z - w) - cz * 16 - 1, z1 = floorD(z + w) - cz * 16 + 1;
+		if (x0 < 0) x0 = 0; if (x1 > 16) x1 = 16;
+		if (y0 < 1) y0 = 1; if (y1 > 120) y1 = 120;
+		if (z0 < 0) z0 = 0; if (z1 > 16) z1 = 16;
+		var water = false, i, j, k;
+		for (i = x0; !water && i < x1; i++) for (k = z0; !water && k < z1; k++) for (j = y1 + 1; !water && j >= y0 - 1; j--) {
+			if (j >= 0 && j < 128) {
+				var v = bytes[(i * 16 + k) * 128 + j];
+				if (v === 8 || v === 9) water = true;
+				if (j !== y0 - 1 && i !== x0 && i !== x1 - 1 && k !== z0 && k !== z1 - 1) j = y0;
+			}
+		}
+		if (water) return false;
+		for (i = x0; i < x1; i++) {
+			var dx = (i + cx * 16 + 0.5 - x) / w;
+			for (k = z0; k < z1; k++) {
+				var dz = (k + cz * 16 + 0.5 - z) / w;
+				var p = (i * 16 + k) * 128 + y1, grass = false;
+				if (dx * dx + dz * dz < 1) {
+					for (j = y1 - 1; j >= y0; j--) {
+						var dy = (j + 0.5 - y) / h;
+						if (rows ? (dx * dx + dz * dz) * rows[j] + dy * dy / 6 < 1 : dy > -0.7 && dx * dx + dy * dy + dz * dz < 1) {
+							var id = bytes[p];
+							if (id === 2) grass = true;
+							if (id === 1 || id === 3 || id === 2) {
+								if (j < 10) bytes[p] = 10;
+								else {
+									bytes[p] = 0;
+									if (grass && bytes[p - 1] === 3) bytes[p - 1] = topBlockAt(self[':worldObj'], i + cx * 16, k + cz * 16);
+								}
+							}
+						}
+						p--;
+					}
+				}
+			}
+		}
+		return true;
+	};
+	var cavesRG = function (vm, self, w, x, z, cx, cz, b) {
+		var r = self[':rand'];
+		var n = rInt(r, rInt(r, rInt(r, 40) + 1) + 1);
+		if (rInt(r, 15) !== 0) n = 0;
+		for (var i = 0; i < n; i++) {
+			var px = x * 16 + rInt(r, 16), py = rInt(r, rInt(r, 120) + 8), pz = z * 16 + rInt(r, 16);
+			var tunnels = 1;
+			if (rInt(r, 4) === 0) {
+				var ls = rLong(r);
+				largeNode(self, ls, cx, cz, b, px, py, pz);
+				tunnels += rInt(r, 4);
+			}
+			for (var t = 0; t < tunnels; t++) {
+				var yaw = F(F(rFloat(r) * FPI) * 2);
+				var pitch = F(F(F(rFloat(r) - 0.5) * 2) / 8);
+				var size = F(F(rFloat(r) * 2) + rFloat(r));
+				if (rInt(r, 10) === 0) { var a1 = rFloat(r), a2 = rFloat(r); size = F(size * F(F(F(a1 * a2) * 3) + 1)); }
+				caveNode(self, rLong(r), cx, cz, b, px, py, pz, size, yaw, pitch, 0, 0, 1);
+			}
+		}
+	};
+	var GLN = 'generateLargeCaveNode(JII[BDDD)V';
+	var largeNode = function (self, seed, cx, cz, b, x, y, z) {
+		var m = ov(self, GLN);
+		if (m) { vm.invoke(m, self, [seed, cx, cz, b, x, y, z]); return; }
+		caveNode(self, seed, cx, cz, b, x, y, z, F(1 + F(rFloat(self[':rand']) * 6)), 0, 0, -1, -1, 0.5);
+	};
+	def('MapGenCaves', { super: SRC + 'MapGenBase', $rg: cavesRG, methods: {
+		'<init>()V': function (vm, self) { self[':range'] = 8; self[':rand'] = newRandom(); },
+		[RG]: function (vm, self, a) { cavesRG(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		[GLN]: function (vm, self, a) { caveNode(self, a[0], a[1], a[2], a[3], a[4], a[5], a[6], F(1 + F(rFloat(self[':rand']) * 6)), 0, 0, -1, -1, 0.5); },
+		[GCN]: function (vm, self, a) { caveNodeJs(self, a); },
+	} });
+	var caveNodeJs = function (self, a) {
+		var t = self.cls.$ovs || (self.cls.$ovs = Object.create(null)), keep = t[GCN];
+		t[GCN] = null;
+		try { caveNode(self, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]); } finally { t[GCN] = keep; }
+	};
+
+	var GRV = 'generateRavine(JII[BDDDFFFIID)V';
+	var ravine = function (self, seed, cx, cz, b, x, y, z, size, yaw, pitch, i, end, yScale) {
+		var r = jRandom(seed);
+		var midX = cx * 16 + 8, midZ = cz * 16 + 8;
+		var dYaw = 0, dPitch = 0;
+		if (end <= 0) { var span = self[':range'] * 16 - 16; end = span - rInt(r, idiv(span, 4)); }
+		var room = false;
+		if (i === -1) { i = idiv(end, 2); room = true; }
+		var rows = self.$rows || (self.$rows = new Float32Array(1024)), wr = 1;
+		for (var k = 0; k < 128; k++) {
+			if (k === 0 || rInt(r, 3) === 0) { var a1 = rFloat(r), a2 = rFloat(r); wr = F(1 + F(F(a1 * a2) * 1)); }
+			rows[k] = F(wr * wr);
+		}
+		var bytes = b ? b.a : null;
+		for (; i < end; i++) {
+			var w = 1.5 + F(F(mhSin(F(F(i * FPI) / end)) * size) * 1);
+			var h = w * yScale;
+			w *= rFloat(r) * 0.25 + 0.75;
+			h *= rFloat(r) * 0.25 + 0.75;
+			var cp = mhCos(pitch), sp = mhSin(pitch);
+			x += F(mhCos(yaw) * cp);
+			y += sp;
+			z += F(mhSin(yaw) * cp);
+			pitch = F(pitch * F(0.7));
+			pitch = F(pitch + F(dPitch * F(0.05)));
+			yaw = F(yaw + F(dYaw * F(0.05)));
+			dPitch = F(dPitch * F(0.8));
+			dYaw = F(dYaw * F(0.5));
+			var f1 = rFloat(r), f2 = rFloat(r), f3 = rFloat(r);
+			dPitch = F(dPitch + F(F(F(f1 - f2) * f3) * 2));
+			f1 = rFloat(r); f2 = rFloat(r); f3 = rFloat(r);
+			dYaw = F(dYaw + F(F(F(f1 - f2) * f3) * 4));
+			if (!room && rInt(r, 4) === 0) continue;
+			var ddx = x - midX, ddz = z - midZ, left = end - i, reach = F(F(size + 2) + 16);
+			if (ddx * ddx + ddz * ddz - left * left > reach * reach) return;
+			if (x < midX - 16 - w * 2 || z < midZ - 16 - w * 2 || x > midX + 16 + w * 2 || z > midZ + 16 + w * 2) continue;
+			if (!bytes) continue;
+			if (carve(self, bytes, cx, cz, x, y, z, w, h, rows) && room) break;
+		}
+	};
+	var ravineRG = function (vm, self, w, x, z, cx, cz, b) {
+		var r = self[':rand'];
+		if (rInt(r, 50) !== 0) return;
+		var px = x * 16 + rInt(r, 16), py = rInt(r, rInt(r, 40) + 8) + 20, pz = z * 16 + rInt(r, 16);
+		var yaw = F(F(rFloat(r) * FPI) * 2);
+		var pitch = F(F(F(rFloat(r) - 0.5) * 2) / 8);
+		var a1 = rFloat(r), size = F(F(F(a1 * 2) + rFloat(r)) * 2);
+		var s = rLong(r), m = ov(self, GRV);
+		if (m) vm.invoke(m, self, [s, cx, cz, b, px, py, pz, size, yaw, pitch, 0, 0, 3]);
+		else ravine(self, s, cx, cz, b, px, py, pz, size, yaw, pitch, 0, 0, 3);
+	};
+	def('MapGenRavine', { super: SRC + 'MapGenBase', $rg: ravineRG, fields: { field_75046_d: '[F' }, methods: {
+		'<init>()V': function (vm, self) { self[':range'] = 8; self[':rand'] = newRandom(); },
+		[RG]: function (vm, self, a) { ravineRG(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		[GRV]: function (vm, self, a) { ravine(self, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]); },
+	} });
+	def('MapGenCavesHell', { super: SRC + 'MapGenBase', methods: { '<init>()V': function (vm, self) { self[':range'] = 8; self[':rand'] = newRandom(); } } });
+
+	['installStructComp', 'installVillages', 'installMineshafts', 'installStrongholds', 'installGenLayers'].forEach(function (n) { if (JVM[n]) JVM[n](vm, H); });
+}
+
+var H = { jrSeed: jrSeed, jRandom: jRandom, rInt: rInt, rInt0: rInt0, rFloat: rFloat, rDouble: rDouble, rBool: rBool, rLong: rLong, rSetSeed: rSetSeed,
+	rRange: rRange, mhSin: mhSin, mhCos: mhCos, floorD: floorD, idiv: idiv, ov: ov, F: F };
+JVM.structHelpers = H;
+JVM.installStructures = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var LW = 'Lnet/minecraft/src/World;', LBB = 'Lnet/minecraft/src/StructureBoundingBox;', LR = 'Ljava/util/Random;';
+var LSC = 'Lnet/minecraft/src/StructureComponent;', LWR = 'Lnet/minecraft/src/WeightedRandomChestContent;';
+
+var B = { air: 0, stone: 1, grass: 2, dirt: 3, cobblestone: 4, planks: 5, waterMoving: 8, waterStill: 9, lavaMoving: 10, lavaStill: 11,
+	sand: 12, gravel: 13, wood: 17, leaves: 18, glass: 20, dispenser: 23, sandStone: 24, web: 30, cloth: 35, blockGold: 41, blockIron: 42,
+	stoneDoubleSlab: 43, stoneSingleSlab: 44, brick: 45, tnt: 46, bookShelf: 47, cobblestoneMossy: 48, obsidian: 49, torchWood: 50,
+	mobSpawner: 52, stairsWoodOak: 53, chest: 54, redstoneWire: 55, diamondBlock: 57, workbench: 58, crops: 59, tilledField: 60,
+	furnaceIdle: 61, signPost: 63, doorWood: 64, ladder: 65, rail: 66, stairsCobblestone: 67, lever: 69, pressurePlateStone: 70,
+	doorIron: 71, torchRedstoneActive: 76, stoneButton: 77, cactus: 81, fence: 85, pumpkin: 86, netherrack: 87, glowStone: 89,
+	pumpkinLantern: 91, redstoneRepeaterIdle: 93, redstoneRepeaterActive: 94, silverfish: 97, stoneBrick: 98, fenceIron: 101,
+	thinGlass: 102, pumpkinStem: 104, melonStem: 105, vine: 106, fenceGate: 107, stairsBrick: 108, stairsStoneBrick: 109,
+	netherBrick: 112, netherFence: 113, stairsNetherBrick: 114, netherStalk: 115, endPortal: 119, endPortalFrame: 120,
+	cocoaPlant: 127, stairsSandStone: 128, tripWireSource: 131, tripWire: 132, stairsWoodSpruce: 134, carrot: 141, potato: 142,
+	pistonStickyBase: 29, pistonBase: 33, anvil: 145, flowerPot: 140, cauldron: 118 };
+var DIRECTIONAL = { 26: 1, 86: 1, 91: 1, 93: 1, 94: 1, 107: 1, 127: 1, 131: 1, 145: 1, 149: 1, 150: 1 };
+var NORMAL = {};
+[1, 2, 3, 4, 5, 7, 12, 13, 14, 15, 16, 17, 19, 21, 22, 23, 24, 25, 35, 41, 42, 43, 45, 47, 48, 49, 56, 57, 58, 61, 62, 73, 74, 80, 82,
+ 84, 86, 87, 88, 91, 97, 98, 99, 100, 103, 110, 112, 121, 123, 124, 125, 129, 133, 137, 153, 155, 158].forEach(function (i) { NORMAL[i] = 1; });
+var STACK = { 256: 1, 257: 1, 258: 1, 259: 1, 261: 1, 267: 1, 268: 1, 269: 1, 270: 1, 271: 1, 272: 1, 273: 1, 274: 1, 275: 1, 276: 1, 277: 1,
+	278: 1, 279: 1, 282: 1, 283: 1, 284: 1, 285: 1, 286: 1, 290: 1, 291: 1, 292: 1, 293: 1, 294: 1, 323: 16, 324: 1, 325: 16, 326: 1,
+	327: 1, 328: 1, 329: 1, 330: 1, 332: 16, 333: 1, 335: 1, 342: 1, 343: 1, 344: 16, 346: 1, 354: 1, 355: 1, 358: 1, 359: 1, 368: 16,
+	373: 1, 387: 1, 398: 1, 403: 1 };
+for (var rec = 2256; rec <= 2267; rec++) STACK[rec] = 1;
+for (var arm = 298; arm <= 317; arm++) STACK[arm] = 1;
+
+function install(vm, H) {
+	var ov = H.ov, rInt = H.rInt, rFloat = H.rFloat, F = H.F;
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var cls = function (n) { return vm.loadClass(SRC + n); };
+	var newList = function (n) { var o = vm.newObject(vm.loadClass(n || 'java/util/ArrayList')); vm.callVirtual(o, '<init>', '()V', []); if (!o.$list) o.$list = []; return o; };
+	var listOf = function (l) {
+		if (!l) return [];
+		if (l.$list) return l.$list;
+		return Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a);
+	};
+	var listAdd = function (l, o) { if (l.$list && l.cls.native) l.$list.push(o); else vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [o]); };
+
+	var getId = function (w, x, y, z) { return vm.callVirtual(w, 'getBlockId', '(III)I', [x, y, z]); };
+	var setB = function (w, x, y, z, id, meta, fl) { vm.callVirtual(w, 'setBlock', '(IIIIII)Z', [x, y, z, id, meta, fl]); };
+	var isAir = function (w, x, y, z) { return !!vm.callVirtual(w, 'isAirBlock', '(III)Z', [x, y, z]); };
+	var blocksList = function () { var c = cls('Block'); if (c.initState !== 2) vm.initClass(c); return c.statics.blocksList && c.statics.blocksList.a; };
+	var liquid = function (id) {
+		if (id >= 8 && id <= 11) return true;
+		if (id <= 0) return false;
+		var b = blocksList(), o = b && b[id], m = o && o[':blockMaterial'];
+		if (!o || o.$vanilla || !m) return false;
+		var mc = cls('Material'); vm.initClass(mc);
+		return m === mc.statics.water || m === mc.statics.lava;
+	};
+	var normalCube = function (w, x, y, z) {
+		var id = getId(w, x, y, z);
+		if (NORMAL[id]) return true;
+		if (id < 256 && !(blocksList() || [])[id]) return false;
+		var b = (blocksList() || [])[id];
+		if (!b || b.$vanilla) return !!NORMAL[id];
+		var r = false;
+		JVM.run(vm, function () { r = !!vm.callVirtual(b, 'isOpaqueCube', '()Z', []) && !!vm.callVirtual(b, 'renderAsNormalBlock', '()Z', []); });
+		return r;
+	};
+	var topSolid = function (w, x, z) { return vm.callVirtual(w, 'getTopSolidOrLiquidBlock', '(II)I', [x, z]); };
+
+	var BBC = null;
+	var bb = function (x0, y0, z0, x1, y1, z1) {
+		var o = vm.newObject(BBC || (BBC = cls('StructureBoundingBox')));
+		o[':minX'] = x0; o[':minY'] = y0; o[':minZ'] = z0; o[':maxX'] = x1; o[':maxY'] = y1; o[':maxZ'] = z1;
+		return o;
+	};
+	var inside = function (b, x, y, z) { return x >= b[':minX'] && x <= b[':maxX'] && z >= b[':minZ'] && z <= b[':maxZ'] && y >= b[':minY'] && y <= b[':maxY']; };
+	var meets = function (a, b) { return a[':maxX'] >= b[':minX'] && a[':minX'] <= b[':maxX'] && a[':maxZ'] >= b[':minZ'] && a[':minZ'] <= b[':maxZ'] && a[':maxY'] >= b[':minY'] && a[':minY'] <= b[':maxY']; };
+	var meets4 = function (a, x0, z0, x1, z1) { return a[':maxX'] >= x0 && a[':minX'] <= x1 && a[':maxZ'] >= z0 && a[':minZ'] <= z1; };
+	var expand = function (a, b) {
+		a[':minX'] = Math.min(a[':minX'], b[':minX']); a[':minY'] = Math.min(a[':minY'], b[':minY']); a[':minZ'] = Math.min(a[':minZ'], b[':minZ']);
+		a[':maxX'] = Math.max(a[':maxX'], b[':maxX']); a[':maxY'] = Math.max(a[':maxY'], b[':maxY']); a[':maxZ'] = Math.max(a[':maxZ'], b[':maxZ']);
+	};
+	var offset = function (a, x, y, z) { a[':minX'] += x; a[':minY'] += y; a[':minZ'] += z; a[':maxX'] += x; a[':maxY'] += y; a[':maxZ'] += z; };
+	var toAdd = function (x, y, z, ox, oy, oz, sx, sy, sz, mode) {
+		switch (mode) {
+			case 2: return bb(x + ox, y + oy, z - sz + 1 + oz, x + sx - 1 + ox, y + sy - 1 + oy, z + oz);
+			case 0: return bb(x + ox, y + oy, z + oz, x + sx - 1 + ox, y + sy - 1 + oy, z + sz - 1 + oz);
+			case 1: return bb(x - sz + 1 + oz, y + oy, z + ox, x + oz, y + sy - 1 + oy, z + sx - 1 + ox);
+			case 3: return bb(x + oz, y + oy, z + ox, x + sz - 1 + oz, y + sy - 1 + oy, z + sx - 1 + ox);
+			default: return bb(x + ox, y + oy, z + oz, x + sx - 1 + ox, y + sy - 1 + oy, z + sz - 1 + oz);
+		}
+	};
+	var xs = function (b) { return b[':maxX'] - b[':minX'] + 1; }, ys = function (b) { return b[':maxY'] - b[':minY'] + 1; }, zs = function (b) { return b[':maxZ'] - b[':minZ'] + 1; };
+	def('StructureBoundingBox', { fields: { minX: 'I', minY: 'I', minZ: 'I', maxX: 'I', maxY: 'I', maxZ: 'I' }, methods: {
+		'<init>()V': function () {},
+		'<init>(Lnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { var o = a[0]; s[':minX'] = o[':minX']; s[':minY'] = o[':minY']; s[':minZ'] = o[':minZ']; s[':maxX'] = o[':maxX']; s[':maxY'] = o[':maxY']; s[':maxZ'] = o[':maxZ']; },
+		'<init>(IIIIII)V': function (vm, s, a) { s[':minX'] = a[0]; s[':minY'] = a[1]; s[':minZ'] = a[2]; s[':maxX'] = a[3]; s[':maxY'] = a[4]; s[':maxZ'] = a[5]; },
+		'<init>(IIII)V': function (vm, s, a) { s[':minX'] = a[0]; s[':minZ'] = a[1]; s[':maxX'] = a[2]; s[':maxZ'] = a[3]; s[':minY'] = 1; s[':maxY'] = 512; },
+		'<init>([I)V': function (vm, s, a) { var v = a[0].a; if (v.length === 6) { s[':minX'] = v[0]; s[':minY'] = v[1]; s[':minZ'] = v[2]; s[':maxX'] = v[3]; s[':maxY'] = v[4]; s[':maxZ'] = v[5]; } },
+		'intersectsWith(Lnet/minecraft/src/StructureBoundingBox;)Z': function (vm, s, a) { return meets(s, a[0]) ? 1 : 0; },
+		'intersectsWith(IIII)Z': function (vm, s, a) { return meets4(s, a[0], a[1], a[2], a[3]) ? 1 : 0; },
+		'expandTo(Lnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { expand(s, a[0]); },
+		'offset(III)V': function (vm, s, a) { offset(s, a[0], a[1], a[2]); },
+		'isVecInside(III)Z': function (vm, s, a) { return inside(s, a[0], a[1], a[2]) ? 1 : 0; },
+		'getXSize()I': function (vm, s) { return xs(s); }, 'getYSize()I': function (vm, s) { return ys(s); }, 'getZSize()I': function (vm, s) { return zs(s); },
+		'getCenterX()I': function (vm, s) { return s[':minX'] + ((xs(s) / 2) | 0); },
+		'getCenterY()I': function (vm, s) { return s[':minY'] + ((ys(s) / 2) | 0); },
+		'getCenterZ()I': function (vm, s) { return s[':minZ'] + ((zs(s) / 2) | 0); },
+		'func_143047_a()Lnet/minecraft/src/NBTTagIntArray;': function () { return null; },
+		'toString()Ljava/lang/String;': function (vm, s) { return '(' + s[':minX'] + ', ' + s[':minY'] + ', ' + s[':minZ'] + '; ' + s[':maxX'] + ', ' + s[':maxY'] + ', ' + s[':maxZ'] + ')'; },
+	}, staticMethods: {
+		'getNewBoundingBox()Lnet/minecraft/src/StructureBoundingBox;': function () { return bb(2147483647, 2147483647, 2147483647, -2147483648, -2147483648, -2147483648); },
+		'getComponentToAddBoundingBox(IIIIIIIIII)Lnet/minecraft/src/StructureBoundingBox;': function (vm, n, a) { return toAdd(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]); },
+	} });
+
+	var K = {
+		place: 'placeBlockAtCurrentPosition(Lnet/minecraft/src/World;IIIIILnet/minecraft/src/StructureBoundingBox;)V',
+		getId: 'getBlockIdAtCurrentPosition(Lnet/minecraft/src/World;IIILnet/minecraft/src/StructureBoundingBox;)I',
+		fill: 'fillWithBlocks(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;IIIIIIIIZ)V',
+		fillMeta: 'fillWithMetadataBlocks(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;IIIIIIIIIIZ)V',
+		fillDown: 'fillCurrentPositionBlocksDownwards(Lnet/minecraft/src/World;IIIIILnet/minecraft/src/StructureBoundingBox;)V',
+		getX: 'getXWithOffset(II)I', getY: 'getYWithOffset(I)I', getZ: 'getZWithOffset(II)I', meta: 'getMetadataWithOffset(II)I',
+		build: 'buildComponent(Lnet/minecraft/src/StructureComponent;Ljava/util/List;Ljava/util/Random;)V',
+		parts: 'addComponentParts(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/StructureBoundingBox;)Z',
+		getBB: 'getBoundingBox()Lnet/minecraft/src/StructureBoundingBox;',
+		biomeBlock: 'getBiomeSpecificBlock(II)I', biomeMeta: 'getBiomeSpecificBlockMetadata(II)I',
+		villagerType: 'getVillagerType(I)I',
+	};
+	var JS = {};
+	var V = function (p, name) {
+		var c = p.cls, t = c.$sv || (c.$sv = Object.create(null)), f = t[name];
+		if (f) return f;
+		var m = ov(p, K[name]);
+		if (m) f = function () { return vm.invoke(m, arguments[0], Array.prototype.slice.call(arguments, 1)); };
+		else {
+			for (var k = c; k && !f; k = k.superClass) if (k.native && k.spec && k.spec.$js && k.spec.$js[name]) f = k.spec.$js[name];
+			f = f || JS[name];
+		}
+		return (t[name] = f);
+	};
+	var gx = function (p, x, z) {
+		var b = p[':boundingBox'];
+		switch (p[':coordBaseMode']) { case 0: case 2: return b[':minX'] + x; case 1: return b[':maxX'] - z; case 3: return b[':minX'] + z; default: return x; }
+	};
+	var gy = function (p, y) { return p[':coordBaseMode'] === -1 ? y : y + p[':boundingBox'][':minY']; };
+	var gz = function (p, x, z) {
+		var b = p[':boundingBox'];
+		switch (p[':coordBaseMode']) { case 0: return b[':minZ'] + z; case 1: case 3: return b[':minZ'] + x; case 2: return b[':maxZ'] - z; default: return z; }
+	};
+	var X = function (p, x, z) { var c = p.cls; return c.$plainOff === true || (c.$plainOff === undefined && (c.$plainOff = !ov(p, K.getX) && !ov(p, K.getY) && !ov(p, K.getZ))) ? gx(p, x, z) : V(p, 'getX')(p, x, z); };
+	var Y = function (p, y) { return p.cls.$plainOff ? gy(p, y) : V(p, 'getY')(p, y); };
+	var Z = function (p, x, z) { return p.cls.$plainOff ? gz(p, x, z) : V(p, 'getZ')(p, x, z); };
+	JS.getX = gx; JS.getY = gy; JS.getZ = gz;
+	JS.meta = function (p, id, m) {
+		var mode = p[':coordBaseMode'];
+		if (id === B.rail) {
+			if (mode === 1 || mode === 3) return m === 1 ? 0 : 1;
+		} else if (id === B.doorWood || id === B.doorIron) {
+			if (mode === 0) { if (m === 0) return 2; if (m === 2) return 0; }
+			else if (mode === 1) return m + 1 & 3;
+			else if (mode === 3) return m + 3 & 3;
+		} else if (id === B.stairsCobblestone || id === B.stairsWoodOak || id === B.stairsNetherBrick || id === B.stairsStoneBrick || id === B.stairsSandStone) {
+			if (mode === 0) { if (m === 2) return 3; if (m === 3) return 2; }
+			else if (mode === 1) { if (m === 0) return 2; if (m === 1) return 3; if (m === 2) return 0; if (m === 3) return 1; }
+			else if (mode === 3) { if (m === 0) return 2; if (m === 1) return 3; if (m === 2) return 1; if (m === 3) return 0; }
+		} else if (id === B.ladder) {
+			if (mode === 0) { if (m === 2) return 3; if (m === 3) return 2; }
+			else if (mode === 1) { if (m === 2) return 4; if (m === 3) return 5; if (m === 4) return 2; if (m === 5) return 3; }
+			else if (mode === 3) { if (m === 2) return 5; if (m === 3) return 4; if (m === 4) return 2; if (m === 5) return 3; }
+		} else if (id === B.stoneButton) {
+			if (mode === 0) { if (m === 3) return 4; if (m === 4) return 3; }
+			else if (mode === 1) { if (m === 3) return 1; if (m === 4) return 2; if (m === 2) return 3; if (m === 1) return 4; }
+			else if (mode === 3) { if (m === 3) return 2; if (m === 4) return 1; if (m === 2) return 3; if (m === 1) return 4; }
+		} else if (id === B.tripWireSource || DIRECTIONAL[id]) {
+			if (mode === 0) { if (m === 0 || m === 2) return [2, 3, 0, 1][m]; }
+			else if (mode === 1) { if (m === 2) return 1; if (m === 0) return 3; if (m === 1) return 2; if (m === 3) return 0; }
+			else if (mode === 3) { if (m === 2) return 3; if (m === 0) return 1; if (m === 1) return 2; if (m === 3) return 0; }
+		} else if (id === B.pistonBase || id === B.pistonStickyBase || id === B.lever || id === B.dispenser) {
+			if (mode === 0) { if (m === 2 || m === 3) return [1, 0, 3, 2, 5, 4][m]; }
+			else if (mode === 1) { if (m === 2) return 4; if (m === 3) return 5; if (m === 4) return 2; if (m === 5) return 3; }
+			else if (mode === 3) { if (m === 2) return 5; if (m === 3) return 4; if (m === 4) return 2; if (m === 5) return 3; }
+		}
+		return m;
+	};
+	var META = function (p, id, m) { return V(p, 'meta')(p, id, m); };
+	JS.place = function (p, w, id, meta, x, y, z, b) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (inside(b, i, j, k)) setB(w, i, j, k, id, meta, 2);
+	};
+	JS.getId = function (p, w, x, y, z, b) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		return inside(b, i, j, k) ? getId(w, i, j, k) : 0;
+	};
+	var place = function (p, w, id, meta, x, y, z, b) { V(p, 'place')(p, w, id, meta, x, y, z, b); };
+	var idAt = function (p, w, x, y, z, b) { return V(p, 'getId')(p, w, x, y, z, b); };
+	var fillAir = function (p, w, b, x0, y0, z0, x1, y1, z1) {
+		var pl = V(p, 'place');
+		for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) pl(p, w, 0, 0, x, y, z, b);
+	};
+	JS.fill = function (p, w, b, x0, y0, z0, x1, y1, z1, edge, fillId, keep) {
+		var pl = V(p, 'place'), gi = V(p, 'getId');
+		for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) {
+			if (keep && gi(p, w, x, y, z, b) === 0) continue;
+			if (y !== y0 && y !== y1 && x !== x0 && x !== x1 && z !== z0 && z !== z1) pl(p, w, fillId, 0, x, y, z, b);
+			else pl(p, w, edge, 0, x, y, z, b);
+		}
+	};
+	JS.fillMeta = function (p, w, b, x0, y0, z0, x1, y1, z1, edge, edgeM, fillId, fillM, keep) {
+		var pl = V(p, 'place'), gi = V(p, 'getId');
+		for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) {
+			if (keep && gi(p, w, x, y, z, b) === 0) continue;
+			if (y !== y0 && y !== y1 && x !== x0 && x !== x1 && z !== z0 && z !== z1) pl(p, w, fillId, fillM, x, y, z, b);
+			else pl(p, w, edge, edgeM, x, y, z, b);
+		}
+	};
+	var fill = function (p, w, b, x0, y0, z0, x1, y1, z1, edge, fillId, keep) { V(p, 'fill')(p, w, b, x0, y0, z0, x1, y1, z1, edge, fillId, keep ? 1 : 0); };
+	var fillMeta = function (p, w, b, x0, y0, z0, x1, y1, z1, edge, edgeM, fillId, fillM, keep) { V(p, 'fillMeta')(p, w, b, x0, y0, z0, x1, y1, z1, edge, edgeM, fillId, fillM, keep ? 1 : 0); };
+	var fillRandom = function (p, w, b, x0, y0, z0, x1, y1, z1, keep, rand, sel) {
+		var pl = V(p, 'place'), gi = V(p, 'getId');
+		for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) {
+			if (keep && gi(p, w, x, y, z, b) === 0) continue;
+			var edge = y === y0 || y === y1 || x === x0 || x === x1 || z === z0 || z === z1;
+			if (sel.$jsSel) { var s = sel.$jsSel(rand, x, y, z, edge); pl(p, w, s[0], s[1], x, y, z, b); }
+			else {
+				vm.callVirtual(sel, 'selectBlocks', '(Ljava/util/Random;IIIZ)V', [rand, x, y, z, edge ? 1 : 0]);
+				pl(p, w, vm.callVirtual(sel, 'getSelectedBlockId', '()I', []), vm.callVirtual(sel, 'getSelectedBlockMetaData', '()I', []), x, y, z, b);
+			}
+		}
+	};
+	var fillChance = function (p, w, b, rand, chance, x0, y0, z0, x1, y1, z1, edge, fillId, keep) {
+		var pl = V(p, 'place'), gi = V(p, 'getId');
+		for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) {
+			if (!(rFloat(rand) <= chance)) continue;
+			if (keep && gi(p, w, x, y, z, b) === 0) continue;
+			if (y !== y0 && y !== y1 && x !== x0 && x !== x1 && z !== z0 && z !== z1) pl(p, w, fillId, 0, x, y, z, b);
+			else pl(p, w, edge, 0, x, y, z, b);
+		}
+	};
+	var maybePlace = function (p, w, b, rand, chance, x, y, z, id, meta) { if (rFloat(rand) < chance) place(p, w, id, meta, x, y, z, b); };
+	var fillEllipsoid = function (p, w, b, x0, y0, z0, x1, y1, z1, id, keep) {
+		var sx = F(x1 - x0 + 1), sy = F(y1 - y0 + 1), sz = F(z1 - z0 + 1);
+		var cx = F(x0 + F(sx / 2)), cz = F(z0 + F(sz / 2));
+		var gi = V(p, 'getId');
+		for (var y = y0; y <= y1; y++) {
+			var fy = F(F(y - y0) / sy);
+			for (var x = x0; x <= x1; x++) {
+				var fx = F(F(x - cx) / F(sx * 0.5));
+				for (var z = z0; z <= z1; z++) {
+					var fz = F(F(z - cz) / F(sz * 0.5));
+					if (keep && gi(p, w, x, y, z, b) === 0) continue;
+					var d = F(F(F(fx * fx) + F(fy * fy)) + F(fz * fz));
+					if (d <= F(1.05)) place(p, w, id, 0, x, y, z, b);
+				}
+			}
+		}
+	};
+	var clearUp = function (p, w, x, y, z, b) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (!inside(b, i, j, k)) return;
+		while (!isAir(w, i, j, k) && j < 255) { setB(w, i, j, k, 0, 0, 2); j++; }
+	};
+	JS.fillDown = function (p, w, id, meta, x, y, z, b) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (!inside(b, i, j, k)) return;
+		while ((isAir(w, i, j, k) || liquid(getId(w, i, j, k))) && j > 1) { setB(w, i, j, k, id, meta, 2); j--; }
+	};
+	var fillDown = function (p, w, id, meta, x, y, z, b) { V(p, 'fillDown')(p, w, id, meta, x, y, z, b); };
+	var liquidIn = function (p, w, b) {
+		var o = p[':boundingBox'];
+		var x0 = Math.max(o[':minX'] - 1, b[':minX']), y0 = Math.max(o[':minY'] - 1, b[':minY']), z0 = Math.max(o[':minZ'] - 1, b[':minZ']);
+		var x1 = Math.min(o[':maxX'] + 1, b[':maxX']), y1 = Math.min(o[':maxY'] + 1, b[':maxY']), z1 = Math.min(o[':maxZ'] + 1, b[':maxZ']);
+		var x, y, z;
+		for (x = x0; x <= x1; x++) for (z = z0; z <= z1; z++) { if (liquid(getId(w, x, y0, z))) return true; if (liquid(getId(w, x, y1, z))) return true; }
+		for (x = x0; x <= x1; x++) for (y = y0; y <= y1; y++) { if (liquid(getId(w, x, y, z0))) return true; if (liquid(getId(w, x, y, z1))) return true; }
+		for (z = z0; z <= z1; z++) for (y = y0; y <= y1; y++) { if (liquid(getId(w, x0, y, z))) return true; if (liquid(getId(w, x1, y, z))) return true; }
+		return false;
+	};
+	var placeDoorBlock = function (w, x, y, z, dir, doorId) {
+		var dx = 0, dz = 0;
+		if (dir === 0) dz = 1; if (dir === 1) dx = -1; if (dir === 2) dz = -1; if (dir === 3) dx = 1;
+		var l = (normalCube(w, x - dx, y, z - dz) ? 1 : 0) + (normalCube(w, x - dx, y + 1, z - dz) ? 1 : 0);
+		var r = (normalCube(w, x + dx, y, z + dz) ? 1 : 0) + (normalCube(w, x + dx, y + 1, z + dz) ? 1 : 0);
+		var ld = getId(w, x - dx, y, z - dz) === doorId || getId(w, x - dx, y + 1, z - dz) === doorId;
+		var rd = getId(w, x + dx, y, z + dz) === doorId || getId(w, x + dx, y + 1, z + dz) === doorId;
+		var flip = false;
+		if (ld && !rd) flip = true; else if (r > l) flip = true;
+		setB(w, x, y, z, doorId, dir, 2);
+		setB(w, x, y + 1, z, doorId, 8 | (flip ? 1 : 0), 2);
+	};
+	var placeDoor = function (p, w, b, rand, x, y, z, meta) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (inside(b, i, j, k)) placeDoorBlock(w, i, j, k, meta, B.doorWood);
+	};
+
+	var pend = function () { var r = JVM.mc152.reg(vm); return r.structPending || (r.structPending = []); };
+	var stackLimit = function (st) {
+		var id = st[':itemID'] | 0;
+		if (STACK[id]) return STACK[id];
+		if (id < 4096) {
+			var ic = cls('Item'); if (ic.initState !== 2) vm.initClass(ic);
+			var it = ic.statics.itemsList && ic.statics.itemsList.a[id];
+			if (it && !it.$vanilla && it[':maxStackSize']) return it[':maxStackSize'];
+		}
+		return 64;
+	};
+	var pick = function (rand, items) {
+		var total = 0, i;
+		for (i = 0; i < items.length; i++) total += items[i][':itemWeight'];
+		if (total <= 0) vm.throwNew('java/lang/IllegalArgumentException', null);
+		var n = rInt(rand, total);
+		for (i = 0; i < items.length; i++) { n -= items[i][':itemWeight']; if (n < 0) return items[i]; }
+		return null;
+	};
+	var fillInv = function (rand, items, count, size) {
+		var slots = [];
+		for (var i = 0; i < count; i++) {
+			var c = pick(rand, items), st = c[':theItemId'];
+			var lo = c[':theMinimumChanceToGenerateItem'], n = lo + rInt(rand, c[':theMaximumChanceToGenerateItem'] - lo + 1);
+			var put = function (k) { slots[rInt(rand, size)] = { id: st[':itemID'] | 0, n: k, d: st[':itemDamage'] | 0, ench: st.$ench || null }; };
+			if (stackLimit(st) >= n) put(n);
+			else for (var j = 0; j < n; j++) put(1);
+		}
+		return slots;
+	};
+	var deliver = function (x, y, z, slots) {
+		var g = vm.game, now = g && g.mode === 'run' && g.op;
+		var e = { k: 'inv', x: x, y: y, z: z, slots: slots, dim: vm.mcDim };
+		if (!now || !sendInv(e)) pend().push(e);
+	};
+	var sendInv = function (e) {
+		var ok = true;
+		e.slots.forEach(function (s, i) { if (s && vm.game.op('setchest', e.x, e.y, e.z, i, s.id, s.n, s.d) === undefined) ok = false; });
+		return ok;
+	};
+	var LWRI = 'Lnet/minecraft/src/WeightedRandomItem;', LCOL = 'Ljava/util/Collection;';
+	var weightOf = function (l) { var t = 0; l.forEach(function (x) { t += x[':itemWeight'] | 0; }); return t; };
+	var pickW = function (rand, l, total) {
+		if (total <= 0) vm.throwNew('java/lang/IllegalArgumentException', null);
+		var n = rInt(rand, total);
+		for (var i = 0; i < l.length; i++) { n -= l[i][':itemWeight'] | 0; if (n < 0) return l[i]; }
+		return null;
+	};
+	var arr = function (a) { return a && a.a ? Array.prototype.slice.call(a.a) : listOf(a); };
+	if (!vm.natives[SRC + 'WeightedRandom']) def('WeightedRandom', { staticMethods: {
+		['getTotalWeight(' + LCOL + ')I']: function (vm, n, a) { return weightOf(arr(a[0])); },
+		['getRandomItem(Ljava/util/Random;' + LCOL + 'I)' + LWRI]: function (vm, n, a) { return pickW(a[0], arr(a[1]), a[2]); },
+		['getRandomItem(Ljava/util/Random;' + LCOL + ')' + LWRI]: function (vm, n, a) { var l = arr(a[1]); return pickW(a[0], l, weightOf(l)); },
+		['getTotalWeight([' + LWRI + ')I']: function (vm, n, a) { return weightOf(arr(a[0])); },
+		['getRandomItem(Ljava/util/Random;[' + LWRI + 'I)' + LWRI]: function (vm, n, a) { return pickW(a[0], arr(a[1]), a[2]); },
+		['getRandomItem(Ljava/util/Random;[' + LWRI + ')' + LWRI]: function (vm, n, a) { var l = arr(a[1]); return pickW(a[0], l, weightOf(l)); },
+	} });
+	var WRCS = vm.natives[SRC + 'WeightedRandomChestContent'];
+	var fillJavaInv = function (rand, items, inv, count) {
+		var size = vm.callVirtual(inv, 'getSizeInventory', '()I', []);
+		fillInv(rand, itemsOf(items), count, size).forEach(function (s, i) {
+			if (!s) return;
+			var st = vm.newObject(cls('ItemStack')); st[':itemID'] = s.id; st[':stackSize'] = s.n; st[':itemDamage'] = s.d; if (s.ench) st.$ench = s.ench;
+			vm.callVirtual(inv, 'setInventorySlotContents', '(ILnet/minecraft/src/ItemStack;)V', [i, st]);
+		});
+	};
+	var addStatics = function (name, ms) {
+		var sp = vm.natives[SRC + name];
+		if (!sp) return;
+		sp.staticMethods = Object.assign({}, sp.staticMethods || {}, ms);
+		var c = vm.classes[SRC + name];
+		if (!c || !c.native) return;
+		var any = c.methods[Object.keys(c.methods)[0]], JM = any && any.constructor;
+		Object.keys(ms).forEach(function (k) {
+			if (c.methods[k]) { c.methods[k].fn = ms[k]; return; }
+			if (!JM) return;
+			var p = k.indexOf('('), m = new JM(c, k.substring(0, p), k.substring(p), JVM.ACC_PUBLIC | 8);
+			m.fn = ms[k]; c.methods[k] = m;
+		});
+	};
+	if (WRCS) addStatics('WeightedRandomChestContent', {
+		'generateChestContents(Ljava/util/Random;[Lnet/minecraft/src/WeightedRandomChestContent;Lnet/minecraft/src/IInventory;I)V': function (vm, n, a) { fillJavaInv(a[0], a[1], a[2], a[3]); },
+		'generateDispenserContents(Ljava/util/Random;[Lnet/minecraft/src/WeightedRandomChestContent;Lnet/minecraft/src/TileEntityDispenser;I)V': function (vm, n, a) { fillJavaInv(a[0], a[1], a[2], a[3]); },
+		'func_92080_a([Lnet/minecraft/src/WeightedRandomChestContent;[Lnet/minecraft/src/WeightedRandomChestContent;)[Lnet/minecraft/src/WeightedRandomChestContent;': function (vm, n, a) {
+			return JVM.javaArray(vm, LWR, arr(a[0]).concat(arr(a[1])));
+		},
+	});
+	var itemsOf = function (a) { return a && a.a ? Array.prototype.slice.call(a.a).filter(Boolean) : (a || []); };
+	var chest = function (p, w, b, rand, x, y, z, items, count) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (!inside(b, i, j, k) || getId(w, i, j, k) === B.chest) return false;
+		setB(w, i, j, k, B.chest, 0, 2);
+		deliver(i, j, k, fillInv(rand, itemsOf(items), count, 27));
+		return true;
+	};
+	var chestAt = function (x, y, z, rand, items, count, size) { deliver(x, y, z, fillInv(rand, itemsOf(items), count, size || 27)); };
+	var dispenser = function (p, w, b, rand, x, y, z, meta, items, count) {
+		var i = X(p, x, z), j = Y(p, y), k = Z(p, x, z);
+		if (!inside(b, i, j, k) || getId(w, i, j, k) === B.dispenser) return false;
+		setB(w, i, j, k, B.dispenser, META(p, B.dispenser, meta), 2);
+		deliver(i, j, k, fillInv(rand, itemsOf(items), count, 9));
+		return true;
+	};
+	var spawnMob = function (name, x, y, z, extra) {
+		var g = vm.game, e = { k: 'mob', name: name, x: x, y: y, z: z, extra: extra || null, dim: vm.mcDim };
+		if (g && g.mode === 'run' && g.op && g.op('spawnmob', name, x, y, z) !== undefined) return;
+		pend().push(e);
+	};
+	JVM.structDeliver = function (vm) {
+		var r = vm.mcReg, q = r && r.structPending;
+		if (!q || !q.length || !vm.game || vm.game.mode !== 'run') return;
+		r.structPending = [];
+		q.forEach(function (e) {
+			if (e.dim != null && vm.mcDim != null && e.dim !== vm.mcDim) { r.structPending.push(e); return; }
+			var t = vm.game.op('tile', e.x | 0, e.k === 'mob' ? Math.floor(e.y) - 1 : e.y, e.z | 0);
+			var ready = e.k === 'inv' ? t && (t.id === B.chest || t.id === B.dispenser) : t && t.id !== 0;
+			if (!ready) { if ((e.tries = (e.tries | 0) + 1) < 1200) r.structPending.push(e); return; }
+			if (e.k === 'inv') sendInv(e);
+			else if (e.k === 'mob') vm.game.op('spawnmob', e.name, e.x, e.y, e.z);
+		});
+		if (r.structPending.length > 4096) r.structPending.length = 0;
+	};
+	var tt = JVM.tileTick;
+	if (tt && !tt.$struct) { JVM.tileTick = function (vm) { JVM.structDeliver(vm); return tt.apply(this, arguments); }; JVM.tileTick.$struct = true; }
+	var twt = JVM.tilesWantTick;
+	if (twt && !twt.$struct) { JVM.tilesWantTick = function (vm) { return twt.apply(this, arguments) || !!(JVM.hasJavaDims && JVM.hasJavaDims(vm)); }; JVM.tilesWantTick.$struct = true; }
+
+	var ENCH = [[0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 3], [6, 1], [7, 3], [16, 5], [17, 5], [18, 5], [19, 2], [20, 2], [21, 3], [32, 5], [33, 1], [34, 3], [35, 3], [48, 5], [49, 2], [50, 1], [51, 1]];
+	var WRC = null;
+	var loot = function (id, meta, lo, hi, weight) {
+		var o = vm.newObject(WRC || (WRC = cls('WeightedRandomChestContent')));
+		var st = vm.newObject(cls('ItemStack')); st[':itemID'] = id; st[':stackSize'] = 1; st[':itemDamage'] = meta;
+		o[':theItemId'] = st; o[':theMinimumChanceToGenerateItem'] = lo; o[':theMaximumChanceToGenerateItem'] = hi; o[':itemWeight'] = weight;
+		return o;
+	};
+	var book = function (rand, lo, hi, weight) {
+		var e = ENCH[rInt(rand, ENCH.length)];
+		var lvl = H.rRange(rand, 1, e[1]);
+		var o = loot(403, 0, lo == null ? 1 : lo, hi == null ? 1 : hi, weight == null ? 1 : weight);
+		var en = {}; en[e[0]] = lvl;
+		o[':theItemId'].$ench = en;
+		return o;
+	};
+	var bookStack = function (self, ed) {
+		var st = vm.newObject(cls('ItemStack')); st[':itemID'] = self[':itemID'] | 0; st[':stackSize'] = 1; st[':itemDamage'] = 0;
+		if (ed && ed[':enchantmentobj']) { var en = {}; en[ed[':enchantmentobj'][':effectId'] | 0] = ed[':enchantmentLevel'] | 0; st.$ench = en; }
+		return st;
+	};
+	var addBookEnch = function (st, ed) { if (st && ed && ed[':enchantmentobj']) { var en = st.$ench || (st.$ench = {}), k = ed[':enchantmentobj'][':effectId'] | 0; en[k] = Math.max(en[k] | 0, ed[':enchantmentLevel'] | 0); } };
+	if (!vm.natives[SRC + 'EnchantmentData']) def('EnchantmentData', { super: SRC + 'WeightedRandomItem', fields: { enchantmentobj: 'Lnet/minecraft/src/Enchantment;', enchantmentLevel: 'I' }, methods: {
+		'<init>(Lnet/minecraft/src/Enchantment;I)V': function (vm, s, a) { s[':enchantmentobj'] = a[0]; s[':enchantmentLevel'] = a[1]; s[':itemWeight'] = a[0] ? a[0].$weight | 0 : 0; },
+		'<init>(II)V': function (vm, s, a) {
+			var ec = cls('Enchantment'); if (ec.initState !== 2) vm.initClass(ec);
+			var e = ec.statics.enchantmentsList && ec.statics.enchantmentsList.a[a[0]];
+			s[':enchantmentobj'] = e || null; s[':enchantmentLevel'] = a[1]; s[':itemWeight'] = e ? e.$weight | 0 : 0;
+		},
+	} });
+	var BK = 'Lnet/minecraft/src/EnchantmentData;)Lnet/minecraft/src/ItemStack;';
+	vm.addNativeMethod(SRC + 'Item', 'func_92111_a(' + BK, function (vm, s, a) { return bookStack(s, a[0]); });
+	vm.addNativeMethod(SRC + 'Item', 'getEnchantedItemStack(' + BK, function (vm, s, a) { return bookStack(s, a[0]); });
+	vm.addNativeMethod(SRC + 'Item', 'func_92115_a(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EnchantmentData;)V', function (vm, s, a) { addBookEnch(a[0], a[1]); });
+	vm.addNativeMethod(SRC + 'Item', 'func_92114_b(Ljava/util/Random;)Lnet/minecraft/src/WeightedRandomChestContent;', function (vm, s, a) { return book(a[0]); });
+	vm.addNativeMethod(SRC + 'Item', 'func_92112_a(Ljava/util/Random;III)Lnet/minecraft/src/WeightedRandomChestContent;', function (vm, s, a) { return book(a[0], a[1], a[2], a[3]); });
+	var withMods = function (items, category) {
+		var r = JVM.mc152.reg(vm), c = r.chestLoot && r.chestLoot[category];
+		var extra = c && c.$items ? c.$items.filter(function (x) { return x && !x.$vanilla; }) : [];
+		return extra.length ? items.concat(extra) : items;
+	};
+
+	var SC = SRC + 'StructureComponent';
+	var scMethods = {
+		'<init>(I)V': function (vm, s, a) { s[':componentType'] = a[0]; s[':coordBaseMode'] = -1; },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; },
+		[K.build]: function () {},
+		[K.getBB]: function (vm, s) { return s[':boundingBox']; },
+		'getComponentType()I': function (vm, s) { return s[':componentType']; },
+		'getCenter()Lnet/minecraft/src/ChunkPosition;': function (vm, s) {
+			var b = s[':boundingBox'], p = vm.newObject(cls('ChunkPosition'));
+			vm.callVirtual(p, '<init>', '(III)V', [b[':minX'] + ((xs(b) / 2) | 0), b[':minY'] + ((ys(b) / 2) | 0), b[':minZ'] + ((zs(b) / 2) | 0)]);
+			return p;
+		},
+		'isLiquidInStructureBoundingBox(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;)Z': function (vm, s, a) { return liquidIn(s, a[0], a[1]) ? 1 : 0; },
+		[K.getX]: function (vm, s, a) { return gx(s, a[0], a[1]); },
+		[K.getY]: function (vm, s, a) { return gy(s, a[0]); },
+		[K.getZ]: function (vm, s, a) { return gz(s, a[0], a[1]); },
+		[K.meta]: function (vm, s, a) { return JS.meta(s, a[0], a[1]); },
+		[K.place]: function (vm, s, a) { JS.place(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		[K.getId]: function (vm, s, a) { return JS.getId(s, a[0], a[1], a[2], a[3], a[4]); },
+		'fillWithAir(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;IIIIII)V': function (vm, s, a) { fillAir(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); },
+		[K.fill]: function (vm, s, a) { JS.fill(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]); },
+		[K.fillMeta]: function (vm, s, a) { JS.fillMeta(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]); },
+		'fillWithRandomizedBlocks(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;IIIIIIZLjava/util/Random;Lnet/minecraft/src/StructurePieceBlockSelector;)V': function (vm, s, a) { fillRandom(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]); },
+		'randomlyFillWithBlocks(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;Ljava/util/Random;FIIIIIIIIZ)V': function (vm, s, a) { fillChance(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]); },
+		'randomlyPlaceBlock(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;Ljava/util/Random;FIIIII)V': function (vm, s, a) { maybePlace(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]); },
+		'randomlyRareFillWithBlocks(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;IIIIIIIZ)V': function (vm, s, a) { fillEllipsoid(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]); },
+		'clearCurrentPositionBlocksUpwards(Lnet/minecraft/src/World;IIILnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { clearUp(s, a[0], a[1], a[2], a[3], a[4]); },
+		[K.fillDown]: function (vm, s, a) { JS.fillDown(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'generateStructureChestContents(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;Ljava/util/Random;III[Lnet/minecraft/src/WeightedRandomChestContent;I)Z': function (vm, s, a) { return chest(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]) ? 1 : 0; },
+		'generateStructureDispenserContents(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;Ljava/util/Random;IIII[Lnet/minecraft/src/WeightedRandomChestContent;I)Z': function (vm, s, a) { return dispenser(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]) ? 1 : 0; },
+		'placeDoorAtCurrentPosition(Lnet/minecraft/src/World;Lnet/minecraft/src/StructureBoundingBox;Ljava/util/Random;IIII)V': function (vm, s, a) { placeDoor(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'func_143010_b(I)Lnet/minecraft/src/NBTTagCompound;': function (vm) { var t = vm.newObject(cls('NBTTagCompound')); vm.callVirtual(t, '<init>', '()V', []); return t; },
+		'func_143009_a(Lnet/minecraft/src/World;Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+		'func_143012_a(Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+		'func_143011_b(Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+	};
+	def('StructureComponent', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, fields: { boundingBox: LBB, coordBaseMode: 'I', componentType: 'I' }, methods: scMethods,
+		abstractMethods: { [K.parts]: true },
+		staticMethods: { 'findIntersecting(Ljava/util/List;Lnet/minecraft/src/StructureBoundingBox;)Lnet/minecraft/src/StructureComponent;': function (vm, n, a) { return findIntersecting(a[0], a[1]); } } });
+	var findIntersecting = function (list, b) {
+		var l = listOf(list);
+		for (var i = 0; i < l.length; i++) { var c = l[i], cb = c && c[':boundingBox']; if (cb && meets(cb, b)) return c; }
+		return null;
+	};
+	def('StructurePieceBlockSelector', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, fields: { selectedBlockId: 'I', selectedBlockMetaData: 'I' }, methods: {
+		'<init>()V': function () {},
+		'getSelectedBlockId()I': function (vm, s) { return s[':selectedBlockId']; },
+		'getSelectedBlockMetaData()I': function (vm, s) { return s[':selectedBlockMetaData']; },
+	}, abstractMethods: { 'selectBlocks(Ljava/util/Random;IIIZ)V': true } });
+
+	var comps = function (s) { return listOf(s[':components']); };
+	var generateStructure = function (s, w, rand, b) {
+		var l = s[':components'], arr = l.$list && l.cls.native ? l.$list : null;
+		var list = arr || comps(s);
+		for (var i = 0; i < list.length; i++) {
+			var c = list[i], cb = c[':boundingBox'];
+			if (!cb || !meets(cb, b)) continue;
+			var m = ov(c, K.parts), ok;
+			if (m) ok = vm.invoke(m, c, [w, rand, b]);
+			else { var f = partsOf(c); ok = f ? f(c, w, rand, b) : 1; }
+			if (!ok) {
+				if (arr) { arr.splice(i, 1); i--; }
+				else vm.callVirtual(l, 'remove', '(Ljava/lang/Object;)Z', [c]);
+			}
+		}
+	};
+	var partsOf = function (c) {
+		var k = c.cls; if (k.$parts !== undefined) return k.$parts;
+		for (var x = k; x; x = x.superClass) if (x.native && x.spec && x.spec.$parts) return (k.$parts = x.spec.$parts);
+		return (k.$parts = null);
+	};
+	var updateBB = function (s) {
+		var b = bb(2147483647, 2147483647, 2147483647, -2147483648, -2147483648, -2147483648);
+		comps(s).forEach(function (c) { expand(b, c[':boundingBox']); });
+		s[':boundingBox'] = b;
+	};
+	var markHeight = function (s, w, rand, lo) {
+		var top = 63 - lo, b = s[':boundingBox'], h = ys(b) + 1;
+		if (h < top) h += rInt(rand, top - h);
+		var dy = h - b[':maxY'];
+		offset(b, 0, dy, 0);
+		comps(s).forEach(function (c) { offset(c[':boundingBox'], 0, dy, 0); });
+	};
+	var randomHeight = function (s, w, rand, lo, hi) {
+		var b = s[':boundingBox'], span = hi - lo + 1 - ys(b), y;
+		if (span > 1) y = lo + rInt(rand, span); else y = lo;
+		var dy = y - b[':minY'];
+		offset(b, 0, dy, 0);
+		comps(s).forEach(function (c) { offset(c[':boundingBox'], 0, dy, 0); });
+	};
+	def('StructureStart', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, fields: { components: 'Ljava/util/LinkedList;', boundingBox: LBB }, methods: {
+		'<init>()V': function (vm, s) { s[':components'] = newList('java/util/LinkedList'); },
+		'<init>(II)V': function (vm, s, a) { s[':components'] = newList('java/util/LinkedList'); s.$cx = a[0]; s.$cz = a[1]; },
+		'getBoundingBox()Lnet/minecraft/src/StructureBoundingBox;': function (vm, s) { return s[':boundingBox']; },
+		'getComponents()Ljava/util/LinkedList;': function (vm, s) { return s[':components']; },
+		'generateStructure(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { generateStructure(s, a[0], a[1], a[2]); },
+		'updateBoundingBox()V': function (vm, s) { updateBB(s); },
+		'markAvailableHeight(Lnet/minecraft/src/World;Ljava/util/Random;I)V': function (vm, s, a) { markHeight(s, a[0], a[1], a[2]); },
+		'setRandomHeight(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, s, a) { randomHeight(s, a[0], a[1], a[2], a[3]); },
+		'isSizeableStructure()Z': function () { return 1; },
+		'func_143019_e()I': function (vm, s) { return s.$cx | 0; }, 'func_143018_f()I': function (vm, s) { return s.$cz | 0; },
+		'func_143022_a(II)Lnet/minecraft/src/NBTTagCompound;': function (vm) { var t = vm.newObject(cls('NBTTagCompound')); vm.callVirtual(t, '<init>', '()V', []); return t; },
+		'func_143020_a(Lnet/minecraft/src/World;Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+		'func_143022_a(Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+		'func_143017_b(Lnet/minecraft/src/NBTTagCompound;)V': function () {},
+	} });
+
+	var KEYS = { can: 'canSpawnStructureAtCoords(II)Z', start: 'getStructureStart(II)Lnet/minecraft/src/StructureStart;', sizeable: 'isSizeableStructure()Z' };
+	var chunkKey = function (x, z) { return JVM.box(vm, BigInt.asIntN(64, (BigInt(x) & 0xFFFFFFFFn) | ((BigInt(z) & 0xFFFFFFFFn) << 32n)), 'J'); };
+	var startsMap = function (g) { var m = g[':structureMap']; if (!m) { m = g[':structureMap'] = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); } return m; };
+	var structRG = function (vm, g, w, cx, cz) {
+		var m = startsMap(g), k = chunkKey(cx, cz);
+		if (m.$m ? m.$m.has(k) : vm.callVirtual(m, 'containsKey', '(Ljava/lang/Object;)Z', [k])) return;
+		H.rInt0(g[':rand']);
+		var can = ov(g, KEYS.can), ok = can ? vm.invoke(can, g, [cx, cz]) : jsOf(g, '$can')(g, cx, cz);
+		if (!ok) return;
+		var sm = ov(g, KEYS.start), s = sm ? vm.invoke(sm, g, [cx, cz]) : jsOf(g, '$start')(g, cx, cz);
+		if (m.$m && m.cls.native) m.$m.put(k, s); else vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [k, s]);
+	};
+	var jsOf = function (o, name) {
+		for (var c = o.cls; c; c = c.superClass) if (c.native && c.spec && c.spec[name]) return c.spec[name];
+		return function () { return null; };
+	};
+	var javaMapOrder = function (m) {
+		if (!m.$m) return listOf(vm.callVirtual(m, 'values', '()Ljava/util/Collection;', []));
+		var es = m.$m.entries(), cap = 16;
+		while (es.length > cap * 0.75) cap *= 2;
+		var idx = es.map(function (e, i) {
+			var v = JVM.unbox(e.k), h;
+			if (typeof v === 'bigint') h = Number(BigInt.asIntN(32, v)) ^ Number(BigInt.asIntN(32, v >> 32n));
+			else h = JVM.hashOf(vm, e.k);
+			h = (h ^ (h >>> 16)) & (cap - 1);
+			return { b: h, i: i, v: e.v };
+		});
+		idx.sort(function (a, b) { return a.b - b.b || a.i - b.i; });
+		return idx.map(function (e) { return e.v; });
+	};
+	var sizeable = function (s) { var m = ov(s, KEYS.sizeable); return m ? !!vm.invoke(m, s, []) : jsOf(s, '$sizeable')(s); };
+	var startBB = function (s) { return s[':boundingBox']; };
+	var genInChunk = function (g, w, rand, cx, cz) {
+		var x = (cx << 4) + 8, z = (cz << 4) + 8, did = false, cb = null;
+		javaMapOrder(startsMap(g)).forEach(function (s) {
+			if (!s || !sizeable(s) || !meets4(startBB(s), x, z, x + 15, z + 15)) return;
+			var gm = ov(s, 'generateStructure(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/StructureBoundingBox;)V');
+			var box = bb(x, 1, z, x + 15, 512, z + 15);
+			if (gm) vm.invoke(gm, s, [w, rand, box]); else generateStructure(s, w, rand, box);
+			did = true;
+		});
+		return did;
+	};
+	def('MapGenStructure', { super: SRC + 'MapGenBase', access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, $rg: function (vm, g, w, x, z) { structRG(vm, g, w, x, z); },
+		fields: { structureMap: 'Ljava/util/Map;' }, methods: {
+		'<init>()V': function (vm, s) { baseInit(s); startsMap(s); },
+		'recursiveGenerate(Lnet/minecraft/src/World;IIII[B)V': function (vm, s, a) { structRG(vm, s, a[0], a[1], a[2]); },
+		'generateStructuresInChunk(Lnet/minecraft/src/World;Ljava/util/Random;II)Z': function (vm, s, a) { return genInChunk(s, a[0], a[1], a[2], a[3]) ? 1 : 0; },
+		'hasStructureAt(III)Z': function (vm, g, a) {
+			var x = a[0], y = a[1], z = a[2];
+			return javaMapOrder(startsMap(g)).some(function (s) {
+				return sizeable(s) && meets4(startBB(s), x, z, x, z) && comps(s).some(function (c) { return inside(c[':boundingBox'], x, y, z); });
+			}) ? 1 : 0;
+		},
+		'getNearestInstance(Lnet/minecraft/src/World;III)Lnet/minecraft/src/ChunkPosition;': function (vm, g, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			g[':worldObj'] = w;
+			var r = g[':rand'], seed = BigInt.asIntN(64, BigInt(vm.callVirtual(w, 'getSeed', '()J', [])));
+			H.rSetSeed(r, seed);
+			var l1 = H.rLong(r), l2 = H.rLong(r);
+			H.rSetSeed(r, BigInt.asIntN(64, BigInt(x >> 4) * l1) ^ BigInt.asIntN(64, BigInt(z >> 4) * l2) ^ seed);
+			vm.callVirtual(g, 'recursiveGenerate', '(Lnet/minecraft/src/World;IIII[B)V', [w, x >> 4, z >> 4, 0, 0, null]);
+			var best = Infinity, res = null;
+			javaMapOrder(startsMap(g)).forEach(function (s) {
+				if (!sizeable(s)) return;
+				var c0 = comps(s)[0];
+				if (!c0) return;
+				var p = vm.callVirtual(c0, 'getCenter', '()Lnet/minecraft/src/ChunkPosition;', []);
+				var dx = p[':x'] - x, dy = p[':y'] - y, dz = p[':z'] - z, d = dx * dx + dy * dy + dz * dz;
+				if (d < best) { best = d; res = p; }
+			});
+			if (res) return res;
+			var l = vm.callVirtual(g, 'getCoordList', '()Ljava/util/List;', []);
+			listOf(l).forEach(function (p) {
+				var dx = p[':x'] - x, dy = p[':y'] - y, dz = p[':z'] - z, d = dx * dx + dy * dy + dz * dz;
+				if (d < best) { best = d; res = p; }
+			});
+			return res;
+		},
+		'getCoordList()Ljava/util/List;': function () { return null; },
+		'func_143025_a()Ljava/lang/String;': function (vm, s) { return s.cls.name.split('/').pop(); },
+		'func_143027_a(Lnet/minecraft/src/World;)V': function () {},
+		'func_143026_a(IILnet/minecraft/src/StructureStart;)V': function () {},
+	}, abstractMethods: { [KEYS.can]: true, [KEYS.start]: true } });
+	var baseInit = function (s) { s[':range'] = 8; var r = vm.newObject(vm.loadClass('java/util/Random')); vm.callVirtual(r, '<init>', '()V', []); s[':rand'] = r; };
+	vm.natives[SRC + 'StructureStart'].$sizeable = function () { return true; };
+	def('MapGenStructureIO', { staticMethods: {
+		'func_143034_b(Ljava/lang/Class;Ljava/lang/String;)V': function () {},
+		'func_143031_a(Ljava/lang/Class;Ljava/lang/String;)V': function () {},
+	} });
+
+	vm.addNativeMethod(SRC + 'World', 'setRandomSeed(III)Ljava/util/Random;', function (vm, w, a) {
+		var r = w.$sr || (w.$sr = (function () { var o = vm.newObject(vm.loadClass('java/util/Random')); vm.callVirtual(o, '<init>', '()V', []); return o; })());
+		var seed = BigInt.asIntN(64, BigInt(vm.callVirtual(w, 'getSeed', '()J', [])));
+		H.rSetSeed(r, BigInt.asIntN(64, BigInt(a[0]) * 341873128712n + BigInt(a[1]) * 132897987541n + seed + BigInt(a[2])));
+		return r;
+	});
+
+	JVM.structCore = {
+		B: B, K: K, JS: JS, V: V, bb: bb, inside: inside, meets: meets, meets4: meets4, expand: expand, offset: offset, toAdd: toAdd, xs: xs, ys: ys, zs: zs,
+		X: X, Y: Y, Z: Z, META: META, place: place, idAt: idAt, fillAir: fillAir, fill: fill, fillMeta: fillMeta, fillRandom: fillRandom, fillChance: fillChance,
+		maybePlace: maybePlace, fillEllipsoid: fillEllipsoid, clearUp: clearUp, fillDown: fillDown, liquidIn: liquidIn, placeDoor: placeDoor, placeDoorBlock: placeDoorBlock,
+		chest: chest, chestAt: chestAt, dispenser: dispenser, loot: loot, book: book, withMods: withMods, spawnMob: spawnMob, findIntersecting: findIntersecting,
+		getId: getId, setB: setB, isAir: isAir, topSolid: topSolid, newList: newList, listOf: listOf, listAdd: listAdd, comps: comps, updateBB: updateBB,
+		markHeight: markHeight, randomHeight: randomHeight, baseInit: baseInit, startsMap: startsMap, scMethods: scMethods, cls: cls, liquid: liquid,
+	};
+}
+JVM.installStructComp = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var LCVSP = 'Lnet/minecraft/src/ComponentVillageStartPiece;';
+var PIECE_INIT = '<init>(' + LCVSP + 'ILjava/util/Random;Lnet/minecraft/src/StructureBoundingBox;I)V';
+
+function install(vm, H) {
+	var C = JVM.structCore;
+	if (!C) return;
+	var B = C.B, rInt = H.rInt, rBool = H.rBool, rRange = H.rRange, idiv = H.idiv;
+	var place = C.place, fill = C.fill, idAt = C.idAt, META = C.META, clearUp = C.clearUp, fillDown = C.fillDown, placeDoor = C.placeDoor;
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var cls = C.cls;
+	B.pressurePlatePlanks = 72;
+
+	var spawnBiomes = function () {
+		var c = cls('MapGenVillage'); if (c.initState !== 2) vm.initClass(c);
+		return c.statics.villageSpawnBiomes;
+	};
+	var viable = function (start, x, z, r) {
+		var w = start[':worldChunkMngr'];
+		if (!w) return true;
+		return !!vm.callVirtual(w, 'areBiomesViable', '(IIILjava/util/List;)Z', [x, z, r, spawnBiomes()]);
+	};
+
+	var desert = function (p) { var s = p[':startPiece']; return !!(s ? s[':inDesert'] : p.$desert); };
+	var biomeBlock = function (p, id, meta) {
+		if (!desert(p)) return id;
+		if (id === B.wood || id === B.cobblestone || id === B.planks || id === B.gravel) return B.sandStone;
+		if (id === B.stairsWoodOak || id === B.stairsCobblestone) return B.stairsSandStone;
+		return id;
+	};
+	var biomeMeta = function (p, id, meta) {
+		if (!desert(p)) return meta;
+		if (id === B.wood || id === B.cobblestone) return 0;
+		if (id === B.planks) return 2;
+		return meta;
+	};
+	var vjs = {
+		biomeBlock: biomeBlock, biomeMeta: biomeMeta,
+		place: function (p, w, id, meta, x, y, z, b) { C.JS.place(p, w, C.V(p, 'biomeBlock')(p, id, meta), C.V(p, 'biomeMeta')(p, id, meta), x, y, z, b); },
+		fill: function (p, w, b, x0, y0, z0, x1, y1, z1, edge, fillId, keep) {
+			var bb = C.V(p, 'biomeBlock'), bm = C.V(p, 'biomeMeta');
+			C.fillMeta(p, w, b, x0, y0, z0, x1, y1, z1, bb(p, edge, 0), bm(p, edge, 0), bb(p, fillId, 0), bm(p, fillId, 0), keep);
+		},
+		fillDown: function (p, w, id, meta, x, y, z, b) { C.JS.fillDown(p, w, C.V(p, 'biomeBlock')(p, id, meta), C.V(p, 'biomeMeta')(p, id, meta), x, y, z, b); },
+	};
+	var groundLevel = function (p, w, b) {
+		var o = p[':boundingBox'], sum = 0, n = 0, prov = w[':provider'];
+		var base = prov ? vm.callVirtual(prov, 'getAverageGroundLevel', '()I', []) : 64;
+		for (var z = o[':minZ']; z <= o[':maxZ']; z++) for (var x = o[':minX']; x <= o[':maxX']; x++) {
+			if (!C.inside(b, x, 64, z)) continue;
+			sum += Math.max(C.topSolid(w, x, z), base); n++;
+		}
+		return n === 0 ? -1 : idiv(sum, n);
+	};
+	var settle = function (p, w, b, height) {
+		if (p[':averageGroundLevel'] < 0) {
+			p[':averageGroundLevel'] = groundLevel(p, w, b);
+			if (p[':averageGroundLevel'] < 0) return false;
+			C.offset(p[':boundingBox'], 0, p[':averageGroundLevel'] - p[':boundingBox'][':maxY'] + height - 1, 0);
+		}
+		return true;
+	};
+	var villagerType = function (p, i) { var f = C.V(p, 'villagerType'); return f ? f(p, i) : 0; };
+	var spawnVillagers = function (p, w, b, x, y, z, count) {
+		for (var i = p[':villagersSpawned'] | 0; i < count; i++) {
+			var ix = C.X(p, x + i, z), iy = C.Y(p, y), iz = C.Z(p, x + i, z);
+			if (!C.inside(b, ix, iy, iz)) break;
+			p[':villagersSpawned'] = (p[':villagersSpawned'] | 0) + 1;
+			C.spawnMob('villager', ix + 0.5, iy, iz + 0.5, { profession: villagerType(p, i) });
+		}
+	};
+	var doorStep = function (p, w, b, x) {
+		if (idAt(p, w, x, 0, -1, b) === 0 && idAt(p, w, x, -1, -1, b) !== 0) place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 3), x, 0, -1, b);
+	};
+	var foundation = function (p, w, b, nz, nx, top, id) {
+		for (var z = 0; z < nz; z++) for (var x = 0; x < nx; x++) { clearUp(p, w, x, top, z, b); fillDown(p, w, id, 0, x, -1, z, b); }
+	};
+
+	var PW = 'StructureVillagePieceWeight';
+	def(PW, { fields: { villagePieceClass: 'Ljava/lang/Class;', villagePieceWeight: 'I', villagePiecesSpawned: 'I', villagePiecesLimit: 'I' }, methods: {
+		'<init>(Ljava/lang/Class;II)V': function (vm, s, a) { s[':villagePieceClass'] = a[0]; s[':villagePieceWeight'] = a[1]; s[':villagePiecesLimit'] = a[2]; },
+		'canSpawnMoreVillagePiecesOfType(I)Z': function (vm, s) { return moreOk(s) ? 1 : 0; },
+		'canSpawnMoreVillagePieces()Z': function (vm, s) { return moreOk(s) ? 1 : 0; },
+	} });
+	var moreOk = function (w) { return w[':villagePiecesLimit'] === 0 || w[':villagePiecesSpawned'] < w[':villagePiecesLimit']; };
+	var pieceWeight = function (name, weight, limit) {
+		var o = vm.newObject(cls(PW));
+		o[':villagePieceClass'] = vm.classObject(cls(name)); o[':villagePieceWeight'] = weight; o[':villagePiecesLimit'] = limit;
+		return o;
+	};
+	var weightedList = function (rand, size) {
+		var l = [
+			pieceWeight('ComponentVillageHouse4_Garden', 4, rRange(rand, 2 + size, 4 + size * 2)),
+			pieceWeight('ComponentVillageChurch', 20, rRange(rand, 0 + size, 1 + size)),
+			pieceWeight('ComponentVillageHouse1', 20, rRange(rand, 0 + size, 2 + size)),
+			pieceWeight('ComponentVillageWoodHut', 3, rRange(rand, 2 + size, 5 + size * 3)),
+			pieceWeight('ComponentVillageHall', 15, rRange(rand, 0 + size, 2 + size)),
+			pieceWeight('ComponentVillageField', 3, rRange(rand, 1 + size, 4 + size)),
+			pieceWeight('ComponentVillageField2', 3, rRange(rand, 2 + size, 4 + size * 2)),
+			pieceWeight('ComponentVillageHouse2', 15, rRange(rand, 0, 1 + size)),
+			pieceWeight('ComponentVillageHouse3', 8, rRange(rand, 0 + size, 3 + size * 2)),
+		].filter(function (w) { return w[':villagePiecesLimit'] !== 0; });
+		var o = C.newList(); o.$list = l;
+		return o;
+	};
+	var totalWeight = function (list) {
+		var any = false, t = 0;
+		C.listOf(list).forEach(function (w) { if (w[':villagePiecesLimit'] > 0 && w[':villagePiecesSpawned'] < w[':villagePiecesLimit']) any = true; t += w[':villagePieceWeight']; });
+		return any ? t : -1;
+	};
+	var HOUSES = {
+		ComponentVillageHouse4_Garden: [5, 6, 5, false], ComponentVillageChurch: [5, 12, 9, true], ComponentVillageHouse1: [9, 9, 6, true],
+		ComponentVillageWoodHut: [4, 6, 5, true], ComponentVillageHall: [9, 7, 11, true], ComponentVillageField: [13, 4, 9, true],
+		ComponentVillageField2: [7, 4, 9, true], ComponentVillageHouse2: [10, 6, 7, true], ComponentVillageHouse3: [9, 7, 12, true],
+	};
+	var canGoDeeper = function (b) { return b != null && b[':minY'] > 10; };
+	var makeHouse = function (name, start, list, rand, x, y, z, mode, type) {
+		var h = HOUSES[name];
+		if (!h) return null;
+		var b = C.toAdd(x, y, z, 0, 0, 0, h[0], h[1], h[2], mode);
+		if (h[3] && !canGoDeeper(b)) return null;
+		if (C.findIntersecting(list, b)) return null;
+		return newPiece(name, start, type, rand, b, mode);
+	};
+	var getNextVillageComponent = function (start, list, rand, x, y, z, mode, type) {
+		var wl = start[':structureVillageWeightedPieceList'], total = totalWeight(wl);
+		if (total <= 0) return null;
+		for (var tries = 0; tries < 5; tries++) {
+			var r = rInt(rand, total), arr = C.listOf(wl);
+			for (var i = 0; i < arr.length; i++) {
+				var w = arr[i];
+				r -= w[':villagePieceWeight'];
+				if (r >= 0) continue;
+				if (!moreOk(w) || (w === start[':structVillagePieceWeight'] && arr.length > 1)) break;
+				var pc = w[':villagePieceClass'], name = pc && pc.$cls ? pc.$cls.name.split('/').pop() : '';
+				var c = makeHouse(name, start, list, rand, x, y, z, mode, type);
+				if (c) {
+					w[':villagePiecesSpawned']++;
+					start[':structVillagePieceWeight'] = w;
+					if (!moreOk(w)) { var k = arr.indexOf(w); if (wl.$list) wl.$list.splice(k, 1); else vm.callVirtual(wl, 'remove', '(Ljava/lang/Object;)Z', [w]); }
+					return c;
+				}
+			}
+		}
+		var tb = C.toAdd(x, y, z, 0, 0, 0, 3, 4, 2, mode);
+		if (C.findIntersecting(list, tb)) return null;
+		return newPiece('ComponentVillageTorch', start, type, rand, tb, mode);
+	};
+	var getNextStructureComponent = function (start, list, rand, x, y, z, mode, type) {
+		if (type > 50) return null;
+		var sb = start[':boundingBox'];
+		if (Math.abs(x - sb[':minX']) > 112 || Math.abs(z - sb[':minZ']) > 112) return null;
+		var c = getNextVillageComponent(start, list, rand, x, y, z, mode, type + 1);
+		if (!c) return null;
+		var b = c[':boundingBox'];
+		var cx = idiv(b[':minX'] + b[':maxX'], 2), cz = idiv(b[':minZ'] + b[':maxZ'], 2), len = Math.max(b[':maxX'] - b[':minX'], b[':maxZ'] - b[':minZ']);
+		if (!viable(start, cx, cz, idiv(len, 2) + 4)) return null;
+		C.listAdd(list, c);
+		C.listAdd(start[':field_74932_i'], c);
+		return c;
+	};
+	var getNextComponentVillagePath = function (start, list, rand, x, y, z, mode, type) {
+		if (type > 3 + start[':terrainType']) return null;
+		var sb = start[':boundingBox'];
+		if (Math.abs(x - sb[':minX']) > 112 || Math.abs(z - sb[':minZ']) > 112) return null;
+		var b = pathBox(start, list, rand, x, y, z, mode);
+		if (!b || b[':minY'] <= 10) return null;
+		var path = newPiece('ComponentVillagePathGen', start, type, rand, b, mode);
+		var cx = idiv(b[':minX'] + b[':maxX'], 2), cz = idiv(b[':minZ'] + b[':maxZ'], 2), len = Math.max(b[':maxX'] - b[':minX'], b[':maxZ'] - b[':minZ']);
+		if (!viable(start, cx, cz, idiv(len, 2) + 4)) return null;
+		C.listAdd(list, path);
+		C.listAdd(start[':field_74930_j'], path);
+		return path;
+	};
+	var pathBox = function (start, list, rand, x, y, z, mode) {
+		for (var len = 7 * rRange(rand, 3, 5); len >= 7; len -= 7) {
+			var b = C.toAdd(x, y, z, 0, 0, 0, 3, 3, len, mode);
+			if (!C.findIntersecting(list, b)) return b;
+		}
+		return null;
+	};
+	var LIST_ARGS = '(' + LCVSP + 'Ljava/util/List;Ljava/util/Random;IIIII)Lnet/minecraft/src/StructureComponent;';
+	def('StructureVillagePieces', { staticMethods: {
+		'getStructureVillageWeightedPieceList(Ljava/util/Random;I)Ljava/util/ArrayList;': function (vm, n, a) { return weightedList(a[0], a[1]); },
+		['getNextStructureComponent' + LIST_ARGS]: function (vm, n, a) { return getNextStructureComponent(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); },
+		['getNextStructureComponentVillagePath' + LIST_ARGS]: function (vm, n, a) { return getNextComponentVillagePath(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); },
+	} });
+	var nextNN = function (p, start, list, rand, dy, off) {
+		var b = p[':boundingBox'], t = p[':componentType'];
+		switch (p[':coordBaseMode']) {
+			case 0: case 2: return getNextStructureComponent(start, list, rand, b[':minX'] - 1, b[':minY'] + dy, b[':minZ'] + off, 1, t);
+			case 1: case 3: return getNextStructureComponent(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':minZ'] - 1, 2, t);
+		}
+		return null;
+	};
+	var nextPP = function (p, start, list, rand, dy, off) {
+		var b = p[':boundingBox'], t = p[':componentType'];
+		switch (p[':coordBaseMode']) {
+			case 0: case 2: return getNextStructureComponent(start, list, rand, b[':maxX'] + 1, b[':minY'] + dy, b[':minZ'] + off, 3, t);
+			case 1: case 3: return getNextStructureComponent(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':maxZ'] + 1, 0, t);
+		}
+		return null;
+	};
+	var buildOf = function (c, start, list, rand) {
+		var m = H.ov(c, C.K.build);
+		if (m) { vm.invoke(m, c, [start, list, rand]); return; }
+		for (var k = c.cls; k; k = k.superClass) if (k.native && k.spec && k.spec.$build) { k.spec.$build(c, start, list, rand); return; }
+	};
+
+	var INIT = {};
+	var newPiece = function (name, start, type, rand, b, mode) {
+		var p = vm.newObject(cls(name));
+		p[':componentType'] = type; p[':coordBaseMode'] = -1; p[':startPiece'] = start;
+		p[':averageGroundLevel'] = -1;
+		p[':coordBaseMode'] = mode; p[':boundingBox'] = b;
+		if (INIT[name]) INIT[name](p, rand);
+		return p;
+	};
+	var crop = function (rand) { switch (rInt(rand, 5)) { case 0: return B.carrot; case 1: return B.potato; default: return B.crops; } };
+	INIT.ComponentVillageHouse4_Garden = function (p, rand) { p[':isRoofAccessible'] = rBool(rand) ? 1 : 0; };
+	INIT.ComponentVillageWoodHut = function (p, rand) { p[':isTallHouse'] = rBool(rand) ? 1 : 0; p[':tablePosition'] = rInt(rand, 3); };
+	INIT.ComponentVillageField = function (p, rand) { p[':cropTypeA'] = crop(rand); p[':cropTypeB'] = crop(rand); p[':cropTypeC'] = crop(rand); p[':cropTypeD'] = crop(rand); };
+	INIT.ComponentVillageField2 = function (p, rand) { p[':cropTypeA'] = crop(rand); p[':cropTypeB'] = crop(rand); };
+	INIT.ComponentVillagePathGen = function (p) { var b = p[':boundingBox']; p[':averageGroundLevel'] = Math.max(C.xs(b), C.zs(b)); };
+
+	var PARTS = {}, BUILD = {}, VTYPE = {};
+	PARTS.ComponentVillageWell = function (p, w, rand, b) {
+		if (p[':averageGroundLevel'] < 0) {
+			p[':averageGroundLevel'] = groundLevel(p, w, b);
+			if (p[':averageGroundLevel'] < 0) return true;
+			C.offset(p[':boundingBox'], 0, p[':averageGroundLevel'] - p[':boundingBox'][':maxY'] + 3, 0);
+		}
+		fill(p, w, b, 1, 0, 1, 4, 12, 4, B.cobblestone, B.waterMoving, false);
+		place(p, w, 0, 0, 2, 12, 2, b); place(p, w, 0, 0, 3, 12, 2, b); place(p, w, 0, 0, 2, 12, 3, b); place(p, w, 0, 0, 3, 12, 3, b);
+		[[1, 1], [4, 1], [1, 4], [4, 4]].forEach(function (c) { place(p, w, B.fence, 0, c[0], 13, c[1], b); place(p, w, B.fence, 0, c[0], 14, c[1], b); });
+		fill(p, w, b, 1, 15, 1, 4, 15, 4, B.cobblestone, B.cobblestone, false);
+		for (var z = 0; z <= 5; z++) for (var x = 0; x <= 5; x++) {
+			if (x !== 0 && x !== 5 && z !== 0 && z !== 5) continue;
+			place(p, w, B.gravel, 0, x, 11, z, b);
+			clearUp(p, w, x, 12, z, b);
+		}
+		return true;
+	};
+	BUILD.ComponentVillageWell = function (p, start, list, rand) {
+		var b = p[':boundingBox'], t = p[':componentType'];
+		getNextComponentVillagePath(start, list, rand, b[':minX'] - 1, b[':maxY'] - 4, b[':minZ'] + 1, 1, t);
+		getNextComponentVillagePath(start, list, rand, b[':maxX'] + 1, b[':maxY'] - 4, b[':minZ'] + 1, 3, t);
+		getNextComponentVillagePath(start, list, rand, b[':minX'] + 1, b[':maxY'] - 4, b[':minZ'] - 1, 2, t);
+		getNextComponentVillagePath(start, list, rand, b[':minX'] + 1, b[':maxY'] - 4, b[':maxZ'] + 1, 0, t);
+	};
+	var wellInit = function (p, rand, x, z) {
+		p[':averageGroundLevel'] = -1;
+		p[':field_74924_a'] = 1;
+		p[':coordBaseMode'] = rInt(rand, 4);
+		p[':boundingBox'] = C.bb(x, 64, z, x + 6 - 1, 78, z + 6 - 1);
+	};
+	BUILD.ComponentVillagePathGen = function (p, start, list, rand) {
+		var any = false, len = p[':averageGroundLevel'], c, i;
+		for (i = rInt(rand, 5); i < len - 8; i += 2 + rInt(rand, 5)) {
+			c = nextNN(p, start, list, rand, 0, i);
+			if (c) { i += Math.max(C.xs(c[':boundingBox']), C.zs(c[':boundingBox'])); any = true; }
+		}
+		for (i = rInt(rand, 5); i < len - 8; i += 2 + rInt(rand, 5)) {
+			c = nextPP(p, start, list, rand, 0, i);
+			if (c) { i += Math.max(C.xs(c[':boundingBox']), C.zs(c[':boundingBox'])); any = true; }
+		}
+		var b = p[':boundingBox'], t = p[':componentType'];
+		if (any && rInt(rand, 3) > 0) {
+			switch (p[':coordBaseMode']) {
+				case 0: getNextComponentVillagePath(start, list, rand, b[':minX'] - 1, b[':minY'], b[':maxZ'] - 2, 1, t); break;
+				case 1: getNextComponentVillagePath(start, list, rand, b[':minX'], b[':minY'], b[':minZ'] - 1, 2, t); break;
+				case 2: getNextComponentVillagePath(start, list, rand, b[':minX'] - 1, b[':minY'], b[':minZ'], 1, t); break;
+				case 3: getNextComponentVillagePath(start, list, rand, b[':maxX'] - 2, b[':minY'], b[':minZ'] - 1, 2, t); break;
+			}
+		}
+		if (any && rInt(rand, 3) > 0) {
+			switch (p[':coordBaseMode']) {
+				case 0: getNextComponentVillagePath(start, list, rand, b[':maxX'] + 1, b[':minY'], b[':maxZ'] - 2, 3, t); break;
+				case 1: getNextComponentVillagePath(start, list, rand, b[':minX'], b[':minY'], b[':maxZ'] + 1, 0, t); break;
+				case 2: getNextComponentVillagePath(start, list, rand, b[':maxX'] + 1, b[':minY'], b[':minZ'], 3, t); break;
+				case 3: getNextComponentVillagePath(start, list, rand, b[':maxX'] - 2, b[':minY'], b[':maxZ'] + 1, 0, t); break;
+			}
+		}
+	};
+	PARTS.ComponentVillagePathGen = function (p, w, rand, b) {
+		var id = C.V(p, 'biomeBlock')(p, B.gravel, 0), o = p[':boundingBox'];
+		for (var x = o[':minX']; x <= o[':maxX']; x++) for (var z = o[':minZ']; z <= o[':maxZ']; z++) {
+			if (C.inside(b, x, 64, z)) C.setB(w, x, C.topSolid(w, x, z) - 1, z, id, 0, 2);
+		}
+		return true;
+	};
+	PARTS.ComponentVillageTorch = function (p, w, rand, b) {
+		if (!settle(p, w, b, 4)) return true;
+		fill(p, w, b, 0, 0, 0, 2, 3, 1, 0, 0, false);
+		place(p, w, B.fence, 0, 1, 0, 0, b); place(p, w, B.fence, 0, 1, 1, 0, b); place(p, w, B.fence, 0, 1, 2, 0, b);
+		place(p, w, B.cloth, 15, 1, 3, 0, b);
+		place(p, w, B.torchWood, 0, 0, 3, 0, b); place(p, w, B.torchWood, 0, 1, 3, 1, b); place(p, w, B.torchWood, 0, 2, 3, 0, b); place(p, w, B.torchWood, 0, 1, 3, -1, b);
+		return true;
+	};
+	PARTS.ComponentVillageHouse4_Garden = function (p, w, rand, b) {
+		if (!settle(p, w, b, 6)) return true;
+		fill(p, w, b, 0, 0, 0, 4, 0, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 4, 0, 4, 4, 4, B.wood, B.wood, false);
+		fill(p, w, b, 1, 4, 1, 3, 4, 3, B.planks, B.planks, false);
+		[[0, 0], [4, 0], [0, 4], [4, 4]].forEach(function (c) { for (var y = 1; y <= 3; y++) place(p, w, B.cobblestone, 0, c[0], y, c[1], b); });
+		fill(p, w, b, 0, 1, 1, 0, 3, 3, B.planks, B.planks, false);
+		fill(p, w, b, 4, 1, 1, 4, 3, 3, B.planks, B.planks, false);
+		fill(p, w, b, 1, 1, 4, 3, 3, 4, B.planks, B.planks, false);
+		place(p, w, B.thinGlass, 0, 0, 2, 2, b); place(p, w, B.thinGlass, 0, 2, 2, 4, b); place(p, w, B.thinGlass, 0, 4, 2, 2, b);
+		place(p, w, B.planks, 0, 1, 1, 0, b); place(p, w, B.planks, 0, 1, 2, 0, b); place(p, w, B.planks, 0, 1, 3, 0, b);
+		place(p, w, B.planks, 0, 2, 3, 0, b); place(p, w, B.planks, 0, 3, 3, 0, b); place(p, w, B.planks, 0, 3, 2, 0, b); place(p, w, B.planks, 0, 3, 1, 0, b);
+		doorStep(p, w, b, 2);
+		fill(p, w, b, 1, 1, 1, 3, 3, 3, 0, 0, false);
+		if (p[':isRoofAccessible']) {
+			for (var x = 0; x <= 4; x++) place(p, w, B.fence, 0, x, 5, 0, b);
+			for (x = 0; x <= 4; x++) place(p, w, B.fence, 0, x, 5, 4, b);
+			place(p, w, B.fence, 0, 4, 5, 1, b); place(p, w, B.fence, 0, 4, 5, 2, b); place(p, w, B.fence, 0, 4, 5, 3, b);
+			place(p, w, B.fence, 0, 0, 5, 1, b); place(p, w, B.fence, 0, 0, 5, 2, b); place(p, w, B.fence, 0, 0, 5, 3, b);
+			var lm = META(p, B.ladder, 3);
+			for (var y = 1; y <= 4; y++) place(p, w, B.ladder, lm, 3, y, 3, b);
+		}
+		place(p, w, B.torchWood, 0, 2, 3, 1, b);
+		foundation(p, w, b, 5, 5, 6, B.cobblestone);
+		spawnVillagers(p, w, b, 1, 1, 2, 1);
+		return true;
+	};
+	PARTS.ComponentVillageHouse1 = function (p, w, rand, b) {
+		if (!settle(p, w, b, 9)) return true;
+		fill(p, w, b, 1, 1, 1, 7, 5, 4, 0, 0, false);
+		fill(p, w, b, 0, 0, 0, 8, 0, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 5, 0, 8, 5, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 6, 1, 8, 6, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 7, 2, 8, 7, 3, B.cobblestone, B.cobblestone, false);
+		var m3 = META(p, B.stairsWoodOak, 3), m2 = META(p, B.stairsWoodOak, 2), i, x;
+		for (i = -1; i <= 2; i++) for (x = 0; x <= 8; x++) { place(p, w, B.stairsWoodOak, m3, x, 6 + i, i, b); place(p, w, B.stairsWoodOak, m2, x, 6 + i, 5 - i, b); }
+		fill(p, w, b, 0, 1, 0, 0, 1, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 1, 5, 8, 1, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 8, 1, 0, 8, 1, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 2, 1, 0, 7, 1, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 2, 0, 0, 4, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 2, 5, 0, 4, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 8, 2, 5, 8, 4, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 8, 2, 0, 8, 4, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 2, 1, 0, 4, 4, B.planks, B.planks, false);
+		fill(p, w, b, 1, 2, 5, 7, 4, 5, B.planks, B.planks, false);
+		fill(p, w, b, 8, 2, 1, 8, 4, 4, B.planks, B.planks, false);
+		fill(p, w, b, 1, 2, 0, 7, 4, 0, B.planks, B.planks, false);
+		[[4, 2, 0], [5, 2, 0], [6, 2, 0], [4, 3, 0], [5, 3, 0], [6, 3, 0], [0, 2, 2], [0, 2, 3], [0, 3, 2], [0, 3, 3], [8, 2, 2], [8, 2, 3], [8, 3, 2], [8, 3, 3],
+			[2, 2, 5], [3, 2, 5], [5, 2, 5], [6, 2, 5]].forEach(function (c) { place(p, w, B.thinGlass, 0, c[0], c[1], c[2], b); });
+		fill(p, w, b, 1, 4, 1, 7, 4, 1, B.planks, B.planks, false);
+		fill(p, w, b, 1, 4, 4, 7, 4, 4, B.planks, B.planks, false);
+		fill(p, w, b, 1, 3, 4, 7, 3, 4, B.bookShelf, B.bookShelf, false);
+		place(p, w, B.planks, 0, 7, 1, 4, b);
+		place(p, w, B.stairsWoodOak, META(p, B.stairsWoodOak, 0), 7, 1, 3, b);
+		var s3 = META(p, B.stairsWoodOak, 3);
+		place(p, w, B.stairsWoodOak, s3, 6, 1, 4, b); place(p, w, B.stairsWoodOak, s3, 5, 1, 4, b); place(p, w, B.stairsWoodOak, s3, 4, 1, 4, b); place(p, w, B.stairsWoodOak, s3, 3, 1, 4, b);
+		place(p, w, B.fence, 0, 6, 1, 3, b); place(p, w, B.pressurePlatePlanks, 0, 6, 2, 3, b);
+		place(p, w, B.fence, 0, 4, 1, 3, b); place(p, w, B.pressurePlatePlanks, 0, 4, 2, 3, b);
+		place(p, w, B.workbench, 0, 7, 1, 1, b);
+		place(p, w, 0, 0, 1, 1, 0, b); place(p, w, 0, 0, 1, 2, 0, b);
+		placeDoor(p, w, b, rand, 1, 1, 0, META(p, B.doorWood, 1));
+		doorStep(p, w, b, 1);
+		foundation(p, w, b, 6, 9, 9, B.cobblestone);
+		spawnVillagers(p, w, b, 2, 1, 2, 1);
+		return true;
+	};
+	VTYPE.ComponentVillageHouse1 = function () { return 1; };
+	var field = function (p, w, rand, b, wide) {
+		if (!settle(p, w, b, 4)) return true;
+		var X1 = wide ? 12 : 6;
+		fill(p, w, b, 0, 1, 0, X1, 4, 8, 0, 0, false);
+		fill(p, w, b, 1, 0, 1, 2, 0, 7, B.tilledField, B.tilledField, false);
+		fill(p, w, b, 4, 0, 1, 5, 0, 7, B.tilledField, B.tilledField, false);
+		if (wide) {
+			fill(p, w, b, 7, 0, 1, 8, 0, 7, B.tilledField, B.tilledField, false);
+			fill(p, w, b, 10, 0, 1, 11, 0, 7, B.tilledField, B.tilledField, false);
+		}
+		fill(p, w, b, 0, 0, 0, 0, 0, 8, B.wood, B.wood, false);
+		fill(p, w, b, 6, 0, 0, 6, 0, 8, B.wood, B.wood, false);
+		if (wide) fill(p, w, b, 12, 0, 0, 12, 0, 8, B.wood, B.wood, false);
+		fill(p, w, b, 1, 0, 0, X1 - 1, 0, 0, B.wood, B.wood, false);
+		fill(p, w, b, 1, 0, 8, X1 - 1, 0, 8, B.wood, B.wood, false);
+		fill(p, w, b, 3, 0, 1, 3, 0, 7, B.waterMoving, B.waterMoving, false);
+		if (wide) fill(p, w, b, 9, 0, 1, 9, 0, 7, B.waterMoving, B.waterMoving, false);
+		var crops = wide ? [[':cropTypeA', 1], [':cropTypeA', 2], [':cropTypeB', 4], [':cropTypeB', 5], [':cropTypeC', 7], [':cropTypeC', 8], [':cropTypeD', 10], [':cropTypeD', 11]]
+			: [[':cropTypeA', 1], [':cropTypeA', 2], [':cropTypeB', 4], [':cropTypeB', 5]];
+		for (var z = 1; z <= 7; z++) crops.forEach(function (c) { place(p, w, p[c[0]], rRange(rand, 2, 7), c[1], 1, z, b); });
+		foundation(p, w, b, 9, X1 + 1, 4, B.dirt);
+		return true;
+	};
+	PARTS.ComponentVillageField = function (p, w, rand, b) { return field(p, w, rand, b, true); };
+	PARTS.ComponentVillageField2 = function (p, w, rand, b) { return field(p, w, rand, b, false); };
+	PARTS.ComponentVillageHall = function (p, w, rand, b) {
+		if (!settle(p, w, b, 7)) return true;
+		fill(p, w, b, 1, 1, 1, 7, 4, 4, 0, 0, false);
+		fill(p, w, b, 2, 1, 6, 8, 4, 10, 0, 0, false);
+		fill(p, w, b, 2, 0, 6, 8, 0, 10, B.dirt, B.dirt, false);
+		place(p, w, B.cobblestone, 0, 6, 0, 6, b);
+		fill(p, w, b, 2, 1, 6, 2, 1, 10, B.fence, B.fence, false);
+		fill(p, w, b, 8, 1, 6, 8, 1, 10, B.fence, B.fence, false);
+		fill(p, w, b, 3, 1, 10, 7, 1, 10, B.fence, B.fence, false);
+		fill(p, w, b, 1, 0, 1, 7, 0, 4, B.planks, B.planks, false);
+		fill(p, w, b, 0, 0, 0, 0, 3, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 8, 0, 0, 8, 3, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 0, 0, 7, 1, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 0, 5, 7, 1, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 2, 0, 7, 3, 0, B.planks, B.planks, false);
+		fill(p, w, b, 1, 2, 5, 7, 3, 5, B.planks, B.planks, false);
+		fill(p, w, b, 0, 4, 1, 8, 4, 1, B.planks, B.planks, false);
+		fill(p, w, b, 0, 4, 4, 8, 4, 4, B.planks, B.planks, false);
+		fill(p, w, b, 0, 5, 2, 8, 5, 3, B.planks, B.planks, false);
+		place(p, w, B.planks, 0, 0, 4, 2, b); place(p, w, B.planks, 0, 0, 4, 3, b); place(p, w, B.planks, 0, 8, 4, 2, b); place(p, w, B.planks, 0, 8, 4, 3, b);
+		var m3 = META(p, B.stairsWoodOak, 3), m2 = META(p, B.stairsWoodOak, 2), i, x;
+		for (i = -1; i <= 2; i++) for (x = 0; x <= 8; x++) { place(p, w, B.stairsWoodOak, m3, x, 4 + i, i, b); place(p, w, B.stairsWoodOak, m2, x, 4 + i, 5 - i, b); }
+		place(p, w, B.wood, 0, 0, 2, 1, b); place(p, w, B.wood, 0, 0, 2, 4, b); place(p, w, B.wood, 0, 8, 2, 1, b); place(p, w, B.wood, 0, 8, 2, 4, b);
+		[[0, 2, 2], [0, 2, 3], [8, 2, 2], [8, 2, 3], [2, 2, 5], [3, 2, 5], [5, 2, 0], [6, 2, 5]].forEach(function (c) { place(p, w, B.thinGlass, 0, c[0], c[1], c[2], b); });
+		place(p, w, B.fence, 0, 2, 1, 3, b); place(p, w, B.pressurePlatePlanks, 0, 2, 2, 3, b);
+		place(p, w, B.planks, 0, 1, 1, 4, b);
+		place(p, w, B.stairsWoodOak, META(p, B.stairsWoodOak, 3), 2, 1, 4, b);
+		place(p, w, B.stairsWoodOak, META(p, B.stairsWoodOak, 1), 1, 1, 3, b);
+		fill(p, w, b, 5, 0, 1, 7, 0, 3, B.stoneDoubleSlab, B.stoneDoubleSlab, false);
+		place(p, w, B.stoneDoubleSlab, 0, 6, 1, 1, b); place(p, w, B.stoneDoubleSlab, 0, 6, 1, 2, b);
+		place(p, w, 0, 0, 2, 1, 0, b); place(p, w, 0, 0, 2, 2, 0, b);
+		place(p, w, B.torchWood, 0, 2, 3, 1, b);
+		placeDoor(p, w, b, rand, 2, 1, 0, META(p, B.doorWood, 1));
+		doorStep(p, w, b, 2);
+		place(p, w, 0, 0, 6, 1, 5, b); place(p, w, 0, 0, 6, 2, 5, b);
+		place(p, w, B.torchWood, 0, 6, 3, 4, b);
+		placeDoor(p, w, b, rand, 6, 1, 5, META(p, B.doorWood, 1));
+		foundation(p, w, b, 5, 9, 7, B.cobblestone);
+		spawnVillagers(p, w, b, 4, 1, 2, 2);
+		return true;
+	};
+	VTYPE.ComponentVillageHall = function (p, i) { return i === 0 ? 4 : 0; };
+	PARTS.ComponentVillageWoodHut = function (p, w, rand, b) {
+		if (!settle(p, w, b, 6)) return true;
+		fill(p, w, b, 1, 1, 1, 3, 5, 4, 0, 0, false);
+		fill(p, w, b, 0, 0, 0, 3, 0, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 0, 1, 2, 0, 3, B.dirt, B.dirt, false);
+		if (p[':isTallHouse']) fill(p, w, b, 1, 4, 1, 2, 4, 3, B.wood, B.wood, false);
+		else fill(p, w, b, 1, 5, 1, 2, 5, 3, B.wood, B.wood, false);
+		[[1, 0], [2, 0], [1, 4], [2, 4], [0, 1], [0, 2], [0, 3], [3, 1], [3, 2], [3, 3]].forEach(function (c) { place(p, w, B.wood, 0, c[0], 4, c[1], b); });
+		fill(p, w, b, 0, 1, 0, 0, 3, 0, B.wood, B.wood, false);
+		fill(p, w, b, 3, 1, 0, 3, 3, 0, B.wood, B.wood, false);
+		fill(p, w, b, 0, 1, 4, 0, 3, 4, B.wood, B.wood, false);
+		fill(p, w, b, 3, 1, 4, 3, 3, 4, B.wood, B.wood, false);
+		fill(p, w, b, 0, 1, 1, 0, 3, 3, B.planks, B.planks, false);
+		fill(p, w, b, 3, 1, 1, 3, 3, 3, B.planks, B.planks, false);
+		fill(p, w, b, 1, 1, 0, 2, 3, 0, B.planks, B.planks, false);
+		fill(p, w, b, 1, 1, 4, 2, 3, 4, B.planks, B.planks, false);
+		place(p, w, B.thinGlass, 0, 0, 2, 2, b); place(p, w, B.thinGlass, 0, 3, 2, 2, b);
+		if (p[':tablePosition'] > 0) { place(p, w, B.fence, 0, p[':tablePosition'], 1, 3, b); place(p, w, B.pressurePlatePlanks, 0, p[':tablePosition'], 2, 3, b); }
+		place(p, w, 0, 0, 1, 1, 0, b); place(p, w, 0, 0, 1, 2, 0, b);
+		placeDoor(p, w, b, rand, 1, 1, 0, META(p, B.doorWood, 1));
+		doorStep(p, w, b, 1);
+		foundation(p, w, b, 5, 4, 6, B.cobblestone);
+		spawnVillagers(p, w, b, 1, 1, 2, 1);
+		return true;
+	};
+	PARTS.ComponentVillageChurch = function (p, w, rand, b) {
+		if (!settle(p, w, b, 12)) return true;
+		fill(p, w, b, 1, 1, 1, 3, 3, 7, 0, 0, false);
+		fill(p, w, b, 1, 5, 1, 3, 9, 3, 0, 0, false);
+		fill(p, w, b, 1, 0, 0, 3, 0, 8, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 1, 0, 3, 10, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 1, 1, 0, 10, 3, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 4, 1, 1, 4, 10, 3, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 0, 4, 0, 4, 7, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 4, 0, 4, 4, 4, 7, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 1, 8, 3, 4, 8, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 5, 4, 3, 10, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 5, 5, 3, 5, 7, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 9, 0, 4, 9, 4, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 4, 0, 4, 4, 4, B.cobblestone, B.cobblestone, false);
+		[[0, 11, 2], [4, 11, 2], [2, 11, 0], [2, 11, 4], [1, 1, 6], [1, 1, 7], [2, 1, 7], [3, 1, 6], [3, 1, 7]].forEach(function (c) { place(p, w, B.cobblestone, 0, c[0], c[1], c[2], b); });
+		place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 3), 1, 1, 5, b);
+		place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 3), 2, 1, 6, b);
+		place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 3), 3, 1, 5, b);
+		place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 1), 1, 2, 7, b);
+		place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 0), 3, 2, 7, b);
+		[[0, 2, 2], [0, 3, 2], [4, 2, 2], [4, 3, 2], [0, 6, 2], [0, 7, 2], [4, 6, 2], [4, 7, 2], [2, 6, 0], [2, 7, 0], [2, 6, 4], [2, 7, 4], [0, 3, 6], [4, 3, 6], [2, 3, 8]]
+			.forEach(function (c) { place(p, w, B.thinGlass, 0, c[0], c[1], c[2], b); });
+		place(p, w, B.torchWood, 0, 2, 4, 7, b); place(p, w, B.torchWood, 0, 1, 4, 6, b); place(p, w, B.torchWood, 0, 3, 4, 6, b); place(p, w, B.torchWood, 0, 2, 4, 5, b);
+		var lm = META(p, B.ladder, 4);
+		for (var y = 1; y <= 9; y++) place(p, w, B.ladder, lm, 3, y, 3, b);
+		place(p, w, 0, 0, 2, 1, 0, b); place(p, w, 0, 0, 2, 2, 0, b);
+		placeDoor(p, w, b, rand, 2, 1, 0, META(p, B.doorWood, 1));
+		doorStep(p, w, b, 2);
+		foundation(p, w, b, 9, 5, 12, B.cobblestone);
+		spawnVillagers(p, w, b, 2, 1, 2, 1);
+		return true;
+	};
+	VTYPE.ComponentVillageChurch = function () { return 2; };
+	var BLACKSMITH = [[264, 0, 1, 3, 3], [265, 0, 1, 5, 10], [266, 0, 1, 3, 5], [297, 0, 1, 3, 15], [260, 0, 1, 3, 15], [257, 0, 1, 1, 5], [267, 0, 1, 1, 5],
+		[307, 0, 1, 1, 5], [306, 0, 1, 1, 5], [308, 0, 1, 1, 5], [309, 0, 1, 1, 5], [49, 0, 3, 7, 5], [6, 0, 3, 7, 5]];
+	var blacksmithLoot = null;
+	PARTS.ComponentVillageHouse2 = function (p, w, rand, b) {
+		if (!settle(p, w, b, 6)) return true;
+		fill(p, w, b, 0, 1, 0, 9, 4, 6, 0, 0, false);
+		fill(p, w, b, 0, 0, 0, 9, 0, 6, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 4, 0, 9, 4, 6, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 0, 5, 0, 9, 5, 6, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, b, 1, 5, 1, 8, 5, 5, 0, 0, false);
+		fill(p, w, b, 1, 1, 0, 2, 3, 0, B.planks, B.planks, false);
+		fill(p, w, b, 0, 1, 0, 0, 4, 0, B.wood, B.wood, false);
+		fill(p, w, b, 3, 1, 0, 3, 4, 0, B.wood, B.wood, false);
+		fill(p, w, b, 0, 1, 6, 0, 4, 6, B.wood, B.wood, false);
+		place(p, w, B.planks, 0, 3, 3, 1, b);
+		fill(p, w, b, 3, 1, 2, 3, 3, 2, B.planks, B.planks, false);
+		fill(p, w, b, 4, 1, 3, 5, 3, 3, B.planks, B.planks, false);
+		fill(p, w, b, 0, 1, 1, 0, 3, 5, B.planks, B.planks, false);
+		fill(p, w, b, 1, 1, 6, 5, 3, 6, B.planks, B.planks, false);
+		fill(p, w, b, 5, 1, 0, 5, 3, 0, B.fence, B.fence, false);
+		fill(p, w, b, 9, 1, 0, 9, 3, 0, B.fence, B.fence, false);
+		fill(p, w, b, 6, 1, 4, 9, 4, 6, B.cobblestone, B.cobblestone, false);
+		place(p, w, B.lavaMoving, 0, 7, 1, 5, b); place(p, w, B.lavaMoving, 0, 8, 1, 5, b);
+		place(p, w, B.fenceIron, 0, 9, 2, 5, b); place(p, w, B.fenceIron, 0, 9, 2, 4, b);
+		fill(p, w, b, 7, 2, 4, 8, 2, 5, 0, 0, false);
+		place(p, w, B.cobblestone, 0, 6, 1, 3, b);
+		place(p, w, B.furnaceIdle, 0, 6, 2, 3, b); place(p, w, B.furnaceIdle, 0, 6, 3, 3, b);
+		place(p, w, B.stoneDoubleSlab, 0, 8, 1, 1, b);
+		place(p, w, B.thinGlass, 0, 0, 2, 2, b); place(p, w, B.thinGlass, 0, 0, 2, 4, b); place(p, w, B.thinGlass, 0, 2, 2, 6, b); place(p, w, B.thinGlass, 0, 4, 2, 6, b);
+		place(p, w, B.fence, 0, 2, 1, 4, b); place(p, w, B.pressurePlatePlanks, 0, 2, 2, 4, b);
+		place(p, w, B.planks, 0, 1, 1, 5, b);
+		place(p, w, B.stairsWoodOak, META(p, B.stairsWoodOak, 3), 2, 1, 5, b);
+		place(p, w, B.stairsWoodOak, META(p, B.stairsWoodOak, 1), 1, 1, 4, b);
+		if (!p[':hasMadeChest']) {
+			var cy = C.Y(p, 1), cx = C.X(p, 5, 5), cz = C.Z(p, 5, 5);
+			if (C.inside(b, cx, cy, cz)) {
+				p[':hasMadeChest'] = 1;
+				blacksmithLoot = blacksmithLoot || BLACKSMITH.map(function (e) { var o = C.loot(e[0], e[1], e[2], e[3], e[4]); o.$vanilla = true; return o; });
+				C.chest(p, w, b, rand, 5, 1, 5, C.withMods(blacksmithLoot, 'villageBlacksmith'), 3 + rInt(rand, 6));
+			}
+		}
+		for (var x = 6; x <= 8; x++) if (idAt(p, w, x, 0, -1, b) === 0 && idAt(p, w, x, -1, -1, b) !== 0) place(p, w, B.stairsCobblestone, META(p, B.stairsCobblestone, 3), x, 0, -1, b);
+		foundation(p, w, b, 7, 10, 6, B.cobblestone);
+		spawnVillagers(p, w, b, 7, 1, 1, 1);
+		return true;
+	};
+	VTYPE.ComponentVillageHouse2 = function () { return 3; };
+	PARTS.ComponentVillageHouse3 = function (p, w, rand, b) {
+		if (!settle(p, w, b, 7)) return true;
+		fill(p, w, b, 1, 1, 1, 7, 4, 4, 0, 0, false);
+		fill(p, w, b, 2, 1, 6, 8, 4, 10, 0, 0, false);
+		fill(p, w, b, 2, 0, 5, 8, 0, 10, B.planks, B.planks, false);
+		fill(p, w, b, 1, 0, 1, 7, 0, 4, B.planks, B.planks, false);
+		fill(p, w, b, 0, 0, 0, 0, 3, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 8, 0, 0, 8, 3, 10, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 0, 0, 7, 2, 0, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 0, 5, 2, 1, 5, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 2, 0, 6, 2, 3, 10, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 3, 0, 10, 7, 3, 10, B.cobblestone, B.cobblestone, false);
+		fill(p, w, b, 1, 2, 0, 7, 3, 0, B.planks, B.planks, false);
+		fill(p, w, b, 1, 2, 5, 2, 3, 5, B.planks, B.planks, false);
+		fill(p, w, b, 0, 4, 1, 8, 4, 1, B.planks, B.planks, false);
+		fill(p, w, b, 0, 4, 4, 3, 4, 4, B.planks, B.planks, false);
+		fill(p, w, b, 0, 5, 2, 8, 5, 3, B.planks, B.planks, false);
+		place(p, w, B.planks, 0, 0, 4, 2, b); place(p, w, B.planks, 0, 0, 4, 3, b); place(p, w, B.planks, 0, 8, 4, 2, b); place(p, w, B.planks, 0, 8, 4, 3, b); place(p, w, B.planks, 0, 8, 4, 4, b);
+		var m3 = META(p, B.stairsWoodOak, 3), m2 = META(p, B.stairsWoodOak, 2), i, x, z;
+		for (i = -1; i <= 2; i++) for (x = 0; x <= 8; x++) {
+			place(p, w, B.stairsWoodOak, m3, x, 4 + i, i, b);
+			if ((i > -1 || x <= 1) && (i > 0 || x <= 3) && (i > 1 || x <= 4 || x >= 6)) place(p, w, B.stairsWoodOak, m2, x, 4 + i, 5 - i, b);
+		}
+		fill(p, w, b, 3, 4, 5, 3, 4, 10, B.planks, B.planks, false);
+		fill(p, w, b, 7, 4, 2, 7, 4, 10, B.planks, B.planks, false);
+		fill(p, w, b, 4, 5, 4, 4, 5, 10, B.planks, B.planks, false);
+		fill(p, w, b, 6, 5, 4, 6, 5, 10, B.planks, B.planks, false);
+		fill(p, w, b, 5, 6, 3, 5, 6, 10, B.planks, B.planks, false);
+		var m0 = META(p, B.stairsWoodOak, 0);
+		for (x = 4; x >= 1; x--) {
+			place(p, w, B.planks, 0, x, 2 + x, 7 - x, b);
+			for (z = 8 - x; z <= 10; z++) place(p, w, B.stairsWoodOak, m0, x, 2 + x, z, b);
+		}
+		var m1 = META(p, B.stairsWoodOak, 1);
+		place(p, w, B.planks, 0, 6, 6, 3, b); place(p, w, B.planks, 0, 7, 5, 4, b);
+		place(p, w, B.stairsWoodOak, m1, 6, 6, 4, b);
+		for (x = 6; x <= 8; x++) for (z = 5; z <= 10; z++) place(p, w, B.stairsWoodOak, m1, x, 12 - x, z, b);
+		[[B.wood, 0, 2, 1], [B.wood, 0, 2, 4], [B.thinGlass, 0, 2, 2], [B.thinGlass, 0, 2, 3], [B.wood, 4, 2, 0], [B.thinGlass, 5, 2, 0], [B.wood, 6, 2, 0],
+			[B.wood, 8, 2, 1], [B.thinGlass, 8, 2, 2], [B.thinGlass, 8, 2, 3], [B.wood, 8, 2, 4], [B.planks, 8, 2, 5], [B.wood, 8, 2, 6], [B.thinGlass, 8, 2, 7],
+			[B.thinGlass, 8, 2, 8], [B.wood, 8, 2, 9], [B.wood, 2, 2, 6], [B.thinGlass, 2, 2, 7], [B.thinGlass, 2, 2, 8], [B.wood, 2, 2, 9], [B.wood, 4, 4, 10],
+			[B.thinGlass, 5, 4, 10], [B.wood, 6, 4, 10], [B.planks, 5, 5, 10]].forEach(function (c) { place(p, w, c[0], 0, c[1], c[2], c[3], b); });
+		place(p, w, 0, 0, 2, 1, 0, b); place(p, w, 0, 0, 2, 2, 0, b);
+		place(p, w, B.torchWood, 0, 2, 3, 1, b);
+		placeDoor(p, w, b, rand, 2, 1, 0, META(p, B.doorWood, 1));
+		fill(p, w, b, 1, 0, -1, 3, 2, -1, 0, 0, false);
+		doorStep(p, w, b, 2);
+		foundation(p, w, b, 5, 9, 7, B.cobblestone);
+		for (z = 5; z < 11; z++) for (x = 2; x < 9; x++) { clearUp(p, w, x, 7, z, b); fillDown(p, w, B.cobblestone, 0, x, -1, z, b); }
+		spawnVillagers(p, w, b, 4, 1, 2, 2);
+		return true;
+	};
+
+	var LIST = 'Ljava/util/List;', LR = 'Ljava/util/Random;', LBB = 'Lnet/minecraft/src/StructureBoundingBox;', LW = 'Lnet/minecraft/src/World;';
+	var partsKey = C.K.parts, buildKey = C.K.build;
+	def('ComponentVillage', { super: SRC + 'StructureComponent', access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, $js: vjs,
+		fields: { villagersSpawned: 'I', startPiece: LCVSP, averageGroundLevel: 'I', field_143015_k: 'I', field_143014_b: 'Z' }, methods: {
+		['<init>(' + LCVSP + 'I)V']: function (vm, s, a) { s[':componentType'] = a[1]; s[':coordBaseMode'] = -1; s[':startPiece'] = a[0]; s[':averageGroundLevel'] = -1; if (a[0]) s[':field_143014_b'] = a[0][':inDesert']; },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; s[':averageGroundLevel'] = -1; },
+		['getNextComponentNN(' + LCVSP + LIST + LR + 'II)Lnet/minecraft/src/StructureComponent;']: function (vm, s, a) { return nextNN(s, a[0], a[1], a[2], a[3], a[4]); },
+		['getNextComponentPP(' + LCVSP + LIST + LR + 'II)Lnet/minecraft/src/StructureComponent;']: function (vm, s, a) { return nextPP(s, a[0], a[1], a[2], a[3], a[4]); },
+		['getAverageGroundLevel(' + LW + LBB + ')I']: function (vm, s, a) { return groundLevel(s, a[0], a[1]); },
+		['spawnVillagers(' + LW + LBB + 'IIII)V']: function (vm, s, a) { spawnVillagers(s, a[0], a[1], a[2], a[3], a[4], a[5]); },
+		'getVillagerType(I)I': function () { return 0; },
+		'getBiomeSpecificBlock(II)I': function (vm, s, a) { return biomeBlock(s, a[0], a[1]); },
+		'getBiomeSpecificBlockMetadata(II)I': function (vm, s, a) { return biomeMeta(s, a[0], a[1]); },
+		[C.K.place]: function (vm, s, a) { vjs.place(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		[C.K.fill]: function (vm, s, a) { vjs.fill(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]); },
+		[C.K.fillDown]: function (vm, s, a) { vjs.fillDown(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+	}, staticMethods: { ['canVillageGoDeeper(' + LBB + ')Z']: function (vm, n, a) { return canGoDeeper(a[0]) ? 1 : 0; } } });
+	vm.natives[SRC + 'ComponentVillage'].$js.villagerType = function () { return 0; };
+	def('ComponentVillageRoadPiece', { super: SRC + 'ComponentVillage', access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {
+		['<init>(' + LCVSP + 'I)V']: function (vm, s, a) { s[':componentType'] = a[1]; s[':coordBaseMode'] = -1; s[':startPiece'] = a[0]; s[':averageGroundLevel'] = -1; },
+	} });
+	var pieceClass = function (name, sup, extraFields) {
+		var parts = PARTS[name], build = BUILD[name], vt = VTYPE[name];
+		var m = {};
+		m[PIECE_INIT] = function (vm, s, a) {
+			s[':componentType'] = a[1]; s[':startPiece'] = a[0]; s[':averageGroundLevel'] = -1; s[':coordBaseMode'] = a[4]; s[':boundingBox'] = a[3];
+			if (INIT[name]) INIT[name](s, a[2]);
+		};
+		m['<init>()V'] = function (vm, s) { s[':coordBaseMode'] = -1; s[':averageGroundLevel'] = -1; };
+		if (parts) m[partsKey] = function (vm, s, a) { return parts(s, a[0], a[1], a[2]) ? 1 : 0; };
+		if (build) m[buildKey] = function (vm, s, a) { build(s, a[0], a[1], a[2]); };
+		if (vt) m['getVillagerType(I)I'] = function (vm, s, a) { return vt(s, a[0]); };
+		var f = {}; (extraFields || []).forEach(function (k) { f[k[0]] = k[1]; });
+		def(name, { super: SRC + sup, fields: f, methods: m, $parts: parts, $build: build, $js: vt ? { villagerType: vt } : undefined });
+	};
+	pieceClass('ComponentVillageWell', 'ComponentVillage', [['field_74924_a', 'Z']]);
+	pieceClass('ComponentVillagePathGen', 'ComponentVillageRoadPiece');
+	pieceClass('ComponentVillageTorch', 'ComponentVillage');
+	pieceClass('ComponentVillageHouse4_Garden', 'ComponentVillage', [['isRoofAccessible', 'Z']]);
+	pieceClass('ComponentVillageHouse1', 'ComponentVillage');
+	pieceClass('ComponentVillageField', 'ComponentVillage', [['cropTypeA', 'I'], ['cropTypeB', 'I'], ['cropTypeC', 'I'], ['cropTypeD', 'I']]);
+	pieceClass('ComponentVillageField2', 'ComponentVillage', [['cropTypeA', 'I'], ['cropTypeB', 'I']]);
+	pieceClass('ComponentVillageHall', 'ComponentVillage');
+	pieceClass('ComponentVillageWoodHut', 'ComponentVillage', [['isTallHouse', 'Z'], ['tablePosition', 'I']]);
+	pieceClass('ComponentVillageChurch', 'ComponentVillage');
+	pieceClass('ComponentVillageHouse2', 'ComponentVillage', [['hasMadeChest', 'Z']]);
+	pieceClass('ComponentVillageHouse3', 'ComponentVillage');
+	Object.keys(HOUSES).concat(['ComponentVillageTorch']).forEach(function (n) {
+		var sp = vm.natives[SRC + n], srg = { ComponentVillageHouse4_Garden: 'func_74912_a', ComponentVillageChurch: 'func_74919_a', ComponentVillageHouse1: 'func_74898_a',
+			ComponentVillageWoodHut: 'func_74908_a', ComponentVillageHall: 'func_74906_a', ComponentVillageField: 'func_74900_a', ComponentVillageField2: 'func_74902_a',
+			ComponentVillageHouse2: 'func_74915_a', ComponentVillageHouse3: 'func_74921_a' }[n];
+		if (!srg) return;
+		sp.staticMethods = {};
+		sp.staticMethods[srg + '(' + LCVSP + LIST + LR + 'IIIII)Lnet/minecraft/src/' + n + ';'] = function (vm, c, a) { return makeHouse(n, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); };
+	});
+
+	var startInit = function (s, wcm, type, rand, x, z, list, size) {
+		s[':componentType'] = type; s[':startPiece'] = null; s[':averageGroundLevel'] = -1;
+		wellInit(s, rand, x, z);
+		s[':field_74932_i'] = C.newList(); s[':field_74930_j'] = C.newList();
+		s[':worldChunkMngr'] = wcm;
+		s[':structureVillageWeightedPieceList'] = list;
+		s[':terrainType'] = size;
+		var bio = wcm ? vm.callVirtual(wcm, 'getBiomeGenAt', '(II)Lnet/minecraft/src/BiomeGenBase;', [x, z]) : null;
+		var bc = cls('BiomeGenBase'); if (bc.initState !== 2) vm.initClass(bc);
+		s[':inDesert'] = bio && (bio === bc.statics.desert || bio === bc.statics.desertHills) ? 1 : 0;
+		s[':field_143014_b'] = s[':inDesert'];
+		s[':startPiece'] = s;
+	};
+	def('ComponentVillageStartPiece', { super: SRC + 'ComponentVillageWell', fields: {
+		worldChunkMngr: 'Lnet/minecraft/src/WorldChunkManager;', inDesert: 'Z', terrainType: 'I', structVillagePieceWeight: 'L' + SRC + PW + ';',
+		structureVillageWeightedPieceList: 'Ljava/util/ArrayList;', field_74932_i: 'Ljava/util/ArrayList;', field_74930_j: 'Ljava/util/ArrayList;' }, methods: {
+		'<init>(Lnet/minecraft/src/WorldChunkManager;ILjava/util/Random;IILjava/util/ArrayList;I)V': function (vm, s, a) { startInit(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; s[':averageGroundLevel'] = -1; },
+		'getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;': function (vm, s) { return s[':worldChunkMngr']; },
+	} });
+
+	var villageStart = function (s, w, rand, cx, cz, size) {
+		s[':components'] = s[':components'] || C.newList('java/util/LinkedList');
+		s[':hasMoreThanTwoComponents'] = 0;
+		var wl = weightedList(rand, size);
+		var wcm = vm.callVirtual(w, 'getWorldChunkManager', '()Lnet/minecraft/src/WorldChunkManager;', []);
+		var start = vm.newObject(cls('ComponentVillageStartPiece'));
+		startInit(start, wcm, 0, rand, (cx << 4) + 2, (cz << 4) + 2, wl, size);
+		var comps = s[':components'];
+		C.listAdd(comps, start);
+		buildOf(start, start, comps, rand);
+		var roads = start[':field_74930_j'], houses = start[':field_74932_i'];
+		for (;;) {
+			var r = C.listOf(roads), h = C.listOf(houses), c;
+			if (!r.length && !h.length) break;
+			if (!r.length) { c = h.splice(rInt(rand, h.length), 1)[0]; buildOf(c, start, comps, rand); }
+			else { c = r.splice(rInt(rand, r.length), 1)[0]; buildOf(c, start, comps, rand); }
+		}
+		C.updateBB(s);
+		var road = cls('ComponentVillageRoadPiece'), n = 0;
+		C.listOf(comps).forEach(function (c) { if (!c.cls.isSubclassOf(road)) n++; });
+		s[':hasMoreThanTwoComponents'] = n > 2 ? 1 : 0;
+	};
+	def('StructureVillageStart', { super: SRC + 'StructureStart', $sizeable: function (s) { return !!s[':hasMoreThanTwoComponents']; }, fields: { hasMoreThanTwoComponents: 'Z' }, methods: {
+		'<init>(Lnet/minecraft/src/World;Ljava/util/Random;III)V': function (vm, s, a) { s[':components'] = C.newList('java/util/LinkedList'); villageStart(s, a[0], a[1], a[2], a[3], a[4]); },
+		'<init>()V': function (vm, s) { s[':components'] = C.newList('java/util/LinkedList'); },
+		'isSizeableStructure()Z': function (vm, s) { return s[':hasMoreThanTwoComponents'] ? 1 : 0; },
+	} });
+
+	var canSpawnVillage = function (g, cx, cz) {
+		var dist = g[':field_82665_g'], sep = g[':field_82666_h'], x0 = cx, z0 = cz;
+		if (cx < 0) cx -= dist - 1;
+		if (cz < 0) cz -= dist - 1;
+		var rx = idiv(cx, dist), rz = idiv(cz, dist);
+		var w = g[':worldObj'];
+		var r = vm.callVirtual(w, 'setRandomSeed', '(III)Ljava/util/Random;', [rx, rz, 10387312]);
+		rx *= dist; rz *= dist;
+		rx += rInt(r, dist - sep);
+		rz += rInt(r, dist - sep);
+		if (x0 !== rx || z0 !== rz) return false;
+		var wcm = vm.callVirtual(w, 'getWorldChunkManager', '()Lnet/minecraft/src/WorldChunkManager;', []);
+		return !wcm || !!vm.callVirtual(wcm, 'areBiomesViable', '(IIILjava/util/List;)Z', [x0 * 16 + 8, z0 * 16 + 8, 0, spawnBiomes()]);
+	};
+	var newStart = function (g, cx, cz) {
+		var s = vm.newObject(cls('StructureVillageStart'));
+		s[':components'] = C.newList('java/util/LinkedList');
+		villageStart(s, g[':worldObj'], g[':rand'], cx, cz, g[':terrainType']);
+		return s;
+	};
+	var mgvInit = function (g) { C.baseInit(g); C.startsMap(g); g[':terrainType'] = 0; g[':field_82665_g'] = 32; g[':field_82666_h'] = 8; };
+	def('MapGenVillage', { super: SRC + 'MapGenStructure', $can: canSpawnVillage, $start: newStart,
+		statics: { villageSpawnBiomes: null },
+		clinit: function (vm, c) {
+			var bc = cls('BiomeGenBase'); vm.initClass(bc);
+			c.statics.villageSpawnBiomes = JVM.newList(vm, [bc.statics.plains, bc.statics.desert].filter(Boolean));
+		},
+		fields: { terrainType: 'I', field_82665_g: 'I', field_82666_h: 'I' }, methods: {
+		'<init>()V': function (vm, s) { mgvInit(s); },
+		'<init>(Ljava/util/Map;)V': function (vm, s, a) {
+			mgvInit(s);
+			var m = a[0], es = m && m.$m ? m.$m.entries() : [];
+			es.forEach(function (e) {
+				var k = String(e.k), v = String(e.v), n = parseInt(v, 10);
+				if (k === 'size') s[':terrainType'] = isNaN(n) ? s[':terrainType'] : Math.max(n, 0);
+				else if (k === 'distance') s[':field_82665_g'] = isNaN(n) ? s[':field_82665_g'] : Math.max(n, s[':field_82666_h'] + 1);
+			});
+		},
+		'canSpawnStructureAtCoords(II)Z': function (vm, s, a) { return canSpawnVillage(s, a[0], a[1]) ? 1 : 0; },
+		'getStructureStart(II)Lnet/minecraft/src/StructureStart;': function (vm, s, a) { return newStart(s, a[0], a[1]); },
+		'func_143025_a()Ljava/lang/String;': function () { return 'Village'; },
+	} });
+	var BM = vm.natives['net/minecraftforge/common/BiomeManager'];
+	if (BM) BM.staticMethods = Object.assign({}, BM.staticMethods, {
+		'addVillageBiome(Lnet/minecraft/src/BiomeGenBase;Z)V': function (vm, n, a) {
+			var l = spawnBiomes();
+			if (a[0] && l && C.listOf(l).indexOf(a[0]) < 0) { var c = cls('MapGenVillage'); c.statics.villageSpawnBiomes = JVM.newList(vm, C.listOf(l).concat([a[0]])); }
+		},
+		'removeVillageBiome(Lnet/minecraft/src/BiomeGenBase;)V': function (vm, n, a) {
+			var l = spawnBiomes();
+			if (l) { var c = cls('MapGenVillage'); c.statics.villageSpawnBiomes = JVM.newList(vm, C.listOf(l).filter(function (b) { return b !== a[0]; })); }
+		},
+	});
+}
+JVM.installVillages = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+JVM.structCartAsChest = true;
+
+function install(vm, H) {
+	var C = JVM.structCore;
+	if (!C) return;
+	var B = C.B, rInt = H.rInt, rFloat = H.rFloat, rBool = H.rBool, rRange = H.rRange, rDouble = H.rDouble, idiv = H.idiv;
+	var place = C.place, fill = C.fill, fillMeta = C.fillMeta, idAt = C.idAt, META = C.META, fillDown = C.fillDown;
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var cls = C.cls;
+	var LIST = 'Ljava/util/List;', LR = 'Ljava/util/Random;', LBB = 'Lnet/minecraft/src/StructureBoundingBox;', LSC = 'Lnet/minecraft/src/StructureComponent;';
+	var nb = function (o) { return o[':boundingBox']; };
+	var lootOf = function (rows) { return rows.map(function (e) { var o = C.loot(e[0], e[1], e[2], e[3], e[4]); o.$vanilla = true; return o; }); };
+	var SEE = {};
+	[0, 6, 8, 9, 10, 11, 18, 20, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 44, 50, 51, 52, 53, 54, 55, 59, 60, 63, 64, 65, 66, 67,
+	 68, 69, 70, 71, 72, 75, 76, 77, 78, 79, 81, 83, 85, 88, 90, 92, 93, 94, 95, 96, 101, 102, 104, 105, 106, 107, 108, 109, 111, 113, 114,
+	 115, 116, 117, 118, 119, 120, 122, 126, 127, 128, 130, 131, 132, 134, 135, 136, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+	 149, 150, 151, 154, 156, 157].forEach(function (i) { SEE[i] = 1; });
+	var opaque = function (id) {
+		if (id < 256 && SEE[id]) return false;
+		var bl = vm.loadClass(SRC + 'Block'); if (bl.initState !== 2) vm.initClass(bl);
+		var b = bl.statics.blocksList && bl.statics.blocksList.a[id];
+		if (!b || b.$vanilla) return id < 256 && !SEE[id];
+		var r = true; JVM.run(vm, function () { r = !!vm.callVirtual(b, 'isOpaqueCube', '()Z', []); });
+		return r;
+	};
+	var buildOf = function (c, start, list, rand) {
+		var m = H.ov(c, C.K.build);
+		if (m) { vm.invoke(m, c, [start, list, rand]); return; }
+		for (var k = c.cls; k; k = k.superClass) if (k.native && k.spec && k.spec.$build) { k.spec.$build(c, start, list, rand); return; }
+	};
+	var piece = function (name, type, mode, b) {
+		var p = vm.newObject(cls(name));
+		p[':componentType'] = type; p[':coordBaseMode'] = mode; p[':boundingBox'] = b;
+		return p;
+	};
+
+	var MINESHAFT = lootOf([[265, 0, 1, 5, 10], [266, 0, 1, 3, 5], [331, 0, 4, 9, 5], [351, 4, 4, 9, 5], [264, 0, 1, 2, 3], [263, 0, 3, 8, 10],
+		[297, 0, 1, 3, 15], [257, 0, 1, 1, 1], [66, 0, 4, 8, 1], [362, 0, 2, 4, 10], [361, 0, 2, 4, 10]]);
+	var randomPiece = function (list, rand, x, y, z, mode, type) {
+		var r = rInt(rand, 100), b;
+		if (r >= 80) { b = crossBox(list, rand, x, y, z, mode); if (b) return newCross(type, rand, b, mode); }
+		else if (r >= 70) { b = stairsBox(list, rand, x, y, z, mode); if (b) return piece('ComponentMineshaftStairs', type, mode, b); }
+		else { b = corridorBox(list, rand, x, y, z, mode); if (b) return newCorridor(type, rand, b, mode); }
+		return null;
+	};
+	var nextMine = function (start, list, rand, x, y, z, mode, type) {
+		if (type > 8) return null;
+		var sb = nb(start);
+		if (Math.abs(x - sb[':minX']) > 80 || Math.abs(z - sb[':minZ']) > 80) return null;
+		var c = randomPiece(list, rand, x, y, z, mode, type + 1);
+		if (c) { C.listAdd(list, c); buildOf(c, start, list, rand); }
+		return c;
+	};
+	def('StructureMineshaftPieces', { staticMethods: {
+		['getNextComponent(' + LSC + LIST + LR + 'IIIII)' + LSC]: function (vm, n, a) { return nextMine(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); },
+		'func_78816_a()[Lnet/minecraft/src/WeightedRandomChestContent;': function (vm) { return JVM.javaArray(vm, 'Lnet/minecraft/src/WeightedRandomChestContent;', MINESHAFT); },
+	} });
+	var newRoom = function (type, rand, x, z) {
+		var p = piece('ComponentMineshaftRoom', type, -1, null);
+		p[':roomsLinkedToTheRoom'] = C.newList('java/util/LinkedList');
+		var x1 = x + 7 + rInt(rand, 6), y1 = 54 + rInt(rand, 6), z1 = z + 7 + rInt(rand, 6);
+		p[':boundingBox'] = C.bb(x, 50, z, x1, y1, z1);
+		return p;
+	};
+	var roomBuild = function (p, start, list, rand) {
+		var t = p[':componentType'], b = nb(p), h = C.ys(b) - 3 - 1, i, c, cb, links = p[':roomsLinkedToTheRoom'];
+		if (h <= 0) h = 1;
+		var link = function (c, x0, y0, z0, x1, y1, z1) { if (c) C.listAdd(links, C.bb(x0, y0, z0, x1, y1, z1)); };
+		for (i = 0; i < C.xs(b); i += 4) {
+			i += rInt(rand, C.xs(b));
+			if (i + 3 > C.xs(b)) break;
+			c = nextMine(start, list, rand, b[':minX'] + i, b[':minY'] + rInt(rand, h) + 1, b[':minZ'] - 1, 2, t);
+			if (c) { cb = nb(c); link(c, cb[':minX'], cb[':minY'], b[':minZ'], cb[':maxX'], cb[':maxY'], b[':minZ'] + 1); }
+		}
+		for (i = 0; i < C.xs(b); i += 4) {
+			i += rInt(rand, C.xs(b));
+			if (i + 3 > C.xs(b)) break;
+			c = nextMine(start, list, rand, b[':minX'] + i, b[':minY'] + rInt(rand, h) + 1, b[':maxZ'] + 1, 0, t);
+			if (c) { cb = nb(c); link(c, cb[':minX'], cb[':minY'], b[':maxZ'] - 1, cb[':maxX'], cb[':maxY'], b[':maxZ']); }
+		}
+		for (i = 0; i < C.zs(b); i += 4) {
+			i += rInt(rand, C.zs(b));
+			if (i + 3 > C.zs(b)) break;
+			c = nextMine(start, list, rand, b[':minX'] - 1, b[':minY'] + rInt(rand, h) + 1, b[':minZ'] + i, 1, t);
+			if (c) { cb = nb(c); link(c, b[':minX'], cb[':minY'], cb[':minZ'], b[':minX'] + 1, cb[':maxY'], cb[':maxZ']); }
+		}
+		for (i = 0; i < C.zs(b); i += 4) {
+			i += rInt(rand, C.zs(b));
+			if (i + 3 > C.zs(b)) break;
+			c = nextMine(start, list, rand, b[':maxX'] + 1, b[':minY'] + rInt(rand, h) + 1, b[':minZ'] + i, 3, t);
+			if (c) { cb = nb(c); link(c, b[':maxX'] - 1, cb[':minY'], cb[':minZ'], b[':maxX'], cb[':maxY'], cb[':maxZ']); }
+		}
+	};
+	var roomParts = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		var b = nb(p);
+		fill(p, w, bb, b[':minX'], b[':minY'], b[':minZ'], b[':maxX'], b[':minY'], b[':maxZ'], B.dirt, 0, true);
+		fill(p, w, bb, b[':minX'], b[':minY'] + 1, b[':minZ'], b[':maxX'], Math.min(b[':minY'] + 3, b[':maxY']), b[':maxZ'], 0, 0, false);
+		C.listOf(p[':roomsLinkedToTheRoom']).forEach(function (r) { fill(p, w, bb, r[':minX'], r[':maxY'] - 2, r[':minZ'], r[':maxX'], r[':maxY'], r[':maxZ'], 0, 0, false); });
+		C.fillEllipsoid(p, w, bb, b[':minX'], b[':minY'] + 4, b[':minZ'], b[':maxX'], b[':maxY'], b[':maxZ'], 0, false);
+		return true;
+	};
+	var corridorBox = function (list, rand, x, y, z, mode) {
+		var b = C.bb(x, y, z, x, y + 2, z), n;
+		for (n = rInt(rand, 3) + 2; n > 0; n--) {
+			var len = n * 5;
+			switch (mode) {
+				case 2: b[':maxX'] = x + 2; b[':minZ'] = z - (len - 1); break;
+				case 0: b[':maxX'] = x + 2; b[':maxZ'] = z + (len - 1); break;
+				case 1: b[':minX'] = x - (len - 1); b[':maxZ'] = z + 2; break;
+				case 3: b[':maxX'] = x + (len - 1); b[':maxZ'] = z + 2; break;
+			}
+			if (!C.findIntersecting(list, b)) break;
+		}
+		return n > 0 ? b : null;
+	};
+	var newCorridor = function (type, rand, b, mode) {
+		var p = piece('ComponentMineshaftCorridor', type, mode, b);
+		p[':hasRails'] = rInt(rand, 3) === 0 ? 1 : 0;
+		p[':hasSpiders'] = !p[':hasRails'] && rInt(rand, 23) === 0 ? 1 : 0;
+		p[':sectionCount'] = mode === 2 || mode === 0 ? idiv(C.zs(b), 5) : idiv(C.xs(b), 5);
+		return p;
+	};
+	var corridorBuild = function (p, start, list, rand) {
+		var t = p[':componentType'], r = rInt(rand, 4), b = nb(p), mode = p[':coordBaseMode'];
+		var y = function () { return b[':minY'] - 1 + rInt(rand, 3); };
+		switch (mode) {
+			case 0:
+				if (r <= 1) nextMine(start, list, rand, b[':minX'], y(), b[':maxZ'] + 1, mode, t);
+				else if (r === 2) nextMine(start, list, rand, b[':minX'] - 1, y(), b[':maxZ'] - 3, 1, t);
+				else nextMine(start, list, rand, b[':maxX'] + 1, y(), b[':maxZ'] - 3, 3, t);
+				break;
+			case 1:
+				if (r <= 1) nextMine(start, list, rand, b[':minX'] - 1, y(), b[':minZ'], mode, t);
+				else if (r === 2) nextMine(start, list, rand, b[':minX'], y(), b[':minZ'] - 1, 2, t);
+				else nextMine(start, list, rand, b[':minX'], y(), b[':maxZ'] + 1, 0, t);
+				break;
+			case 2:
+				if (r <= 1) nextMine(start, list, rand, b[':minX'], y(), b[':minZ'] - 1, mode, t);
+				else if (r === 2) nextMine(start, list, rand, b[':minX'] - 1, y(), b[':minZ'], 1, t);
+				else nextMine(start, list, rand, b[':maxX'] + 1, y(), b[':minZ'], 3, t);
+				break;
+			case 3:
+				if (r <= 1) nextMine(start, list, rand, b[':maxX'] + 1, y(), b[':minZ'], mode, t);
+				else if (r === 2) nextMine(start, list, rand, b[':maxX'] - 3, y(), b[':minZ'] - 1, 2, t);
+				else nextMine(start, list, rand, b[':maxX'] - 3, y(), b[':maxZ'] + 1, 0, t);
+				break;
+		}
+		if (t >= 8) return;
+		var i, k;
+		if (mode === 2 || mode === 0) {
+			for (i = b[':minZ'] + 3; i + 3 <= b[':maxZ']; i += 5) {
+				k = rInt(rand, 5);
+				if (k === 0) nextMine(start, list, rand, b[':minX'] - 1, b[':minY'], i, 1, t + 1);
+				else if (k === 1) nextMine(start, list, rand, b[':maxX'] + 1, b[':minY'], i, 3, t + 1);
+			}
+		} else {
+			for (i = b[':minX'] + 3; i + 3 <= b[':maxX']; i += 5) {
+				k = rInt(rand, 5);
+				if (k === 0) nextMine(start, list, rand, i, b[':minY'], b[':minZ'] - 1, 2, t + 1);
+				else if (k === 1) nextMine(start, list, rand, i, b[':minY'], b[':maxZ'] + 1, 0, t + 1);
+			}
+		}
+	};
+	var cartChest = function (p, w, bb, rand, x, y, z, items, count) {
+		var i = C.X(p, x, z), j = C.Y(p, y), k = C.Z(p, x, z);
+		if (!C.inside(bb, i, j, k) || C.getId(w, i, j, k) !== 0) return false;
+		var rm = META(p, B.rail, rBool(rand) ? 1 : 0);
+		if (JVM.structCartAsChest) {
+			C.setB(w, i, j, k, B.chest, 0, 2);
+			C.chestAt(i, j, k, rand, items, count, 27);
+		} else {
+			C.setB(w, i, j, k, B.rail, rm, 2);
+			C.chestAt(i, j, k, rand, items, count, 27);
+			C.spawnMob('minecart_chest', F(i + 0.5), F(j + 0.5), F(k + 0.5));
+		}
+		return true;
+	};
+	var F = H.F;
+	var corridorParts = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		var len = p[':sectionCount'] * 5 - 1, i, z;
+		fill(p, w, bb, 0, 0, 0, 2, 1, len, 0, 0, false);
+		C.fillChance(p, w, bb, rand, F(0.8), 0, 2, 0, 2, 2, len, 0, 0, false);
+		if (p[':hasSpiders']) C.fillChance(p, w, bb, rand, F(0.6), 0, 0, 0, 2, 1, len, B.web, 0, false);
+		for (i = 0; i < p[':sectionCount']; i++) {
+			z = 2 + i * 5;
+			fill(p, w, bb, 0, 0, z, 0, 1, z, B.fence, 0, false);
+			fill(p, w, bb, 2, 0, z, 2, 1, z, B.fence, 0, false);
+			if (rInt(rand, 4) === 0) { fill(p, w, bb, 0, 2, z, 0, 2, z, B.planks, 0, false); fill(p, w, bb, 2, 2, z, 2, 2, z, B.planks, 0, false); }
+			else fill(p, w, bb, 0, 2, z, 2, 2, z, B.planks, 0, false);
+			C.maybePlace(p, w, bb, rand, F(0.1), 0, 2, z - 1, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.1), 2, 2, z - 1, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.1), 0, 2, z + 1, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.1), 2, 2, z + 1, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 0, 2, z - 2, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 2, 2, z - 2, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 0, 2, z + 2, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 2, 2, z + 2, B.web, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 1, 2, z - 1, B.torchWood, 0);
+			C.maybePlace(p, w, bb, rand, F(0.05), 1, 2, z + 1, B.torchWood, 0);
+			if (rInt(rand, 100) === 0) {
+				var items = C.withMods(MINESHAFT.concat([C.book(rand)]), 'mineshaftCorridor');
+				cartChest(p, w, bb, rand, 2, 0, z - 1, items, 3 + rInt(rand, 4));
+			}
+			if (rInt(rand, 100) === 0) {
+				var items2 = C.withMods(MINESHAFT.concat([C.book(rand)]), 'mineshaftCorridor');
+				cartChest(p, w, bb, rand, 0, 0, z + 1, items2, 3 + rInt(rand, 4));
+			}
+			if (p[':hasSpiders'] && !p[':spawnerPlaced']) {
+				var sy = C.Y(p, 0), sz0 = z - 1 + rInt(rand, 3), sx = C.X(p, 1, sz0), sz = C.Z(p, 1, sz0);
+				if (C.inside(bb, sx, sy, sz)) { p[':spawnerPlaced'] = 1; C.setB(w, sx, sy, sz, B.mobSpawner, 0, 2); }
+			}
+		}
+		for (i = 0; i <= 2; i++) for (z = 0; z <= len; z++) if (idAt(p, w, i, -1, z, bb) === 0) place(p, w, B.planks, 0, i, -1, z, bb);
+		if (p[':hasRails']) {
+			for (z = 0; z <= len; z++) {
+				var under = idAt(p, w, 1, -1, z, bb);
+				if (under > 0 && opaque(under)) C.maybePlace(p, w, bb, rand, F(0.7), 1, 0, z, B.rail, META(p, B.rail, 0));
+			}
+		}
+		return true;
+	};
+	var crossBox = function (list, rand, x, y, z, mode) {
+		var b = C.bb(x, y, z, x, y + 2, z);
+		if (rInt(rand, 4) === 0) b[':maxY'] += 4;
+		switch (mode) {
+			case 2: b[':minX'] = x - 1; b[':maxX'] = x + 3; b[':minZ'] = z - 4; break;
+			case 0: b[':minX'] = x - 1; b[':maxX'] = x + 3; b[':maxZ'] = z + 4; break;
+			case 1: b[':minX'] = x - 4; b[':minZ'] = z - 1; b[':maxZ'] = z + 3; break;
+			case 3: b[':maxX'] = x + 4; b[':minZ'] = z - 1; b[':maxZ'] = z + 3; break;
+		}
+		return C.findIntersecting(list, b) ? null : b;
+	};
+	var newCross = function (type, rand, b, dir) {
+		var p = piece('ComponentMineshaftCross', type, -1, b);
+		p[':corridorDirection'] = dir;
+		p[':isMultipleFloors'] = C.ys(b) > 3 ? 1 : 0;
+		return p;
+	};
+	var crossBuild = function (p, start, list, rand) {
+		var t = p[':componentType'], b = nb(p);
+		var N = function () { nextMine(start, list, rand, b[':minX'] + 1, b[':minY'], b[':minZ'] - 1, 2, t); };
+		var S = function () { nextMine(start, list, rand, b[':minX'] + 1, b[':minY'], b[':maxZ'] + 1, 0, t); };
+		var W = function () { nextMine(start, list, rand, b[':minX'] - 1, b[':minY'], b[':minZ'] + 1, 1, t); };
+		var E = function () { nextMine(start, list, rand, b[':maxX'] + 1, b[':minY'], b[':minZ'] + 1, 3, t); };
+		switch (p[':corridorDirection']) {
+			case 2: N(); W(); E(); break;
+			case 0: S(); W(); E(); break;
+			case 1: N(); S(); W(); break;
+			case 3: N(); S(); E(); break;
+		}
+		if (p[':isMultipleFloors']) {
+			var y = b[':minY'] + 3 + 1;
+			if (rBool(rand)) nextMine(start, list, rand, b[':minX'] + 1, y, b[':minZ'] - 1, 2, t);
+			if (rBool(rand)) nextMine(start, list, rand, b[':minX'] - 1, y, b[':minZ'] + 1, 1, t);
+			if (rBool(rand)) nextMine(start, list, rand, b[':maxX'] + 1, y, b[':minZ'] + 1, 3, t);
+			if (rBool(rand)) nextMine(start, list, rand, b[':minX'] + 1, y, b[':maxZ'] + 1, 0, t);
+		}
+	};
+	var crossParts = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		var b = nb(p), x0 = b[':minX'], y0 = b[':minY'], z0 = b[':minZ'], x1 = b[':maxX'], y1 = b[':maxY'], z1 = b[':maxZ'];
+		if (p[':isMultipleFloors']) {
+			fill(p, w, bb, x0 + 1, y0, z0, x1 - 1, y0 + 3 - 1, z1, 0, 0, false);
+			fill(p, w, bb, x0, y0, z0 + 1, x1, y0 + 3 - 1, z1 - 1, 0, 0, false);
+			fill(p, w, bb, x0 + 1, y1 - 2, z0, x1 - 1, y1, z1, 0, 0, false);
+			fill(p, w, bb, x0, y1 - 2, z0 + 1, x1, y1, z1 - 1, 0, 0, false);
+			fill(p, w, bb, x0 + 1, y0 + 3, z0 + 1, x1 - 1, y0 + 3, z1 - 1, 0, 0, false);
+		} else {
+			fill(p, w, bb, x0 + 1, y0, z0, x1 - 1, y1, z1, 0, 0, false);
+			fill(p, w, bb, x0, y0, z0 + 1, x1, y1, z1 - 1, 0, 0, false);
+		}
+		fill(p, w, bb, x0 + 1, y0, z0 + 1, x0 + 1, y1, z0 + 1, B.planks, 0, false);
+		fill(p, w, bb, x0 + 1, y0, z1 - 1, x0 + 1, y1, z1 - 1, B.planks, 0, false);
+		fill(p, w, bb, x1 - 1, y0, z0 + 1, x1 - 1, y1, z0 + 1, B.planks, 0, false);
+		fill(p, w, bb, x1 - 1, y0, z1 - 1, x1 - 1, y1, z1 - 1, B.planks, 0, false);
+		for (var x = x0; x <= x1; x++) for (var z = z0; z <= z1; z++) if (idAt(p, w, x, y0 - 1, z, bb) === 0) place(p, w, B.planks, 0, x, y0 - 1, z, bb);
+		return true;
+	};
+	var stairsBox = function (list, rand, x, y, z, mode) {
+		var b = C.bb(x, y - 5, z, x, y + 2, z);
+		switch (mode) {
+			case 2: b[':maxX'] = x + 2; b[':minZ'] = z - 8; break;
+			case 0: b[':maxX'] = x + 2; b[':maxZ'] = z + 8; break;
+			case 1: b[':minX'] = x - 8; b[':maxZ'] = z + 2; break;
+			case 3: b[':maxX'] = x + 8; b[':maxZ'] = z + 2; break;
+		}
+		return C.findIntersecting(list, b) ? null : b;
+	};
+	var stairsBuild = function (p, start, list, rand) {
+		var t = p[':componentType'], b = nb(p);
+		switch (p[':coordBaseMode']) {
+			case 2: nextMine(start, list, rand, b[':minX'], b[':minY'], b[':minZ'] - 1, 2, t); break;
+			case 0: nextMine(start, list, rand, b[':minX'], b[':minY'], b[':maxZ'] + 1, 0, t); break;
+			case 1: nextMine(start, list, rand, b[':minX'] - 1, b[':minY'], b[':minZ'], 1, t); break;
+			case 3: nextMine(start, list, rand, b[':maxX'] + 1, b[':minY'], b[':minZ'], 3, t); break;
+		}
+	};
+	var stairsParts = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		fill(p, w, bb, 0, 5, 0, 2, 7, 1, 0, 0, false);
+		fill(p, w, bb, 0, 0, 7, 2, 2, 8, 0, 0, false);
+		for (var i = 0; i < 5; i++) fill(p, w, bb, 0, 5 - i - (i < 4 ? 1 : 0), 2 + i, 2, 7 - i, 2 + i, 0, 0, false);
+		return true;
+	};
+	var SC = SRC + 'StructureComponent', PK = C.K.parts, BK = C.K.build;
+	var pieceDef = function (name, fields, parts, build, extra) {
+		var m = {};
+		if (parts) m[PK] = function (vm, s, a) { return parts(s, a[0], a[1], a[2]) ? 1 : 0; };
+		if (build) m[BK] = function (vm, s, a) { build(s, a[0], a[1], a[2]); };
+		Object.assign(m, extra || {});
+		def(name, { super: SC, fields: fields, methods: m, $parts: parts, $build: build });
+	};
+	pieceDef('ComponentMineshaftRoom', { roomsLinkedToTheRoom: 'Ljava/util/LinkedList;' }, roomParts, roomBuild, {
+		'<init>(ILjava/util/Random;II)V': function (vm, s, a) { var r = newRoom(a[0], a[1], a[2], a[3]); s[':componentType'] = a[0]; s[':coordBaseMode'] = -1; s[':roomsLinkedToTheRoom'] = r[':roomsLinkedToTheRoom']; s[':boundingBox'] = r[':boundingBox']; },
+	});
+	pieceDef('ComponentMineshaftCorridor', { hasRails: 'Z', hasSpiders: 'Z', spawnerPlaced: 'Z', sectionCount: 'I' }, corridorParts, corridorBuild, {
+		['<init>(ILjava/util/Random;' + LBB + 'I)V']: function (vm, s, a) { var c = newCorridor(a[0], a[1], a[2], a[3]); ['componentType', 'coordBaseMode', 'boundingBox', 'hasRails', 'hasSpiders', 'sectionCount'].forEach(function (k) { s[':' + k] = c[':' + k]; }); },
+	});
+	pieceDef('ComponentMineshaftCross', { corridorDirection: 'I', isMultipleFloors: 'Z' }, crossParts, crossBuild, {
+		['<init>(ILjava/util/Random;' + LBB + 'I)V']: function (vm, s, a) { var c = newCross(a[0], a[1], a[2], a[3]); ['componentType', 'coordBaseMode', 'boundingBox', 'corridorDirection', 'isMultipleFloors'].forEach(function (k) { s[':' + k] = c[':' + k]; }); },
+	});
+	pieceDef('ComponentMineshaftStairs', {}, stairsParts, stairsBuild, {
+		['<init>(ILjava/util/Random;' + LBB + 'I)V']: function (vm, s, a) { s[':componentType'] = a[0]; s[':coordBaseMode'] = a[3]; s[':boundingBox'] = a[2]; },
+	});
+	var mineStart = function (s, w, rand, cx, cz) {
+		var room = newRoom(0, rand, (cx << 4) + 2, (cz << 4) + 2);
+		var comps = s[':components'];
+		C.listAdd(comps, room);
+		buildOf(room, room, comps, rand);
+		C.updateBB(s);
+		C.markHeight(s, w, rand, 10);
+	};
+	def('StructureMineshaftStart', { super: SRC + 'StructureStart', methods: {
+		'<init>(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, s, a) { s[':components'] = C.newList('java/util/LinkedList'); mineStart(s, a[0], a[1], a[2], a[3]); },
+		'<init>()V': function (vm, s) { s[':components'] = C.newList('java/util/LinkedList'); },
+	} });
+	var canMine = function (g, cx, cz) {
+		var r = g[':rand'];
+		return rDouble(r) < g[':field_82673_e'] && rInt(r, 80) < Math.max(Math.abs(cx), Math.abs(cz));
+	};
+	var mineNew = function (g, cx, cz) {
+		var s = vm.newObject(cls('StructureMineshaftStart'));
+		s[':components'] = C.newList('java/util/LinkedList');
+		mineStart(s, g[':worldObj'], g[':rand'], cx, cz);
+		return s;
+	};
+	def('MapGenMineshaft', { super: SRC + 'MapGenStructure', $can: canMine, $start: mineNew, fields: { field_82673_e: 'D' }, methods: {
+		'<init>()V': function (vm, s) { C.baseInit(s); C.startsMap(s); s[':field_82673_e'] = 0.01; },
+		'<init>(Ljava/util/Map;)V': function (vm, s, a) {
+			C.baseInit(s); C.startsMap(s); s[':field_82673_e'] = 0.01;
+			(a[0] && a[0].$m ? a[0].$m.entries() : []).forEach(function (e) { if (String(e.k) === 'chance') { var d = parseFloat(String(e.v)); if (!isNaN(d)) s[':field_82673_e'] = d; } });
+		},
+		'canSpawnStructureAtCoords(II)Z': function (vm, s, a) { return canMine(s, a[0], a[1]) ? 1 : 0; },
+		'getStructureStart(II)Lnet/minecraft/src/StructureStart;': function (vm, s, a) { return mineNew(s, a[0], a[1]); },
+		'func_143025_a()Ljava/lang/String;': function () { return 'Mineshaft'; },
+	} });
+
+	var TEMPLE = lootOf([[264, 0, 1, 3, 3], [265, 0, 1, 5, 10], [266, 0, 2, 7, 15], [388, 0, 1, 3, 2], [352, 0, 4, 6, 20], [367, 0, 3, 7, 16]]);
+	var ARROWS = lootOf([[262, 0, 2, 7, 30]]);
+	var featureInit = function (p, rand, x, y, z, sx, sy, sz) {
+		p[':componentType'] = 0;
+		p[':field_74936_d'] = -1;
+		p[':scatteredFeatureSizeX'] = sx; p[':scatteredFeatureSizeY'] = sy; p[':scatteredFeatureSizeZ'] = sz;
+		p[':coordBaseMode'] = rInt(rand, 4);
+		if (p[':coordBaseMode'] === 0 || p[':coordBaseMode'] === 2) p[':boundingBox'] = C.bb(x, y, z, x + sx - 1, y + sy - 1, z + sz - 1);
+		else p[':boundingBox'] = C.bb(x, y, z, x + sz - 1, y + sy - 1, z + sx - 1);
+	};
+	var onGround = function (p, w, bb, dy) {
+		if (p[':field_74936_d'] >= 0) return true;
+		var b = nb(p), sum = 0, n = 0, prov = w[':provider'];
+		var base = prov ? vm.callVirtual(prov, 'getAverageGroundLevel', '()I', []) : 64;
+		for (var z = b[':minZ']; z <= b[':maxZ']; z++) for (var x = b[':minX']; x <= b[':maxX']; x++) {
+			if (!C.inside(bb, x, 64, z)) continue;
+			sum += Math.max(C.topSolid(w, x, z), base); n++;
+		}
+		if (n === 0) return false;
+		p[':field_74936_d'] = idiv(sum, n);
+		C.offset(b, 0, p[':field_74936_d'] - b[':minY'] + dy, 0);
+		return true;
+	};
+	var DX = [0, -1, 0, 1], DZ = [1, 0, -1, 0];
+	var pyramidParts = function (p, w, rand, bb) {
+		var SX = p[':scatteredFeatureSizeX'], SZ = p[':scatteredFeatureSizeZ'], i;
+		fill(p, w, bb, 0, -4, 0, SX - 1, 0, SZ - 1, B.sandStone, B.sandStone, false);
+		for (i = 1; i <= 9; i++) {
+			fill(p, w, bb, i, i, i, SX - 1 - i, i, SZ - 1 - i, B.sandStone, B.sandStone, false);
+			fill(p, w, bb, i + 1, i, i + 1, SX - 2 - i, i, SZ - 2 - i, 0, 0, false);
+		}
+		for (i = 0; i < SX; i++) for (var j = 0; j < SZ; j++) fillDown(p, w, B.sandStone, 0, i, -5, j, bb);
+		var s3 = META(p, B.stairsSandStone, 3), s2 = META(p, B.stairsSandStone, 2), s0 = META(p, B.stairsSandStone, 0), s1 = META(p, B.stairsSandStone, 1);
+		var orange = 1, blue = 11;
+		fill(p, w, bb, 0, 0, 0, 4, 9, 4, B.sandStone, 0, false);
+		fill(p, w, bb, 1, 10, 1, 3, 10, 3, B.sandStone, B.sandStone, false);
+		place(p, w, B.stairsSandStone, s3, 2, 10, 0, bb); place(p, w, B.stairsSandStone, s2, 2, 10, 4, bb);
+		place(p, w, B.stairsSandStone, s0, 0, 10, 2, bb); place(p, w, B.stairsSandStone, s1, 4, 10, 2, bb);
+		fill(p, w, bb, SX - 5, 0, 0, SX - 1, 9, 4, B.sandStone, 0, false);
+		fill(p, w, bb, SX - 4, 10, 1, SX - 2, 10, 3, B.sandStone, B.sandStone, false);
+		place(p, w, B.stairsSandStone, s3, SX - 3, 10, 0, bb); place(p, w, B.stairsSandStone, s2, SX - 3, 10, 4, bb);
+		place(p, w, B.stairsSandStone, s0, SX - 5, 10, 2, bb); place(p, w, B.stairsSandStone, s1, SX - 1, 10, 2, bb);
+		fill(p, w, bb, 8, 0, 0, 12, 4, 4, B.sandStone, 0, false);
+		fill(p, w, bb, 9, 1, 0, 11, 3, 4, 0, 0, false);
+		place(p, w, B.sandStone, 2, 9, 1, 1, bb); place(p, w, B.sandStone, 2, 9, 2, 1, bb); place(p, w, B.sandStone, 2, 9, 3, 1, bb);
+		place(p, w, B.sandStone, 2, 10, 3, 1, bb); place(p, w, B.sandStone, 2, 11, 3, 1, bb); place(p, w, B.sandStone, 2, 11, 2, 1, bb); place(p, w, B.sandStone, 2, 11, 1, 1, bb);
+		fill(p, w, bb, 4, 1, 1, 8, 3, 3, B.sandStone, 0, false);
+		fill(p, w, bb, 4, 1, 2, 8, 2, 2, 0, 0, false);
+		fill(p, w, bb, 12, 1, 1, 16, 3, 3, B.sandStone, 0, false);
+		fill(p, w, bb, 12, 1, 2, 16, 2, 2, 0, 0, false);
+		fill(p, w, bb, 5, 4, 5, SX - 6, 4, SZ - 6, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, 9, 4, 9, 11, 4, 11, 0, 0, false);
+		fillMeta(p, w, bb, 8, 1, 8, 8, 3, 8, B.sandStone, 2, B.sandStone, 2, false);
+		fillMeta(p, w, bb, 12, 1, 8, 12, 3, 8, B.sandStone, 2, B.sandStone, 2, false);
+		fillMeta(p, w, bb, 8, 1, 12, 8, 3, 12, B.sandStone, 2, B.sandStone, 2, false);
+		fillMeta(p, w, bb, 12, 1, 12, 12, 3, 12, B.sandStone, 2, B.sandStone, 2, false);
+		fill(p, w, bb, 1, 1, 5, 4, 4, 11, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, SX - 5, 1, 5, SX - 2, 4, 11, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, 6, 7, 9, 6, 7, 11, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, SX - 7, 7, 9, SX - 7, 7, 11, B.sandStone, B.sandStone, false);
+		fillMeta(p, w, bb, 5, 5, 9, 5, 7, 11, B.sandStone, 2, B.sandStone, 2, false);
+		fillMeta(p, w, bb, SX - 6, 5, 9, SX - 6, 7, 11, B.sandStone, 2, B.sandStone, 2, false);
+		place(p, w, 0, 0, 5, 5, 10, bb); place(p, w, 0, 0, 5, 6, 10, bb); place(p, w, 0, 0, 6, 6, 10, bb);
+		place(p, w, 0, 0, SX - 6, 5, 10, bb); place(p, w, 0, 0, SX - 6, 6, 10, bb); place(p, w, 0, 0, SX - 7, 6, 10, bb);
+		fill(p, w, bb, 2, 4, 4, 2, 6, 4, 0, 0, false);
+		fill(p, w, bb, SX - 3, 4, 4, SX - 3, 6, 4, 0, 0, false);
+		place(p, w, B.stairsSandStone, s3, 2, 4, 5, bb); place(p, w, B.stairsSandStone, s3, 2, 3, 4, bb);
+		place(p, w, B.stairsSandStone, s3, SX - 3, 4, 5, bb); place(p, w, B.stairsSandStone, s3, SX - 3, 3, 4, bb);
+		fill(p, w, bb, 1, 1, 3, 2, 2, 3, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, SX - 3, 1, 3, SX - 2, 2, 3, B.sandStone, B.sandStone, false);
+		place(p, w, B.stairsSandStone, 0, 1, 1, 2, bb); place(p, w, B.stairsSandStone, 0, SX - 2, 1, 2, bb);
+		place(p, w, B.stoneSingleSlab, 1, 1, 2, 2, bb); place(p, w, B.stoneSingleSlab, 1, SX - 2, 2, 2, bb);
+		place(p, w, B.stairsSandStone, s1, 2, 1, 2, bb); place(p, w, B.stairsSandStone, s0, SX - 3, 1, 2, bb);
+		fill(p, w, bb, 4, 3, 5, 4, 3, 18, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, SX - 5, 3, 5, SX - 5, 3, 17, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, 3, 1, 5, 4, 2, 16, 0, 0, false);
+		fill(p, w, bb, SX - 6, 1, 5, SX - 5, 2, 16, 0, 0, false);
+		for (i = 5; i <= 17; i += 2) {
+			place(p, w, B.sandStone, 2, 4, 1, i, bb); place(p, w, B.sandStone, 1, 4, 2, i, bb);
+			place(p, w, B.sandStone, 2, SX - 5, 1, i, bb); place(p, w, B.sandStone, 1, SX - 5, 2, i, bb);
+		}
+		[[10, 7], [10, 8], [9, 9], [11, 9], [8, 10], [12, 10], [7, 10], [13, 10], [9, 11], [11, 11], [10, 12], [10, 13]].forEach(function (c) { place(p, w, B.cloth, orange, c[0], 0, c[1], bb); });
+		place(p, w, B.cloth, blue, 10, 0, 10, bb);
+		var band = function (fx) {
+			return [[B.sandStone, 2, 2, 1], [B.cloth, orange, 2, 2], [B.sandStone, 2, 2, 3], [B.sandStone, 2, 3, 1], [B.cloth, orange, 3, 2], [B.sandStone, 2, 3, 3],
+				[B.cloth, orange, 4, 1], [B.sandStone, 1, 4, 2], [B.cloth, orange, 4, 3], [B.sandStone, 2, 5, 1], [B.cloth, orange, 5, 2], [B.sandStone, 2, 5, 3],
+				[B.cloth, orange, 6, 1], [B.sandStone, 1, 6, 2], [B.cloth, orange, 6, 3], [B.cloth, orange, 7, 1], [B.cloth, orange, 7, 2], [B.cloth, orange, 7, 3],
+				[B.sandStone, 2, 8, 1], [B.sandStone, 2, 8, 2], [B.sandStone, 2, 8, 3]].forEach(function (c) { fx(c[0], c[1], c[2], c[3]); });
+		};
+		for (i = 0; i <= SX - 1; i += SX - 1) band(function (id, m, y, z) { place(p, w, id, m, i, y, z, bb); });
+		for (i = 2; i <= SX - 3; i += SX - 3 - 2) band(function (id, m, y, z) { place(p, w, id, m, i + z - 2, y, 0, bb); });
+		fillMeta(p, w, bb, 8, 4, 0, 12, 6, 0, B.sandStone, 2, B.sandStone, 2, false);
+		place(p, w, 0, 0, 8, 6, 0, bb); place(p, w, 0, 0, 12, 6, 0, bb);
+		place(p, w, B.cloth, orange, 9, 5, 0, bb); place(p, w, B.sandStone, 1, 10, 5, 0, bb); place(p, w, B.cloth, orange, 11, 5, 0, bb);
+		fillMeta(p, w, bb, 8, -14, 8, 12, -11, 12, B.sandStone, 2, B.sandStone, 2, false);
+		fillMeta(p, w, bb, 8, -10, 8, 12, -10, 12, B.sandStone, 1, B.sandStone, 1, false);
+		fillMeta(p, w, bb, 8, -9, 8, 12, -9, 12, B.sandStone, 2, B.sandStone, 2, false);
+		fill(p, w, bb, 8, -8, 8, 12, -1, 12, B.sandStone, B.sandStone, false);
+		fill(p, w, bb, 9, -11, 9, 11, -1, 11, 0, 0, false);
+		place(p, w, B.pressurePlateStone, 0, 10, -11, 10, bb);
+		fill(p, w, bb, 9, -13, 9, 11, -13, 11, B.tnt, 0, false);
+		place(p, w, 0, 0, 8, -11, 10, bb); place(p, w, 0, 0, 8, -10, 10, bb); place(p, w, B.sandStone, 1, 7, -10, 10, bb); place(p, w, B.sandStone, 2, 7, -11, 10, bb);
+		place(p, w, 0, 0, 12, -11, 10, bb); place(p, w, 0, 0, 12, -10, 10, bb); place(p, w, B.sandStone, 1, 13, -10, 10, bb); place(p, w, B.sandStone, 2, 13, -11, 10, bb);
+		place(p, w, 0, 0, 10, -11, 8, bb); place(p, w, 0, 0, 10, -10, 8, bb); place(p, w, B.sandStone, 1, 10, -10, 7, bb); place(p, w, B.sandStone, 2, 10, -11, 7, bb);
+		place(p, w, 0, 0, 10, -11, 12, bb); place(p, w, 0, 0, 10, -10, 12, bb); place(p, w, B.sandStone, 1, 10, -10, 13, bb); place(p, w, B.sandStone, 2, 10, -11, 13, bb);
+		var made = p.$chests || (p.$chests = [false, false, false, false]);
+		for (i = 0; i < 4; i++) {
+			if (made[i]) continue;
+			var items = C.withMods(TEMPLE.concat([C.book(rand)]), 'pyramidDesertyChest');
+			made[i] = C.chest(p, w, bb, rand, 10 + DX[i] * 2, -11, 10 + DZ[i] * 2, items, 2 + rInt(rand, 5));
+		}
+		return true;
+	};
+	var jungleStones = { $jsSel: function (rand) { return [rFloat(rand) < F(0.4) ? B.cobblestone : B.cobblestoneMossy, 0]; } };
+	var leverInvert = function (m) { return [0, 5, 4, 3, 2, 1][m] == null ? -1 : [0, 5, 4, 3, 2, 1][m]; };
+	var jungleParts = function (p, w, rand, bb) {
+		if (!onGround(p, w, bb, 0)) return false;
+		var s3 = META(p, B.stairsCobblestone, 3), s2 = META(p, B.stairsCobblestone, 2), s0 = META(p, B.stairsCobblestone, 0), s1 = META(p, B.stairsCobblestone, 1);
+		var SX = p[':scatteredFeatureSizeX'], SZ = p[':scatteredFeatureSizeZ'], i, j;
+		var R = function (x0, y0, z0, x1, y1, z1) { C.fillRandom(p, w, bb, x0, y0, z0, x1, y1, z1, false, rand, jungleStones); };
+		var A = function (x0, y0, z0, x1, y1, z1) { C.fillAir(p, w, bb, x0, y0, z0, x1, y1, z1); };
+		R(0, -4, 0, SX - 1, 0, SZ - 1);
+		R(2, 1, 2, 9, 2, 2); R(2, 1, 12, 9, 2, 12); R(2, 1, 3, 2, 2, 11); R(9, 1, 3, 9, 2, 11);
+		R(1, 3, 1, 10, 6, 1); R(1, 3, 13, 10, 6, 13); R(1, 3, 2, 1, 6, 12); R(10, 3, 2, 10, 6, 12);
+		R(2, 3, 2, 9, 3, 12); R(2, 6, 2, 9, 6, 12); R(3, 7, 3, 8, 7, 11); R(4, 8, 4, 7, 8, 10);
+		A(3, 1, 3, 8, 2, 11); A(4, 3, 6, 7, 3, 9); A(2, 4, 2, 9, 5, 12); A(4, 6, 5, 7, 6, 9); A(5, 7, 6, 6, 7, 8);
+		A(5, 1, 2, 6, 2, 2); A(5, 2, 12, 6, 2, 12); A(5, 5, 1, 6, 5, 1); A(5, 5, 13, 6, 5, 13);
+		place(p, w, 0, 0, 1, 5, 5, bb); place(p, w, 0, 0, 10, 5, 5, bb); place(p, w, 0, 0, 1, 5, 9, bb); place(p, w, 0, 0, 10, 5, 9, bb);
+		for (i = 0; i <= 14; i += 14) { R(2, 4, i, 2, 5, i); R(4, 4, i, 4, 5, i); R(7, 4, i, 7, 5, i); R(9, 4, i, 9, 5, i); }
+		R(5, 6, 0, 6, 6, 0);
+		for (i = 0; i <= 11; i += 11) {
+			for (j = 2; j <= 12; j += 2) R(i, 4, j, i, 5, j);
+			R(i, 6, 5, i, 6, 5); R(i, 6, 9, i, 6, 9);
+		}
+		R(2, 7, 2, 2, 9, 2); R(9, 7, 2, 9, 9, 2); R(2, 7, 12, 2, 9, 12); R(9, 7, 12, 9, 9, 12);
+		R(4, 9, 4, 4, 9, 4); R(7, 9, 4, 7, 9, 4); R(4, 9, 10, 4, 9, 10); R(7, 9, 10, 7, 9, 10); R(5, 9, 7, 6, 9, 7);
+		place(p, w, B.stairsCobblestone, s3, 5, 9, 6, bb); place(p, w, B.stairsCobblestone, s3, 6, 9, 6, bb);
+		place(p, w, B.stairsCobblestone, s2, 5, 9, 8, bb); place(p, w, B.stairsCobblestone, s2, 6, 9, 8, bb);
+		place(p, w, B.stairsCobblestone, s3, 4, 0, 0, bb); place(p, w, B.stairsCobblestone, s3, 5, 0, 0, bb); place(p, w, B.stairsCobblestone, s3, 6, 0, 0, bb); place(p, w, B.stairsCobblestone, s3, 7, 0, 0, bb);
+		place(p, w, B.stairsCobblestone, s3, 4, 1, 8, bb); place(p, w, B.stairsCobblestone, s3, 4, 2, 9, bb); place(p, w, B.stairsCobblestone, s3, 4, 3, 10, bb);
+		place(p, w, B.stairsCobblestone, s3, 7, 1, 8, bb); place(p, w, B.stairsCobblestone, s3, 7, 2, 9, bb); place(p, w, B.stairsCobblestone, s3, 7, 3, 10, bb);
+		R(4, 1, 9, 4, 1, 9); R(7, 1, 9, 7, 1, 9); R(4, 1, 10, 7, 2, 10); R(5, 4, 5, 6, 4, 5);
+		place(p, w, B.stairsCobblestone, s0, 4, 4, 5, bb); place(p, w, B.stairsCobblestone, s1, 7, 4, 5, bb);
+		for (i = 0; i < 4; i++) {
+			place(p, w, B.stairsCobblestone, s2, 5, 0 - i, 6 + i, bb); place(p, w, B.stairsCobblestone, s2, 6, 0 - i, 6 + i, bb);
+			A(5, 0 - i, 7 + i, 6, 0 - i, 9 + i);
+		}
+		A(1, -3, 12, 10, -1, 13); A(1, -3, 1, 3, -1, 13); A(1, -3, 1, 9, -1, 5);
+		for (i = 1; i <= 13; i += 2) R(1, -3, i, 1, -2, i);
+		for (i = 2; i <= 12; i += 2) R(1, -1, i, 3, -1, i);
+		R(2, -2, 1, 5, -2, 1); R(7, -2, 1, 9, -2, 1); R(6, -3, 1, 6, -3, 1); R(6, -1, 1, 6, -1, 1);
+		place(p, w, B.tripWireSource, META(p, B.tripWireSource, 3) | 4, 1, -3, 8, bb);
+		place(p, w, B.tripWireSource, META(p, B.tripWireSource, 1) | 4, 4, -3, 8, bb);
+		place(p, w, B.tripWire, 4, 2, -3, 8, bb); place(p, w, B.tripWire, 4, 3, -3, 8, bb);
+		[[5, -3, 7], [5, -3, 6], [5, -3, 5], [5, -3, 4], [5, -3, 3], [5, -3, 2], [5, -3, 1], [4, -3, 1]].forEach(function (c) { place(p, w, B.redstoneWire, 0, c[0], c[1], c[2], bb); });
+		place(p, w, B.cobblestoneMossy, 0, 3, -3, 1, bb);
+		if (!p[':field_74945_j']) p[':field_74945_j'] = C.dispenser(p, w, bb, rand, 3, -2, 1, 2, C.withMods(ARROWS, 'pyramidJungleDispenser'), 2) ? 1 : 0;
+		place(p, w, B.vine, 15, 3, -2, 2, bb);
+		place(p, w, B.tripWireSource, META(p, B.tripWireSource, 2) | 4, 7, -3, 1, bb);
+		place(p, w, B.tripWireSource, META(p, B.tripWireSource, 0) | 4, 7, -3, 5, bb);
+		place(p, w, B.tripWire, 4, 7, -3, 2, bb); place(p, w, B.tripWire, 4, 7, -3, 3, bb); place(p, w, B.tripWire, 4, 7, -3, 4, bb);
+		place(p, w, B.redstoneWire, 0, 8, -3, 6, bb); place(p, w, B.redstoneWire, 0, 9, -3, 6, bb); place(p, w, B.redstoneWire, 0, 9, -3, 5, bb);
+		place(p, w, B.cobblestoneMossy, 0, 9, -3, 4, bb); place(p, w, B.redstoneWire, 0, 9, -2, 4, bb);
+		if (!p[':field_74946_k']) p[':field_74946_k'] = C.dispenser(p, w, bb, rand, 9, -2, 3, 4, C.withMods(ARROWS, 'pyramidJungleDispenser'), 2) ? 1 : 0;
+		place(p, w, B.vine, 15, 8, -1, 3, bb); place(p, w, B.vine, 15, 8, -2, 3, bb);
+		if (!p[':field_74947_h']) {
+			var items = C.withMods(TEMPLE.concat([C.book(rand)]), 'pyramidJungleChest');
+			p[':field_74947_h'] = C.chest(p, w, bb, rand, 8, -3, 3, items, 2 + rInt(rand, 5)) ? 1 : 0;
+		}
+		[[9, -3, 2], [8, -3, 1], [4, -3, 5], [5, -2, 5], [5, -1, 5], [6, -3, 5], [7, -2, 5], [7, -1, 5], [8, -3, 5]].forEach(function (c) { place(p, w, B.cobblestoneMossy, 0, c[0], c[1], c[2], bb); });
+		R(9, -1, 1, 9, -1, 5);
+		A(8, -3, 8, 10, -1, 10);
+		place(p, w, B.stoneBrick, 3, 8, -2, 11, bb); place(p, w, B.stoneBrick, 3, 9, -2, 11, bb); place(p, w, B.stoneBrick, 3, 10, -2, 11, bb);
+		var lv = leverInvert(META(p, B.lever, 2));
+		place(p, w, B.lever, lv, 8, -2, 12, bb); place(p, w, B.lever, lv, 9, -2, 12, bb); place(p, w, B.lever, lv, 10, -2, 12, bb);
+		R(8, -3, 8, 8, -3, 10); R(10, -3, 8, 10, -3, 10);
+		place(p, w, B.cobblestoneMossy, 0, 10, -2, 9, bb);
+		place(p, w, B.redstoneWire, 0, 8, -2, 9, bb); place(p, w, B.redstoneWire, 0, 8, -2, 10, bb); place(p, w, B.redstoneWire, 0, 10, -1, 9, bb);
+		place(p, w, B.pistonStickyBase, 1, 9, -2, 8, bb);
+		place(p, w, B.pistonStickyBase, META(p, B.pistonStickyBase, 4), 10, -2, 8, bb);
+		place(p, w, B.pistonStickyBase, META(p, B.pistonStickyBase, 4), 10, -1, 8, bb);
+		place(p, w, B.redstoneRepeaterIdle, META(p, B.redstoneRepeaterIdle, 2), 10, -2, 10, bb);
+		if (!p[':field_74948_i']) {
+			var items2 = C.withMods(TEMPLE.concat([C.book(rand)]), 'pyramidJungleChest');
+			p[':field_74948_i'] = C.chest(p, w, bb, rand, 9, -3, 10, items2, 2 + rInt(rand, 5)) ? 1 : 0;
+		}
+		return true;
+	};
+	var hutParts = function (p, w, rand, bb) {
+		if (!onGround(p, w, bb, 0)) return false;
+		fillMeta(p, w, bb, 1, 1, 1, 5, 1, 7, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 1, 4, 2, 5, 4, 7, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 2, 1, 0, 4, 1, 0, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 2, 2, 2, 3, 3, 2, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 1, 2, 3, 1, 3, 6, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 5, 2, 3, 5, 3, 6, B.planks, 1, B.planks, 1, false);
+		fillMeta(p, w, bb, 2, 2, 7, 4, 3, 7, B.planks, 1, B.planks, 1, false);
+		fill(p, w, bb, 1, 0, 2, 1, 3, 2, B.wood, B.wood, false);
+		fill(p, w, bb, 5, 0, 2, 5, 3, 2, B.wood, B.wood, false);
+		fill(p, w, bb, 1, 0, 7, 1, 3, 7, B.wood, B.wood, false);
+		fill(p, w, bb, 5, 0, 7, 5, 3, 7, B.wood, B.wood, false);
+		place(p, w, B.fence, 0, 2, 3, 2, bb); place(p, w, B.fence, 0, 3, 3, 7, bb);
+		place(p, w, 0, 0, 1, 3, 4, bb); place(p, w, 0, 0, 5, 3, 4, bb); place(p, w, 0, 0, 5, 3, 5, bb);
+		place(p, w, B.flowerPot, 7, 1, 3, 5, bb);
+		place(p, w, B.workbench, 0, 3, 2, 6, bb);
+		place(p, w, B.cauldron, 0, 4, 2, 6, bb);
+		place(p, w, B.fence, 0, 1, 2, 1, bb); place(p, w, B.fence, 0, 5, 2, 1, bb);
+		var m3 = META(p, B.stairsWoodOak, 3), m1 = META(p, B.stairsWoodOak, 1), m0 = META(p, B.stairsWoodOak, 0), m2 = META(p, B.stairsWoodOak, 2);
+		fillMeta(p, w, bb, 0, 4, 1, 6, 4, 1, B.stairsWoodSpruce, m3, B.stairsWoodSpruce, m3, false);
+		fillMeta(p, w, bb, 0, 4, 2, 0, 4, 7, B.stairsWoodSpruce, m0, B.stairsWoodSpruce, m0, false);
+		fillMeta(p, w, bb, 6, 4, 2, 6, 4, 7, B.stairsWoodSpruce, m1, B.stairsWoodSpruce, m1, false);
+		fillMeta(p, w, bb, 0, 4, 8, 6, 4, 8, B.stairsWoodSpruce, m2, B.stairsWoodSpruce, m2, false);
+		for (var z = 2; z <= 7; z += 5) for (var x = 1; x <= 5; x += 4) fillDown(p, w, B.wood, 0, x, -1, z, bb);
+		if (!p[':hasWitch']) {
+			var wx = C.X(p, 2, 5), wy = C.Y(p, 2), wz = C.Z(p, 2, 5);
+			if (C.inside(bb, wx, wy, wz)) { p[':hasWitch'] = 1; C.spawnMob('witch', wx + 0.5, wy, wz + 0.5); }
+		}
+		return true;
+	};
+	def('ComponentScatteredFeature', { super: SC, access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT,
+		fields: { scatteredFeatureSizeX: 'I', scatteredFeatureSizeY: 'I', scatteredFeatureSizeZ: 'I', field_74936_d: 'I' }, methods: {
+		'<init>(Ljava/util/Random;IIIIII)V': function (vm, s, a) { featureInit(s, a[0], a[1], a[2], a[3], a[4], a[5], a[6]); },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; s[':field_74936_d'] = -1; },
+		['func_74935_a(Lnet/minecraft/src/World;' + LBB + 'I)Z']: function (vm, s, a) { return onGround(s, a[0], a[1], a[2]) ? 1 : 0; },
+	} });
+	var FS = SRC + 'ComponentScatteredFeature';
+	var featDef = function (name, sizes, parts, fields) {
+		var m = {};
+		m['<init>(Ljava/util/Random;II)V'] = function (vm, s, a) { featureInit(s, a[0], a[1], 64, a[2], sizes[0], sizes[1], sizes[2]); };
+		m['<init>()V'] = function (vm, s) { s[':coordBaseMode'] = -1; s[':field_74936_d'] = -1; };
+		m[PK] = function (vm, s, a) { return parts(s, a[0], a[1], a[2]) ? 1 : 0; };
+		def(name, { super: FS, fields: fields || {}, methods: m, $parts: parts });
+	};
+	featDef('ComponentScatteredFeatureDesertPyramid', [21, 15, 21], pyramidParts, { field_74940_h: '[Z' });
+	featDef('ComponentScatteredFeatureJunglePyramid', [12, 10, 15], jungleParts, { field_74947_h: 'Z', field_74948_i: 'Z', field_74945_j: 'Z', field_74946_k: 'Z' });
+	featDef('ComponentScatteredFeatureSwampHut', [7, 5, 9], hutParts, { hasWitch: 'Z' });
+	var feature = function (name, rand, x, z, sizes) { var p = vm.newObject(cls(name)); featureInit(p, rand, x, 64, z, sizes[0], sizes[1], sizes[2]); return p; };
+	var featureStart = function (s, w, rand, cx, cz) {
+		var bio = vm.callVirtual(w, 'getBiomeGenForCoords', '(II)Lnet/minecraft/src/BiomeGenBase;', [cx * 16 + 8, cz * 16 + 8]);
+		var bc = cls('BiomeGenBase'); if (bc.initState !== 2) vm.initClass(bc);
+		var S = bc.statics, p;
+		if (bio && (bio === S.jungle || bio === S.jungleHills)) p = feature('ComponentScatteredFeatureJunglePyramid', rand, cx * 16, cz * 16, [12, 10, 15]);
+		else if (bio && bio === S.swampland) p = feature('ComponentScatteredFeatureSwampHut', rand, cx * 16, cz * 16, [7, 5, 9]);
+		else p = feature('ComponentScatteredFeatureDesertPyramid', rand, cx * 16, cz * 16, [21, 15, 21]);
+		C.listAdd(s[':components'], p);
+		C.updateBB(s);
+	};
+	def('StructureScatteredFeatureStart', { super: SRC + 'StructureStart', methods: {
+		'<init>(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, s, a) { s[':components'] = C.newList('java/util/LinkedList'); featureStart(s, a[0], a[1], a[2], a[3]); },
+		'<init>()V': function (vm, s) { s[':components'] = C.newList('java/util/LinkedList'); },
+	} });
+	var featureBiomes = function () {
+		var c = cls('MapGenScatteredFeature'); if (c.initState !== 2) vm.initClass(c);
+		return c.statics.biomelist;
+	};
+	var canFeature = function (g, cx, cz) {
+		var dist = g[':maxDistanceBetweenScatteredFeatures'], sep = g[':minDistanceBetweenScatteredFeatures'], x0 = cx, z0 = cz;
+		if (cx < 0) cx -= dist - 1;
+		if (cz < 0) cz -= dist - 1;
+		var rx = idiv(cx, dist), rz = idiv(cz, dist), w = g[':worldObj'];
+		var r = vm.callVirtual(w, 'setRandomSeed', '(III)Ljava/util/Random;', [rx, rz, 14357617]);
+		rx *= dist; rz *= dist;
+		rx += rInt(r, dist - sep);
+		rz += rInt(r, dist - sep);
+		if (x0 !== rx || z0 !== rz) return false;
+		var wcm = vm.callVirtual(w, 'getWorldChunkManager', '()Lnet/minecraft/src/WorldChunkManager;', []);
+		var bio = wcm ? vm.callVirtual(wcm, 'getBiomeGenAt', '(II)Lnet/minecraft/src/BiomeGenBase;', [x0 * 16 + 8, z0 * 16 + 8]) : null;
+		return C.listOf(featureBiomes()).some(function (b) { return b === bio; });
+	};
+	var featureNew = function (g, cx, cz) {
+		var s = vm.newObject(cls('StructureScatteredFeatureStart'));
+		s[':components'] = C.newList('java/util/LinkedList');
+		featureStart(s, g[':worldObj'], g[':rand'], cx, cz);
+		return s;
+	};
+	var mgsfInit = function (g) {
+		C.baseInit(g); C.startsMap(g);
+		g[':maxDistanceBetweenScatteredFeatures'] = 32; g[':minDistanceBetweenScatteredFeatures'] = 8;
+		var l = C.newList(), se = vm.newObject(cls('SpawnListEntry'));
+		JVM.run(vm, function () { vm.callVirtual(se, '<init>', '(Ljava/lang/Class;III)V', [vm.classObject(cls('EntityWitch')), 1, 1, 1]); });
+		C.listAdd(l, se);
+		g[':scatteredFeatureSpawnList'] = l;
+	};
+	def('MapGenScatteredFeature', { super: SRC + 'MapGenStructure', $can: canFeature, $start: featureNew,
+		statics: { biomelist: null },
+		clinit: function (vm, c) {
+			var bc = cls('BiomeGenBase'); vm.initClass(bc);
+			var S = bc.statics;
+			c.statics.biomelist = JVM.newList(vm, [S.desert, S.desertHills, S.jungle, S.jungleHills, S.swampland].filter(Boolean));
+		},
+		fields: { scatteredFeatureSpawnList: 'Ljava/util/List;', maxDistanceBetweenScatteredFeatures: 'I', minDistanceBetweenScatteredFeatures: 'I' }, methods: {
+		'<init>()V': function (vm, s) { mgsfInit(s); },
+		'<init>(Ljava/util/Map;)V': function (vm, s, a) {
+			mgsfInit(s);
+			(a[0] && a[0].$m ? a[0].$m.entries() : []).forEach(function (e) { if (String(e.k) === 'distance') { var n = parseInt(String(e.v), 10); if (!isNaN(n)) s[':maxDistanceBetweenScatteredFeatures'] = Math.max(n, s[':minDistanceBetweenScatteredFeatures'] + 1); } });
+		},
+		'canSpawnStructureAtCoords(II)Z': function (vm, s, a) { return canFeature(s, a[0], a[1]) ? 1 : 0; },
+		'getStructureStart(II)Lnet/minecraft/src/StructureStart;': function (vm, s, a) { return featureNew(s, a[0], a[1]); },
+		'getScatteredFeatureSpawnList()Ljava/util/List;': function (vm, s) { return s[':scatteredFeatureSpawnList']; },
+		'func_143025_a()Ljava/lang/String;': function () { return 'Temple'; },
+	} });
+}
+JVM.installMineshafts = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+
+function install(vm, H) {
+	var C = JVM.structCore;
+	if (!C) return;
+	var B = C.B, rInt = H.rInt, rFloat = H.rFloat, rBool = H.rBool, rDouble = H.rDouble, F = H.F;
+	var place = C.place, fill = C.fill, META = C.META;
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var cls = C.cls;
+	var LIST = 'Ljava/util/List;', LR = 'Ljava/util/Random;', LBB = 'Lnet/minecraft/src/StructureBoundingBox;';
+	var nb = function (o) { return o[':boundingBox']; };
+	var lootOf = function (rows) { return rows.map(function (e) { var o = C.loot(e[0], e[1], e[2], e[3], e[4]); o.$vanilla = true; return o; }); };
+	var CHEST = lootOf([[368, 0, 1, 1, 10], [264, 0, 1, 3, 3], [265, 0, 1, 5, 10], [266, 0, 1, 3, 5], [331, 0, 4, 9, 5], [297, 0, 1, 3, 15], [260, 0, 1, 3, 15],
+		[257, 0, 1, 1, 5], [267, 0, 1, 1, 5], [307, 0, 1, 1, 5], [306, 0, 1, 1, 5], [308, 0, 1, 1, 5], [309, 0, 1, 1, 5], [322, 0, 1, 1, 1]]);
+	var LIBRARY = lootOf([[340, 0, 1, 3, 20], [339, 0, 2, 7, 20], [395, 0, 1, 1, 1], [345, 0, 1, 1, 1]]);
+	var CROSSING = lootOf([[265, 0, 1, 5, 10], [266, 0, 1, 3, 5], [331, 0, 4, 9, 5], [263, 0, 3, 8, 10], [297, 0, 1, 3, 15], [260, 0, 1, 3, 15], [257, 0, 1, 1, 1]]);
+
+	var stones = { $jsSel: function (rand, x, y, z, edge) {
+		if (!edge) return [0, 0];
+		var f = rFloat(rand);
+		if (f < F(0.2)) return [B.stoneBrick, 2];
+		if (f < F(0.5)) return [B.stoneBrick, 1];
+		if (f < F(0.55)) return [B.silverfish, 2];
+		return [B.stoneBrick, 0];
+	} };
+	var R = function (p, w, bb, rand, x0, y0, z0, x1, y1, z1, keep) { C.fillRandom(p, w, bb, x0, y0, z0, x1, y1, z1, keep, rand, stones); };
+
+	var WEIGHTS = [['ComponentStrongholdStraight', 40, 0, 0], ['ComponentStrongholdPrison', 5, 5, 0], ['ComponentStrongholdLeftTurn', 20, 0, 0],
+		['ComponentStrongholdRightTurn', 20, 0, 0], ['ComponentStrongholdRoomCrossing', 10, 6, 0], ['ComponentStrongholdStairsStraight', 5, 5, 0],
+		['ComponentStrongholdStairs', 5, 5, 0], ['ComponentStrongholdCrossing', 5, 4, 0], ['ComponentStrongholdChestCorridor', 5, 4, 0],
+		['ComponentStrongholdLibrary', 10, 2, 4], ['ComponentStrongholdPortalRoom', 20, 1, 5]].map(function (e) { return { name: e[0], weight: e[1], limit: e[2], deeper: e[3], spawned: 0 }; });
+	var S = { list: [], total: 0, forced: null };
+	var prepare = function () { S.list = WEIGHTS.slice(); WEIGHTS.forEach(function (w) { w.spawned = 0; }); S.forced = null; };
+	var more = function (w) { return w.limit === 0 || w.spawned < w.limit; };
+	var moreOfType = function (w, t) { return more(w) && (!w.deeper || t > w.deeper); };
+	var canAdd = function () {
+		var any = false; S.total = 0;
+		S.list.forEach(function (w) { if (w.limit > 0 && w.spawned < w.limit) any = true; S.total += w.weight; });
+		return any;
+	};
+	var deeper = function (b) { return b != null && b[':minY'] > 10; };
+	var fits = function (list, b) { return deeper(b) && !C.findIntersecting(list, b); };
+	var SIZES = {
+		ComponentStrongholdStraight: [-1, -1, 0, 5, 5, 7], ComponentStrongholdPrison: [-1, -1, 0, 9, 5, 11], ComponentStrongholdLeftTurn: [-1, -1, 0, 5, 5, 5],
+		ComponentStrongholdRoomCrossing: [-4, -1, 0, 11, 7, 11], ComponentStrongholdStairsStraight: [-1, -7, 0, 5, 11, 8], ComponentStrongholdStairs: [-1, -7, 0, 5, 11, 5],
+		ComponentStrongholdCrossing: [-4, -3, 0, 10, 9, 11], ComponentStrongholdChestCorridor: [-1, -1, 0, 5, 5, 7], ComponentStrongholdPortalRoom: [-4, -1, 0, 11, 8, 16],
+	};
+	var make = function (name, list, rand, x, y, z, mode, type) {
+		if (name === 'ComponentStrongholdRightTurn') name = 'ComponentStrongholdLeftTurn';
+		var b;
+		if (name === 'ComponentStrongholdLibrary') {
+			b = C.toAdd(x, y, z, -4, -1, 0, 14, 11, 15, mode);
+			if (!fits(list, b)) { b = C.toAdd(x, y, z, -4, -1, 0, 14, 6, 15, mode); if (!fits(list, b)) return null; }
+		} else {
+			var s = SIZES[name];
+			if (!s) return null;
+			b = C.toAdd(x, y, z, s[0], s[1], s[2], s[3], s[4], s[5], mode);
+			if (!fits(list, b)) return null;
+		}
+		return newRoom(name, type, rand, b, mode);
+	};
+	var nextComponent = function (start, list, rand, x, y, z, mode, type) {
+		if (!canAdd()) return null;
+		if (S.forced) {
+			var f = make(S.forced, list, rand, x, y, z, mode, type);
+			S.forced = null;
+			if (f) return f;
+		}
+		for (var tries = 0; tries < 5; tries++) {
+			var r = rInt(rand, S.total);
+			for (var i = 0; i < S.list.length; i++) {
+				var w = S.list[i];
+				r -= w.weight;
+				if (r >= 0) continue;
+				if (!moreOfType(w, type) || w === start.$lastWeight) break;
+				var c = make(w.name, list, rand, x, y, z, mode, type);
+				if (c) {
+					w.spawned++;
+					start.$lastWeight = w;
+					if (!more(w)) S.list.splice(S.list.indexOf(w), 1);
+					return c;
+				}
+			}
+		}
+		var cb = corridorBox(list, rand, x, y, z, mode);
+		if (cb && cb[':minY'] > 1) return newCorridor(type, rand, cb, mode);
+		return null;
+	};
+	var nextValid = function (start, list, rand, x, y, z, mode, type) {
+		if (type > 50) return null;
+		var sb = nb(start);
+		if (Math.abs(x - sb[':minX']) > 112 || Math.abs(z - sb[':minZ']) > 112) return null;
+		var c = nextComponent(start, list, rand, x, y, z, mode, type + 1);
+		if (c) { C.listAdd(list, c); C.listAdd(start[':field_75026_c'], c); }
+		return c;
+	};
+	def('StructureStrongholdPieces', { staticMethods: {
+		'prepareStructurePieces()V': function () { prepare(); },
+		['getNextValidComponentAccess(Lnet/minecraft/src/ComponentStrongholdStairs2;' + LIST + LR + 'IIIII)Lnet/minecraft/src/StructureComponent;']: function (vm, n, a) { return nextValid(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]); },
+	} });
+
+	var DOORS = ['OPENING', 'WOOD_DOOR', 'GRATES', 'IRON_DOOR'];
+	var randomDoor = function (rand) { switch (rInt(rand, 5)) { case 2: return 1; case 3: return 2; case 4: return 3; default: return 0; } };
+	var placeDoor = function (p, w, rand, bb, door, x, y, z) {
+		switch (door) {
+			case 1:
+				[[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0]].forEach(function (c) { place(p, w, B.stoneBrick, 0, x + c[0], y + c[1], z, bb); });
+				place(p, w, B.doorWood, 0, x + 1, y, z, bb); place(p, w, B.doorWood, 8, x + 1, y + 1, z, bb);
+				break;
+			case 2:
+				place(p, w, 0, 0, x + 1, y, z, bb); place(p, w, 0, 0, x + 1, y + 1, z, bb);
+				[[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0]].forEach(function (c) { place(p, w, B.fenceIron, 0, x + c[0], y + c[1], z, bb); });
+				break;
+			case 3:
+				[[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0]].forEach(function (c) { place(p, w, B.stoneBrick, 0, x + c[0], y + c[1], z, bb); });
+				place(p, w, B.doorIron, 0, x + 1, y, z, bb); place(p, w, B.doorIron, 8, x + 1, y + 1, z, bb);
+				place(p, w, B.stoneButton, META(p, B.stoneButton, 4), x + 2, y + 1, z + 1, bb);
+				place(p, w, B.stoneButton, META(p, B.stoneButton, 3), x + 2, y + 1, z - 1, bb);
+				break;
+			default: fill(p, w, bb, x, y, z, x + 3 - 1, y + 3 - 1, z, 0, 0, false);
+		}
+	};
+	var nextNormal = function (p, start, list, rand, off, dy) {
+		var b = nb(p), m = p[':coordBaseMode'], t = p[':componentType'];
+		switch (m) {
+			case 2: return nextValid(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':minZ'] - 1, m, t);
+			case 0: return nextValid(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':maxZ'] + 1, m, t);
+			case 1: return nextValid(start, list, rand, b[':minX'] - 1, b[':minY'] + dy, b[':minZ'] + off, m, t);
+			case 3: return nextValid(start, list, rand, b[':maxX'] + 1, b[':minY'] + dy, b[':minZ'] + off, m, t);
+		}
+		return null;
+	};
+	var nextX = function (p, start, list, rand, dy, off) {
+		var b = nb(p), t = p[':componentType'];
+		switch (p[':coordBaseMode']) {
+			case 0: case 2: return nextValid(start, list, rand, b[':minX'] - 1, b[':minY'] + dy, b[':minZ'] + off, 1, t);
+			case 1: case 3: return nextValid(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':minZ'] - 1, 2, t);
+		}
+		return null;
+	};
+	var nextZ = function (p, start, list, rand, dy, off) {
+		var b = nb(p), t = p[':componentType'];
+		switch (p[':coordBaseMode']) {
+			case 0: case 2: return nextValid(start, list, rand, b[':maxX'] + 1, b[':minY'] + dy, b[':minZ'] + off, 3, t);
+			case 1: case 3: return nextValid(start, list, rand, b[':minX'] + off, b[':minY'] + dy, b[':maxZ'] + 1, 0, t);
+		}
+		return null;
+	};
+
+	var INIT = {}, PARTS = {}, BUILD = {};
+	var newRoom = function (name, type, rand, b, mode) {
+		var p = vm.newObject(cls(name));
+		p[':componentType'] = type; p[':coordBaseMode'] = mode; p[':boundingBox'] = b;
+		if (name !== 'ComponentStrongholdPortalRoom') p.$door = randomDoor(rand);
+		if (INIT[name]) INIT[name](p, rand);
+		return p;
+	};
+	BUILD.ComponentStrongholdStairs = function (p, start, list, rand) {
+		if (p[':field_75024_a']) S.forced = 'ComponentStrongholdCrossing';
+		nextNormal(p, start, list, rand, 1, 1);
+	};
+	PARTS.ComponentStrongholdStairs = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 10, 4, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 7, 0);
+		placeDoor(p, w, rand, bb, 0, 1, 1, 4);
+		[[B.stoneBrick, 2, 6, 1], [B.stoneBrick, 1, 5, 1], [B.stoneSingleSlab, 1, 6, 1], [B.stoneBrick, 1, 5, 2], [B.stoneBrick, 1, 4, 3], [B.stoneSingleSlab, 1, 5, 3],
+			[B.stoneBrick, 2, 4, 3], [B.stoneBrick, 3, 3, 3], [B.stoneSingleSlab, 3, 4, 3], [B.stoneBrick, 3, 3, 2], [B.stoneBrick, 3, 2, 1], [B.stoneSingleSlab, 3, 3, 1],
+			[B.stoneBrick, 2, 2, 1], [B.stoneBrick, 1, 1, 1], [B.stoneSingleSlab, 1, 2, 1], [B.stoneBrick, 1, 1, 2], [B.stoneSingleSlab, 1, 1, 3]]
+			.forEach(function (c) { place(p, w, c[0], 0, c[1], c[2], c[3], bb); });
+		return true;
+	};
+	var corridorBox = function (list, rand, x, y, z, mode) {
+		var b = C.toAdd(x, y, z, -1, -1, 0, 5, 5, 4, mode), hit = C.findIntersecting(list, b);
+		if (!hit) return null;
+		if (nb(hit)[':minY'] === b[':minY']) {
+			for (var n = 3; n >= 1; n--) {
+				b = C.toAdd(x, y, z, -1, -1, 0, 5, 5, n - 1, mode);
+				if (!C.meets(nb(hit), b)) return C.toAdd(x, y, z, -1, -1, 0, 5, 5, n, mode);
+			}
+		}
+		return null;
+	};
+	var newCorridor = function (type, rand, b, mode) {
+		var p = vm.newObject(cls('ComponentStrongholdCorridor'));
+		p[':componentType'] = type; p[':coordBaseMode'] = mode; p[':boundingBox'] = b;
+		p[':field_74993_a'] = mode === 2 || mode === 0 ? C.zs(b) : C.xs(b);
+		return p;
+	};
+	PARTS.ComponentStrongholdCorridor = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		for (var z = 0; z < p[':field_74993_a']; z++) {
+			for (var x = 0; x <= 4; x++) place(p, w, B.stoneBrick, 0, x, 0, z, bb);
+			for (var y = 1; y <= 3; y++) {
+				place(p, w, B.stoneBrick, 0, 0, y, z, bb);
+				place(p, w, 0, 0, 1, y, z, bb); place(p, w, 0, 0, 2, y, z, bb); place(p, w, 0, 0, 3, y, z, bb);
+				place(p, w, B.stoneBrick, 0, 4, y, z, bb);
+			}
+			for (x = 0; x <= 4; x++) place(p, w, B.stoneBrick, 0, x, 4, z, bb);
+		}
+		return true;
+	};
+	INIT.ComponentStrongholdStraight = function (p, rand) { p[':expandsX'] = rInt(rand, 2) === 0 ? 1 : 0; p[':expandsZ'] = rInt(rand, 2) === 0 ? 1 : 0; };
+	BUILD.ComponentStrongholdStraight = function (p, start, list, rand) {
+		nextNormal(p, start, list, rand, 1, 1);
+		if (p[':expandsX']) nextX(p, start, list, rand, 1, 2);
+		if (p[':expandsZ']) nextZ(p, start, list, rand, 1, 2);
+	};
+	PARTS.ComponentStrongholdStraight = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 4, 6, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 1, 0);
+		placeDoor(p, w, rand, bb, 0, 1, 1, 6);
+		C.maybePlace(p, w, bb, rand, F(0.1), 1, 2, 1, B.torchWood, 0);
+		C.maybePlace(p, w, bb, rand, F(0.1), 3, 2, 1, B.torchWood, 0);
+		C.maybePlace(p, w, bb, rand, F(0.1), 1, 2, 5, B.torchWood, 0);
+		C.maybePlace(p, w, bb, rand, F(0.1), 3, 2, 5, B.torchWood, 0);
+		if (p[':expandsX']) fill(p, w, bb, 0, 1, 2, 0, 3, 4, 0, 0, false);
+		if (p[':expandsZ']) fill(p, w, bb, 4, 1, 2, 4, 3, 4, 0, 0, false);
+		return true;
+	};
+	BUILD.ComponentStrongholdLeftTurn = function (p, start, list, rand) {
+		var m = p[':coordBaseMode'];
+		if (m === 2 || m === 3) nextX(p, start, list, rand, 1, 1); else nextZ(p, start, list, rand, 1, 1);
+	};
+	PARTS.ComponentStrongholdLeftTurn = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 4, 4, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 1, 0);
+		var m = p[':coordBaseMode'];
+		if (m === 2 || m === 3) fill(p, w, bb, 0, 1, 1, 0, 3, 3, 0, 0, false); else fill(p, w, bb, 4, 1, 1, 4, 3, 3, 0, 0, false);
+		return true;
+	};
+	BUILD.ComponentStrongholdRightTurn = function (p, start, list, rand) {
+		var m = p[':coordBaseMode'];
+		if (m === 2 || m === 3) nextZ(p, start, list, rand, 1, 1); else nextX(p, start, list, rand, 1, 1);
+	};
+	PARTS.ComponentStrongholdRightTurn = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 4, 4, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 1, 0);
+		var m = p[':coordBaseMode'];
+		if (m === 2 || m === 3) fill(p, w, bb, 4, 1, 1, 4, 3, 3, 0, 0, false); else fill(p, w, bb, 0, 1, 1, 0, 3, 3, 0, 0, false);
+		return true;
+	};
+	BUILD.ComponentStrongholdStairsStraight = function (p, start, list, rand) { nextNormal(p, start, list, rand, 1, 1); };
+	PARTS.ComponentStrongholdStairsStraight = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 10, 7, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 7, 0);
+		placeDoor(p, w, rand, bb, 0, 1, 1, 7);
+		var m = META(p, B.stairsCobblestone, 2);
+		for (var i = 0; i < 6; i++) {
+			place(p, w, B.stairsCobblestone, m, 1, 6 - i, 1 + i, bb); place(p, w, B.stairsCobblestone, m, 2, 6 - i, 1 + i, bb); place(p, w, B.stairsCobblestone, m, 3, 6 - i, 1 + i, bb);
+			if (i < 5) { place(p, w, B.stoneBrick, 0, 1, 5 - i, 1 + i, bb); place(p, w, B.stoneBrick, 0, 2, 5 - i, 1 + i, bb); place(p, w, B.stoneBrick, 0, 3, 5 - i, 1 + i, bb); }
+		}
+		return true;
+	};
+	BUILD.ComponentStrongholdPrison = function (p, start, list, rand) { nextNormal(p, start, list, rand, 1, 1); };
+	PARTS.ComponentStrongholdPrison = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 8, 4, 10, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 1, 0);
+		fill(p, w, bb, 1, 1, 10, 3, 3, 10, 0, 0, false);
+		R(p, w, bb, rand, 4, 1, 1, 4, 3, 1, false); R(p, w, bb, rand, 4, 1, 3, 4, 3, 3, false);
+		R(p, w, bb, rand, 4, 1, 7, 4, 3, 7, false); R(p, w, bb, rand, 4, 1, 9, 4, 3, 9, false);
+		fill(p, w, bb, 4, 1, 4, 4, 3, 6, B.fenceIron, B.fenceIron, false);
+		fill(p, w, bb, 5, 1, 5, 7, 3, 5, B.fenceIron, B.fenceIron, false);
+		place(p, w, B.fenceIron, 0, 4, 3, 2, bb); place(p, w, B.fenceIron, 0, 4, 3, 8, bb);
+		var d = META(p, B.doorIron, 3);
+		place(p, w, B.doorIron, d, 4, 1, 2, bb); place(p, w, B.doorIron, META(p, B.doorIron, 3) + 8, 4, 2, 2, bb);
+		place(p, w, B.doorIron, META(p, B.doorIron, 3), 4, 1, 8, bb); place(p, w, B.doorIron, META(p, B.doorIron, 3) + 8, 4, 2, 8, bb);
+		return true;
+	};
+	INIT.ComponentStrongholdRoomCrossing = function (p, rand) { p[':roomType'] = rInt(rand, 5); };
+	BUILD.ComponentStrongholdRoomCrossing = function (p, start, list, rand) {
+		nextNormal(p, start, list, rand, 4, 1);
+		nextX(p, start, list, rand, 1, 4);
+		nextZ(p, start, list, rand, 1, 4);
+	};
+	PARTS.ComponentStrongholdRoomCrossing = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 10, 6, 10, true);
+		placeDoor(p, w, rand, bb, p.$door, 4, 1, 0);
+		fill(p, w, bb, 4, 1, 10, 6, 3, 10, 0, 0, false);
+		fill(p, w, bb, 0, 1, 4, 0, 3, 6, 0, 0, false);
+		fill(p, w, bb, 10, 1, 4, 10, 3, 6, 0, 0, false);
+		var i;
+		switch (p[':roomType']) {
+			case 0:
+				place(p, w, B.stoneBrick, 0, 5, 1, 5, bb); place(p, w, B.stoneBrick, 0, 5, 2, 5, bb); place(p, w, B.stoneBrick, 0, 5, 3, 5, bb);
+				place(p, w, B.torchWood, 0, 4, 3, 5, bb); place(p, w, B.torchWood, 0, 6, 3, 5, bb); place(p, w, B.torchWood, 0, 5, 3, 4, bb); place(p, w, B.torchWood, 0, 5, 3, 6, bb);
+				[[4, 4], [4, 5], [4, 6], [6, 4], [6, 5], [6, 6], [5, 4], [5, 6]].forEach(function (c) { place(p, w, B.stoneSingleSlab, 0, c[0], 1, c[1], bb); });
+				break;
+			case 1:
+				for (i = 0; i < 5; i++) {
+					place(p, w, B.stoneBrick, 0, 3, 1, 3 + i, bb); place(p, w, B.stoneBrick, 0, 7, 1, 3 + i, bb);
+					place(p, w, B.stoneBrick, 0, 3 + i, 1, 3, bb); place(p, w, B.stoneBrick, 0, 3 + i, 1, 7, bb);
+				}
+				place(p, w, B.stoneBrick, 0, 5, 1, 5, bb); place(p, w, B.stoneBrick, 0, 5, 2, 5, bb); place(p, w, B.stoneBrick, 0, 5, 3, 5, bb);
+				place(p, w, B.waterMoving, 0, 5, 4, 5, bb);
+				break;
+			case 2:
+				for (i = 1; i <= 9; i++) { place(p, w, B.cobblestone, 0, 1, 3, i, bb); place(p, w, B.cobblestone, 0, 9, 3, i, bb); }
+				for (i = 1; i <= 9; i++) { place(p, w, B.cobblestone, 0, i, 3, 1, bb); place(p, w, B.cobblestone, 0, i, 3, 9, bb); }
+				[[5, 1, 4], [5, 1, 6], [5, 3, 4], [5, 3, 6], [4, 1, 5], [6, 1, 5], [4, 3, 5], [6, 3, 5]].forEach(function (c) { place(p, w, B.cobblestone, 0, c[0], c[1], c[2], bb); });
+				for (i = 1; i <= 3; i++) {
+					place(p, w, B.cobblestone, 0, 4, i, 4, bb); place(p, w, B.cobblestone, 0, 6, i, 4, bb);
+					place(p, w, B.cobblestone, 0, 4, i, 6, bb); place(p, w, B.cobblestone, 0, 6, i, 6, bb);
+				}
+				place(p, w, B.torchWood, 0, 5, 3, 5, bb);
+				for (i = 2; i <= 8; i++) {
+					place(p, w, B.planks, 0, 2, 3, i, bb); place(p, w, B.planks, 0, 3, 3, i, bb);
+					if (i <= 3 || i >= 7) { place(p, w, B.planks, 0, 4, 3, i, bb); place(p, w, B.planks, 0, 5, 3, i, bb); place(p, w, B.planks, 0, 6, 3, i, bb); }
+					place(p, w, B.planks, 0, 7, 3, i, bb); place(p, w, B.planks, 0, 8, 3, i, bb);
+				}
+				place(p, w, B.ladder, META(p, B.ladder, 4), 9, 1, 3, bb);
+				place(p, w, B.ladder, META(p, B.ladder, 4), 9, 2, 3, bb);
+				place(p, w, B.ladder, META(p, B.ladder, 4), 9, 3, 3, bb);
+				var items = C.withMods(CROSSING.concat([C.book(rand)]), 'strongholdCrossing');
+				C.chest(p, w, bb, rand, 3, 4, 8, items, 1 + rInt(rand, 4));
+				break;
+		}
+		return true;
+	};
+	BUILD.ComponentStrongholdChestCorridor = function (p, start, list, rand) { nextNormal(p, start, list, rand, 1, 1); };
+	PARTS.ComponentStrongholdChestCorridor = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 4, 4, 6, true);
+		placeDoor(p, w, rand, bb, p.$door, 1, 1, 0);
+		placeDoor(p, w, rand, bb, 0, 1, 1, 6);
+		fill(p, w, bb, 3, 1, 2, 3, 1, 4, B.stoneBrick, B.stoneBrick, false);
+		place(p, w, B.stoneSingleSlab, 5, 3, 1, 1, bb); place(p, w, B.stoneSingleSlab, 5, 3, 1, 5, bb);
+		place(p, w, B.stoneSingleSlab, 5, 3, 2, 2, bb); place(p, w, B.stoneSingleSlab, 5, 3, 2, 4, bb);
+		for (var z = 2; z <= 4; z++) place(p, w, B.stoneSingleSlab, 5, 2, 1, z, bb);
+		if (!p[':hasMadeChest']) {
+			var y = C.Y(p, 2), x = C.X(p, 3, 3), zz = C.Z(p, 3, 3);
+			if (C.inside(bb, x, y, zz)) {
+				p[':hasMadeChest'] = 1;
+				var items = C.withMods(CHEST.concat([C.book(rand)]), 'strongholdCorridor');
+				C.chest(p, w, bb, rand, 3, 2, 3, items, 2 + rInt(rand, 2));
+			}
+		}
+		return true;
+	};
+	INIT.ComponentStrongholdCrossing = function (p, rand) {
+		p[':field_74996_b'] = rBool(rand) ? 1 : 0; p[':field_74997_c'] = rBool(rand) ? 1 : 0; p[':field_74995_d'] = rBool(rand) ? 1 : 0;
+		p[':field_74999_h'] = rInt(rand, 3) > 0 ? 1 : 0;
+	};
+	BUILD.ComponentStrongholdCrossing = function (p, start, list, rand) {
+		var a = 3, b = 5, m = p[':coordBaseMode'];
+		if (m === 1 || m === 2) { a = 8 - a; b = 8 - b; }
+		nextNormal(p, start, list, rand, 5, 1);
+		if (p[':field_74996_b']) nextX(p, start, list, rand, a, 1);
+		if (p[':field_74997_c']) nextX(p, start, list, rand, b, 7);
+		if (p[':field_74995_d']) nextZ(p, start, list, rand, a, 1);
+		if (p[':field_74999_h']) nextZ(p, start, list, rand, b, 7);
+	};
+	PARTS.ComponentStrongholdCrossing = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		R(p, w, bb, rand, 0, 0, 0, 9, 8, 10, true);
+		placeDoor(p, w, rand, bb, p.$door, 4, 3, 0);
+		if (p[':field_74996_b']) fill(p, w, bb, 0, 3, 1, 0, 5, 3, 0, 0, false);
+		if (p[':field_74995_d']) fill(p, w, bb, 9, 3, 1, 9, 5, 3, 0, 0, false);
+		if (p[':field_74997_c']) fill(p, w, bb, 0, 5, 7, 0, 7, 9, 0, 0, false);
+		if (p[':field_74999_h']) fill(p, w, bb, 9, 5, 7, 9, 7, 9, 0, 0, false);
+		fill(p, w, bb, 5, 1, 10, 7, 3, 10, 0, 0, false);
+		R(p, w, bb, rand, 1, 2, 1, 8, 2, 6, false);
+		R(p, w, bb, rand, 4, 1, 5, 4, 4, 9, false);
+		R(p, w, bb, rand, 8, 1, 5, 8, 4, 9, false);
+		R(p, w, bb, rand, 1, 4, 7, 3, 4, 9, false);
+		R(p, w, bb, rand, 1, 3, 5, 3, 3, 6, false);
+		fill(p, w, bb, 1, 3, 4, 3, 3, 4, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, bb, 1, 4, 6, 3, 4, 6, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		R(p, w, bb, rand, 5, 1, 7, 7, 1, 8, false);
+		fill(p, w, bb, 5, 1, 9, 7, 1, 9, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, bb, 5, 2, 7, 7, 2, 7, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, bb, 4, 5, 7, 4, 5, 9, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, bb, 8, 5, 7, 8, 5, 9, B.stoneSingleSlab, B.stoneSingleSlab, false);
+		fill(p, w, bb, 5, 5, 7, 7, 5, 9, B.stoneDoubleSlab, B.stoneDoubleSlab, false);
+		place(p, w, B.torchWood, 0, 6, 5, 6, bb);
+		return true;
+	};
+	INIT.ComponentStrongholdLibrary = function (p) { p[':isLargeRoom'] = C.ys(nb(p)) > 6 ? 1 : 0; };
+	PARTS.ComponentStrongholdLibrary = function (p, w, rand, bb) {
+		if (C.liquidIn(p, w, bb)) return false;
+		var h = p[':isLargeRoom'] ? 11 : 6, big = !!p[':isLargeRoom'], z;
+		R(p, w, bb, rand, 0, 0, 0, 13, h - 1, 14, true);
+		placeDoor(p, w, rand, bb, p.$door, 4, 1, 0);
+		C.fillChance(p, w, bb, rand, F(0.07), 2, 1, 1, 11, 4, 13, B.web, B.web, false);
+		for (z = 1; z <= 13; z++) {
+			if ((z - 1) % 4 === 0) {
+				fill(p, w, bb, 1, 1, z, 1, 4, z, B.planks, B.planks, false);
+				fill(p, w, bb, 12, 1, z, 12, 4, z, B.planks, B.planks, false);
+				place(p, w, B.torchWood, 0, 2, 3, z, bb); place(p, w, B.torchWood, 0, 11, 3, z, bb);
+				if (big) { fill(p, w, bb, 1, 6, z, 1, 9, z, B.planks, B.planks, false); fill(p, w, bb, 12, 6, z, 12, 9, z, B.planks, B.planks, false); }
+			} else {
+				fill(p, w, bb, 1, 1, z, 1, 4, z, B.bookShelf, B.bookShelf, false);
+				fill(p, w, bb, 12, 1, z, 12, 4, z, B.bookShelf, B.bookShelf, false);
+				if (big) { fill(p, w, bb, 1, 6, z, 1, 9, z, B.bookShelf, B.bookShelf, false); fill(p, w, bb, 12, 6, z, 12, 9, z, B.bookShelf, B.bookShelf, false); }
+			}
+		}
+		for (z = 3; z < 12; z += 2) {
+			fill(p, w, bb, 3, 1, z, 4, 3, z, B.bookShelf, B.bookShelf, false);
+			fill(p, w, bb, 6, 1, z, 7, 3, z, B.bookShelf, B.bookShelf, false);
+			fill(p, w, bb, 9, 1, z, 10, 3, z, B.bookShelf, B.bookShelf, false);
+		}
+		if (big) {
+			fill(p, w, bb, 1, 5, 1, 3, 5, 13, B.planks, B.planks, false);
+			fill(p, w, bb, 10, 5, 1, 12, 5, 13, B.planks, B.planks, false);
+			fill(p, w, bb, 4, 5, 1, 9, 5, 2, B.planks, B.planks, false);
+			fill(p, w, bb, 4, 5, 12, 9, 5, 13, B.planks, B.planks, false);
+			place(p, w, B.planks, 0, 9, 5, 11, bb); place(p, w, B.planks, 0, 8, 5, 11, bb); place(p, w, B.planks, 0, 9, 5, 10, bb);
+			fill(p, w, bb, 3, 6, 2, 3, 6, 12, B.fence, B.fence, false);
+			fill(p, w, bb, 10, 6, 2, 10, 6, 10, B.fence, B.fence, false);
+			fill(p, w, bb, 4, 6, 2, 9, 6, 2, B.fence, B.fence, false);
+			fill(p, w, bb, 4, 6, 12, 8, 6, 12, B.fence, B.fence, false);
+			place(p, w, B.fence, 0, 9, 6, 11, bb); place(p, w, B.fence, 0, 8, 6, 11, bb); place(p, w, B.fence, 0, 9, 6, 10, bb);
+			var lm = META(p, B.ladder, 3);
+			for (var y = 1; y <= 7; y++) place(p, w, B.ladder, lm, 10, y, 13, bb);
+			var cx = 7, cz = 7;
+			[[cx - 1, 9, cz], [cx, 9, cz], [cx - 1, 8, cz], [cx, 8, cz], [cx - 1, 7, cz], [cx, 7, cz], [cx - 2, 7, cz], [cx + 1, 7, cz],
+				[cx - 1, 7, cz - 1], [cx - 1, 7, cz + 1], [cx, 7, cz - 1], [cx, 7, cz + 1]].forEach(function (c) { place(p, w, B.fence, 0, c[0], c[1], c[2], bb); });
+			[[cx - 2, 8, cz], [cx + 1, 8, cz], [cx - 1, 8, cz - 1], [cx - 1, 8, cz + 1], [cx, 8, cz - 1], [cx, 8, cz + 1]].forEach(function (c) { place(p, w, B.torchWood, 0, c[0], c[1], c[2], bb); });
+		}
+		var items = C.withMods(LIBRARY.concat([C.book(rand, 1, 5, 2)]), 'strongholdLibrary');
+		C.chest(p, w, bb, rand, 3, 3, 5, items, 1 + rInt(rand, 4));
+		if (big) {
+			place(p, w, 0, 0, 12, 9, 1, bb);
+			var items2 = C.withMods(LIBRARY.concat([C.book(rand, 1, 5, 2)]), 'strongholdLibrary');
+			C.chest(p, w, bb, rand, 12, 8, 1, items2, 1 + rInt(rand, 4));
+		}
+		return true;
+	};
+	BUILD.ComponentStrongholdPortalRoom = function (p, start) { if (start) start[':strongholdPortalRoom'] = p; };
+	PARTS.ComponentStrongholdPortalRoom = function (p, w, rand, bb) {
+		R(p, w, bb, rand, 0, 0, 0, 10, 7, 15, false);
+		placeDoor(p, w, rand, bb, 2, 4, 1, 0);
+		var y = 6, i;
+		R(p, w, bb, rand, 1, y, 1, 1, y, 14, false); R(p, w, bb, rand, 9, y, 1, 9, y, 14, false);
+		R(p, w, bb, rand, 2, y, 1, 8, y, 2, false); R(p, w, bb, rand, 2, y, 14, 8, y, 14, false);
+		R(p, w, bb, rand, 1, 1, 1, 2, 1, 4, false); R(p, w, bb, rand, 8, 1, 1, 9, 1, 4, false);
+		fill(p, w, bb, 1, 1, 1, 1, 1, 3, B.lavaMoving, B.lavaMoving, false);
+		fill(p, w, bb, 9, 1, 1, 9, 1, 3, B.lavaMoving, B.lavaMoving, false);
+		R(p, w, bb, rand, 3, 1, 8, 7, 1, 12, false);
+		fill(p, w, bb, 4, 1, 9, 6, 1, 11, B.lavaMoving, B.lavaMoving, false);
+		for (i = 3; i < 14; i += 2) { fill(p, w, bb, 0, 3, i, 0, 4, i, B.fenceIron, B.fenceIron, false); fill(p, w, bb, 10, 3, i, 10, 4, i, B.fenceIron, B.fenceIron, false); }
+		for (i = 2; i < 9; i += 2) fill(p, w, bb, i, 3, 15, i, 4, 15, B.fenceIron, B.fenceIron, false);
+		var sm = META(p, B.stairsStoneBrick, 3);
+		R(p, w, bb, rand, 4, 1, 5, 6, 1, 7, false); R(p, w, bb, rand, 4, 2, 6, 6, 2, 7, false); R(p, w, bb, rand, 4, 3, 7, 6, 3, 7, false);
+		for (i = 4; i <= 6; i++) { place(p, w, B.stairsStoneBrick, sm, i, 1, 4, bb); place(p, w, B.stairsStoneBrick, sm, i, 2, 5, bb); place(p, w, B.stairsStoneBrick, sm, i, 3, 6, bb); }
+		var a = 2, b = 0, c = 3, d = 1;
+		switch (p[':coordBaseMode']) {
+			case 0: a = 0; b = 2; break;
+			case 3: a = 3; b = 1; c = 0; d = 2; break;
+			case 1: a = 1; b = 3; c = 0; d = 2; break;
+		}
+		var eye = function () { return rFloat(rand) > F(0.9) ? 4 : 0; };
+		[[a, 4, 8], [a, 5, 8], [a, 6, 8], [b, 4, 12], [b, 5, 12], [b, 6, 12], [c, 3, 9], [c, 3, 10], [c, 3, 11], [d, 7, 9], [d, 7, 10], [d, 7, 11]]
+			.forEach(function (e) { place(p, w, B.endPortalFrame, e[0] + eye(), e[1], 3, e[2], bb); });
+		if (!p[':hasSpawner']) {
+			var sy = C.Y(p, 3), sx = C.X(p, 5, 6), sz = C.Z(p, 5, 6);
+			if (C.inside(bb, sx, sy, sz)) { p[':hasSpawner'] = 1; C.setB(w, sx, sy, sz, B.mobSpawner, 0, 2); }
+		}
+		return true;
+	};
+
+	var PK = C.K.parts, BK = C.K.build, SC = SRC + 'StructureComponent', CS = SRC + 'ComponentStronghold';
+	var SP2 = 'Lnet/minecraft/src/ComponentStrongholdStairs2;';
+	def('ComponentStronghold', { super: SC, access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {
+		'<init>(I)V': function (vm, s, a) { s[':componentType'] = a[0]; s[':coordBaseMode'] = -1; },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; },
+		['getNextComponentNormal(' + SP2 + LIST + LR + 'II)Lnet/minecraft/src/StructureComponent;']: function (vm, s, a) { return nextNormal(s, a[0], a[1], a[2], a[3], a[4]); },
+		['getNextComponentX(' + SP2 + LIST + LR + 'II)Lnet/minecraft/src/StructureComponent;']: function (vm, s, a) { return nextX(s, a[0], a[1], a[2], a[3], a[4]); },
+		['getNextComponentZ(' + SP2 + LIST + LR + 'II)Lnet/minecraft/src/StructureComponent;']: function (vm, s, a) { return nextZ(s, a[0], a[1], a[2], a[3], a[4]); },
+	}, staticMethods: { ['canStrongholdGoDeeper(' + LBB + ')Z']: function (vm, n, a) { return deeper(a[0]) ? 1 : 0; } } });
+	var roomDef = function (name, sup, fields) {
+		var parts = PARTS[name], build = BUILD[name], m = {};
+		m['<init>(ILjava/util/Random;' + LBB + 'I)V'] = function (vm, s, a) {
+			s[':componentType'] = a[0]; s[':coordBaseMode'] = a[3]; s[':boundingBox'] = a[2];
+			if (name !== 'ComponentStrongholdPortalRoom' && name !== 'ComponentStrongholdCorridor') s.$door = randomDoor(a[1]);
+			if (name === 'ComponentStrongholdCorridor') s[':field_74993_a'] = a[3] === 2 || a[3] === 0 ? C.zs(a[2]) : C.xs(a[2]);
+			if (INIT[name]) INIT[name](s, a[1]);
+		};
+		if (parts) m[PK] = function (vm, s, a) { return parts(s, a[0], a[1], a[2]) ? 1 : 0; };
+		if (build) m[BK] = function (vm, s, a) { build(s, a[0], a[1], a[2]); };
+		def(name, { super: sup || CS, fields: fields || {}, methods: m, $parts: parts, $build: build });
+	};
+	roomDef('ComponentStrongholdStairs', CS, { field_75024_a: 'Z', doorType: 'Lnet/minecraft/src/EnumDoor;' });
+	roomDef('ComponentStrongholdCorridor', CS, { field_74993_a: 'I' });
+	roomDef('ComponentStrongholdStraight', CS, { expandsX: 'Z', expandsZ: 'Z' });
+	roomDef('ComponentStrongholdLeftTurn', CS);
+	roomDef('ComponentStrongholdRightTurn', SRC + 'ComponentStrongholdLeftTurn');
+	roomDef('ComponentStrongholdStairsStraight', CS);
+	roomDef('ComponentStrongholdPrison', CS);
+	roomDef('ComponentStrongholdRoomCrossing', CS, { roomType: 'I' });
+	roomDef('ComponentStrongholdChestCorridor', CS, { hasMadeChest: 'Z' });
+	roomDef('ComponentStrongholdCrossing', CS, { field_74996_b: 'Z', field_74997_c: 'Z', field_74995_d: 'Z', field_74999_h: 'Z' });
+	roomDef('ComponentStrongholdLibrary', CS, { isLargeRoom: 'Z' });
+	roomDef('ComponentStrongholdPortalRoom', CS, { hasSpawner: 'Z' });
+	var stairs2 = function (s, rand, x, z) {
+		s[':componentType'] = 0;
+		s[':field_75024_a'] = 1;
+		s[':coordBaseMode'] = rInt(rand, 4);
+		s.$door = 0;
+		s[':boundingBox'] = C.bb(x, 64, z, x + 5 - 1, 74, z + 5 - 1);
+		s[':field_75026_c'] = C.newList();
+	};
+	def('ComponentStrongholdStairs2', { super: SRC + 'ComponentStrongholdStairs',
+		fields: { strongholdPieceWeight: 'Lnet/minecraft/src/StructureStrongholdPieceWeight;', strongholdPortalRoom: 'Lnet/minecraft/src/ComponentStrongholdPortalRoom;', field_75026_c: 'Ljava/util/ArrayList;' }, methods: {
+		'<init>(ILjava/util/Random;II)V': function (vm, s, a) { stairs2(s, a[1], a[2], a[3]); },
+		'<init>()V': function (vm, s) { s[':coordBaseMode'] = -1; },
+		'getCenter()Lnet/minecraft/src/ChunkPosition;': function (vm, s) {
+			var pr = s[':strongholdPortalRoom'];
+			return pr ? vm.callVirtual(pr, 'getCenter', '()Lnet/minecraft/src/ChunkPosition;', []) : C.scMethods['getCenter()Lnet/minecraft/src/ChunkPosition;'](vm, s);
+		},
+	} });
+	var buildOf = function (c, start, list, rand) {
+		var m = H.ov(c, BK);
+		if (m) { vm.invoke(m, c, [start, list, rand]); return; }
+		for (var k = c.cls; k; k = k.superClass) if (k.native && k.spec && k.spec.$build) { k.spec.$build(c, start, list, rand); return; }
+	};
+	var strongholdStart = function (s, w, rand, cx, cz) {
+		prepare();
+		var st = vm.newObject(cls('ComponentStrongholdStairs2'));
+		stairs2(st, rand, (cx << 4) + 2, (cz << 4) + 2);
+		var comps = s[':components'];
+		C.listAdd(comps, st);
+		buildOf(st, st, comps, rand);
+		var pending = st[':field_75026_c'];
+		for (;;) {
+			var l = C.listOf(pending);
+			if (!l.length) break;
+			var c = l.splice(rInt(rand, l.length), 1)[0];
+			buildOf(c, st, comps, rand);
+		}
+		C.updateBB(s);
+		C.markHeight(s, w, rand, 10);
+	};
+	def('StructureStrongholdStart', { super: SRC + 'StructureStart', methods: {
+		'<init>(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, s, a) { s[':components'] = C.newList('java/util/LinkedList'); strongholdStart(s, a[0], a[1], a[2], a[3]); },
+		'<init>()V': function (vm, s) { s[':components'] = C.newList('java/util/LinkedList'); },
+	} });
+
+	var ALLOWED = ['desert', 'forest', 'extremeHills', 'swampland', 'taiga', 'icePlains', 'iceMountains', 'desertHills', 'forestHills', 'extremeHillsEdge', 'jungle', 'jungleHills'];
+	var canStronghold = function (g, cx, cz) {
+		if (!g[':ranBiomeCheck']) {
+			var w = g[':worldObj'];
+			var jr = vm.newObject(vm.loadClass('java/util/Random'));
+			H.rSetSeed(jr, BigInt.asIntN(64, BigInt(vm.callVirtual(w, 'getSeed', '()J', []))));
+			var ang = rDouble(jr) * Math.PI * 2, ring = 1;
+			var coords = g.$coords = [];
+			var n = g[':structureCoords'] ? g[':structureCoords'].a.length : 3;
+			var bc = cls('BiomeGenBase'); if (bc.initState !== 2) vm.initClass(bc);
+			var biomes = JVM.newList(vm, ALLOWED.map(function (k) { return bc.statics[k]; }).filter(Boolean));
+			var wcm = vm.callVirtual(w, 'getWorldChunkManager', '()Lnet/minecraft/src/WorldChunkManager;', []);
+			for (var i = 0; i < n; i++) {
+				var dist = (1.25 * ring + rDouble(jr)) * (g[':field_82671_h'] * ring);
+				var x = Math.round(Math.cos(ang) * dist) | 0, z = Math.round(Math.sin(ang) * dist) | 0;
+				var pos = wcm ? vm.callVirtual(wcm, 'findBiomePosition', '(IIILjava/util/List;Ljava/util/Random;)Lnet/minecraft/src/ChunkPosition;', [(x << 4) + 8, (z << 4) + 8, 112, biomes, jr]) : null;
+				if (pos) { x = pos[':x'] >> 4; z = pos[':z'] >> 4; }
+				coords.push([x, z]);
+				ang += Math.PI * 2 * ring / g[':field_82672_i'];
+				if (i === g[':field_82672_i']) { ring += 2 + rInt(jr, 5); g[':field_82672_i'] += 1 + rInt(jr, 2); }
+			}
+			g[':ranBiomeCheck'] = 1;
+		}
+		return (g.$coords || []).some(function (c) { return c[0] === cx && c[1] === cz; });
+	};
+	var strongholdNew = function (g, cx, cz) {
+		for (;;) {
+			var s = vm.newObject(cls('StructureStrongholdStart'));
+			s[':components'] = C.newList('java/util/LinkedList');
+			strongholdStart(s, g[':worldObj'], g[':rand'], cx, cz);
+			var l = C.listOf(s[':components']);
+			if (l.length && l[0][':strongholdPortalRoom']) return s;
+		}
+	};
+	var mgsInit = function (g) {
+		C.baseInit(g); C.startsMap(g);
+		g[':structureCoords'] = vm.newArray('Lnet/minecraft/src/ChunkCoordIntPair;', 3);
+		g[':field_82671_h'] = 32; g[':field_82672_i'] = 3; g[':ranBiomeCheck'] = 0;
+	};
+	def('MapGenStronghold', { super: SRC + 'MapGenStructure', $can: canStronghold, $start: strongholdNew,
+		fields: { allowedBiomeGenBases: '[Lnet/minecraft/src/BiomeGenBase;', ranBiomeCheck: 'Z', structureCoords: '[Lnet/minecraft/src/ChunkCoordIntPair;', field_82671_h: 'D', field_82672_i: 'I' }, methods: {
+		'<init>()V': function (vm, s) { mgsInit(s); },
+		'<init>(Ljava/util/Map;)V': function (vm, s, a) {
+			mgsInit(s);
+			(a[0] && a[0].$m ? a[0].$m.entries() : []).forEach(function (e) {
+				var k = String(e.k), v = String(e.v);
+				if (k === 'distance') { var d = parseFloat(v); if (!isNaN(d)) s[':field_82671_h'] = Math.max(d, 1); }
+				else if (k === 'count') { var n = parseInt(v, 10); if (!isNaN(n)) s[':structureCoords'] = vm.newArray('Lnet/minecraft/src/ChunkCoordIntPair;', Math.max(n, 1)); }
+				else if (k === 'spread') { var sp = parseInt(v, 10); if (!isNaN(sp)) s[':field_82672_i'] = Math.max(sp, 1); }
+			});
+		},
+		'canSpawnStructureAtCoords(II)Z': function (vm, s, a) { return canStronghold(s, a[0], a[1]) ? 1 : 0; },
+		'getStructureStart(II)Lnet/minecraft/src/StructureStart;': function (vm, s, a) { return strongholdNew(s, a[0], a[1]); },
+		'getCoordList()Ljava/util/List;': function (vm, s) {
+			return JVM.newList(vm, (s.$coords || []).map(function (c) { var p = vm.newObject(cls('ChunkPosition')); vm.callVirtual(p, '<init>', '(III)V', [(c[0] << 4) + 8, 64, (c[1] << 4) + 8]); return p; }));
+		},
+		'func_143025_a()Ljava/lang/String;': function () { return 'Stronghold'; },
+	} });
+}
+JVM.installStrongholds = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+var M = 6364136223846793005n, A = 1442695040888963407n;
+function L(v) { return BigInt.asIntN(64, v); }
+function step(s, add) { return L(L(s * L(L(s * M) + A)) + add); }
+
+function install(vm) {
+	var def = function (n, s) { vm.defineNative(SRC + n, s); };
+	var LGL = 'Lnet/minecraft/src/GenLayer;', GI = 'getInts(IIII)[I';
+	var ints = function (n) { return vm.newArray('I', n <= 256 ? 256 : n); };
+	var getInts = function (g, x, z, w, h) {
+		if (!g) vm.throwNew('java/lang/NullPointerException', 'GenLayer.parent');
+		var c = g.cls, f = c.$gi;
+		if (f === undefined) {
+			var m = c.findMethod(GI);
+			f = c.$gi = m && !m.cls.native ? null : (m && m.cls.spec && m.cls.spec.$gi) || null;
+			if (!f) c.$giM = m;
+		}
+		return f ? f(g, x, z, w, h) : vm.invoke(c.$giM, g, [x, z, w, h]);
+	};
+	var baseSeed = function (s) {
+		var b = BigInt(s);
+		var v = b;
+		v = step(v, b); v = step(v, b); v = step(v, b);
+		return v;
+	};
+	var initWorld = function (g, seed) {
+		var p = g[':parent'];
+		if (p) vm.callVirtual(p, 'initWorldGenSeed', '(J)V', [seed]);
+		var b = g[':baseSeed'] || 0n, v = BigInt(seed);
+		v = step(v, b); v = step(v, b); v = step(v, b);
+		g[':worldGenSeed'] = v;
+	};
+	var initChunk = function (g, x, z) {
+		var s = g[':worldGenSeed'] || 0n, bx = BigInt(x), bz = BigInt(z);
+		s = step(s, bx); s = step(s, bz); s = step(s, bx); s = step(s, bz);
+		g[':chunkSeed'] = s;
+	};
+	var nextInt = function (g, n) {
+		var s = g[':chunkSeed'] || 0n;
+		var v = Number(BigInt.asIntN(32, (s >> 24n) % BigInt(n)));
+		if (v < 0) v += n;
+		g[':chunkSeed'] = step(s, g[':worldGenSeed'] || 0n);
+		return v;
+	};
+	def('GenLayer', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, fields: { worldGenSeed: 'J', parent: LGL, chunkSeed: 'J', baseSeed: 'J' }, methods: {
+		'<init>(J)V': function (vm, s, a) { s[':baseSeed'] = baseSeed(a[0]); },
+		'initWorldGenSeed(J)V': function (vm, s, a) { initWorld(s, a[0]); },
+		'initChunkSeed(JJ)V': function (vm, s, a) { initChunk(s, a[0], a[1]); },
+		'nextInt(I)I': function (vm, s, a) { return nextInt(s, a[0]); },
+	}, abstractMethods: { [GI]: true } });
+	def('IntCache', { staticMethods: {
+		'getIntCache(I)[I': function (vm, n, a) { return ints(a[0]); },
+		'resetIntCache()V': function () {},
+		'func_85144_b()Ljava/lang/String;': function () { return 'cache: 0, tcache: 0, allocated: 0, tallocated: 0'; },
+	} });
+	var choose = function (g, a, b) { return nextInt(g, 2) === 0 ? a : b; };
+	var modeOrRandom = function (g, a, b, c, d) {
+		if (b === c && c === d) return b;
+		if (a === b && a === c) return a;
+		if (a === b && a === d) return a;
+		if (a === c && a === d) return a;
+		if (a === b && c !== d) return a;
+		if (a === c && b !== d) return a;
+		if (a === d && b !== c) return a;
+		if (b === a && c !== d) return b;
+		if (b === c && a !== d) return b;
+		if (b === d && a !== c) return b;
+		if (c === a && b !== d) return c;
+		if (c === b && a !== d) return c;
+		if (c === d && a !== b) return c;
+		if (d === a && b !== c) return c;
+		if (d === b && a !== c) return c;
+		if (d === c && a !== b) return c;
+		var r = nextInt(g, 4);
+		return r === 0 ? a : r === 1 ? b : r === 2 ? c : d;
+	};
+	var zoom = function (g, x, z, w, h) {
+		var px = x >> 1, pz = z >> 1, pw = (w >> 1) + 3, ph = (h >> 1) + 3;
+		var src = getInts(g[':parent'], px, pz, pw, ph).a;
+		var tmp = new Int32Array(pw * 2 * (ph * 2)), row = pw << 1;
+		for (var j = 0; j < ph - 1; j++) {
+			var i0 = (j << 1) * row;
+			var a = src[(j + 0) * pw], b = src[(j + 1) * pw];
+			for (var i = 0; i < pw - 1; i++) {
+				initChunk(g, (i + px) << 1, (j + pz) << 1);
+				var c = src[i + 1 + (j + 0) * pw], d = src[i + 1 + (j + 1) * pw];
+				tmp[i0] = a;
+				tmp[i0++ + row] = vChoose(g, a, b);
+				tmp[i0] = vChoose(g, a, c);
+				tmp[i0++ + row] = vMode(g, a, c, b, d);
+				a = c; b = d;
+			}
+		}
+		var out = ints(w * h);
+		for (var k = 0; k < h; k++) out.a.set(tmp.subarray((k + (z & 1)) * (pw << 1) + (x & 1), (k + (z & 1)) * (pw << 1) + (x & 1) + w), k * w);
+		return out;
+	};
+	var vChoose = function (g, a, b) { var m = H.ov(g, 'choose(II)I'); return m ? vm.invoke(m, g, [a, b]) : choose(g, a, b); };
+	var vMode = function (g, a, b, c, d) { var m = H.ov(g, 'modeOrRandom(IIII)I'); return m ? vm.invoke(m, g, [a, b, c, d]) : modeOrRandom(g, a, b, c, d); };
+	var H = JVM.structHelpers;
+	var newLayer = function (name, seed, parent) {
+		var o = vm.newObject(vm.loadClass(SRC + name));
+		o[':baseSeed'] = baseSeed(seed); o[':parent'] = parent;
+		return o;
+	};
+	def('GenLayerZoom', { super: SRC + 'GenLayer', $gi: zoom, methods: {
+		'<init>(JLnet/minecraft/src/GenLayer;)V': function (vm, s, a) { s[':baseSeed'] = baseSeed(a[0]); s[':parent'] = a[1]; },
+		[GI]: function (vm, s, a) { return zoom(s, a[0], a[1], a[2], a[3]); },
+		'choose(II)I': function (vm, s, a) { return choose(s, a[0], a[1]); },
+		'modeOrRandom(IIII)I': function (vm, s, a) { return modeOrRandom(s, a[0], a[1], a[2], a[3]); },
+	}, staticMethods: {
+		['magnify(J' + LGL + 'I)' + LGL]: function (vm, n, a) {
+			var g = a[1];
+			for (var i = 0; i < a[2]; i++) g = newLayer('GenLayerZoom', BigInt.asIntN(64, BigInt(a[0]) + BigInt(i)), g);
+			return g;
+		},
+	} });
+	var smooth = function (g, x, z, w, h) {
+		var pw = w + 2, src = getInts(g[':parent'], x - 1, z - 1, pw, h + 2).a, out = ints(w * h);
+		for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+			var l = src[i + 0 + (j + 1) * pw], r = src[i + 2 + (j + 1) * pw], t = src[i + 1 + (j + 0) * pw], b = src[i + 1 + (j + 2) * pw], c = src[i + 1 + (j + 1) * pw];
+			if (l === r && t === b) { initChunk(g, i + x, j + z); c = nextInt(g, 2) === 0 ? l : t; }
+			else { if (l === r) c = l; if (t === b) c = t; }
+			out.a[i + j * w] = c;
+		}
+		return out;
+	};
+	def('GenLayerSmooth', { super: SRC + 'GenLayer', $gi: smooth, methods: {
+		'<init>(JLnet/minecraft/src/GenLayer;)V': function (vm, s, a) { s[':baseSeed'] = baseSeed(a[0]); s[':parent'] = a[1]; },
+		[GI]: function (vm, s, a) { return smooth(s, a[0], a[1], a[2], a[3]); },
+	} });
+	var bid = function (k) { var c = vm.loadClass(SRC + 'BiomeGenBase'); if (c.initState !== 2) vm.initClass(c); var b = c.statics[k]; return b ? b[':biomeID'] : -1; };
+	var riverMix = function (g, x, z, w, h) {
+		var bio = getInts(g[':biomePatternGeneratorChain'], x, z, w, h).a, riv = getInts(g[':riverPatternGeneratorChain'], x, z, w, h).a;
+		var out = ints(w * h), ocean = bid('ocean'), ice = bid('icePlains'), frozen = bid('frozenRiver'), mush = bid('mushroomIsland'), shore = bid('mushroomIslandShore');
+		for (var i = 0; i < w * h; i++) {
+			if (bio[i] === ocean) out.a[i] = bio[i];
+			else if (riv[i] >= 0) {
+				if (bio[i] === ice) out.a[i] = frozen;
+				else if (bio[i] === mush || bio[i] === shore) out.a[i] = shore;
+				else out.a[i] = riv[i];
+			} else out.a[i] = bio[i];
+		}
+		return out;
+	};
+	def('GenLayerRiverMix', { super: SRC + 'GenLayer', $gi: riverMix, fields: { biomePatternGeneratorChain: LGL, riverPatternGeneratorChain: LGL }, methods: {
+		'<init>(JLnet/minecraft/src/GenLayer;Lnet/minecraft/src/GenLayer;)V': function (vm, s, a) { s[':baseSeed'] = baseSeed(a[0]); s[':biomePatternGeneratorChain'] = a[1]; s[':riverPatternGeneratorChain'] = a[2]; },
+		'initWorldGenSeed(J)V': function (vm, s, a) {
+			vm.callVirtual(s[':biomePatternGeneratorChain'], 'initWorldGenSeed', '(J)V', [a[0]]);
+			vm.callVirtual(s[':riverPatternGeneratorChain'], 'initWorldGenSeed', '(J)V', [a[0]]);
+			initWorld(s, a[0]);
+		},
+		[GI]: function (vm, s, a) { return riverMix(s, a[0], a[1], a[2], a[3]); },
+	} });
+	var voronoi = function (g, x, z, w, h) {
+		x -= 2; z -= 2;
+		var sh = 2, n = 1 << sh, px = x >> sh, pz = z >> sh, pw = (w >> sh) + 3, ph = (h >> sh) + 3;
+		var src = getInts(g[':parent'], px, pz, pw, ph).a;
+		var tw = pw << sh, th = ph << sh, tmp = new Int32Array(tw * th);
+		var jit = function () { return (nextInt(g, 1024) / 1024 - 0.5) * (n * 0.9); };
+		for (var j = 0; j < ph - 1; j++) {
+			var a = src[(j + 0) * pw], c = src[(j + 1) * pw];
+			for (var i = 0; i < pw - 1; i++) {
+				initChunk(g, (i + px) << sh, (j + pz) << sh);
+				var ax = jit(), az = jit();
+				initChunk(g, (i + px + 1) << sh, (j + pz) << sh);
+				var bx = jit() + n, bz = jit();
+				initChunk(g, (i + px) << sh, (j + pz + 1) << sh);
+				var cx = jit(), cz = jit() + n;
+				initChunk(g, (i + px + 1) << sh, (j + pz + 1) << sh);
+				var dx = jit() + n, dz = jit() + n;
+				var b = src[i + 1 + (j + 0) * pw], d = src[i + 1 + (j + 1) * pw];
+				for (var zz = 0; zz < n; zz++) {
+					var p = ((j << sh) + zz) * tw + (i << sh);
+					for (var xx = 0; xx < n; xx++) {
+						var da = (zz - az) * (zz - az) + (xx - ax) * (xx - ax);
+						var db = (zz - bz) * (zz - bz) + (xx - bx) * (xx - bx);
+						var dc = (zz - cz) * (zz - cz) + (xx - cx) * (xx - cx);
+						var dd = (zz - dz) * (zz - dz) + (xx - dx) * (xx - dx);
+						if (da < db && da < dc && da < dd) tmp[p++] = a;
+						else if (db < da && db < dc && db < dd) tmp[p++] = b;
+						else if (dc < da && dc < db && dc < dd) tmp[p++] = c;
+						else tmp[p++] = d;
+					}
+				}
+				a = b; c = d;
+			}
+		}
+		var out = ints(w * h);
+		for (var k = 0; k < h; k++) { var o = (k + (z & (n - 1))) * (pw << sh) + (x & (n - 1)); out.a.set(tmp.subarray(o, o + w), k * w); }
+		return out;
+	};
+	def('GenLayerVoronoiZoom', { super: SRC + 'GenLayer', $gi: voronoi, methods: {
+		'<init>(JLnet/minecraft/src/GenLayer;)V': function (vm, s, a) { s[':baseSeed'] = baseSeed(a[0]); s[':parent'] = a[1]; },
+		[GI]: function (vm, s, a) { return voronoi(s, a[0], a[1], a[2], a[3]); },
+	} });
+	var LBGB = 'Lnet/minecraft/src/BiomeGenBase;';
+	var cacheBlock = function (c, x, z) {
+		var m = c.$m || (c.$m = new Map()), k = (x >> 4) + ',' + (z >> 4), b = m.get(k);
+		if (b) return b;
+		if (m.size > 1024) m.clear();
+		b = vm.newObject(vm.loadClass(SRC + 'BiomeCacheBlock'));
+		b[':xPosition'] = x >> 4; b[':zPosition'] = z >> 4; b[':theBiomeCache'] = c;
+		var arr = vm.newArray(LBGB, 256), wcm = c[':chunkManager'];
+		if (wcm) arr = vm.callVirtual(wcm, 'getBiomeGenAt', '([' + LBGB + 'IIIIZ)[' + LBGB, [arr, (x >> 4) << 4, (z >> 4) << 4, 16, 16, 0]) || arr;
+		b[':biomes'] = arr;
+		m.set(k, b);
+		return b;
+	};
+	def('BiomeCacheBlock', { fields: { temperatureValues: '[F', rainfallValues: '[F', biomes: '[' + LBGB, xPosition: 'I', zPosition: 'I', lastAccessTime: 'J', theBiomeCache: 'Lnet/minecraft/src/BiomeCache;' }, methods: {
+		['getBiomeGenAt(II)' + LBGB]: function (vm, s, a) { return s[':biomes'].a[(a[0] & 15) | (a[1] & 15) << 4]; },
+	} });
+	def('BiomeCache', { fields: { chunkManager: 'Lnet/minecraft/src/WorldChunkManager;', lastCleanupTime: 'J' }, methods: {
+		'<init>(Lnet/minecraft/src/WorldChunkManager;)V': function (vm, s, a) { s[':chunkManager'] = a[0]; },
+		'getBiomeCacheBlock(II)Lnet/minecraft/src/BiomeCacheBlock;': function (vm, s, a) { return cacheBlock(s, a[0], a[1]); },
+		['getBiomeGenAt(II)' + LBGB]: function (vm, s, a) { return cacheBlock(s, a[0], a[1])[':biomes'].a[(a[0] & 15) | (a[1] & 15) << 4]; },
+		['getCachedBiomes(II)[' + LBGB]: function (vm, s, a) { return cacheBlock(s, a[0], a[1])[':biomes']; },
+		'cleanupCache()V': function () {},
+	}, staticMethods: { 'getChunkManager(Lnet/minecraft/src/BiomeCache;)Lnet/minecraft/src/WorldChunkManager;': function (vm, n, a) { return a[0][':chunkManager']; } } });
+	JVM.genLayerHelpers = { initChunk: initChunk, nextInt: nextInt, getInts: getInts, ints: ints };
+}
+JVM.installGenLayers = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
 var POTIONS = [null, 'moveSpeed', 'moveSlowdown', 'digSpeed', 'digSlowdown', 'damageBoost', 'heal', 'harm', 'jump', 'confusion',
 	'regeneration', 'resistance', 'fireResistance', 'waterBreathing', 'invisibility', 'blindness', 'nightVision', 'hunger',
 	'weakness', 'poison', 'wither', 'field_76434_w', 'field_76443_y'];
@@ -12947,14 +16431,14 @@ function installMobs(vm) {
 		'<init>(Lnet/minecraft/src/ModelBase;F)V': function (vm, self, a) { self[':mainModel'] = a[0]; self[':shadowSize'] = a[1]; },
 		'setRenderPassModel(Lnet/minecraft/src/ModelBase;)V': function (vm, self, a) { self[':renderPassModel'] = a[0]; },
 		'setRenderManager(Lnet/minecraft/src/RenderManager;)V': function () {},
-		'loadTexture(Ljava/lang/String;)V': function () {},
+		'loadTexture(Ljava/lang/String;)V': function (vm, self, a) { if (a[0] != null) self.$boundTex = String(a[0]); },
 		'doRender(Lnet/minecraft/src/Entity;DDDFF)V': function () {},
 		'doRenderLiving(Lnet/minecraft/src/EntityLiving;DDDFF)V': function () {},
 	}, anyInit: function (vm, self, args) {
 		var m = args.filter(function (x) { return x && x.cls && vm.isInstance(x, vm.loadClass(SRC + 'ModelBase')); })[0];
 		if (m) self[':mainModel'] = m;
 	} };
-	def('Render', { methods: { '<init>()V': function () {}, 'doRender(Lnet/minecraft/src/Entity;DDDFF)V': function () {}, 'loadTexture(Ljava/lang/String;)V': function () {},
+	def('Render', { methods: { '<init>()V': function () {}, 'doRender(Lnet/minecraft/src/Entity;DDDFF)V': function () {}, 'loadTexture(Ljava/lang/String;)V': function (vm, self, a) { if (a[0] != null) self.$boundTex = String(a[0]); },
 		'bindTexture(Lnet/minecraft/src/ResourceLocation;)V': function (vm, self, a) { if (a[0]) self.$boundTex = a[0].$domain + ':' + a[0].$path; },
 		'bindEntityTexture(Lnet/minecraft/src/Entity;)V': function () {},
 		'getEntityTexture(Lnet/minecraft/src/Entity;)Lnet/minecraft/src/ResourceLocation;': function () { return null; },
@@ -12980,10 +16464,23 @@ function installMobs(vm) {
 	wspec.methods = Object.assign({}, wspec.methods, {
 		'spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) {
 			var e = a[0];
-			if (e && !e.$stack && vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving'))) {
+			if (e && !e.$stack && (vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving')) || JVM.mobKeyOf(vm, e.cls))) {
 				var keys = mobs(vm).keys, name = null;
 				for (var c = e.cls; c && !name; c = c.superClass) name = (keys && keys.get(c)) || (c.native || c.absent ? VANILLA_NAME[c.name.split('/').pop()] : null) || null;
-				if (name) { var id = op(vm, 'spawnmob', name, e[':posX'], e[':posY'], e[':posZ']); if (id) { e[':entityId'] = id; return 1; } return 0; }
+				if (name) {
+					var id = op(vm, 'spawnmob', name, e[':posX'], e[':posY'], e[':posZ']);
+					if (!id) return 0;
+					e[':entityId'] = id;
+					var live = mobs(vm).live || (mobs(vm).live = new Map());
+					if (!live.has(id) && !vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving'))) {
+						e.$mobKey = String(name).split(':').pop();
+						live.set(id, e);
+						if (JVM.mobSaveState) JVM.mobSaveState(vm, e, id);
+					}
+					var yaw = +e[':rotationYaw'] || 0;
+					if (yaw) op(vm, 'setrot', id, yaw, +e[':rotationPitch'] || 0);
+					return 1;
+				}
 			}
 			return prevSpawn ? prevSpawn(vm, self, a) : 0;
 		},
@@ -13110,7 +16607,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		});
 	});
 	var living = vm.loadClass(SRC + 'EntityLiving');
-	var shotClasses = ['EntityThrowable', 'EntityArrow', 'EntityFireball'].map(function (n) { return vm.natives[SRC + n] ? vm.loadClass(SRC + n) : null; }).filter(Boolean);
+	var shotClasses = ['EntityThrowable', 'EntityArrow', 'EntityFireball', 'EntityFishHook'].map(function (n) { return vm.natives[SRC + n] ? vm.loadClass(SRC + n) : null; }).filter(Boolean);
 	var lookOf = function (cls, ent, key, vanilla) {
 		var render = renderers.get(cls);
 		for (var k2 = cls; !render && k2; k2 = k2.superClass) render = renderers.get(k2);
@@ -13169,12 +16666,39 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		});
 		return hit;
 	};
+	var objectOf = function (e, key, world) {
+		var ent = safe(function () {
+			var o = vm.newObject(e.cls);
+			var k = e.cls.findDeclared('<init>(Lnet/minecraft/src/World;)V');
+			if (k) vm.invoke(k, o, [world]);
+			else JVM.run(vm, function () { vm.callVirtual(o, '<init>', '(Lnet/minecraft/src/World;)V', [world]); });
+			return o;
+		}, null);
+		if (!ent) { out.skipped.push(e.name + ' (its constructor failed)'); return; }
+		var ownUpd = ['onUpdate()V', 'onEntityUpdate()V'].some(function (k) { var m = e.cls.findMethod(k); return !!(m && !m.cls.native); });
+		var rd0 = rendererOf(vm, e.cls);
+		var look = rd0 ? lookOf(e.cls, ent, key, null) : { skip: 'no renderer' };
+		if (!rd0 && ownUpd) look = { invisible: true };
+		if (look.model || look.invisible) {
+			var json = { name: (reg(vm).lang['entity.' + e.name + '.name']) || e.name, behaviour: 'object', health: 20, speed: 0.25,
+				size: [Math.max(0.1, +ent[':width'] || 0.6), Math.max(0.1, +ent[':height'] || 0.6)], xp: 0, egg: false, spawn: [],
+					sounds: { ambient: 'none', hurt: 'none', death: 'none' }, no_fall_damage: true, no_step_sounds: true };
+				if (look.invisible) json.invisible = true; else { json.model = look.model; json.texture = look.texture; }
+			var im = e.cls.findMethod('interact(Lnet/minecraft/src/EntityPlayer;)Z');
+			if (im && !im.cls.native) json.java_interact = true;
+			out.mobs[key] = json;
+			(mb.keys || (mb.keys = new Map())).set(e.cls, modId + ':' + key);
+			return;
+		}
+		if (ownUpd && JVM.objectIcon && safe(function () { return JVM.objectIcon(vm, ent, true); }, null)) { (mb.thrownObjects || (mb.thrownObjects = new Set())).add(e.cls); return; }
+		out.skipped.push(e.name + (look.skip ? ' (' + look.skip + ')' : ''));
+	};
 	ents.forEach(function (e) {
 		if (!e.cls || (e.mod || '') !== modId) return;
 		if (shotClasses.some(function (c) { return e.cls.isSubclassOf(c); })) return;
-		if (!e.cls.isSubclassStrict(living) || e.cls === living) { out.skipped.push(e.name); return; }
 		var key = String(e.name || e.cls.name.split('/').pop()).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
 		var world = JVM.mc152.worldObj(vm);
+		if (!e.cls.isSubclassStrict(living) || e.cls === living) { objectOf(e, key, world); return; }
 		var ent = safe(function () {
 			var o = vm.newObject(e.cls);
 			var k = e.cls.findDeclared('<init>(Lnet/minecraft/src/World;)V');
@@ -13365,12 +16889,48 @@ JVM.mobLook = function (vm, o, id) {
 	if (n != null && n !== o.$texShown) { gameOp(vm, 'enttex', id, n); o.$texShown = n; }
 };
 JVM.mobSaveState = function (vm, o, id) {
-	var w = o.cls.findMethod('writeEntityToNBT(Lnet/minecraft/src/NBTTagCompound;)V');
-	if (!w || w.cls.native || !JVM.nbtToJson) return;
+	if (!JVM.nbtToJson) return;
 	var c = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(c, '<init>', '()V', []);
-	if (!JVM.run(vm, function () { vm.invoke(w, o, [c]); }).ok) return;
+	if (!JVM.run(vm, function () { JVM.entityWriteAll(vm, o, c, false); }).ok) return;
 	var j = JSON.stringify(JVM.nbtToJson(c));
 	if (j !== o.$savedState) { gameOp(vm, 'entjava', id, j); o.$savedState = j; }
+};
+JVM.entityWriteAll = function (vm, o, c, withPlace) {
+	var STR = 'Ljava/lang/String;', NB = 'Lnet/minecraft/src/NBTTagCompound;';
+	if (withPlace) {
+		var dl = function (k, vs, t) {
+			var l = vm.newObject(vm.loadClass(SRC + 'NBTTagList')); vm.callVirtual(l, '<init>', '()V', []);
+			vs.forEach(function (v) {
+				var x = vm.newObject(vm.loadClass(SRC + (t === 'D' ? 'NBTTagDouble' : 'NBTTagFloat')));
+				x.$t = t === 'D' ? 6 : 5; x.$v = +v || 0; x.$name = ''; x[':data'] = x.$v;
+				vm.callVirtual(l, 'appendTag', '(Lnet/minecraft/src/NBTBase;)V', [x]);
+			});
+			vm.callVirtual(c, 'setTag', '(' + STR + 'Lnet/minecraft/src/NBTBase;)V', [k, l]);
+		};
+		dl('Pos', [o[':posX'], o[':posY'], o[':posZ']], 'D');
+		dl('Motion', [o[':motionX'], o[':motionY'], o[':motionZ']], 'D');
+		dl('Rotation', [o[':rotationYaw'], o[':rotationPitch']], 'F');
+		vm.callVirtual(c, 'setFloat', '(' + STR + 'F)V', ['FallDistance', Math.fround(+o[':fallDistance'] || 0)]);
+		vm.callVirtual(c, 'setBoolean', '(' + STR + 'Z)V', ['OnGround', o[':onGround'] ? 1 : 0]);
+	}
+	vm.callVirtual(o, 'writeEntityToNBT', '(' + NB + ')V', [c]);
+	if (o.$entityData) vm.callVirtual(c, 'setCompoundTag', '(' + STR + NB + ')V', ['ForgeData', o.$entityData]);
+	if (o.$ext) Object.keys(o.$ext).forEach(function (k) {
+		var t = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(t, '<init>', '()V', []);
+		vm.callVirtual(o.$ext[k], 'saveNBTData', '(' + NB + ')V', [t]);
+		vm.callVirtual(c, 'setCompoundTag', '(' + STR + NB + ')V', ['$ext:' + k, t]);
+	});
+};
+JVM.entityReadAll = function (vm, o, c) {
+	var NB = 'Lnet/minecraft/src/NBTTagCompound;';
+	vm.callVirtual(o, 'readEntityFromNBT', '(' + NB + ')V', [c]);
+	if (c.$v && c.$v.get('ForgeData') && c.$v.get('ForgeData').$t === 10) o.$entityData = c.$v.get('ForgeData');
+	if (c.$v) c.$v.forEach(function (t, k) {
+		if (k.indexOf('$ext:') !== 0 || !t || t.$t !== 10) return;
+		var name = k.substring(5);
+		(o.$extSaved || (o.$extSaved = {}))[name] = t;
+		if (o.$ext && o.$ext[name]) vm.callVirtual(o.$ext[name], 'loadNBTData', '(' + NB + ')V', [t]);
+	});
 };
 function liveMob(vm, ent) {
 	var mb = mobs(vm), live = mb.live || (mb.live = new Map());
@@ -13387,9 +16947,9 @@ function liveMob(vm, ent) {
 		live.set(ent.id, o);
 		var saved = gameOp(vm, 'entjava', ent.id), rd = o.cls.findMethod('readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V');
 		var tvs = mb.texVariants && mb.texVariants[o.$mobKey];
-		if (typeof saved === 'string' && saved && rd && !rd.cls.native && JVM.nbtFromJson) {
+		if (typeof saved === 'string' && saved && rd && JVM.nbtFromJson) {
 			o.$savedState = saved;
-			JVM.run(vm, function () { vm.invoke(rd, o, [JVM.nbtFromJson(vm, JSON.parse(saved), '')]); });
+			JVM.run(vm, function () { JVM.entityReadAll(vm, o, JVM.nbtFromJson(vm, JSON.parse(saved), '')); });
 		} else if (ent.tex > 0 && tvs && tvs.kindOf[ent.tex] != null) {
 			var st = o.cls.findMethod('setType(I)V');
 			if (st) JVM.run(vm, function () { vm.invoke(st, o, [tvs.kindOf[ent.tex]]); });
@@ -13445,6 +17005,29 @@ JVM.mobInteract = function (vm, ev) {
 	}
 	JVM.mobParts(vm, o, ent.id);
 	JVM.mobLook(vm, o, ent.id); JVM.mobSaveState(vm, o, ent.id);
+};
+JVM.mobKeyOf = function (vm, cls) {
+	var keys = mobs(vm).keys;
+	if (!keys) return null;
+	for (var c = cls; c; c = c.superClass) { var k = keys.get(c); if (k) return k; }
+	return null;
+};
+JVM.objHurt = function (vm, ev) {
+	var o = liveMob(vm, ev);
+	if (!o) return;
+	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	var src = null, DS = SRC + 'DamageSource';
+	JVM.run(vm, function () {
+		var who = ev.source && JVM.entityFor ? JVM.entityFor(vm, ev.source) : null;
+		if (who && who.$info) src = vm.callStatic(DS, 'causePlayerDamage', '(Lnet/minecraft/src/EntityPlayer;)L' + DS + ';', [who]);
+		else if (who) src = vm.callStatic(DS, 'causeMobDamage', '(Lnet/minecraft/src/EntityLiving;)L' + DS + ';', [who]);
+		else { var dc = vm.loadClass(DS); vm.initClass(dc); src = dc.statics.generic || null; }
+	});
+	var f = o.cls.findMethod('attackEntityFrom(Lnet/minecraft/src/DamageSource;F)Z'), i = o.cls.findMethod('attackEntityFrom(Lnet/minecraft/src/DamageSource;I)Z');
+	var m = f && !f.cls.native ? f : i && !i.cls.native ? i : f || i;
+	if (m) JVM.run(vm, function () { vm.invoke(m, o, [src, m === f ? Math.fround(+ev.damage || 1) : (ev.damage | 0) || 1]); });
+	if (o[':isDead']) { gameOp(vm, 'remove', ev.id); var live = mobs(vm).live; if (live) live.delete(ev.id); return; }
+	JVM.mobSaveState(vm, o, ev.id);
 };
 JVM.installMobs = installMobs;
 JVM.liveMob = liveMob;
@@ -13723,6 +17306,11 @@ function install(vm) {
 		if (vm.isInstance(e, vm.loadClass(SRC + 'EntityArrow'))) return 'arrow';
 		if (vm.isInstance(e, vm.loadClass(SRC + 'EntityFireball'))) return 'fireball';
 		if (vm.isInstance(e, vm.loadClass(SRC + 'EntityFishHook'))) return 'hook';
+		var c = e.cls;
+		if (c && !c.native && !vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving')) && !(JVM.mobKeyOf && JVM.mobKeyOf(vm, c))) {
+			var own = ['onUpdate()V', 'onEntityUpdate()V'].some(function (k) { var u = c.findMethod(k); return !!(u && !u.cls.native); });
+			if (own && objectIcon(vm, e, true)) return 'object';
+		}
 		return null;
 	};
 	W0.methods['spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z'] = function (vm, self, a) {
@@ -13732,7 +17320,27 @@ function install(vm) {
 	};
 }
 
+function objectIcon(vm, e, anyKind) {
+	var r = JVM.rendererOf ? JVM.rendererOf(vm, e.cls) : null;
+	if (r && r.$item && r.$item[':itemID'] != null) return [r.$item[':itemID'], r.$data | 0];
+	var got = null;
+	for (var c = e.cls; c && !c.native && !got; c = c.superClass) Object.keys(c.methods).some(function (k) {
+		var m = c.methods[k];
+		if (m.isStatic || !m.code || k.indexOf('()') < 0 || k.charAt(0) === '<') return false;
+		var ret = k.substring(k.indexOf(')') + 1);
+		var call = function () { var x = JVM.run(vm, function () { return vm.invoke(m, e, []); }); return x.ok ? x.value : null; };
+		if (anyKind && (ret === 'L' + SRC + 'ItemStack;' || ret === 'L' + SRC + 'Block;' || (ret === 'I' && /item_?id/i.test(m.name)))) { got = true; return true; }
+		if (ret === 'L' + SRC + 'ItemStack;') { var st = call(); if (st && st[':itemID'] > 0) got = [st[':itemID'], st[':itemDamage'] | 0]; }
+		else if (ret === 'L' + SRC + 'Block;') { var b = call(); if (b && b[':blockID'] > 0) got = [b[':blockID'], 0]; }
+		else if (ret === 'I' && /item_?id/i.test(m.name)) { var n = call(); if (n > 0) got = [n, 0]; }
+		return !!got;
+	});
+	return got;
+}
+JVM.objectIcon = objectIcon;
+
 function iconOf(vm, e, kind) {
+	if (kind === 'object') return objectIcon(vm, e) || [4, 0];
 	var r = JVM.rendererOf ? JVM.rendererOf(vm, e.cls) : null;
 	if (r && r.$item && r.$item[':itemID'] != null) return [r.$item[':itemID'], r.$data | 0];
 	var shooter = e[':thrower'] || e[':shootingEntity'] || e[':angler'];
@@ -13752,15 +17360,15 @@ JVM.shoot = function (vm, e, kind) {
 		grav = 0; inertia = 1;
 		mx = (+e[':accelerationX'] || 0) * 19; my = (+e[':accelerationY'] || 0) * 19; mz = (+e[':accelerationZ'] || 0) * 19;
 	}
-	if (kind === 'hook') grav = 0;
+	if (kind === 'hook' || kind === 'object') grav = 0;
 	var icon = iconOf(vm, e, kind), shooter = e[':thrower'] || e[':shootingEntity'] || e[':angler'];
 	var gid = op(vm, 'shoot', +e[':posX'] || 0, +e[':posY'] || 0, +e[':posZ'] || 0, mx, my, mz, icon[0], icon[1], grav, inertia, gameIdOf(shooter), jid);
 	if (!gid || gid < 0) return false;
 	e[':entityId'] = gid;
 	e[':ticksExisted'] = 0;
-	var m = e.cls.findMethod('onUpdate()V');
-	S.live[jid] = { e: e, gid: gid, kind: kind, update: !!(m && !m.cls.native), driven: false };
-	if (kind === 'hook' && S.live[jid].update) { S.live[jid].driven = true; op(vm, 'setdriven', gid, 1); }
+	var m = e.cls.findMethod('onUpdate()V'), m2 = kind === 'object' ? e.cls.findMethod('onEntityUpdate()V') : null;
+	S.live[jid] = { e: e, gid: gid, kind: kind, update: !!(m && !m.cls.native) || !!(m2 && !m2.cls.native), driven: false };
+	if ((kind === 'hook' || kind === 'object') && S.live[jid].update) { S.live[jid].driven = true; op(vm, 'setdriven', gid, 1); }
 	return true;
 };
 
@@ -13814,7 +17422,7 @@ JVM.shotHit = function (vm, ev) {
 			v[':xCoord'] = ev.hx != null ? +ev.hx : +ev.x; v[':yCoord'] = ev.hy != null ? +ev.hy : +ev.y; v[':zCoord'] = ev.hz != null ? +ev.hz : +ev.z;
 			vm.callVirtual(mop, '<init>', '(IIIILnet/minecraft/src/Vec3;)V', [ev.bx | 0, ev.by | 0, ev.bz | 0, ev.face | 0, v]);
 		}
-		if (s.kind === 'hook') vm.callVirtual(e, 'setDead', '()V', []);
+		if (s.kind === 'hook' || s.kind === 'object') vm.callVirtual(e, 'setDead', '()V', []);
 		else if (s.kind === 'arrow') arrowHit(vm, e, target, ev);
 		else vm.callVirtual(e, 'onImpact', '(' + MOP + ')V', [mop]);
 	});
@@ -13882,6 +17490,7 @@ JVM.shotTick = function (vm) {
 };
 JVM.installProjectiles = install;
 JVM.entityFor = entityFor;
+JVM.VANILLA_ENTITY_CLS = VANILLA_CLS;
 })();
 
 (function () {
@@ -14066,6 +17675,7 @@ function install(vm) {
 		};
 	};
 	add('Vec3', {
+		'squareDistanceTo(DDD)D': function (vm, self, a) { var dx = a[0] - self[':xCoord'], dy = a[1] - self[':yCoord'], dz = a[2] - self[':zCoord']; return dx * dx + dy * dy + dz * dz; },
 		'rotateAroundX(F)V': rot('x'), 'rotateAroundY(F)V': rot('y'), 'rotateAroundZ(F)V': rot('z'),
 		'func_72440_a(F)V': rot('x'), 'func_72442_b(F)V': rot('y'), 'func_72446_c(F)V': rot('z'),
 	});
@@ -14087,9 +17697,12 @@ function install(vm) {
 		W.methods['getPathEntityToEntity(' + E + E + 'FZZZZ)Lnet/minecraft/src/PathEntity;'] = function (vm, self, a) { var t = a[1]; return t ? pathTo(vm, t[':posX'], t[':posY'], t[':posZ']) : null; };
 	}
 	if (!vm.natives[SRC + 'PathEntity']) vm.defineNative(SRC + 'PathEntity', { methods: {
-		'isFinished()Z': function () { return 0; },
+		'isFinished()Z': function (vm, self) { return (self.$at | 0) >= 1 ? 1 : 0; },
+		'incrementPathIndex()V': function (vm, self) { self.$at = (self.$at | 0) + 1; },
+		'setCurrentPathIndex(I)V': function (vm, self, a) { self.$at = a[0] | 0; },
 		'getCurrentPathLength()I': function () { return 1; },
-		'getCurrentPathIndex()I': function () { return 0; },
+		'getCurrentPathIndex()I': function (vm, self) { return self.$at | 0; },
+		'getFinalPathPoint()Lnet/minecraft/src/PathPoint;': function () { return null; },
 		'getPosition(Lnet/minecraft/src/Entity;)Lnet/minecraft/src/Vec3;': function (vm, self) { var t = self.$to || [0, 0, 0]; return vm.callStatic(SRC + 'Vec3', 'createVectorHelper', '(DDD)Lnet/minecraft/src/Vec3;', [t[0], t[1], t[2]]); },
 	} });
 	var EC = vm.natives[SRC + 'EntityCreature'];
@@ -14208,9 +17821,127 @@ function install(vm) {
 		if (!prev) return;
 		EL.methods[k] = function (vm, self, a) { var h = prev(vm, self, a); if (h) h.$owner = self; return h; };
 	});
+	installSaved(vm, spec, add);
+	add('Entity', {
+		'setDead()V': function (vm, self) { self[':isDead'] = 1; },
+		'onUpdate()V': function (vm, self) { vm.callVirtual(self, 'onEntityUpdate', '()V', []); },
+		'onEntityUpdate()V': function () {},
+	});
+	var RULES = { doFireTick: 'true', mobGriefing: 'true', keepInventory: 'false', doMobSpawning: 'true', doMobLoot: 'true', doTileDrops: 'true', commandBlockOutput: 'true', naturalRegeneration: 'true', doDaylightCycle: 'true' };
+	var rulesOf = function (vm) { var g = vm.$gameRules; if (!g) { g = vm.$gameRules = vm.newObject(vm.loadClass(SRC + 'GameRules')); g.$r = Object.assign({}, RULES); } return g; };
+	if (!vm.natives[SRC + 'GameRules']) vm.defineNative(SRC + 'GameRules', { methods: {
+		'<init>()V': function (vm, self) { self.$r = Object.assign({}, RULES); },
+		'getGameRuleBooleanValue(Ljava/lang/String;)Z': function (vm, self, a) { return (self.$r || RULES)[a[0]] === 'true' ? 1 : 0; },
+		'getGameRuleStringValue(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var v = (self.$r || RULES)[a[0]]; return v != null ? v : ''; },
+		'setOrCreateGameRule(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { (self.$r || (self.$r = Object.assign({}, RULES)))[a[0]] = String(a[1]); },
+		'addGameRule(Ljava/lang/String;Ljava/lang/String;)V': function (vm, self, a) { (self.$r || (self.$r = Object.assign({}, RULES)))[a[0]] = String(a[1]); },
+		'hasRule(Ljava/lang/String;)Z': function (vm, self, a) { return (self.$r || RULES)[a[0]] != null ? 1 : 0; },
+	} });
+	var Wsp = spec('World');
+	if (Wsp && !Wsp.methods['getGameRules()Lnet/minecraft/src/GameRules;']) Wsp.methods['getGameRules()Lnet/minecraft/src/GameRules;'] = function (vm) { return rulesOf(vm); };
+	add('WorldInfo', { 'getGameRulesInstance()Lnet/minecraft/src/GameRules;': function (vm) { return rulesOf(vm); } });
+	add('Entity', { 'moveFlying(FFF)V': function (vm, self, a) {
+		var st = +a[0], fw = +a[1], l = st * st + fw * fw;
+		if (l < 1.0E-4) return;
+		l = Math.sqrt(l); if (l < 1) l = 1;
+		l = +a[2] / l; st *= l; fw *= l;
+		var r = (+self[':rotationYaw'] || 0) * Math.PI / 180, sn = Math.fround(Math.sin(r)), cs = Math.fround(Math.cos(r));
+		self[':motionX'] = (+self[':motionX'] || 0) + st * cs - fw * sn;
+		self[':motionZ'] = (+self[':motionZ'] || 0) + fw * cs + st * sn;
+	} });
+	var ENs = spec('Entity'), prevMove = ENs && ENs.methods['moveEntity(DDD)V'];
+	if (prevMove) ENs.methods['moveEntity(DDD)V'] = function (vm, self, a) { if (vm.$brainTick && self.$brain) self.$javaMoved = true; return prevMove(vm, self, a); };
+	if (JVM.installNet) JVM.installNet(vm);
 }
 
-var ACTIVE = ['onUpdate()V', 'onLivingUpdate()V', 'updateEntityActionState()V', 'updateAITasks()V', 'attackEntity(Lnet/minecraft/src/Entity;F)V'];
+function installSaved(vm, spec, add) {
+	var NB = 'Lnet/minecraft/src/NBTTagCompound;', STR = 'Ljava/lang/String;';
+	var is = function (o, n) { var c = vm.natives[SRC + n] ? vm.loadClass(SRC + n) : null; return !!(c && vm.isInstance(o, c)); };
+	var set = function (c, t, k, v) { vm.callVirtual(c, 'set' + t[0], '(' + STR + t[1] + ')V', [k, v]); };
+	var get = function (c, t, k) { return vm.callVirtual(c, 'get' + t[0], '(' + STR + ')' + t[1], [k]); };
+	var has = function (c, k) { return !!vm.callVirtual(c, 'hasKey', '(' + STR + ')Z', [k]); };
+	var S = ['String', STR], I = ['Integer', 'I'], B = ['Boolean', 'Z'], SH = ['Short', 'S'], F = ['Float', 'F'];
+	var callOr = function (o, name, desc, args, d) { try { return vm.callVirtual(o, name, desc, args || []); } catch (e) { if (e instanceof JVM.JavaThrow) return d; throw e; } };
+	var write = function (vm, self, a) {
+		var c = a[0];
+		if (!c) return;
+		if (is(self, 'EntityLiving')) {
+			var h = +self[':health'];
+			if (isFinite(h)) { set(c, SH, 'Health', Math.round(h) | 0); set(c, F, 'HealF', Math.fround(h)); }
+			if (self[':customName'] != null && String(self[':customName'])) set(c, S, 'CustomName', String(self[':customName']));
+			if (self[':customNameVisible']) set(c, B, 'CustomNameVisible', 1);
+			set(c, B, 'PersistenceRequired', self[':persistenceRequired'] ? 1 : 0);
+			set(c, B, 'CanPickUpLoot', self[':canPickUpLoot'] ? 1 : 0);
+			if (self.$equip && self.$equip.some(Boolean)) {
+				var l = vm.newObject(vm.loadClass(SRC + 'NBTTagList')); vm.callVirtual(l, '<init>', '()V', []);
+				for (var i = 0; i < 5; i++) {
+					var t = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(t, '<init>', '()V', []);
+					if (self.$equip[i]) callOr(self.$equip[i], 'writeToNBT', '(' + NB + ')' + NB, [t], null);
+					vm.callVirtual(l, 'appendTag', '(Lnet/minecraft/src/NBTBase;)V', [t]);
+				}
+				vm.callVirtual(c, 'setTag', '(' + STR + 'Lnet/minecraft/src/NBTBase;)V', ['Equipment', l]);
+			}
+		}
+		if (is(self, 'EntityAgeable')) set(c, I, 'Age', self[':growingAge'] | 0);
+		if (is(self, 'EntityAnimal')) set(c, I, 'InLove', self[':inLove'] | 0);
+		if (is(self, 'EntityTameable')) {
+			var own = callOr(self, 'getOwnerName', '()' + STR, [], '');
+			set(c, S, 'Owner', own == null ? '' : String(own));
+			set(c, B, 'Sitting', callOr(self, 'isSitting', '()Z', [], 0) ? 1 : 0);
+		}
+	};
+	var read = function (vm, self, a) {
+		var c = a[0];
+		if (!c) return;
+		if (is(self, 'EntityLiving')) {
+			if (has(c, 'CustomName')) self[':customName'] = get(c, S, 'CustomName');
+			if (has(c, 'CustomNameVisible')) self[':customNameVisible'] = get(c, B, 'CustomNameVisible');
+			if (has(c, 'PersistenceRequired')) self[':persistenceRequired'] = get(c, B, 'PersistenceRequired');
+			if (has(c, 'CanPickUpLoot')) self[':canPickUpLoot'] = get(c, B, 'CanPickUpLoot');
+			if (has(c, 'Equipment')) {
+				var l = vm.callVirtual(c, 'getTagList', '(' + STR + ')Lnet/minecraft/src/NBTTagList;', ['Equipment']);
+				var n = vm.callVirtual(l, 'tagCount', '()I', []);
+				self.$equip = [];
+				for (var i = 0; i < n && i < 5; i++) {
+					var t = vm.callVirtual(l, 'tagAt', '(I)Lnet/minecraft/src/NBTBase;', [i]);
+					self.$equip[i] = t && t.$v && t.$v.size ? JVM.run(vm, function () { return vm.callStatic(SRC + 'ItemStack', 'loadItemStackFromNBT', '(' + NB + ')Lnet/minecraft/src/ItemStack;', [t]); }).value || null : null;
+				}
+			}
+		}
+		if (is(self, 'EntityAgeable') && has(c, 'Age')) self[':growingAge'] = get(c, I, 'Age');
+		if (is(self, 'EntityAnimal') && has(c, 'InLove')) self[':inLove'] = get(c, I, 'InLove');
+		if (is(self, 'EntityTameable')) {
+			var own = has(c, 'Owner') ? get(c, S, 'Owner') : '';
+			if (own != null && String(own).length) {
+				callOr(self, 'setOwner', '(' + STR + ')V', [String(own)], null);
+				callOr(self, 'setTamed', '(Z)V', [1], null);
+			}
+			if (has(c, 'Sitting')) callOr(self, 'setSitting', '(Z)V', [get(c, B, 'Sitting')], null);
+		}
+	};
+	add('Entity', { 'writeEntityToNBT(Lnet/minecraft/src/NBTTagCompound;)V': write, 'readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V': read });
+	['EntityLivingBase', 'EntityLiving', 'EntityCreature', 'EntityAgeable', 'EntityAnimal', 'EntityTameable', 'EntityMob', 'EntityWaterMob', 'EntityAmbientCreature', 'EntityFlying', 'EntityGolem'].forEach(function (n) {
+		var s = spec(n);
+		if (!s || !s.methods) return;
+		delete s.methods['writeEntityToNBT(Lnet/minecraft/src/NBTTagCompound;)V'];
+		delete s.methods['readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V'];
+	});
+	add('Entity', {
+		'writeToNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) { if (a[0] && JVM.entityWriteAll) JVM.entityWriteAll(vm, self, a[0], true); },
+		'readFromNBT(Lnet/minecraft/src/NBTTagCompound;)V': function (vm, self, a) { if (a[0] && JVM.entityReadAll) JVM.entityReadAll(vm, self, a[0]); },
+		'setCustomNameTag(Ljava/lang/String;)V': function (vm, self, a) { self[':customName'] = a[0] == null ? '' : String(a[0]); },
+		'getCustomNameTag()Ljava/lang/String;': function (vm, self) { return self[':customName'] != null ? String(self[':customName']) : ''; },
+		'hasCustomNameTag()Z': function (vm, self) { return self[':customName'] != null && String(self[':customName']).length ? 1 : 0; },
+		'setAlwaysRenderNameTag(Z)V': function (vm, self, a) { self[':customNameVisible'] = a[0] ? 1 : 0; },
+		'getAlwaysRenderNameTag()Z': function (vm, self) { return self[':customNameVisible'] ? 1 : 0; },
+	});
+	add('EntityLiving', {
+		'isNoDespawnRequired()Z': function (vm, self) { return self[':persistenceRequired'] ? 1 : 0; },
+		'func_110163_bv()V': function (vm, self) { self[':persistenceRequired'] = 1; },
+	});
+}
+
+var ACTIVE = ['onUpdate()V', 'onLivingUpdate()V', 'updateEntityActionState()V', 'updateAITasks()V', 'attackEntity(Lnet/minecraft/src/Entity;F)V', 'onEntityUpdate()V'];
 function brainOf(vm, o) {
 	var c = o.cls;
 	if (c.$brain === undefined) {
@@ -14222,11 +17953,37 @@ function brainOf(vm, o) {
 	return lists.some(function (l) { return (l || []).some(function (t) { return t && t.cls && !t.cls.native; }); });
 }
 
+JVM.despawnVerdict = function (vm, o) {
+	var EL = vm.natives[SRC + 'EntityLiving'] ? vm.loadClass(SRC + 'EntityLiving') : null;
+	if (!EL || !vm.isInstance(o, EL)) return 0;
+	var ev = JVM.forgePost ? JVM.forgePost(vm, 'net/minecraftforge/event/entity/living/LivingSpawnEvent$AllowDespawn', function (e) {
+		e[':entity'] = o; e[':entityLiving'] = o; e[':world'] = o[':worldObj'] || JVM.mc152.worldObj(vm);
+		e[':x'] = Math.fround(+o[':posX'] || 0); e[':y'] = Math.fround(+o[':posY'] || 0); e[':z'] = Math.fround(+o[':posZ'] || 0);
+	}) : null;
+	var res = ev && ev.$result && ev.$result.$name;
+	if (res === 'DENY') return 1;
+	if (res === 'ALLOW') return 2;
+	if (o[':persistenceRequired'] || (o[':customName'] != null && String(o[':customName']).length)) return 1;
+	var tm = o.cls.findMethod('isTamed()Z');
+	if (tm && JVM.run(vm, function () { return vm.invoke(tm, o, []); }).value) return 1;
+	var cd = o.cls.findMethod('canDespawn()Z');
+	if (cd && !cd.cls.native) {
+		var r = JVM.run(vm, function () { return vm.invoke(cd, o, []); });
+		if (r.ok) return r.value ? 2 : 1;
+	}
+	return 0;
+};
+function keepCheck(vm, o, id) {
+	var k = JVM.despawnVerdict(vm, o);
+	if (k !== o.$keep) { if (op(vm, 'entkeep', id, k)) o.$keep = k; }
+}
+
 JVM.mobTick = function (vm) {
 	if (!JVM.liveMob || !JVM.entityFor) return;
 	var B = vm.$brainState || (vm.$brainState = { tick: 0, seen: {} });
 	B.tick++;
 	var world = JVM.mc152.worldObj(vm);
+	if (B.tick % 20 === 1 && vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); if (JVM.netClient) JVM.mc152.playerObj(vm, null)[':sendQueue'] = JVM.netClient(vm); });
 	if (B.tick % 100 === 1 || world[':difficultySetting'] == null) {
 		var wi = op(vm, 'world');
 		world[':difficultySetting'] = wi && wi.difficulty != null ? wi.difficulty | 0 : 2;
@@ -14248,7 +18005,9 @@ JVM.mobTick = function (vm) {
 			if (dx * dx + dz * dz > 24 * 24) return;
 		}
 		var o = JVM.liveMob(vm, info);
-		if (!o || o.cls.$brainOff || !brainOf(vm, o)) return;
+		if (!o) return;
+		if ((B.tick + info.id) % 40 === 20) keepCheck(vm, o, info.id);
+		if (o.cls.$brainOff || !brainOf(vm, o)) return;
 		var avg = o.cls.$brainRuns > 4 ? o.cls.$brainMs / o.cls.$brainRuns : 0;
 		if (avg > 2) { var every = Math.min(10, Math.ceil(avg / 2)); if ((B.tick + info.id) % every) return; }
 		o.$brain = true; o.$brainInfo = info; o.$entityId = info.id; o[':entityId'] = info.id;
@@ -14272,6 +18031,17 @@ JVM.mobTick = function (vm) {
 		if (rider) {
 			rider[':moveForward'] = +me.fwd || 0; rider[':moveStrafing'] = +me.strafe || 0; rider[':isJumping'] = me.jump ? 1 : 0;
 			rider[':rotationYaw'] = +me.yaw || 0; rider[':rotationPitch'] = +me.pitch || 0; rider[':ridingEntity'] = o;
+			var rs = +me.strafe || 0, rf = +me.fwd || 0, rl = Math.sqrt(rs * rs + rf * rf);
+			if (rl >= 0.01) {
+				var rk = 0.02 / Math.max(1, rl), ry = (+me.yaw || 0) * Math.PI / 180;
+				rider[':motionX'] = (rs * rk * Math.cos(ry) - rf * rk * Math.sin(ry)) * 0.91;
+				rider[':motionZ'] = (rf * rk * Math.cos(ry) + rs * rk * Math.sin(ry)) * 0.91;
+			} else { rider[':motionX'] = 0; rider[':motionZ'] = 0; }
+			rider[':motionY'] = 0;
+		} else if (info.pathing != null) {
+			var sp = JVM.attrValue ? JVM.attrValue(o, 'generic.movementSpeed') : null;
+			if (sp == null) sp = +o[':moveSpeed'] || 0.25;
+			o[':moveForward'] = info.pathing ? +sp : 0; o[':moveStrafing'] = 0;
 		}
 		o[':riddenByEntity'] = rider || (info.rider ? o[':riddenByEntity'] : null);
 		var before ={ vx: o[':motionX'], vy: o[':motionY'], vz: o[':motionZ'], x: o[':posX'], y: o[':posY'], z: o[':posZ'], h: o[':health'], t: tgt };
@@ -14280,8 +18050,10 @@ JVM.mobTick = function (vm) {
 		var r;
 		var c0 = Date.now();
 		try {
+			o.$javaMoved = false;
 			r = JVM.run(vm, function () { vm.callVirtual(o, 'onUpdate', '()V', []); });
-			if (r.ok && rider) JVM.run(vm, function () { vm.callVirtual(o, 'moveEntityWithHeading', '(FF)V', [+o[':moveStrafing'] || 0, +o[':moveForward'] || 0]); });
+			var mh = r.ok && o.cls.$ownMove === undefined ? (o.cls.$ownMove = (function () { var m = o.cls.findMethod('moveEntityWithHeading(FF)V'); return !!(m && !m.cls.native); })()) : o.cls.$ownMove;
+			if (r.ok && (rider || mh) && o.cls.findMethod('moveEntityWithHeading(FF)V')) JVM.run(vm, function () { vm.callVirtual(o, 'moveEntityWithHeading', '(FF)V', [+o[':moveStrafing'] || 0, +o[':moveForward'] || 0]); });
 		}
 		finally { vm.$brainTick = false; o.cls.$brainMs = (o.cls.$brainMs || 0) + Date.now() - c0; o.cls.$brainRuns = (o.cls.$brainRuns | 0) + 1; }
 		if (!r.ok) {
@@ -14292,6 +18064,10 @@ JVM.mobTick = function (vm) {
 		}
 		var id = info.id, eps = 1e-5;
 		if (o[':isDead']) { op(vm, 'remove', id); return; }
+		if (o.$javaMoved) {
+			op(vm, 'entdrive', id, 3);
+			if (Math.abs((+o[':rotationYaw'] || 0) - (+info.yaw || 0)) > 0.5 || Math.abs((+o[':rotationPitch'] || 0) - (+info.pitch || 0)) > 0.5) op(vm, 'setrot', id, +o[':rotationYaw'] || 0, +o[':rotationPitch'] || 0);
+		}
 		if (Math.abs(o[':posX'] - before.x) > 0.01 || Math.abs(o[':posY'] - before.y) > 0.01 || Math.abs(o[':posZ'] - before.z) > 0.01) op(vm, 'entpos', id, o[':posX'], o[':posY'], o[':posZ']);
 		if (Math.abs(o[':motionX'] - before.vx) > eps) op(vm, 'setvel', id, 'x', +o[':motionX']);
 		if (Math.abs(o[':motionY'] - before.vy) > eps) op(vm, 'setvel', id, 'y', +o[':motionY']);
@@ -14325,6 +18101,138 @@ JVM.mobDeath = function (vm, ev) {
 	if (live) live.delete(ev.id);
 };
 JVM.installBrain = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', NET = 'cpw/mods/fml/common/network/';
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function net(vm) { return vm.$net || (vm.$net = { client: {}, server: {}, specsDone: false, queue: [], handlers: new Map() }); }
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	def(SRC + 'Packet', { fields: {}, methods: { '<init>()V': function () {} } });
+	def(SRC + 'Packet250CustomPayload', { super: SRC + 'Packet', fields: { channel: 'Ljava/lang/String;', data: '[B', length: 'I' }, methods: {
+		'<init>()V': function () {},
+		'<init>(Ljava/lang/String;[B)V': function (vm, self, a) { self[':channel'] = a[0]; self[':data'] = a[1]; self[':length'] = a[1] ? a[1].a.length : 0; },
+	} });
+	def(SRC + 'INetworkManager', { access: JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT });
+	var add = function (side, ch, h) { var t = net(vm)[side]; (t[ch] || (t[ch] = [])).indexOf(h) < 0 && t[ch].push(h); };
+	var NR = vm.natives[NET + 'NetworkRegistry'];
+	if (NR) {
+		NR.methods['registerChannel(Lcpw/mods/fml/common/network/IPacketHandler;Ljava/lang/String;)V'] = function (vm, self, a) { if (a[0] && a[1]) { add('client', String(a[1]), a[0]); add('server', String(a[1]), a[0]); } };
+		NR.methods['registerChannel(Lcpw/mods/fml/common/network/IPacketHandler;Ljava/lang/String;Lcpw/mods/fml/relauncher/Side;)V'] = function (vm, self, a) {
+			if (!a[0] || !a[1]) return;
+			var side = a[2] && a[2].$name;
+			if (side !== 'SERVER') add('client', String(a[1]), a[0]);
+			if (side !== 'CLIENT') add('server', String(a[1]), a[0]);
+		};
+	}
+	var PD = vm.natives[NET + 'PacketDispatcher'];
+	if (PD) {
+		var P = 'Lnet/minecraft/src/Packet;';
+		var pick = function (i) { return function (vm, n, a) { send(vm, 'client', a[i]); }; };
+		PD.staticMethods['sendPacketToPlayer(' + P + 'Lcpw/mods/fml/common/network/Player;)V'] = pick(0);
+		PD.staticMethods['sendPacketToAllAround(DDDDI' + P + ')V'] = pick(5);
+		PD.staticMethods['sendPacketToAllInDimension(' + P + 'I)V'] = pick(0);
+		PD.staticMethods['sendPacketToAllPlayers(' + P + ')V'] = pick(0);
+		PD.staticMethods['sendPacketToServer(' + P + ')V'] = function (vm, n, a) { send(vm, 'server', a[0]); };
+		PD.staticMethods['getPacket(Ljava/lang/String;[B)Lnet/minecraft/src/Packet250CustomPayload;'] = function (vm, n, a) {
+			var p = vm.newObject(vm.loadClass(SRC + 'Packet250CustomPayload'));
+			p[':channel'] = a[0]; p[':data'] = a[1]; p[':length'] = a[1] ? a[1].a.length : 0;
+			return p;
+		};
+	}
+	def(SRC + 'NetClientHandler', { methods: {
+		'addToSendQueue(Lnet/minecraft/src/Packet;)V': function (vm, self, a) { send(vm, 'server', a[0]); },
+	} });
+	var MC = vm.natives['net/minecraft/client/Minecraft'];
+	if (MC && !MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;']) MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;'] = function (vm) { return JVM.netClient(vm); };
+	var W = vm.natives[SRC + 'World'];
+	if (W) W.methods['getEntityByID(I)Lnet/minecraft/src/Entity;'] = function (vm, self, a) { return entityById(vm, a[0] | 0); };
+}
+
+function entityById(vm, id) {
+	var live = vm.mcReg && vm.mcReg.mobs && vm.mcReg.mobs.live;
+	if (live && live.get(id)) return live.get(id);
+	var me = op(vm, 'player');
+	if (me && me.id === id) return JVM.mc152.playerObj(vm, null);
+	var info = op(vm, 'ent', id);
+	return info && JVM.entityFor ? JVM.entityFor(vm, info) : null;
+}
+
+function scanSpecs(vm) {
+	var N = net(vm);
+	if (N.specsDone) return;
+	N.specsDone = true;
+	var f = vm.mcReg && vm.mcReg.forge;
+	(f && f.mods || []).forEach(function (m) {
+		var a = m.cls && m.cls.cf ? JVM.annotation(vm, m.cls.cf.annotations, NET + 'NetworkMod') : null;
+		if (!a) return;
+		var v = a.values || {};
+		var chans = function (x) { return x && x.t === '[' ? x.items.map(function (i) { return String(i.v); }) : []; };
+		var handler = function (x) {
+			if (!x || x.t !== 'c' || !x.desc) return null;
+			var cn = x.desc.replace(/^L|;$/g, '');
+			if (/NetworkMod\$NULL$/.test(cn)) return null;
+			if (N.handlers.has(cn)) return N.handlers.get(cn);
+			var r = JVM.run(vm, function () { var c = vm.loadClass(cn), o = vm.newObject(c); vm.callVirtual(o, '<init>', '()V', []); return o; });
+			var h = r.ok ? r.value : null;
+			N.handlers.set(cn, h);
+			return h;
+		};
+		var side = function (spec, which) {
+			if (!spec || spec.t !== '@' || !spec.ann) return;
+			var sv = spec.ann.values || {}, h = handler(sv.packetHandler);
+			if (h) chans(sv.channels).forEach(function (ch) { var t = N[which]; (t[ch] || (t[ch] = [])).indexOf(h) < 0 && t[ch].push(h); });
+		};
+		side(v.clientPacketHandlerSpec, 'client');
+		side(v.serverPacketHandlerSpec, 'server');
+		var both = handler(v.packetHandler);
+		if (both) chans(v.channels).forEach(function (ch) { ['client', 'server'].forEach(function (w) { var t = N[w]; (t[ch] || (t[ch] = [])).indexOf(both) < 0 && t[ch].push(both); }); });
+	});
+}
+
+function send(vm, side, packet) {
+	if (!packet || packet[':channel'] == null) return;
+	net(vm).queue.push({ side: side, packet: packet });
+	if (!vm.$netPending && typeof Promise !== 'undefined') {
+		vm.$netPending = true;
+		Promise.resolve().then(function () { vm.$netPending = false; JVM.netDeliver(vm); });
+	}
+}
+
+JVM.netDeliver = function (vm) {
+	var N = net(vm);
+	if (!N.queue.length) return 0;
+	scanSpecs(vm);
+	var q = N.queue.splice(0), n = 0, server = false;
+	var world = JVM.mc152.worldObj(vm), pl = JVM.mc152.playerObj(vm, null);
+	if (vm.$minecraftObj) JVM.run(vm, function () { vm.$minecraftObj(vm); });
+	pl[':sendQueue'] = JVM.netClient(vm);
+	var live = vm.mcReg && vm.mcReg.mobs && vm.mcReg.mobs.live;
+	JVM.run(vm, function () {
+		var l = world[':loadedEntityList'];
+		if (!l) return;
+		vm.callVirtual(l, 'clear', '()V', []);
+		vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [pl]);
+		if (live) live.forEach(function (o, id) { o[':entityId'] = id; o[':worldObj'] = world; vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [o]); });
+	});
+	q.forEach(function (it) {
+		var ch = String(it.packet[':channel']), hs = N[it.side][ch] || [];
+		if (it.side === 'server') server = true;
+		hs.forEach(function (h) {
+			n++;
+			JVM.run(vm, function () { vm.callVirtual(h, 'onPacketData', '(Lnet/minecraft/src/INetworkManager;Lnet/minecraft/src/Packet250CustomPayload;Lcpw/mods/fml/common/network/Player;)V', [null, it.packet, pl]); });
+		});
+	});
+	if (server && live && JVM.mobSaveState && vm.game && vm.game.mode === 'run') live.forEach(function (o, id) { JVM.mobSaveState(vm, o, id); });
+	if (N.queue.length && N.queue.length < 1000) return n + JVM.netDeliver(vm);
+	return n;
+};
+JVM.netClient = function (vm) { return vm.$netClient || (vm.$netClient = vm.newObject(vm.loadClass(SRC + 'NetClientHandler'))); };
+JVM.installNet = install;
 })();
 
 (function () {
@@ -16859,6 +20767,8 @@ function install(vm) {
 		'<init>(Lnet/minecraft/client/Minecraft;)V': function () {},
 		'updateRenderer()V': function () {},
 	} });
+	var MCs = spec('net/minecraft/client/Minecraft');
+	if (MCs) { MCs.staticMethods = Object.assign({}, MCs.staticMethods || {}); if (!MCs.staticMethods['isFancyGraphicsEnabled()Z']) MCs.staticMethods['isFancyGraphicsEnabled()Z'] = function () { return 1; }; }
 	add('Block', { 'getBlockTexture(Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;': function (vm, self, a) {
 		var meta = 0;
 		try { meta = a[0] ? vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]) : 0; } catch (e) { meta = 0; }
@@ -16920,6 +20830,47 @@ function install(vm) {
 			'getInterpolatedU(D)F': function (vm, self, a) { return kOf(vm, self) + a[0] / 16; },
 			'getInterpolatedV(D)F': function (vm, self, a) { return kOf(vm, self) + a[0] / 16; },
 		});
+	}
+
+	var STS = 'net/modificationstation/stationapi/api/client/texture/atlas/', SPs = spec(STS + 'Atlas$Sprite'), ATs = spec(STS + 'Atlas');
+	if (SPs && ATs) {
+		var spK = function (vm, self) {
+			if (!self.$k) {
+				vm.$iconK = (vm.$iconK || 1) + 1; self.$k = vm.$iconK; (vm.$recIcons || (vm.$recIcons = {}))[self.$k] = self;
+			}
+			if (self.$texEntry === undefined && vm.$recFiles && JVM.stationSprite) self.$texEntry = JVM.stationSprite(vm, self[':index'] | 0, vm.$recFiles) || undefined;
+			return self.$k;
+		};
+		SPs.methods = Object.assign({}, SPs.methods || {}, {
+			'getStartU()D': function (vm, self) { return spK(vm, self); }, 'getEndU()D': function (vm, self) { return spK(vm, self) + 1; },
+			'getStartV()D': function (vm, self) { return spK(vm, self); }, 'getEndV()D': function (vm, self) { return spK(vm, self) + 1; },
+			'getWidth()I': function () { return 16; }, 'getHeight()I': function () { return 16; },
+		});
+		ATs.methods = Object.assign({}, ATs.methods || {}, {
+			'getTexture(I)Lnet/modificationstation/stationapi/api/client/texture/atlas/Atlas$Sprite;': function (vm, self, a) {
+				var c = vm.$stSpriteObjs || (vm.$stSpriteObjs = {});
+				if (!c[a[0]]) { var o = vm.newObject(vm.loadClass(STS + 'Atlas$Sprite')); o[':index'] = a[0]; c[a[0]] = o; }
+				return c[a[0]];
+			},
+		});
+	}
+
+	var STC = 'net/modificationstation/stationapi/api/client/';
+	if (ATs && !spec(STC + 'StationRenderAPI')) {
+		var SAT = STC + 'texture/SpriteAtlasTexture', BMM = STC + 'render/model/BakedModelManager';
+		def(SAT, { methods: { 'bindTexture()V': function (vm) { var R = rec(vm); if (R) R.tex = null; } } });
+		def(BMM, { methods: { 'getAtlas(Lnet/modificationstation/stationapi/api/util/Identifier;)Lnet/modificationstation/stationapi/api/client/texture/SpriteAtlasTexture;': function (vm) {
+			return vm.$stAtlasTex || (vm.$stAtlasTex = vm.newObject(vm.loadClass(SAT)));
+		} } });
+		def(STC + 'StationRenderAPI', { staticMethods: { 'getBakedModelManager()Lnet/modificationstation/stationapi/api/client/render/model/BakedModelManager;': function (vm) {
+			return vm.$stBmm || (vm.$stBmm = vm.newObject(vm.loadClass(BMM)));
+		} } });
+		var ATL = spec(STS + 'Atlases');
+		if (ATL && JVM.station && JVM.station.identifier) {
+			ATL.statics = Object.assign({}, ATL.statics || {}, { GAME_ATLAS_TEXTURE: null });
+			var atlInit = ATL.clinit;
+			ATL.clinit = function (vm, c) { if (atlInit) atlInit(vm, c); c.statics.GAME_ATLAS_TEXTURE = JVM.station.identifier(vm, 'stationapi', 'textures/atlas/terrain.png'); };
+		}
 	}
 
 	var MR = spec('ModelRenderer');
@@ -17333,6 +21284,7 @@ function install(vm) {
 		JVM.mc152.onMinecraft.$rg = true;
 	}
 	def('RenderArrow', { super: SRC + 'Render', methods: { '<init>()V': function () {} } });
+	def('RenderEntity', { super: SRC + 'Render', methods: { '<init>()V': function () {} } });
 	var STB = 'net/modificationstation/stationapi/api/client/model/block/';
 	def(STB + 'BlockWithWorldRenderer', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
 	def(STB + 'BlockWithInventoryRenderer', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC });
@@ -17449,11 +21401,15 @@ JVM.recordBlock = function (vm, b, id, meta, modId) {
 		(un[modId] || (un[modId] = Object.create(null)))['feature:custom-drawn blocks and items'] = why;
 	};
 	var babric = !!(modId && vm.$stFiles && vm.$stFiles[modId]);
-	var stModel = false;
-	if (babric && tesr && !worldR && rt === 0) { try { stModel = !!(JVM.stationModel && JVM.stationModel(vm, b, vm.$stFiles[modId])); } catch (eM) { stModel = false; } }
+	var stModel = null;
+	if (babric && tesr && !worldR && rt === 0) { try { stModel = JVM.stationModel ? JVM.stationModel(vm, b, vm.$stFiles[modId], b.$stStates ? meta : undefined) : null; } catch (eM) { stModel = null; } }
+	var mq = null;
 	if (stModel) {
-		gap('a block entity renderer drawing over ' + b.cls.name.split('/').pop() + "'s model isn't drawn here");
-		tesr = null;
+		mq = modelQuads(stModel);
+		if (!mq) {
+			gap('a block entity renderer drawing over ' + b.cls.name.split('/').pop() + "'s model isn't drawn here");
+			tesr = null;
+		}
 	}
 	if (!h && !tesr && !worldR) return null;
 	var w2 = JVM.mc152.worldObj(vm);
@@ -17463,7 +21419,7 @@ JVM.recordBlock = function (vm, b, id, meta, modId) {
 	var newRB = function () { var rb = vm.newObject(vm.loadClass(SRC + 'RenderBlocks')); vm.callVirtual(rb, '<init>', '(Lnet/minecraft/src/IBlockAccess;)V', [w2]); return rb; };
 	JVM.recStart(vm);
 	var log = vm.log;
-	vm.log = function (level) { if (level !== 'error') return log.apply(vm, arguments); };
+	vm.log = function (level) { if (level !== 'error' || JVM.recDebug) return log.apply(vm, arguments); };
 	var ran = !!(worldR || h || (tesr && rt === 0));
 	var ok = ran ? JVM.run(vm, function () {
 		if (worldR) {
@@ -17491,8 +21447,68 @@ JVM.recordBlock = function (vm, b, id, meta, modId) {
 	if ((ran && !ok.ok) || (tesr && !ok2.ok)) gap(b.cls.name.split('/').pop() + "'s render code stopped with an error");
 	var quads = JVM.recStop(vm);
 	vm.$defTile = prevDef; vm.$recFiles = prevFiles;
+	if (mq && ok2.ok) {
+		if (!quads.length) quads = [];
+		quads.$modelQuads = mq.quads; quads.$modelTextures = mq.textures;
+		return quads;
+	}
 	return (ok.ok || ok2.ok) && quads.length ? quads : null;
 };
+
+function modelQuads(sm) {
+	var m = sm && sm.model;
+	if (!m || !Array.isArray(m.elements) || !m.elements.length) return null;
+	var texOf = function (ref) {
+		var v = ref;
+		for (var i = 0; i < 8 && typeof v === 'string' && v[0] === '#'; i++) v = m.textures && m.textures[v.slice(1)];
+		return typeof v === 'string' && v[0] !== '#' ? v : null;
+	};
+	var rotPt = function (p, r) {
+		if (!r || !r.angle || !r.origin) return p;
+		var a = r.angle * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), o = r.origin;
+		var x = p[0] - o[0], y = p[1] - o[1], z = p[2] - o[2];
+		if (r.axis === 'x') return [x + o[0], y * c - z * s + o[1], y * s + z * c + o[2]];
+		if (r.axis === 'y') return [x * c + z * s + o[0], y + o[1], -x * s + z * c + o[2]];
+		return [x * c - y * s + o[0], x * s + y * c + o[1], z + o[2]];
+	};
+	var turn = sm.rotation || null;
+	var turnPt = function (p) {
+		var q = p.slice();
+		for (var i = 0; turn && i < ((((turn.x | 0) / 90) % 4) + 4) % 4; i++) q = [q[0], 16 - q[2], q[1]];
+		for (var j = 0; turn && j < ((((turn.y | 0) / 90) % 4) + 4) % 4; j++) q = [16 - q[2], q[1], q[0]];
+		return q;
+	};
+	var out = [];
+	m.elements.forEach(function (e) {
+		if (!e || !e.from || !e.to) return;
+		var x1 = Math.min(e.from[0], e.to[0]), y1 = Math.min(e.from[1], e.to[1]), z1 = Math.min(e.from[2], e.to[2]);
+		var x2 = Math.max(e.from[0], e.to[0]), y2 = Math.max(e.from[1], e.to[1]), z2 = Math.max(e.from[2], e.to[2]);
+		var C = {
+			north: [[[x2, y2, z1], [x2, y1, z1], [x1, y1, z1], [x1, y2, z1]], [16 - x2, 16 - y2, 16 - x1, 16 - y1]],
+			south: [[[x1, y2, z2], [x1, y1, z2], [x2, y1, z2], [x2, y2, z2]], [x1, 16 - y2, x2, 16 - y1]],
+			west: [[[x1, y2, z1], [x1, y1, z1], [x1, y1, z2], [x1, y2, z2]], [z1, 16 - y2, z2, 16 - y1]],
+			east: [[[x2, y2, z2], [x2, y1, z2], [x2, y1, z1], [x2, y2, z1]], [16 - z2, 16 - y2, 16 - z1, 16 - y1]],
+			up: [[[x1, y2, z1], [x1, y2, z2], [x2, y2, z2], [x2, y2, z1]], [x1, z1, x2, z2]],
+			down: [[[x1, y1, z2], [x1, y1, z1], [x2, y1, z1], [x2, y1, z2]], [x1, 16 - z2, x2, 16 - z1]],
+		};
+		Object.keys(e.faces || {}).forEach(function (k) {
+			var fc = e.faces[k], c = C[k];
+			if (!fc || !c) return;
+			var t = texOf(fc.texture);
+			if (!t) return;
+			var uv = Array.isArray(fc.uv) && fc.uv.length === 4 ? fc.uv : c[1];
+			var uvs = [[uv[0], uv[1]], [uv[0], uv[3]], [uv[2], uv[3]], [uv[2], uv[1]]];
+			for (var r = 0; r < ((((fc.rotation | 0) / 90) % 4) + 4) % 4; r++) uvs = uvs.slice(1).concat(uvs.slice(0, 1));
+			var pts = c[0].map(function (p) { return turnPt(rotPt(p, e.rotation)); });
+			var nm = function (v) { return Math.round(v * 1000) / 1000; };
+			var ax = pts[1][0] - pts[0][0], ay = pts[1][1] - pts[0][1], az = pts[1][2] - pts[0][2], bx = pts[2][0] - pts[0][0], by = pts[2][1] - pts[0][1], bz = pts[2][2] - pts[0][2];
+			var n = [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx], an = n.map(Math.abs);
+			var f = an[1] >= an[0] && an[1] >= an[2] ? (n[1] >= 0 ? 1 : 0) : an[2] >= an[0] ? (n[2] >= 0 ? 3 : 2) : (n[0] >= 0 ? 5 : 4);
+			out.push({ t: t, f: f, p: pts.map(function (p, i) { return [nm(p[0]), nm(p[1]), nm(p[2]), nm(uvs[i][0]), nm(uvs[i][1])]; }) });
+		});
+	});
+	return out.length ? { quads: out, textures: sm.textures || [] } : null;
+}
 JVM.addTileRenderer = function (vm, cls, r) {
 	if (!cls || !r) return;
 	var m = vm.mcReg || (vm.mcReg = {}), D = m.draw || (m.draw = { handlers: {}, tesr: [] });
@@ -18186,7 +22202,56 @@ function installStation(vm) {
 			return o;
 		},
 	} });
-	def(ST + 'item/tool/ToolLevel', { staticMethods: { 'getNumeric(I)Lnet/modificationstation/stationapi/api/item/tool/ToolLevel;': function (vm, n, a) { var o = vm.newObject(vm.loadClass(ST + 'item/tool/ToolLevel')); o.$level = a[0]; return o; } } });
+	var TL = ST + 'item/tool/ToolLevel';
+	var numeric = function (vm, n) { var s = st(vm), c = s.toolLevels || (s.toolLevels = {}); if (!c[n]) { var o = vm.newObject(vm.loadClass('mcre/NumericToolLevel')); o.$level = n; c[n] = o; } return c[n]; };
+	var graph = function (vm) { var s = st(vm); return s.toolGraph || (s.toolGraph = { nodes: [], up: new Map(), down: new Map() }); };
+	var levelOf = function (vm, l, depth) {
+		if (!l || depth > 16) return 0;
+		if (l.$level !== undefined) return l.$level | 0;
+		var below = graph(vm).down.get(l) || [], best = -1;
+		below.forEach(function (b) { best = Math.max(best, levelOf(vm, b, depth + 1)); });
+		return best + 1;
+	};
+	def(TL, { access: I, statics: { GRAPH: null }, clinit: function (vm, c) { c.statics.GRAPH = vm.newObject(vm.loadClass('mcre/ToolLevelGraph')); },
+		staticMethods: { 'getNumeric(I)Lnet/modificationstation/stationapi/api/item/tool/ToolLevel;': function (vm, n, a) { return numeric(vm, a[0] | 0); } } });
+	def('mcre/NumericToolLevel', { interfaces: [TL], methods: {} });
+	def(ST + 'item/tool/TagToolLevel', { interfaces: [TL], fields: { tag: 'L' + ST + 'tag/TagKey;' }, methods: {
+		'<init>(Lnet/modificationstation/stationapi/api/tag/TagKey;)V': function (vm, self, a) { self[':tag'] = a[0]; },
+		'getTag()Lnet/modificationstation/stationapi/api/tag/TagKey;': function (vm, self) { return self[':tag'] || null; },
+	} });
+	var gset = function (vm, m, k) { var l = m.get(k); if (!l) { l = []; m.set(k, l); } return l; };
+	var jset = function (vm, arr) { var o = vm.newObject(vm.loadClass('java/util/LinkedHashSet')); vm.callVirtual(o, '<init>', '()V', []); arr.forEach(function (x) { vm.callVirtual(o, 'add', '(Ljava/lang/Object;)Z', [x]); }); return o; };
+	def('mcre/ToolLevelGraph', { methods: {
+		'putEdge(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) {
+			var g = graph(vm), up = gset(vm, g.up, a[0]);
+			[a[0], a[1]].forEach(function (n) { if (g.nodes.indexOf(n) < 0) g.nodes.push(n); });
+			if (up.indexOf(a[1]) >= 0) return 0;
+			up.push(a[1]); gset(vm, g.down, a[1]).push(a[0]);
+			return 1;
+		},
+		'removeEdge(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) {
+			var g = graph(vm), up = g.up.get(a[0]) || [], i = up.indexOf(a[1]);
+			if (i < 0) return 0;
+			up.splice(i, 1);
+			var dn = g.down.get(a[1]) || [], j = dn.indexOf(a[0]);
+			if (j >= 0) dn.splice(j, 1);
+			return 1;
+		},
+		'addNode(Ljava/lang/Object;)Z': function (vm, self, a) { var g = graph(vm); if (g.nodes.indexOf(a[0]) >= 0) return 0; g.nodes.push(a[0]); return 1; },
+		'nodes()Ljava/util/Set;': function (vm) { return jset(vm, graph(vm).nodes); },
+		'successors(Ljava/lang/Object;)Ljava/util/Set;': function (vm, self, a) { return jset(vm, graph(vm).up.get(a[0]) || []); },
+		'predecessors(Ljava/lang/Object;)Ljava/util/Set;': function (vm, self, a) { return jset(vm, graph(vm).down.get(a[0]) || []); },
+		'hasEdgeConnecting(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) { return (graph(vm).up.get(a[0]) || []).indexOf(a[1]) >= 0 ? 1 : 0; },
+	} });
+	var TM = vm.natives[SRC + 'EnumToolMaterial'];
+	if (TM) TM.methods = Object.assign({}, TM.methods, {
+		'getToolLevel()Lnet/modificationstation/stationapi/api/item/tool/ToolLevel;': function (vm, self) { return self.$toolLevel || numeric(vm, self.$m ? self.$m[0] | 0 : 0); },
+		'toolLevel(Lnet/modificationstation/stationapi/api/item/tool/ToolLevel;)Lnet/minecraft/src/EnumToolMaterial;': function (vm, self, a) {
+			self.$toolLevel = a[0];
+			if (a[0] && self.$m) { self.$m = self.$m.slice(); self.$m[0] = levelOf(vm, a[0], 0); }
+			return self;
+		},
+	});
 	var SPRITE = ST + 'client/texture/atlas/Atlas$Sprite';
 	def(SPRITE, { fields: { index: 'I', id: LID } });
 	var sprite = function (vm, id) {
@@ -18302,6 +22367,12 @@ function installStation(vm) {
 		'register(Lnet/modificationstation/stationapi/api/client/color/item/ItemColorProvider;[Lnet/minecraft/src/Block;)V': tintTo('$stItemTint'),
 	} });
 	def(ST + 'item/ItemConvertible', { access: I });
+	var IBs = vm.natives[SRC + 'ItemBlock'];
+	if (IBs && !(IBs.statics && 'BLOCK_ITEMS' in IBs.statics)) {
+		IBs.statics = Object.assign({}, IBs.statics || {}, { BLOCK_ITEMS: null });
+		var ibInit = IBs.clinit;
+		IBs.clinit = function (vm, c) { if (ibInit) ibInit(vm, c); c.statics.BLOCK_ITEMS = JVM.newMap(vm); };
+	}
 	[B, It].forEach(function (spec) { spec.interfaces = (spec.interfaces || []).concat([ST + 'item/ItemConvertible']); });
 	vm.defineNative(SRC + 'ChunkPosition', { fields: { x: 'I', y: 'I', z: 'I' }, methods: {
 		'<init>(III)V': function (vm, self, a) { self[':x'] = a[0]; self[':y'] = a[1]; self[':z'] = a[2]; },
@@ -18323,12 +22394,35 @@ function installStation(vm) {
 	var Wn = vm.natives[SRC + 'World'];
 	if (Wn) Wn.methods = Object.assign({}, Wn.methods, { 'getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;': function (vm) { return wcm(vm); } });
 	vm.defineNative(SRC + 'ColorizerGrass', { staticMethods: { 'getGrassColor(DD)I': function () { return 0x91bd59; } } });
+	var BCI = 'net/modificationstation/stationapi/impl/worldgen/BiomeColorInterpolator', BCOL = { GRASS_INTERPOLATOR: 0x91bd59, FOLIAGE_INTERPOLATOR: 0x77ab2f, WATER_INTERPOLATOR: 0x3f76e4 };
+	vm.defineNative(BCI, { methods: { 'getColor(Lnet/minecraft/src/WorldChunkManager;DD)I': function (vm, self) { return self.$col | 0; } } });
+	vm.defineNative('net/modificationstation/stationapi/impl/worldgen/BiomeColorsImpl', { statics: { GRASS_INTERPOLATOR: null, FOLIAGE_INTERPOLATOR: null, WATER_INTERPOLATOR: null }, clinit: function (vm, c) {
+		Object.keys(BCOL).forEach(function (k) { var o = vm.newObject(vm.loadClass(BCI)); o.$col = BCOL[k]; c.statics[k] = o; });
+	} });
 	vm.defineNative(SRC + 'ColorizerFoliage', { staticMethods: {
 		'getFoliageColor(DD)I': function () { return 0x77ab2f; }, 'getFoliageColorBirch()I': function () { return 0x80a755; },
 		'getFoliageColorPine()I': function () { return 0x619961; }, 'func_31073_c()I': function () { return 0x48b518; },
 	} });
 	ev('client/event/color/block/BlockColorsRegisterEvent', null, { fields: { blockColors: 'L' + BC + 'BlockColors;' } });
 	ev('client/event/color/item/ItemColorsRegisterEvent', null, { fields: { itemColors: 'L' + IC + 'ItemColors;', blockColors: 'L' + BC + 'BlockColors;' } });
+	ev('client/event/gui/screen/container/TooltipRenderEvent', null, { fields: { itemStack: 'Lnet/minecraft/src/ItemStack;', mouseX: 'I', mouseY: 'I' } });
+	var PM = ST + 'client/model/';
+	def(PM + 'item/ItemModelPredicateProvider', { access: I, abstractMethods: { 'call(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/EntityLiving;I)F': true } });
+	def(PM + 'block/BlockModelPredicateProvider', { access: I, abstractMethods: { 'call(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)F': true } });
+	var predPut = function (vm, self, a) { if (a[0] && a[1] && a[2]) (a[0].$stPreds || (a[0].$stPreds = Object.create(null)))[a[1].$s] = a[2]; };
+	[['Item', 'Lnet/minecraft/src/Item;', 'item/ItemModelPredicateProvider'], ['Block', 'Lnet/minecraft/src/Block;', 'block/BlockModelPredicateProvider']].forEach(function (k) {
+		var R = ST + 'client/registry/' + k[0] + 'ModelPredicateProviderRegistry', m = {};
+		m['register(' + k[1] + 'Lnet/modificationstation/stationapi/api/util/Identifier;L' + PM + k[2] + ';)V'] = predPut;
+		def(R, { interfaces: [ST + 'registry/Registry'], statics: { INSTANCE: null }, clinit: function (vm, c) { c.statics.INSTANCE = vm.newObject(c); }, methods: m });
+		ev('client/event/render/model/' + k[0] + 'ModelPredicateProviderRegistryEvent', null, { fields: { registry: 'L' + ST + 'registry/Registry;' }, methods: {
+			'register(ILnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) {
+				var c = vm.loadClass(SRC + k[0]); vm.initClass(c);
+				var l = c.statics[k[0] === 'Item' ? 'itemsList' : 'blocksList'], o = l && l.a ? l.a[a[0]] : null;
+				predPut(vm, self, [o, a[1], a[2]]);
+				return a[2];
+			},
+		} });
+	});
 	vm.defineNative(SRC + 'ModelBed', { statics: { bedDirection: null, field_22280_a: null, field_22279_b: null }, clinit: function (vm, c) {
 		var ia2 = function (rows) { return JVM.javaArray(vm, '[I', rows.map(function (r) { return JVM.javaArray(vm, 'I', r); })); };
 		c.statics.field_22280_a = ia2([[0, 1], [-1, 0], [0, -1], [1, 0]]);
@@ -18895,6 +22989,7 @@ function applyAccessorMixins(vm, modId, fj, files) {
 var CI = MX + 'injection/callback/CallbackInfo', CIR = MX + 'injection/callback/CallbackInfoReturnable';
 var OPERATION = 'com/llamalad7/mixinextras/injector/wrapoperation/Operation';
 function ensureCallbackInfo(vm) {
+	ensureArgs(vm);
 	if (vm.natives[CI]) return;
 	vm.defineNative(CI, { methods: {
 		'<init>(Ljava/lang/String;Z)V': function (vm, self, a) { self.$id = a[0]; self.$cancellable = !!a[1]; },
@@ -19070,10 +23165,10 @@ function applyInjectMixins(vm, modId, fj, files) {
 	if (JVM.hookMixinsApplied) JVM.hookMixinsApplied(vm, modId);
 	return applied;
 }
-var CALL_KINDS = /^(Redirect|WrapOperation|ModifyExpressionValue|ModifyArg|WrapWithCondition)$/;
+var CALL_KINDS = /^(Redirect|WrapOperation|ModifyExpressionValue|ModifyArg|ModifyArgs|WrapWithCondition)$/;
 function applyInjector(vm, x, tcls, refs, miss, modId) {
 	var kind = x.kind, m = x.m, vals = x.a.values;
-	if (/^(Overwrite|ModifyConstant|ModifyArgs|ModifyReceiver)$/.test(kind)) { miss('kind:' + kind + ' ' + m.name); return false; }
+	if (/^(Overwrite|ModifyReceiver)$/.test(kind)) { miss('kind:' + kind + ' ' + m.name); return false; }
 	var at = vals.at, atv = at && (at.items ? at.items[0] : at);
 	var where = atv && atv.ann && atv.ann.values.value ? String(atv.ann.values.value.v) : kind === 'Inject' ? 'HEAD' : '';
 	var shift = atv && atv.ann && atv.ann.values.shift ? String(atv.ann.values.shift.name) : '';
@@ -19104,6 +23199,12 @@ function applyInjector(vm, x, tcls, refs, miss, modId) {
 					}
 					slot = 'tail';
 				} else { bad = 'at:' + where + ' ' + m.name; return; }
+			} else if (kind === 'ModifyConstant') {
+				var want = constantOf(vals.constant, m.sig.ret);
+				if (!want) { bad = 'const:' + m.name; return; }
+				var cs = fn.$consts || [];
+				if (!cs.some(function (c) { return c.t === want.t && (want.v === undefined || c.v === want.v); })) { nosite = 'noconst:' + (want.v === undefined ? want.t : want.v) + ' in ' + f.key; return; }
+				slot = 'consts'; e.konst = want;
 			} else if (kind === 'ModifyReturnValue') slot = 'tail';
 			else if (kind === 'WrapMethod') slot = 'wrap';
 			else if (kind === 'ModifyVariable') {
@@ -19121,6 +23222,7 @@ function applyInjector(vm, x, tcls, refs, miss, modId) {
 				slot = 'vars'; e.param = f.idx ? f.idx[p] : p;
 			} else if (CALL_KINDS.test(kind)) {
 				if (!(mem && fn.$sites && fn.$sites.indexOf(mem.name) >= 0)) { nosite = 'nosite:' + kind + ' ' + (mem ? mem.name : where) + ' in ' + f.key; return; }
+				if (kind === 'ModifyArgs') e.types = JVM.parseMethodDesc(mem.desc || '()V').args;
 				if (kind === 'ModifyArg') {
 					var it = JVM.parseMethodDesc(mem.desc || '()V').args;
 					if (vals.index && vals.index.v >= 0) e.index = vals.index.v;
@@ -19166,7 +23268,7 @@ function hookNative(vm, sp, key, slot, e) {
 	var fn = sp.methods[key];
 	if (!fn.$hooks) {
 		var orig = fn, p = key.indexOf('(');
-		var hooks = { head: [], tail: [], wrap: [], vars: [], sites: Object.create(null), key: key,
+		var hooks = { head: [], tail: [], wrap: [], vars: [], consts: [], sites: Object.create(null), key: key,
 			ret: key.slice(key.indexOf(')') + 1), types: JVM.parseMethodDesc(key.slice(p)).args };
 		fn = function (vm, self, args) { return runHooked(vm, hooks, self, args, function (a) { return orig(vm, self, a); }); };
 		fn.$hooks = hooks;
@@ -19191,10 +23293,20 @@ function isTarget(vm, self, target, e) {
 }
 function handlerArgs(e, a) { return e.adapt ? e.adapt(a) : a; }
 function callHandler(vm, e, self, a) {
+	mixinFieldInit(vm, e.m, self);
 	var busy = e.busy || (e.busy = []);
 	busy.push(self);
 	try { return vm.invoke(e.m, (e.m.access & JVM.ACC_STATIC) ? null : self, a); }
 	finally { busy.pop(); }
+}
+function mixinFieldInit(vm, m, self) {
+	var c = m && m.cls;
+	if (!self || typeof self !== 'object' || (m.access & JVM.ACC_STATIC) || !c || c.native || (c.superClass && c.superClass.name !== 'java/lang/Object')) return;
+	var done = self.$mxInit || (self.$mxInit = Object.create(null));
+	if (done[c.name]) return;
+	done[c.name] = true;
+	var init = c.methods['<init>()V'];
+	if (init && init.code && init.code.bytes && init.code.bytes.length > 5) vm.invoke(init, self, []);
 }
 function idle(e, self) { return !(e.busy && e.busy.length && e.busy.indexOf(self) >= 0); }
 function retValue(v, t) { return v && typeof v === 'object' && v.$box !== undefined && t.length === 1 ? JVM.unbox(v) : v; }
@@ -19269,6 +23381,12 @@ JVM.mixinSite = function (vm, self, name, recv, args, call) {
 	var a = args.slice();
 	hs.forEach(function (e) {
 		if (e.kind === 'ModifyArg') a[e.index] = callHandler(vm, e, self, e.m.sig.args.length === a.length ? a.slice() : [a[e.index]]);
+		else if (e.kind === 'ModifyArgs') {
+			var ao = vm.newObject(vm.loadClass(ARGS)), ty = e.types || [];
+			ao.$vals = a.map(function (v, i) { return ty[i] && ty[i].length === 1 ? JVM.box(vm, v == null ? 0 : v, ty[i]) : v; });
+			callHandler(vm, e, self, [ao].concat(outer(e, e.m.sig.args.length - 1)));
+			a = ao.$vals.map(function (v, i) { return ty[i] && ty[i].length === 1 ? JVM.unbox(v) : v; });
+		}
 		else if (e.kind === 'Inject' && !e.after) { var ci = vm.newObject(vm.loadClass(CI)); callHandler(vm, e, self, e.m.sig.args.length <= 1 ? [ci] : handlerArgs(e, f.args).concat([ci])); }
 	});
 	ret = inner(a);
@@ -19277,6 +23395,36 @@ JVM.mixinSite = function (vm, self, name, recv, args, call) {
 		else if (e.kind === 'Inject' && e.after) { var ci = vm.newObject(vm.loadClass(CI)); callHandler(vm, e, self, e.m.sig.args.length <= 1 ? [ci] : handlerArgs(e, f.args).concat([ci])); }
 	});
 	return ret;
+};
+var ARGS = MX + 'injection/invoke/arg/Args';
+function ensureArgs(vm) {
+	if (vm.natives[ARGS]) return;
+	vm.defineNative(ARGS, { methods: {
+		'get(I)Ljava/lang/Object;': function (vm, self, a) { return self.$vals[a[0]]; },
+		'set(ILjava/lang/Object;)V': function (vm, self, a) { self.$vals[a[0]] = a[1]; },
+		'setAll([Ljava/lang/Object;)V': function (vm, self, a) { var arr = a[0] ? a[0].a : []; for (var i = 0; i < arr.length && i < self.$vals.length; i++) self.$vals[i] = arr[i]; },
+		'size()I': function (vm, self) { return self.$vals.length; },
+	} });
+}
+JVM.mixinArgsClass = ensureArgs;
+function constantOf(cv, ret) {
+	cv = cv && (cv.items ? cv.items[0] : cv);
+	var c = cv && cv.ann && cv.ann.values;
+	if (!c) return null;
+	var T = { intValue: 'I', floatValue: 'F', longValue: 'J', doubleValue: 'D', stringValue: 'Ljava/lang/String;' };
+	for (var k in T) if (c[k]) { var v = c[k].v; return { t: T[k], v: T[k] === 'J' ? Number(v) : T[k].length === 1 ? +v : String(v) }; }
+	if (c.nullValue && c.nullValue.v) return { t: ret, v: null };
+	return null;
+}
+JVM.mixinConst = function (vm, self, v, t) {
+	var st = vm.$mxFrames, f = st && st[st.length - 1];
+	if (!(f && f.self === self && f.hooks.consts.length)) return v;
+	f.hooks.consts.forEach(function (e) {
+		if (e.konst.t !== t || (e.konst.v !== undefined && e.konst.v !== v) || !idle(e, self) || !isTarget(vm, self, e.target, e)) return;
+		var r = callHandler(vm, e, self, [v].concat(handlerArgs(e, f.args).slice(0, e.m.sig.args.length - 1)));
+		v = t.length === 1 && r && typeof r === 'object' && r.$box !== undefined ? JVM.unbox(r) : r;
+	});
+	return v;
 };
 JVM.mixinRun = function (vm, self, key, args, orig) {
 	for (var k = self && self.cls; k; k = k.superClass) {
@@ -19292,7 +23440,7 @@ JVM.mixinWants = function (vm, self, key) {
 		if (!fn) continue;
 		var h = fn.$hooks;
 		if (!h) return false;
-		var all = h.head.concat(h.tail, h.wrap, h.vars);
+		var all = h.head.concat(h.tail, h.wrap, h.vars, h.consts || []);
 		Object.keys(h.sites).forEach(function (s) { all = all.concat(h.sites[s]); });
 		return all.some(function (e) { return isTarget(vm, self, e.target, e); });
 	}
@@ -19405,6 +23553,10 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 		var bcs = vm.newObject(vm.loadClass(ST + 'client/color/block/BlockColors')), ics = vm.newObject(vm.loadClass(ST + 'client/color/item/ItemColors'));
 		fire(vm, newEvent(vm, E('client/event/color/block/BlockColorsRegisterEvent'), { blockColors: bcs }), modId);
 		fire(vm, newEvent(vm, E('client/event/color/item/ItemColorsRegisterEvent'), { itemColors: ics, blockColors: bcs }), modId);
+		['Item', 'Block'].forEach(function (k) {
+			var rc = vm.loadClass(ST + 'client/registry/' + k + 'ModelPredicateProviderRegistry'); vm.initClass(rc);
+			fire(vm, newEvent(vm, E('client/event/render/model/' + k + 'ModelPredicateProviderRegistryEvent'), { registry: rc.statics.INSTANCE }), modId);
+		});
 	});
 	JVM.run(vm, function () {
 		var kl = JVM.newList(vm, []);
@@ -19414,7 +23566,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(DimensionRegistry|BiomeRegister|BiomeProviderRegister|StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|EntityRendererRegister|BlockEntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
+	var SENT = /(DimensionRegistry|BiomeRegister|BiomeProviderRegister|StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|ItemModelPredicateProviderRegistry|BlockModelPredicateProviderRegistry|EntityRendererRegister|BlockEntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();
@@ -19508,6 +23660,10 @@ function modelTextures(files, modelId, depth) {
 	var p = String(modelId).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
 	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json') || json(files, 'assets/' + ns + '/models/' + path + '.json');
 	if (!j) return { $parent: path };
+	if (Array.isArray(j.overrides) && j.overrides.length && LASTVM && LASTVM.$modelObj) {
+		var ov = JVM.stationOverride(LASTVM, LASTVM.$modelObj, j.overrides);
+		if (ov && ov !== modelId) return modelTextures(files, ov, depth + 1);
+	}
 	var base = j.parent ? modelTextures(files, j.parent, depth + 1) : {};
 	var out = Object.assign({}, base, j.textures || {});
 	out.$parent = base.$parent || (j.parent ? String(j.parent).replace(/^minecraft:/, '') : '');
@@ -19547,9 +23703,36 @@ function modelFaces(files, t) {
 	FACE.forEach(function (k) { if (!f[k] && any) f[k] = any; });
 	return Object.keys(f).length ? f : null;
 }
+JVM.stationOverride = function (vm, o, overrides) {
+	if (!o || !o.$stPreds) return null;
+	var vals = Object.create(null), isItem = o[':itemID'] !== undefined && o[':blockID'] === undefined;
+	var val = function (k) {
+		if (k in vals) return vals[k];
+		var pr = o.$stPreds[k], v = 0;
+		if (pr) {
+			var r = JVM.run(vm, function () {
+				return isItem ? vm.callVirtual(pr, 'call', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/EntityLiving;I)F', [JVM.mc152.newStack(vm, o[':itemID'], 1, 0), null, null, 0])
+					: vm.callVirtual(pr, 'call', '(Lnet/modificationstation/stationapi/api/block/BlockState;Lnet/minecraft/src/IBlockAccess;Lnet/minecraft/src/ChunkPosition;I)F', [JVM.stationState.defaultOf(vm, o), JVM.mc152.worldObj(vm), posAt(vm), 0]);
+			});
+			v = r.ok ? +r.value || 0 : 0;
+		}
+		return (vals[k] = v);
+	};
+	var pick = null;
+	overrides.forEach(function (ov) {
+		if (!ov || !ov.model || !ov.predicate) return;
+		if (Object.keys(ov.predicate).every(function (k) { return val(k) >= +ov.predicate[k]; })) pick = String(ov.model);
+	});
+	return pick;
+};
 JVM.stationTexture = function (vm, o, side, files, meta) {
 	if (!files) return null;
 	LASTVM = vm;
+	var prevObj = vm.$modelObj;
+	vm.$modelObj = o;
+	try { return stationTexture1(vm, o, side, files, meta); } finally { vm.$modelObj = prevObj; }
+};
+function stationTexture1(vm, o, side, files, meta) {
 	var t = stationTex0(vm, o, side, files, meta | 0);
 	var prov = side >= 0 ? o.$stTint : o.$stItemTint;
 	if (t && t.file && prov) {
@@ -19564,7 +23747,7 @@ JVM.stationTexture = function (vm, o, side, files, meta) {
 		}
 	}
 	return t;
-};
+}
 function posAt(vm) { var p = vm.newObject(vm.loadClass(SRC + 'ChunkPosition')); p[':x'] = 0; p[':y'] = 64; p[':z'] = 0; return p; }
 function stationTex0(vm, o, side, files, meta) {
 	var s = st(vm), isBlock = side >= 0;
@@ -19600,6 +23783,11 @@ function stationTex0(vm, o, side, files, meta) {
 var SHAPED_PARENTS = /^(minecraft:)?block[/](slab|slab_top|cross|carpet)$/;
 JVM.stationModel = function (vm, o, files, stateIdx) {
 	LASTVM = vm;
+	var prevObj = vm.$modelObj;
+	vm.$modelObj = o;
+	try { return stationModel1(vm, o, files, stateIdx); } finally { vm.$modelObj = prevObj; }
+};
+function stationModel1(vm, o, files, stateIdx) {
 	var id = o && o.$stId;
 	if (!id || !files) return null;
 	var p = String(id).split(':');
@@ -19637,7 +23825,7 @@ JVM.stationModel = function (vm, o, files, stateIdx) {
 	if (t.$elements) model.elements = t.$elements;
 	else model.parent = 'minecraft:' + parent.replace(/^minecraft:/, '');
 	return { model: model, rotate: facing, textures: entries };
-};
+}
 function inlineTextures(files, t, entries, prefix) {
 	var textures = {};
 	Object.keys(t).forEach(function (k) {
@@ -20126,6 +24314,8 @@ function install(vm) {
 		'addChatMessage(Ljava/lang/String;)V': function (vm, self, a) { if (JVM.chat) JVM.chat(vm, String(a[0])); },
 	} });
 	if (!vm.natives[SRC + 'SlotCrafting'] && vm.natives[SRC + 'Slot']) vm.defineNative(SRC + 'SlotCrafting', { super: SRC + 'Slot', methods: {} });
+	vm.addNativeMethod(SRC + 'EntityRenderer', FRAME, function (vm, self) { JVM.hudFrameNative(vm, self); });
+	creatureNatives(vm);
 	HOOKS.forEach(function (h) { vm.addNativeMethod(h[0], h[1], function () {}); });
 	dropNatives(vm);
 	var SL = vm.natives[SRC + 'StatList'];
@@ -20386,6 +24576,108 @@ JVM.hookDrops = function (vm, e) {
 	return 1;
 };
 
+var ENT_HURT = 'attackEntityFrom(Lnet/minecraft/src/Entity;I)Z', ENT_DEATH = 'onDeath(Lnet/minecraft/src/Entity;)V';
+var ENT_DROPS = 'dropFewItems()V', PL_ATTACK = 'attackTargetEntityWithCurrentItem(Lnet/minecraft/src/Entity;)V';
+var PL_USE = 'useCurrentItemOnEntity(Lnet/minecraft/src/Entity;)V';
+function creatureClasses(vm) {
+	var out = [SRC + 'EntityPlayerMP', SRC + 'EntityLiving'], V = JVM.VANILLA_ENTITY_CLS || {};
+	Object.keys(V).forEach(function (k) { if (!vm || vm.natives[SRC + V[k]]) out.push(SRC + V[k]); });
+	return out;
+}
+function playerClasses() { return [SRC + 'EntityPlayerMP']; }
+HOOKS.push([SRC + 'Entity', ENT_HURT, creatureClasses], [SRC + 'EntityLiving', ENT_DEATH, creatureClasses], [SRC + 'EntityLiving', ENT_DROPS, creatureClasses],
+	[SRC + 'EntityPlayer', PL_ATTACK, playerClasses], [SRC + 'EntityPlayer', PL_USE, playerClasses]);
+function unpluggedNative(cls, key) {
+	var p = key.indexOf('('), ret = key.slice(key.indexOf(')') + 1);
+	return function (vm, self) {
+		vm.warnOnce('m:' + cls + '.' + key, 'not available here: ' + cls.replace(/[/]/g, '.') + '.' + key + ' (left unplugged)');
+		return ret === 'V' ? undefined : vm.unpluggedValue(ret, self);
+	};
+}
+var DROP_ID = 'getDropItemId()I', OWN_DROPS = { EntitySheep: 1, EntitySkeleton: 1, EntitySquid: 1, EntityGhast: 1 };
+var dropIdHooked = false;
+function dropIdHooks(vm) {
+	if (dropIdHooked) return;
+	dropIdHooked = true;
+	var V = JVM.VANILLA_ENTITY_CLS || {};
+	Object.keys(V).forEach(function (k) {
+		var cn = V[k];
+		if (OWN_DROPS[cn]) return;
+		HOOKS.push([SRC + cn, DROP_ID, function (vm) { return vm.natives[SRC + cn] ? [SRC + cn] : []; }]);
+	});
+}
+function creatureNatives(vm) {
+	dropIdHooks(vm);
+	[[SRC + 'Entity', ENT_HURT], [SRC + 'EntityLiving', ENT_DEATH], [SRC + 'EntityLiving', ENT_DROPS], [SRC + 'EntityPlayer', PL_ATTACK], [SRC + 'EntityPlayer', PL_USE]].forEach(function (h) {
+		var sp = vm.natives[h[0]];
+		if (sp && !(sp.methods && sp.methods[h[1]])) vm.addNativeMethod(h[0], h[1], unpluggedNative(h[0], h[1]));
+	});
+	var D = vm.natives[SRC + 'EntityLiving'];
+	if (D && D.methods[ENT_DEATH]) D.methods[ENT_DEATH].$sites = ['dropFewItems'];
+	if (D && D.methods[ENT_DROPS]) D.methods[ENT_DROPS].$sites = ['getDropItemId'];
+	var P = vm.natives[SRC + 'EntityPlayer'];
+	if (P && P.methods[PL_USE]) P.methods[PL_USE].$sites = ['interact'];
+}
+var ASK_KEYS = { hurt: [SRC + 'Entity', ENT_HURT], death: [SRC + 'EntityLiving', ENT_DEATH, ENT_DROPS], attack: [SRC + 'EntityPlayer', PL_ATTACK], interact: [SRC + 'EntityPlayer', PL_USE] };
+JVM.hookAskWanted = function (vm, kind) {
+	var k = ASK_KEYS[kind];
+	if (!k) return false;
+	for (var i = 1; i < k.length; i++) if (hooked(vm, k[0], k[i])) return true;
+	if (kind === 'death') { var V = JVM.VANILLA_ENTITY_CLS || {}; for (var c in V) if (!OWN_DROPS[V[c]] && hooked(vm, SRC + V[c], DROP_ID)) return true; }
+	return false;
+};
+JVM.hookAsk = function (vm, kind, e) {
+	var dflt = kind === 'hurt' ? e.damage | 0 : 0;
+	if (!JVM.hookAskWanted(vm, kind) || !JVM.entityFor) return dflt;
+	if (JVM.liveMob && e.entity && JVM.liveMob(vm, e.entity) && kind !== 'attack' && kind !== 'interact') return dflt;
+	var self = JVM.entityFor(vm, e.entity), other = e.other ? JVM.entityFor(vm, e.other) : null;
+	if (!self) return dflt;
+	var w = JVM.mc152.worldObj(vm);
+	self[':worldObj'] = w;
+	if (e.entity && e.entity.health != null) self[':health'] = +e.entity.health;
+	var st = { reached: false, dmg: dflt, done: false };
+	var prevCancel = vm.$mxCancelled;
+	vm.$mxCancelled = false;
+	try {
+		JVM.run(vm, function () {
+			if (kind === 'hurt') JVM.mixinRun(vm, self, ENT_HURT, [other, dflt], function (a) { st.reached = true; st.dmg = a[1] | 0; return 1; });
+			else if (kind === 'death') {
+				JVM.mixinRun(vm, self, ENT_DEATH, [other], function () {
+					JVM.mixinSite(vm, self, 'dropFewItems', self, [], function () {
+						JVM.mixinRun(vm, self, ENT_DROPS, [], function () {
+							var cn = self.cls && self.cls.name.split('/').pop();
+							var siteH = (function () { var f = vm.$mxFrames, t = f && f[f.length - 1]; return !!(t && t.self === self && t.hooks.sites.getDropItemId); })();
+							if (!OWN_DROPS[cn] && (JVM.mixinWants(vm, self, DROP_ID) || siteH)) {
+								var id = JVM.mixinSite(vm, self, 'getDropItemId', self, [], function () { return vm.callVirtual(self, 'getDropItemId', '()I', []); }) | 0;
+								var game = e.damage | 0, gameJ = game > 0 && vm.game && vm.game.itemToJava ? vm.game.itemToJava(game) : game;
+								if (id !== (gameJ | 0)) {
+									st.own = true;
+									var rnd = self[':rand'] || (w && w[':rand']);
+									var n = rnd ? vm.callVirtual(rnd, 'nextInt', '(I)I', [3]) : Math.floor(Math.random() * 3);
+									for (var i = 0; id > 0 && i < n; i++) vm.callVirtual(self, 'dropItem', '(II)Lnet/minecraft/src/EntityItem;', [id, 1]);
+									return;
+								}
+							}
+							st.reached = true;
+						});
+					});
+				});
+			} else if (kind === 'attack') {
+				JVM.mixinRun(vm, JVM.mc152.playerObj(vm, null), PL_ATTACK, [self], function () { st.reached = true; });
+			} else if (kind === 'interact') {
+				var p = JVM.mc152.playerObj(vm, null);
+				JVM.mixinRun(vm, p, PL_USE, [self], function () {
+					JVM.mixinSite(vm, p, 'interact', self, [p], function () { st.reached = true; return 0; });
+				});
+			}
+			st.done = true;
+		});
+	} finally { vm.$mxCancelled = prevCancel; }
+	if (!st.done) return dflt;
+	if (kind === 'hurt') return st.reached ? Math.max(0, st.dmg) : -1;
+	return st.reached && !st.own ? 0 : 1;
+};
+
 var CTORS = [[SRC + 'CraftingManager', '<init>()V', function (vm) { return vm.callStatic(SRC + 'CraftingManager', 'getInstance', '()Lnet/minecraft/src/CraftingManager;', []); }]];
 CTORS.forEach(function (c) { HOOKS.push([c[0], c[1]]); });
 JVM.hookMixinsApplied = function (vm, modId) {
@@ -20403,7 +24695,7 @@ JVM.hookPoint = function (vm, cls, key, tn) {
 	return HOOKS.some(function (h) {
 		if (h[0] !== cls || h[1] !== key) return false;
 		if (!tn) return true;
-		var passed = typeof h[2] === 'function' ? h[2]() : (h[2] || [h[0]]);
+		var passed = typeof h[2] === 'function' ? h[2](vm) : (h[2] || [h[0]]);
 		return passed.some(function (p) { return classIsA(vm, p, tn); });
 	});
 };
@@ -20428,9 +24720,12 @@ LOCALS[SRC + 'GuiIngame|renderGameOverlay(FZII)V'] = {
 };
 JVM.hookLocals = function (cls, key) { return LOCALS[cls + '|' + key] || null; };
 
+var FRAME = 'updateCameraAndRender(F)V';
+HOOKS.push([SRC + 'EntityRenderer', FRAME]);
+JVM.hudFrameNative = function (vm, self) { if (vm.$hudFrame) hudOverlay(vm, self && self[':mc'] || mc(vm)); };
 JVM.hudWanted = function (vm) {
 	var r = JVM.mc152.reg(vm), f = vm.mcReg && vm.mcReg.forge;
-	return !!(hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') || (r.tickMods && r.tickMods.length) || (JVM.forgeWantsTick && JVM.forgeWantsTick(vm)) ||
+	return !!(hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') || hooked(vm, SRC + 'EntityRenderer', FRAME) || (r.tickMods && r.tickMods.length) || (JVM.forgeWantsTick && JVM.forgeWantsTick(vm)) ||
 		(f && f.buses && f.buses.EVENT_BUS && f.buses.EVENT_BUS.$listeners.some(function (l) { return /RenderGameOverlayEvent/.test(l.type && l.type.name || ''); })));
 };
 JVM.hudBegin = function (vm, w, h, s) {
@@ -20439,15 +24734,23 @@ JVM.hudBegin = function (vm, w, h, s) {
 	if (m) { m[':displayWidth'] = w * s; m[':displayHeight'] = h * s; }
 	if (JVM.guiRecordStart) JVM.guiRecordStart(vm);
 };
+function hudOverlay(vm, m) {
+	if (!(hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') && m)) return;
+	var g = m[':ingameGUI'];
+	if (!g) { g = m[':ingameGUI'] = vm.newObject(vm.loadClass(SRC + 'GuiIngame')); vm.callVirtual(g, '<init>', '(Lnet/minecraft/client/Minecraft;)V', [m]); }
+	vm.callVirtual(g, 'renderGameOverlay', '(FZII)V', [0, 0, -1, -1]);
+}
 JVM.hudEnd = function (vm) {
 	var m = mc(vm), hud = vm.mcHud || { w: 427, h: 240, s: 2 };
-	if (hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') && m) {
+	if (m && hooked(vm, SRC + 'EntityRenderer', FRAME)) {
 		JVM.run(vm, function () {
-			var g = m[':ingameGUI'];
-			if (!g) { g = m[':ingameGUI'] = vm.newObject(vm.loadClass(SRC + 'GuiIngame')); vm.callVirtual(g, '<init>', '(Lnet/minecraft/client/Minecraft;)V', [m]); }
-			vm.callVirtual(g, 'renderGameOverlay', '(FZII)V', [0, 0, -1, -1]);
+			var er = m[':entityRenderer'];
+			if (!er) { er = m[':entityRenderer'] = vm.newObject(vm.loadClass(SRC + 'EntityRenderer')); vm.callVirtual(er, '<init>', '(Lnet/minecraft/client/Minecraft;)V', [m]); }
+			if (!er[':mc']) er[':mc'] = m;
+			vm.$hudFrame = true;
+			try { vm.callVirtual(er, 'updateCameraAndRender', '(F)V', [0]); } finally { vm.$hudFrame = false; }
 		});
-	}
+	} else JVM.run(vm, function () { hudOverlay(vm, m); });
 	var F = 'net/minecraftforge/client/event/RenderGameOverlayEvent';
 	if (JVM.forgePost && vm.natives[F]) {
 		var res = null;
@@ -22541,11 +26844,19 @@ function install(vm) {
 	def(SRC + 'IChunkProvider', { access: JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT, abstractMethods: {
 		'provideChunk(II)Lnet/minecraft/src/Chunk;': true, 'populate(Lnet/minecraft/src/IChunkProvider;II)V': true,
 	} });
-	def(SRC + 'MapGenBase', { methods: {
-		'<init>()V': function () {},
-		'generate(Lnet/minecraft/src/IChunkProvider;Lnet/minecraft/src/World;II[B)V': function () {},
-	} });
-	def(SRC + 'MapGenCaves', { super: SRC + 'MapGenBase' });
+	if (JVM.installStructures) JVM.installStructures(vm);
+	var WS = vm.natives[SRC + 'World'], GB = 'getBiomeGenForCoords(II)Lnet/minecraft/src/BiomeGenBase;';
+	if (WS && WS.methods && WS.methods[GB] && !WS.methods[GB].$dims) {
+		var gb0 = WS.methods[GB];
+		WS.methods[GB] = function (vm, self, a) {
+			var p = self[':provider'], w = p && p.$javaDim ? p[':worldChunkMgr'] : null;
+			if (w) { var b = vm.callVirtual(w, 'getBiomeGenAt', '(II)Lnet/minecraft/src/BiomeGenBase;', [a[0], a[1]]); if (b) return b; }
+			return gb0(vm, self, a);
+		};
+		WS.methods[GB].$dims = true;
+		var WC = vm.classes[SRC + 'World'];
+		if (WC && WC.methods[GB]) WC.methods[GB].fn = WS.methods[GB];
+	}
 
 	if (!vm.natives[SRC + 'Vec3D']) def(SRC + 'Vec3D', { fields: { xCoord: 'D', yCoord: 'D', zCoord: 'D' }, methods: {
 		'addVector(DDD)Lnet/minecraft/src/Vec3D;': function (vm, self, a) { return vec3d(vm, self[':xCoord'] + a[0], self[':yCoord'] + a[1], self[':zCoord'] + a[2]); },
@@ -22735,6 +27046,7 @@ function live(vm, contentKey) {
 function liveMake(vm, d, c, contentKey) {
 	var dim = makeDimension(vm, c);
 	if (!dim) return null;
+	dim.$javaDim = true;
 	var world = JVM.mc152.worldObj(vm), prov = null;
 	JVM.run(vm, function () {
 		vm.callVirtual(dim, 'registerWorld', '(Lnet/minecraft/src/World;)V', [world]);

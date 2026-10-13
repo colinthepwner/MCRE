@@ -1107,6 +1107,7 @@ F	net/minecraft/class_272	field_1118	field_1118	zPosition
 F	net/minecraft/class_272	field_1119	field_1119	rotation
 F	net/minecraft/class_272	field_1120	field_1120	pitch
 F	net/minecraft/class_272	field_1121	field_1121	currentItem
+F	net/minecraft/class_273	field_1122	field_1122	longValue
 F	net/minecraft/class_276	field_1123	field_1123	windowId
 F	net/minecraft/class_277	field_1126	field_1126	isSinglePlayer
 F	net/minecraft/class_277$1	field_1127	field_1127	armorType
@@ -1178,8 +1179,10 @@ F	net/minecraft/class_343	field_1304	field_1304	solaris
 F	net/minecraft/class_343	field_1305	field_1305	windows
 F	net/minecraft/class_343	field_1306	field_1306	macos
 F	net/minecraft/class_343	field_1307	field_1307	unknown
+F	net/minecraft/class_347	field_1312	field_1312	intValue
 F	net/minecraft/class_353	field_1318	field_1318	offsets
 F	net/minecraft/class_356	field_1326	field_1326	mc
+F	net/minecraft/class_358	field_1336	field_1336	floatValue
 F	net/minecraft/class_359	field_1350	field_1350	worldObj
 F	net/minecraft/class_363	field_1365	field_1365	action
 F	net/minecraft/class_363	field_1366	field_1366	itemStack
@@ -1351,6 +1354,7 @@ F	net/minecraft/class_414	field_1664	field_1664	xPosition
 F	net/minecraft/class_414	field_1665	field_1665	yPosition
 F	net/minecraft/class_414	field_1666	field_1666	zPosition
 F	net/minecraft/class_414	field_1670	field_1670	type
+F	net/minecraft/class_419	field_1680	field_1680	doubleValue
 F	net/minecraft/class_428	field_1688	field_1688	WOOD
 F	net/minecraft/class_428	field_1689	field_1689	STONE
 F	net/minecraft/class_428	field_1690	field_1690	IRON
@@ -1366,6 +1370,7 @@ F	net/minecraft/class_449	field_1710	field_1710	recordName
 F	net/minecraft/class_431	field_1712	field_1712	entityId
 F	net/minecraft/class_431	field_1713	field_1713	state
 F	net/minecraft/class_452	field_1715	field_1715	mc
+F	net/minecraft/class_454	field_1723	field_1723	sendQueue
 F	net/minecraft/class_436	field_1735	field_1735	xPosition
 F	net/minecraft/class_436	field_1736	field_1736	yPosition
 F	net/minecraft/class_436	field_1737	field_1737	zPosition
@@ -1581,6 +1586,7 @@ F	net/minecraft/class_50	field_2176	field_2176	isHellWorld
 F	net/minecraft/class_50	field_2177	field_2177	hasNoSky
 F	net/minecraft/class_50	field_2178	field_2178	lightBrightnessTable
 F	net/minecraft/class_50	field_2179	field_2179	worldType
+F	net/minecraft/class_522	field_2190	field_2190	stringValue
 F	net/minecraft/class_526	field_2206	field_2206	random
 F	net/minecraft/class_529	field_2209	field_2209	liquidBlockId
 F	net/minecraft/class_531	field_2210	field_2210	linux
@@ -1671,6 +1677,7 @@ F	net/minecraft/class_578	field_2497	field_2497	playerViewY
 F	net/minecraft/class_578	field_2498	field_2498	playerViewX
 F	net/minecraft/class_578	field_2499	field_2499	options
 F	net/minecraft/class_578	field_2504	field_2504	fontRenderer
+F	net/minecraft/class_580	field_2505	field_2505	sendQueue
 F	net/minecraft/class_552	field_2518	field_2518	vertexPositions
 F	net/minecraft/class_552	field_2519	field_2519	nVertices
 F	net/minecraft/class_552	field_2520	field_2520	invertNormal
@@ -1746,6 +1753,7 @@ F	net/minecraft/client/Minecraft	field_2809	field_2809	session
 F	net/minecraft/client/Minecraft	field_2814	field_2814	renderEngine
 F	net/minecraft/client/Minecraft	field_2815	field_2815	fontRenderer
 F	net/minecraft/client/Minecraft	field_2816	field_2816	currentScreen
+F	net/minecraft/client/Minecraft	field_2818	field_2818	entityRenderer
 F	net/minecraft/client/Minecraft	field_2820	field_2820	ingameGUI
 F	net/minecraft/client/Minecraft	field_2823	field_2823	objectMouseOver
 F	net/minecraft/client/Minecraft	field_2824	field_2824	gameSettings
@@ -1932,6 +1940,8 @@ M	net/minecraft/class_54	method_500	()V	method_500	swingItem
 M	net/minecraft/class_54	method_502	()Lnet/minecraft/class_31;	method_502	getCurrentEquippedItem
 M	net/minecraft/class_54	method_512	(Lnet/minecraft/class_139;)V	method_512	triggerAchievement
 M	net/minecraft/class_54	method_514	(Lnet/minecraft/class_17;)Z	method_514	canHarvestBlock
+M	net/minecraft/class_54	method_515	(Lnet/minecraft/class_57;)V	method_515	useCurrentItemOnEntity
+M	net/minecraft/class_54	method_516	(Lnet/minecraft/class_57;)V	method_516	attackTargetEntityWithCurrentItem
 M	net/minecraft/class_53	method_523	()V	method_523	saveAllData
 M	net/minecraft/class_53	method_526	(Ljava/lang/String;)I	method_526	getUniqueDataId
 M	net/minecraft/class_148	method_538	()Lnet/minecraft/class_148;	method_538	getInstance
@@ -2042,10 +2052,12 @@ M	net/minecraft/class_127	method_918	()V	method_918	playLivingSound
 M	net/minecraft/class_127	method_924	(Lnet/minecraft/class_57;FF)V	method_924	faceEntity
 M	net/minecraft/class_127	method_928	(Lnet/minecraft/class_57;)Z	method_928	canEntityBeSeen
 M	net/minecraft/class_127	method_932	()Z	method_932	isOnLadder
+M	net/minecraft/class_127	method_933	()V	method_933	dropFewItems
 M	net/minecraft/class_127	method_934	()Z	method_934	canBreatheUnderwater
 M	net/minecraft/class_127	method_935	()Z	method_935	getCanSpawnHere
 M	net/minecraft/class_127	method_936	()I	method_936	getTalkInterval
 M	net/minecraft/class_127	method_937	()V	method_937	onLivingUpdate
+M	net/minecraft/class_127	method_938	(Lnet/minecraft/class_57;)V	method_938	onDeath
 M	net/minecraft/class_127	method_939	(I)V	method_939	heal
 M	net/minecraft/class_127	method_940	()Z	method_940	canDespawn
 M	net/minecraft/class_127	method_942	()Z	method_942	isMovementBlocked
@@ -2119,6 +2131,7 @@ M	net/minecraft/class_76	method_1089	(Ljava/awt/image/BufferedImage;I)V	method_1
 M	net/minecraft/class_76	method_1093	(Ljava/lang/String;Ljava/lang/String;)I	method_1093	getTextureForDownloadableImage
 M	net/minecraft/class_76	method_1097	(I)V	method_1097	bindTexture
 M	net/minecraft/class_76	method_1100	(Ljava/lang/String;)I	method_1100	getTexture
+M	net/minecraft/class_117	method_1123	(Lnet/minecraft/class_169;)V	method_1123	addToSendQueue
 M	net/minecraft/class_239	method_1142	(Lnet/minecraft/class_18;Ljava/util/Random;III)Z	method_1142	generate
 M	net/minecraft/class_59	method_1150	(IIIIII)V	method_1150	markBlockRangeNeedsUpdate
 M	net/minecraft/class_59	method_1153	(Ljava/lang/String;DDDDDD)V	method_1153	spawnParticle
@@ -2168,6 +2181,7 @@ M	net/minecraft/class_26	method_1293	(DDD)Lnet/minecraft/class_26;	method_1293	c
 M	net/minecraft/class_26	method_1297	(DDD)Lnet/minecraft/class_26;	method_1297	createVector
 M	net/minecraft/class_26	method_1300	()D	method_1300	lengthVector
 M	net/minecraft/class_26	method_1301	(DDD)Lnet/minecraft/class_26;	method_1301	addVector
+M	net/minecraft/class_26	method_1303	(DDD)D	method_1303	squareDistanceTo
 M	net/minecraft/class_26	method_1306	(F)V	method_1306	rotateAroundX
 M	net/minecraft/class_26	method_1308	(F)V	method_1308	rotateAroundY
 M	net/minecraft/class_57	method_1310	()V	method_1310	entityInit
@@ -2176,6 +2190,7 @@ M	net/minecraft/class_57	method_1318	()Z	method_1318	isEntityAlive
 M	net/minecraft/class_57	method_1321	(FF)V	method_1321	setSize
 M	net/minecraft/class_57	method_1322	(DDD)V	method_1322	addVelocity
 M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
+M	net/minecraft/class_57	method_1324	(FFF)V	method_1324	moveFlying
 M	net/minecraft/class_57	method_1325	(IIF)Lnet/minecraft/class_142;	method_1325	dropItemWithOffset
 M	net/minecraft/class_57	method_1327	(Lnet/minecraft/class_31;F)Lnet/minecraft/class_142;	method_1327	entityDropItem
 M	net/minecraft/class_57	method_1328	(Lnet/minecraft/class_15;)Z	method_1328	isInsideOfMaterial
@@ -2193,6 +2208,7 @@ M	net/minecraft/class_57	method_1348	(Lnet/minecraft/class_8;)V	method_1348	read
 M	net/minecraft/class_57	method_1350	(DDD)D	method_1350	getDistance
 M	net/minecraft/class_57	method_1351	(Lnet/minecraft/class_57;)F	method_1351	getDistanceToEntity
 M	net/minecraft/class_57	method_1352	(Lnet/minecraft/class_57;)D	method_1352	getDistanceSqToEntity
+M	net/minecraft/class_57	method_1355	(Lnet/minecraft/class_57;I)Z	method_1355	attackEntityFrom
 M	net/minecraft/class_57	method_1356	()Z	method_1356	canBeCollidedWith
 M	net/minecraft/class_57	method_1358	()Z	method_1358	canTriggerWalking
 M	net/minecraft/class_57	method_1359	()Z	method_1359	isBurning
@@ -2228,6 +2244,7 @@ M	net/minecraft/class_209	method_1515	([DIIIIDDD)[D	method_1515	func_4109_a
 M	net/minecraft/class_471	method_1537	()V	method_1537	loadRenderers
 M	net/minecraft/class_471	method_1546	(Lnet/minecraft/class_18;)V	method_1546	changeWorld
 M	net/minecraft/class_17	method_1560	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1560	onEntityWalking
+M	net/minecraft/class_17	method_1561	(Lnet/minecraft/class_18;IIII)Z	method_1561	canPlaceBlockOnSide
 M	net/minecraft/class_17	method_1565	()I	method_1565	tickRate
 M	net/minecraft/class_17	method_1566	(Lnet/minecraft/class_18;III)Z	method_1566	canBlockStay
 M	net/minecraft/class_17	method_1567	(Lnet/minecraft/class_18;III)Z	method_1567	canPlaceBlockAt
@@ -2281,6 +2298,8 @@ M	net/minecraft/class_17	method_1630	(Lnet/minecraft/class_18;III)V	method_1630	
 M	net/minecraft/class_451	method_1631	(I)V	method_1631	setSlimeSize
 M	net/minecraft/class_451	method_1632	()I	method_1632	getSlimeSize
 M	net/minecraft/class_477	method_1633	()Ljava/io/File;	method_1633	getMinecraftDir
+M	net/minecraft/class_219	method_1645	(I)Lnet/minecraft/class_57;	method_1645	getEntityByID
+M	net/minecraft/class_219	method_1648	(Lnet/minecraft/class_169;)V	method_1648	addToSendQueue
 M	net/minecraft/class_139	method_1676	()Lnet/minecraft/class_139;	method_1676	registerStat
 M	net/minecraft/class_473	method_1683	(I)Z	method_1683	canThisPlantGrowOnThisBlockID
 M	net/minecraft/class_67	method_1685	()V	method_1685	draw
@@ -2339,6 +2358,7 @@ M	net/minecraft/class_163	method_1819	(F)V	method_1819	renderWithRotation
 M	net/minecraft/class_163	method_1820	(F)V	method_1820	postRender
 M	net/minecraft/class_554	method_1835	()I	method_1835	getHealAmount
 M	net/minecraft/class_555	method_1837	()V	method_1837	updateRenderer
+M	net/minecraft/class_555	method_1844	(F)V	method_1844	updateCameraAndRender
 M	net/minecraft/class_564	method_1857	()I	method_1857	getScaledWidth
 M	net/minecraft/class_564	method_1858	()I	method_1858	getScaledHeight
 M	net/minecraft/class_181	method_1876	()Ljava/lang/String;	method_1876	getText
@@ -2388,6 +2408,7 @@ M	net/minecraft/class_579	method_2028	(Lnet/minecraft/class_57;DDDF)V	method_202
 M	net/minecraft/class_579	method_2029	(Lnet/minecraft/class_578;)V	method_2029	setRenderManager
 M	net/minecraft/class_579	method_2032	(Lnet/minecraft/class_57;DDDFF)V	method_2032	doRenderShadowAndFire
 M	net/minecraft/class_579	method_2033	(Lnet/minecraft/class_57;DDDFF)V	method_2033	renderShadow
+M	net/minecraft/class_61	method_2040	()V	method_2040	incrementPathIndex
 M	net/minecraft/class_61	method_2042	()Z	method_2042	isFinished
 M	net/minecraft/class_613	method_2044	(Ljava/util/Random;)I	method_2044	getRandomFleeceColor
 M	net/minecraft/class_613	method_2045	(Z)V	method_2045	setSheared
@@ -2409,6 +2430,7 @@ M	net/minecraft/client/Minecraft	method_2115	(Lnet/minecraft/class_18;Ljava/lang
 M	net/minecraft/client/Minecraft	method_2120	(Ljava/lang/String;Ljava/lang/String;J)V	method_2120	startWorld
 M	net/minecraft/client/Minecraft	method_2123	()Ljava/io/File;	method_2123	getMinecraftDir
 M	net/minecraft/client/Minecraft	method_2137	()V	method_2137	runTick
+M	net/minecraft/client/Minecraft	method_2147	()Z	method_2147	isFancyGraphicsEnabled
 S	net/minecraft/class_24	net/minecraft/class_139	
 S	net/minecraft/class_100	net/minecraft/class_153	
 S	net/minecraft/class_368	net/minecraft/class_153	

@@ -759,6 +759,7 @@ F	iz	a	field_1615_a	stackSize
 F	iz	c	field_1617_c	itemID
 F	iz	d	field_1616_d	itemDamage
 F	yg	a	field_204_f	scale
+F	tk	bN	field_797_bg	sendQueue
 F	qb	a	field_1371_a	keyDescription
 F	qb	b	field_1370_b	keyCode
 F	ju	a	field_799_a	blockID
@@ -886,6 +887,7 @@ F	sn	bC	field_9304_bm	isImmuneToFire
 F	sn	bD	field_21064_bx	dataWatcher
 F	sn	bM	field_28016_bK	ignoreFrustumCheck
 F	v	a	field_4013_a	modelBipedMain
+F	sz	a	field_1089_a	doubleValue
 F	up	j	field_956_i	options
 F	fp	a	field_20157_a	allowedCharacters
 F	fp	b	field_22286_b	allowedCharactersArray
@@ -1035,6 +1037,7 @@ F	b	a	field_25210_a	instance
 F	rq	n	field_22100_m	saveList
 F	uv	b	field_886_b	chunkMapping
 F	uv	d	field_888_d	worldObj
+F	p	a	field_1097_a	floatValue
 F	ls	H	field_735_n	renderYawOffset
 F	ls	O	field_9357_z	texture
 F	ls	X	field_9339_I	swingProgress
@@ -1054,6 +1057,7 @@ F	uq	d	field_930_d	itemRenderer
 F	uq	e	field_929_e	chatMessageList
 F	uq	f	field_9423_f	rand
 F	uq	g	field_9422_g	mc
+F	xb	a	field_1098_a	stringValue
 F	kx	d	field_896_d	chunkProvider
 F	kx	f	field_894_f	chunks
 F	kx	g	field_893_g	worldObj
@@ -1077,6 +1081,7 @@ F	bd	f	field_1788_f	running
 F	bd	k	field_1783_k	xPosition
 F	bd	l	field_1782_l	yPosition
 F	ht	a	MUSIC	MUSIC
+F	mm	D	field_1052_A	sendQueue
 F	jx	a	field_1590_a	slots
 F	jx	b	field_1589_b	count
 F	lf	b	field_1555_b	count
@@ -1260,6 +1265,7 @@ F	kh	a	field_27344_a	mc
 F	yr	a	field_582_a	reason
 F	ih	c	field_880_c	worldObj
 F	ih	f	field_877_f	height
+F	mi	a	field_1095_a	longValue
 F	sl	i	field_9315_g	inGround
 F	sl	b	field_688_a	arrowShake
 F	sl	c	field_682_g	owner
@@ -1317,6 +1323,7 @@ F	rg	c	field_513_c	yPosition
 F	rg	d	field_512_d	zPosition
 F	rg	e	field_511_e	yaw
 F	rg	f	field_510_f	pitch
+F	pp	a	field_1093_a	intValue
 F	tv	a	field_492_a	xPosition
 F	tv	b	field_491_b	yPosition
 F	tv	c	field_495_c	zPosition
@@ -1808,7 +1815,9 @@ M	gs	r	()V	func_20059_m	closeScreen
 M	gs	a	(Lvr;I)V	func_25058_a	addStat
 M	gs	b	(Luu;)Z	func_454_b	canHarvestBlock
 M	gs	a	(Llw;)V	func_452_a	displayGUIChest
+M	gs	c	(Lsn;)V	func_6415_a_	useCurrentItemOnEntity
 M	gs	G	()Liz;	func_6416_v	getCurrentEquippedItem
+M	gs	d	(Lsn;)V	func_463_a	attackTargetEntityWithCurrentItem
 M	gs	b	(Ljava/lang/String;)V	func_22055_b	addChatMessage
 M	gs	a	(Lvr;)V	func_27026_a	triggerAchievement
 M	kd	a	(Ljava/util/Random;)Lpg;	func_21107_a	getRandomWorldGenForTrees
@@ -1887,6 +1896,7 @@ M	sn	w_	()V	func_370_e_	onUpdate
 M	sn	b	(Lnu;)V	func_352_a	writeEntityToNBT
 M	sn	a	(Lnu;)V	func_357_b	readEntityFromNBT
 M	sn	b	(F)V	func_400_c	fall
+M	sn	a	(Lsn;I)Z	func_396_a	attackEntityFrom
 M	sn	h_	()Z	func_401_c_	canBeCollidedWith
 M	sn	x_	()F	func_392_h_	getShadowSize
 M	sn	w	()F	func_373_s	getEyeHeight
@@ -1905,6 +1915,7 @@ M	sn	ag	()Z	func_27013_ag	isInWater
 M	sn	k_	()Z	func_397_g_	handleWaterMovement
 M	sn	a	(Lln;)Z	func_393_a	isInsideOfMaterial
 M	sn	ah	()Z	func_359_G	handleLavaMovement
+M	sn	a	(FFF)V	func_351_a	moveFlying
 M	sn	a	(Lfd;)V	func_398_a	setWorld
 M	sn	c	(DDDFF)V	func_365_c	setLocationAndAngles
 M	sn	f	(Lsn;)F	func_379_d	getDistanceToEntity
@@ -1947,6 +1958,8 @@ M	bu	b	()F	func_21206_b	getEfficiencyOnProperMaterial
 M	bu	c	()I	func_21205_c	getDamageVsEntity
 M	bu	d	()I	func_21208_d	getHarvestLevel
 M	px	a	()V	func_911_a	updateRenderer
+M	px	b	(F)V	func_4136_b	updateCameraAndRender
+M	dh	a	()V	func_1206_a	incrementPathIndex
 M	dh	b	()Z	func_1207_b	isFinished
 M	bw	a	(Lsn;DDDFF)V	func_147_a	doRender
 M	bw	a	(Ljava/lang/String;)V	func_151_a	loadTexture
@@ -2022,9 +2035,11 @@ M	ls	j	()I	func_422_g	getDropItemId
 M	ls	r_	()Liz;	func_4045_l	getHeldItem
 M	ls	c	(I)V	func_432_b	heal
 M	ls	y	()Z	func_22049_v	isMovementBlocked
+M	ls	b	(Lsn;)V	func_419_b	onDeath
 M	ls	N	()Z	func_22051_K	isPlayerSleeping
 M	ls	u	()Z	func_25023_u	canDespawn
 M	ls	k	()F	func_6393_h	getSoundVolume
+M	ls	q	()V	func_21066_o	dropFewItems
 M	ls	e	()I	func_421_b	getTalkInterval
 M	ls	e	(Lsn;)Z	func_420_c	canEntityBeSeen
 M	ls	T	()V	func_22050_O	playLivingSound
@@ -2107,6 +2122,8 @@ M	gb	s	()Z	func_27022_s	getPowered
 M	gb	a_	(F)F	func_440_b	setCreeperFlashTime
 M	gb	v	()I	func_21091_q	getCreeperState
 M	gb	e	(I)V	func_21090_e	setCreeperState
+M	nb	b	(Lki;)V	func_847_a	addToSendQueue
+M	nb	a	(I)Lsn;	func_12246_a	getEntityByID
 M	dw	b	(I)Lgp;	func_20118_a	getSlot
 M	dw	a	(I)Liz;	func_27279_a	getStackInSlot
 M	dw	a	(Lgs;)V	func_1104_a	onCraftGuiClosed
@@ -2212,6 +2229,7 @@ M	bt	a	(DDD)Lbt;	func_1260_a	createVectorHelper
 M	bt	b	()V	func_1259_a	initialize
 M	bt	b	(DDD)Lbt;	func_1248_b	createVector
 M	bt	c	(DDD)Lbt;	func_1257_c	addVector
+M	bt	d	(DDD)D	func_1255_d	squareDistanceTo
 M	bt	d	()D	func_1253_c	lengthVector
 M	bt	a	(F)V	func_1258_a	rotateAroundX
 M	bt	b	(F)V	func_1249_b	rotateAroundY
@@ -2303,6 +2321,7 @@ M	xa	a	(II)Z	func_4102_a	canCoordinateBeSpawn
 M	xa	e	()V	func_4093_b	generateLightBrightnessTable
 M	xa	f	()Z	func_6477_d	canRespawnHere
 M	xa	a	(Lfd;)V	func_4095_a	registerWorld
+M	pf	a	(Lki;)V	func_972_a	addToSendQueue
 M	xv	a	(II)Lkd;	func_4073_a	getBiomeGenAt
 M	xv	b	(II)D	func_4072_b	getTemperature
 M	xv	a	(IIII)[Lkd;	func_4069_a	func_4069_a
@@ -2347,6 +2366,7 @@ M	uu	e	()I	func_4025_d	tickRate
 M	uu	g	()V	func_237_e	setBlockBoundsForItemRender
 M	uu	a	(IZ)Z	func_224_a	canCollideCheck
 M	uu	a	(Lfd;IIIIF)V	func_216_a	dropBlockAsItemWithChance
+M	uu	a	(Lfd;IIII)Z	func_28030_e	canPlaceBlockOnSide
 M	uu	e	(Lfd;IIII)V	func_258_d	onBlockPlaced
 M	uu	v_	()Z	func_245_h	isCollidable
 M	uu	k	()V	func_28028_i	initializeBlock

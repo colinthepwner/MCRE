@@ -1737,9 +1737,10 @@
             function javaOf(ref, data) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
                 if (/^id:38(\D|$)/.test(ref || '')) return { id: 38, data: 0 };
-                if (m && javaMods[m[1]]) return { id: refToJava(ref), data: window.JVM.contentMeta(vm, m[1], m[2]) };
+                if (m && javaMods[m[1]]) return { id: refToJava(ref), data: window.JVM.stateBlockOf && window.JVM.stateBlockOf(vm, m[1], m[2]) ? data | 0 : window.JVM.contentMeta(vm, m[1], m[2]) };
                 return { id: refToJava(ref), data: data | 0 };
             }
+            function stateBlock(jid) { var b = reg() && reg().blocks[jid]; return !!(b && !b.$override && window.JVM.stateShapeOf && window.JVM.stateShapeOf(vm, b)); }
             function refToJava(ref) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
                 if (m) { var jid = javaMods[m[1]] ? window.JVM.contentId(vm, m[1], m[2]) : null; return jid != null ? jid : 4095; }
@@ -1771,12 +1772,15 @@
                     case 'settile': {
                         forget(a[0], a[1], a[2]);
                         var sref = a[3] ? blockRef(a[3], a[4]) : 'id:0';
-                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : gameData(a[3], a[4] | 0), a[5] ? 1 : 0].join('\t'));
+                        var sgg = /^mod:/.test(sref) && stateBlock(a[3] | 0) ? genGame(a[3] | 0, a[4] | 0) : null;
+                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, sgg ? sgg.aux : /^mod:/.test(sref) ? '' : gameData(a[3], a[4] | 0), a[5] ? 1 : 0].join('\t'));
                     }
                     case 'setdata': {
                         forget(a[0], a[1], a[2]);
                         if (Module._mcJavaRunTile && typeof genJava === 'function') {
-                            var dcur = genJava(Module._mcJavaRunTile(a[0] | 0, a[1] | 0, a[2] | 0));
+                            var draw = Module._mcJavaRunTile(a[0] | 0, a[1] | 0, a[2] | 0), dcur = genJava(draw);
+                            if (dcur.mod && Module._mcJavaStateSlot && stateBlock(dcur.id))
+                                return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, Module._mcJavaStateSlot(draw & 255, draw >> 8, a[3] | 0)].join('\t'));
                             if (dcur.mod) {
                                 var dob = reg() && reg().blocks[dcur.id], dref = blockRef(dcur.id, a[3] | 0);
                                 if (dob && window.JVM.variantsOf(vm, dob).indexOf(a[3] | 0) >= 0 && dref !== blockRef(dcur.id, dcur.data))
@@ -1909,6 +1913,8 @@
                     }
                     case 'extrahp': return mp(a.length && a[0] != null ? ['extrahp', a[0] | 0].join('\t') : 'extrahp');
                     case 'entparts': return mp(['entparts', a[0] | 0, clean(a[1]), a[2] ? 1 : 0].join('\t'));
+                    case 'entkeep': return mp(['entkeep', a[0] | 0, a[1] | 0].join('\t'));
+                    case 'entdrive': return mp(['entdrive', a[0] | 0, a[1] | 0].join('\t'));
                     case 'enttex': return mp(['enttex', a[0] | 0, a[1] | 0].join('\t'));
                     case 'entjava': return mp(['entjava', a[0] | 0].concat(a.length > 1 && a[1] != null ? [String(a[1]).replace(/[\t\r\n]/g, ' ')] : []).join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
@@ -1932,7 +1938,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, release: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -1943,6 +1949,16 @@
                 tiles = {}; vm.steps = 0;
                 try { return window.JVM.dispense(vm, { x: e.x, y: e.y, z: e.z, meta: e.meta, slot: e.slot, id: j.id, data: j.data, left: e.left }) | 0; }
                 catch (x) { console.warn('[java] dispense', x); return 0; }
+                finally { tiles = null; }
+            };
+            J.askWanted = function (kind) { try { return !!(running && vm && window.JVM.hookAskWanted && window.JVM.hookAskWanted(vm, kind)); } catch (x) { return false; } };
+            J.ask = function (kind, json) {
+                var e; try { e = JSON.parse(json); } catch (x) { return kind === 'hurt' ? -2 : 0; }
+                var dflt = kind === 'hurt' ? e.damage | 0 : 0;
+                if (!running || !vm || !window.JVM.hookAsk) return dflt;
+                tiles = {}; vm.steps = 0;
+                try { return window.JVM.hookAsk(vm, kind, e) | 0; }
+                catch (x) { console.warn('[java] ask ' + kind, x); return dflt; }
                 finally { tiles = null; }
             };
             J.dropsWanted = function () { try { return !!(running && vm && window.JVM.dropsWanted && window.JVM.dropsWanted(vm)); } catch (x) { return false; } };
@@ -1997,8 +2013,13 @@
                 if (window.JVM.hookWorldStart) window.JVM.hookWorldStart(vm);
                 return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
-            var genRefs = {}, genIds = {};
+            var genRefs = {}, genIds = {}, genBind = -1;
+            function genFresh() {
+                var bv = Module._mcModBindVersion ? Module._mcModBindVersion() : 0;
+                if (bv !== genBind) { genBind = bv; genRefs = {}; genIds = {}; }
+            }
             function genJava(raw) {
+                genFresh();
                 var v = genRefs[raw];
                 if (!v) {
                     var p = UTF8ToString(Module._mcJavaRefOf(raw & 255, raw >> 8)).split('\t');
@@ -2008,11 +2029,13 @@
                 return v;
             }
             function genGame(jid, jdata) {
+                genFresh();
                 var gk = jid + ':' + (jdata | 0), v = genIds[gk];
                 if (v === undefined) {
                     var ref = blockRef(jid, jdata);
-                    if (/^id:/.test(ref)) v = { id: jid, aux: 0, mod: false };
+                    if (/^id:/.test(ref)) v = jid > 0 && jid < 256 && !(Module._mcModIsHost && Module._mcModIsHost(jid)) ? { id: jid, aux: 0, mod: false } : null;
                     else { var n = Module.ccall('mcJavaResolve', 'number', ['string'], [ref]); v = n < 0 ? null : { id: n & 255, aux: n >> 8, mod: true }; }
+                    if (v && v.mod && Module._mcJavaStateSlot && stateBlock(jid)) v.aux = Module._mcJavaStateSlot(v.id, v.aux, jdata | 0);
                     genIds[gk] = v;
                 }
                 return v;
@@ -2031,8 +2054,9 @@
                         return 0;
                     }
                     case 'setdata': {
-                        var raw = Module._mcJavaGenTile(x, y, z);
-                        if (!genJava(raw).mod) Module._mcJavaGenSet(x, y, z, raw & 255, b | 0);
+                        var raw = Module._mcJavaGenTile(x, y, z), gj = genJava(raw);
+                        if (!gj.mod) Module._mcJavaGenSet(x, y, z, raw & 255, b | 0);
+                        else if (Module._mcJavaStateSlot && stateBlock(gj.id)) Module._mcJavaGenSet(x, y, z, raw & 255, Module._mcJavaStateSlot(raw & 255, raw >> 8, b | 0));
                         return 0;
                     }
                     case 'destroy': Module._mcJavaGenSet(x, y, z, 0, 0); return 0;
@@ -2232,6 +2256,7 @@
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
                 if (e.t === 'javahit') { if (JV.mobHit) JV.mobHit(vm, e); return; }
                 if (e.t === 'javadeath') { if (JV.mobDeath) JV.mobDeath(vm, e); return; }
+                if (e.t === 'javahurt') { if (JV.objHurt) JV.objHurt(vm, e); return; }
                 if (e.t === 'accessory') { if (JV.accessoryChanged) JV.accessoryChanged(vm, e, javaOf); return; }
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
@@ -2242,6 +2267,7 @@
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
                     else if (e.t === 'place') {
                         if (blk.$stStates && JV.stationState) JV.stationState.placed(vm, blk, world, x, y, z, pl, M.heldStack(vm), e.face);
+                        if (JV.statePlaced) { forget(x, y, z); JV.statePlaced(vm, blk, world, x, y, z, e.face); forget(x, y, z); }
                         if (JV.tilePlaced) JV.tilePlaced(vm, x, y, z); call(blk, SIG.added, [world, x, y, z]); call(blk, SIG.placedBy, [world, x, y, z, pl, M.heldStack(vm)]);
                     }
                     else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, bdata]); call(blk, SIG.destroyedBy, [world, x, y, z, bdata]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
@@ -3050,6 +3076,7 @@
             function manifestOf(files, fallbackName) {
                 var dec = new TextDecoder(), m = {}, notes = [];
                 var base = String(fallbackName || 'mod').replace(/\.(zip|modpkg|mcpack|mcaddon|jar)$/i, '');
+                var derivedHere = !files['manifest.json'];
                 if (!files['manifest.json']) {
                     try {
                         var jm = files['mcmod.info'] ? mcLenientJson(dec.decode(files['mcmod.info'])) : null;
@@ -3085,7 +3112,39 @@
                          description: str(m.description, 4000), notes: notes,
                          deps: depsOf(m, notes), settings: settingsDeclOf(m, notes),
                          devices: devicesOf(m, notes, !!files['manifest.json']),
+                         sameKeys: sameKeysOf(files, derivedHere ? null : m, id),
                          java: Object.keys(files).some(function (k) { return /[.]class$/i.test(k); }) };
+            }
+            function sameKeysOf(files, ownManifest, id) {
+                var keys = [], dec = new TextDecoder();
+                var generic = /^(examplemod|example|example_mod|mymod|my_mod|modid|mod|mod_id|yourmodid|testmod|test|template|modtemplate)$/;
+                var add = function (k, v) { v = String(v || '').trim().toLowerCase(); if (v && !generic.test(v) && keys.indexOf(k + v) < 0) keys.push(k + v); };
+                try {
+                    var jm = files['mcmod.info'] ? mcLenientJson(dec.decode(files['mcmod.info'])) : null;
+                    if (jm && !Array.isArray(jm)) jm = jm.modList || jm.modlist || [jm];
+                    if (Array.isArray(jm) && jm[0]) add('j:', jm[0].modid || jm[0].id);
+                } catch (e) { }
+                try {
+                    var fm = files['fabric.mod.json'] ? mcLenientJson(dec.decode(files['fabric.mod.json'])) : null;
+                    if (fm && typeof fm === 'object') add('j:', fm.id);
+                } catch (e) { }
+                if (!keys.length) {
+                    var sig = 'Lcpw/mods/fml/common/Mod;', s0 = sig.charCodeAt(0), n = sig.length;
+                    var has = function (b) {
+                        outer: for (var i = 0, end = b.length - n; i <= end; i++) {
+                            if (b[i] !== s0) continue;
+                            for (var k = 1; k < n; k++) if (b[i + k] !== sig.charCodeAt(k)) continue outer;
+                            return true;
+                        }
+                        return false;
+                    };
+                    Object.keys(files).forEach(function (k) {
+                        if (!/[.]class$/i.test(k) || !files[k]) return;
+                        if (/^mod_[^/$]+[.]class$/.test(k) || (files[k].length < 400000 && has(files[k]))) add('c:', k.replace(/[.]class$/i, ''));
+                    });
+                }
+                if (ownManifest && typeof ownManifest.id === 'string' && id === ownManifest.id) add('m:', id + '|' + (typeof ownManifest.author === 'string' ? ownManifest.author.trim() : ''));
+                return keys;
             }
             function devicesOf(m, notes, hasManifest) {
                 var raw = m.devices !== undefined ? m.devices : m.device !== undefined ? m.device : m.platform !== undefined ? m.platform : m.platforms;
@@ -3725,7 +3784,8 @@
                 slab: '0,0,0,16,8,16', bottom_slab: '0,0,0,16,8,16', top_slab: '0,8,0,16,16,16',
                 carpet: '0,0,0,16,1,16', layer: '0,0,0,16,2,16', plate: '1,0,1,15,1,15',
                 path: '0,0,0,16,15,16', cactus: '1,0,1,15,16,15', post: '6,0,6,10,16,10',
-                pillar: '4,0,4,12,16,12', table: '0,12,0,16,16,16', button: '5,0,6,11,2,10'
+                pillar: '4,0,4,12,16,12', table: '0,12,0,16,16,16', button: '5,0,6,11,2,10',
+                vine: 'vine', ladder: 'ladder', torch: 'torch'
             };
             function shapeOf(s) {
                 if (Array.isArray(s) && s.length === 6 && s.every(function (v) { return typeof v === 'number'; })) {
@@ -4405,7 +4465,7 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(b.name)));
                     var light = j.light === true ? 15 : Math.max(0, Math.min(15, Math.round(+j.light || 0)));
                     var shape = shapeOf(j.shape);
-                    var collide = j.collision === undefined && j.collide === undefined ? shape !== 'cross' : !!(j.collision === undefined ? j.collide : j.collision);
+                    var collide = j.collision === undefined && j.collide === undefined ? ['cross', 'vine', 'torch'].indexOf(shape) < 0 : !!(j.collision === undefined ? j.collide : j.collision);
                     var friction = typeof j.friction === 'number' ? Math.max(0.1, Math.min(1.2, j.friction)) : (j.slippery ? 0.98 : 0.6);
                     lines.push(['block', key, desc, tex.join(','), hard, tool, sound, light,
                                 (j.transparent || j.see_through) ? 1 : 0, drop, count,
@@ -5085,7 +5145,7 @@
                         lines.push(['smelt', inp, res, count].join('\t'));
                     } else bad(r.mod, r.file, 'unknown recipe "type": "' + (j.type || '') + '" (shaped, shapeless, smelting or fuel)');
                 });
-                var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4, segment: 5 };
+                var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4, segment: 5, object: 6 };
                 Object.keys(mobs).forEach(function (key) {
                     var mb = mobs[key], j = mb.j, file = mb.file;
                     var mf = mobFiles[mb.mod + ':' + String(j.model || '').replace(/^[/]+/, '')]
@@ -5132,7 +5192,7 @@
                         variants.push(vp);
                     });
                     var beh = BEHAVIOURS[String(j.behaviour || j.behavior || 'passive').toLowerCase()];
-                    if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying, swimming or segment)'); beh = 0; }
+                    if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying, swimming, segment or object)'); beh = 0; }
                     var num = function (v, d, lo, hi) { v = Number(v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
                     var size = Array.isArray(j.size) ? j.size : [0.9, 0.9];
                     var drops = '';
@@ -5293,20 +5353,51 @@
                     mods.forEach(function (L) {
                         if (!L.libUsers || L.err) return;
                         var on = L.libUsers.some(function (y) { return y.enabled; });
+                        if (on && !L.enabled && sameModOn(L)) on = false;
                         if (L.enabled !== on) { L.enabled = on; if (on) L.onAt = L.onAt || Date.now(); any = changed = true; }
                     });
                     if (!any) break;
                 }
                 return changed;
             }
+            function rankOfMod(x) { return x.justAdded ? -Infinity : -(x.onAt || 0) * 1000 + mods.indexOf(x); }
+            function sharesKey(a, b) {
+                var ka = (a.m && a.m.sameKeys) || [], kb = (b.m && b.m.sameKeys) || [];
+                return ka.some(function (k) { return kb.indexOf(k) >= 0; });
+            }
+            function sameModOn(x) { return mods.some(function (o) { return o !== x && o.enabled && !o.err && sharesKey(o, x); }); }
+            function sameModClashes(list, rank) {
+                var kept = [], out = [];
+                list.filter(function (x) { return x.enabled && !x.err && x.m && x.m.sameKeys && x.m.sameKeys.length; })
+                    .sort(function (a, b) { return rank(a) - rank(b); })
+                    .forEach(function (x) {
+                        var by = kept.filter(function (k) { return sharesKey(k, x); })[0];
+                        if (by) out.push({ x: x, by: by }); else kept.push(x);
+                    });
+                return out;
+            }
+            function dropSameMods() {
+                if (session) return '';
+                var c = sameModClashes(mods, rankOfMod);
+                if (!c.length) return '';
+                var nm = function (x) { var m = x.m || {}; return (m.name || x.id) + (m.version ? ' ' + m.version : ''); };
+                c.forEach(function (e) { e.x.enabled = false; delete e.x.justAdded; });
+                syncLibs();
+                writeState();
+                return c.map(function (e) {
+                    var a = nm(e.x), b = nm(e.by);
+                    return a + ' turned off - another version of the same mod is on' + (a !== b ? ' (' + b + ')' : '') + '.';
+                }).join(' ');
+            }
             function reapply(tell, ask) {
                 if (busy) { again = true; return Promise.resolve(); }
                 if (syncLibs()) writeState();
+                var sameNote = dropSameMods();
                 var keep = status;
                 busy = true; bump('Applying mods...');
                 return applyAll(ask).then(function (unknown) {
                     busy = false;
-                    var n = api.problemCount(), note = applyNote;
+                    var n = api.problemCount(), note = [sameNote, applyNote].filter(Boolean).join(' ');
                     applyNote = '';
                     var probs = n + (n === 1 ? ' problem' : ' problems');
                     bump(note ? note + (n ? ' (' + probs + ' - choose a mod to see them)' : '') : n ? probs + ' in your mods - choose a mod to see them' : keep);
