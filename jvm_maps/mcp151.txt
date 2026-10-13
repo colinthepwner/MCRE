@@ -3212,6 +3212,16 @@ M	alh	d	()I	func_71857_b	getRenderType
 M	alh	e	(Laab;III)V	func_72262_c	checkFlowerChange
 M	alh	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	alh	f_	(I)Z	func_72263_d_	canThisPlantGrowOnThisBlockID
+M	alj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	alj	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	alj	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
+M	alj	a	(Lly;)V	func_94332_a	registerIcons
+M	alj	b	()Z	func_71886_c	renderAsNormalBlock
+M	alj	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	alj	c	()Z	func_71926_d	isOpaqueCube
+M	alj	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	alj	d	()I	func_71857_b	getRenderType
+M	alj	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	amb	a	(Laab;)I	func_71859_p_	tickRate
 M	amb	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	amb	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -3224,6 +3234,15 @@ M	amb	a	(Lly;)V	func_94332_a	registerIcons
 M	amb	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
 M	amb	j_	(I)Lbf;	func_100009_j_	getFacing
 M	amh	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	aoh	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	aoh	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	aoh	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aoh	b	()Z	func_71886_c	renderAsNormalBlock
+M	aoh	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aoh	c	()Z	func_71926_d	isOpaqueCube
+M	aoh	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	aoh	d	()I	func_71857_b	getRenderType
+M	aoh	f	(Laab;III)Z	func_71854_d	canBlockStay
 M	apa	A	()Ljava/lang/String;	func_71931_t	getLocalizedName
 M	apa	C	()Z	func_71876_u	getEnableStats
 M	apa	D	()Lapa;	func_71896_v	disableStats
@@ -6020,6 +6039,7 @@ R	func_70307_a	readFromNBT
 R	func_70310_b	writeToNBT
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
+R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
 R	func_72676_a	getBreakSound
 R	func_72145_a	playSoundEffect

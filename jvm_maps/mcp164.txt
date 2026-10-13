@@ -3288,6 +3288,17 @@ M	ane	d	()I	func_71857_b	getRenderType
 M	ane	e	(Labw;III)V	func_72262_c	checkFlowerChange
 M	ane	f	(Labw;III)Z	func_71854_d	canBlockStay
 M	ane	g_	(I)Z	func_72263_d_	canThisPlantGrowOnThisBlockID
+M	ang	a	(II)Lms;	func_71858_a	getIcon
+M	ang	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
+M	ang	a	(Labw;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ang	a	(Labw;IIILnn;)V	func_71869_a	onEntityCollidedWithBlock
+M	ang	a	(Lmt;)V	func_94332_a	registerIcons
+M	ang	b	()Z	func_71886_c	renderAsNormalBlock
+M	ang	b	(Labw;III)Lasx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	ang	c	()Z	func_71926_d	isOpaqueCube
+M	ang	c	(Labw;III)Z	func_71930_b	canPlaceBlockAt
+M	ang	d	()I	func_71857_b	getRenderType
+M	ang	f	(Labw;III)Z	func_71854_d	canBlockStay
 M	any	a	(II)Lms;	func_71858_a	getIcon
 M	any	a	(Labw;)I	func_71859_p_	tickRate
 M	any	a	(Labw;III)V	func_71861_g	onBlockAdded
@@ -3300,6 +3311,15 @@ M	any	a	(Lmt;)V	func_94332_a	registerIcons
 M	any	b	(Labw;)Lasp;	func_72274_a	createNewTileEntity
 M	any	l_	(I)Lbl;	func_100009_j_	getFacing
 M	aoe	b	(Labw;)Lasp;	func_72274_a	createNewTileEntity
+M	aqe	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	aqe	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
+M	aqe	a	(Labw;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aqe	b	()Z	func_71886_c	renderAsNormalBlock
+M	aqe	b	(Labw;III)Lasx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aqe	c	()Z	func_71926_d	isOpaqueCube
+M	aqe	c	(Labw;III)Z	func_71930_b	canPlaceBlockAt
+M	aqe	d	()I	func_71857_b	getRenderType
+M	aqe	f	(Labw;III)Z	func_71854_d	canBlockStay
 M	aqg	a	(I)I	func_71899_b	damageDropped
 M	aqg	a	(II)Lms;	func_71858_a	getIcon
 M	aqg	a	(Labw;IIIIFFFI)I	func_85104_a	onBlockPlaced
@@ -6044,6 +6064,7 @@ R	func_71913_a	canCollideCheck
 R	func_72216_n	isFlammable
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
+R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
 R	func_72676_a	getBreakSound
 R	func_111049_d	getEndIcon

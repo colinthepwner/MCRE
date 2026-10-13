@@ -1717,7 +1717,7 @@
             }
             function itemRef(id, data) {
                 var r = reg();
-                if (id < 4096) return blockRef(id, data);
+                if (id < 4096 && (!r || r.blocks[id] || !r.items[id])) return blockRef(id, data);
                 var it = r && r.items[id];
                 return it && !it.$override ? 'mod:' + it.$mod + ':' + window.JVM.contentName(vm, id, data) : 'id:' + id;
             }
@@ -2382,7 +2382,7 @@
             }
             var jgIcons = {};
             function jgIcon(id, data) {
-                var ref = id < 4096 ? blockRef(id) : itemRef(id);
+                var ref = itemRef(id);
                 if (/^id:/.test(ref) && data) ref += ':' + data;
                 if (jgIcons[ref] !== undefined) return jgIcons[ref];
                 jgIcons[ref] = null;

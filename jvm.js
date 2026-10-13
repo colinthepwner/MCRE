@@ -7539,6 +7539,7 @@ JVM.collectContent = function (vm, modId) {
 		if (overrides(b, ['onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V'])) json.neighbor_updates = true;
 		var flc = vm.natives[SRC + 'BlockFlower'] ? vm.loadClass(SRC + 'BlockFlower') : null;
 		if (flc && vm.isInstance(b, flc)) json.neighbor_updates = true;
+		['BlockReed', 'BlockCactus'].forEach(function (n) { if (vm.natives[SRC + n] && vm.isInstance(b, vm.loadClass(SRC + n))) json.neighbor_updates = true; });
 		if (overrides(b, ['onEntityCollidedWithBlock(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V'])) json.entity_inside = true;
 		if (overrides(b, ['getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;'])) {
 			vm.$defTile = { x: 0, y: 64, z: 0, id: id, data: meta };
@@ -10299,6 +10300,80 @@ function install(vm) {
 		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
 	} });
 	def('BlockBush', { super: SRC + 'BlockFlower' });
+	var popIfLoose = function (vm, self, w, x, y, z) {
+		if (vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [w, x, y, z])) return;
+		vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [w, x, y, z, meta(w, x, y, z), 0]);
+		put(w, x, y, z, 0, 0, 3);
+	};
+	def('BlockReed', { super: SRC + 'Block', interfaces: ['net/minecraftforge/common/IPlantable'], methods: {
+		'<init>(I)V': function (vm, self, a) {
+			var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+			if (k) vm.invoke(k, self, [a[0], plantsMat()]);
+			self[':needsRandomTick'] = 1;
+			self[':minX'] = 0.125; self[':minY'] = 0; self[':minZ'] = 0.125; self[':maxX'] = 0.875; self[':maxY'] = 1; self[':maxZ'] = 0.875;
+		},
+		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], bid = self[':blockID'];
+			if (id(w, x, y + 1, z) !== 0) return;
+			var l = 1;
+			while (id(w, x, y - l, z) === bid) l++;
+			if (l >= 3) return;
+			var m = meta(w, x, y, z);
+			if (m === 15) { put(w, x, y + 1, z, bid, 0, 3); put(w, x, y, z, bid, 0, 4); }
+			else put(w, x, y, z, bid, m + 1, 4);
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], below = id(w, x, y - 1, z);
+			if (below === self[':blockID']) return 1;
+			if (below !== B.grass && below !== B.dirt && below !== B.sand) return 0;
+			return water(id(w, x - 1, y - 1, z)) || water(id(w, x + 1, y - 1, z)) || water(id(w, x, y - 1, z - 1)) || water(id(w, x, y - 1, z + 1)) ? 1 : 0;
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { return vm.callVirtual(self, 'canPlaceBlockAt', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]]); },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) { popIfLoose(vm, self, a[0], a[1], a[2], a[3]); },
+		'getCollisionBoundingBoxFromPool(Lnet/minecraft/src/World;III)Lnet/minecraft/src/AxisAlignedBB;': function () { return null; },
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+		'getRenderType()I': function () { return 1; },
+		'getPlantType(Lnet/minecraft/src/World;III)Lnet/minecraftforge/common/EnumPlantType;': function (vm) {
+			var e = vm.loadClass('net/minecraftforge/common/EnumPlantType'); vm.initClass(e); return e.statics.Beach || null;
+		},
+		'getPlantID(Lnet/minecraft/src/World;III)I': function (vm, self) { return self[':blockID']; },
+		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
+	} });
+	def('BlockCactus', { super: SRC + 'Block', interfaces: ['net/minecraftforge/common/IPlantable'], methods: {
+		'<init>(I)V': function (vm, self, a) {
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+			if (k) vm.invoke(k, self, [a[0], mc.statics.cactus || plantsMat()]);
+			self[':needsRandomTick'] = 1;
+		},
+		'updateTick(Lnet/minecraft/src/World;IIILjava/util/Random;)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], bid = self[':blockID'];
+			if (id(w, x, y + 1, z) !== 0) return;
+			var l = 1;
+			while (id(w, x, y - l, z) === bid) l++;
+			if (l >= 3) return;
+			var m = meta(w, x, y, z);
+			if (m === 15) { put(w, x, y + 1, z, bid, 0, 3); put(w, x, y, z, bid, 0, 4); }
+			else put(w, x, y, z, bid, m + 1, 4);
+		},
+		'canBlockStay(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3];
+			if (!replaceable(id(w, x - 1, y, z)) || !replaceable(id(w, x + 1, y, z)) || !replaceable(id(w, x, y, z - 1)) || !replaceable(id(w, x, y, z + 1))) return 0;
+			var below = id(w, x, y - 1, z);
+			return below === self[':blockID'] || below === B.sand ? 1 : 0;
+		},
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) { return vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [a[0], a[1], a[2], a[3]]); },
+		'onNeighborBlockChange(Lnet/minecraft/src/World;IIII)V': function (vm, self, a) { popIfLoose(vm, self, a[0], a[1], a[2], a[3]); },
+		'isOpaqueCube()Z': function () { return 0; },
+		'renderAsNormalBlock()Z': function () { return 0; },
+		'getRenderType()I': function () { return 13; },
+		'getPlantType(Lnet/minecraft/src/World;III)Lnet/minecraftforge/common/EnumPlantType;': function (vm) {
+			var e = vm.loadClass('net/minecraftforge/common/EnumPlantType'); vm.initClass(e); return e.statics.Desert || null;
+		},
+		'getPlantID(Lnet/minecraft/src/World;III)I': function (vm, self) { return self[':blockID']; },
+		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
+	} });
 
 	var WG = SRC + 'WorldGenerator';
 	var superInit = function (self, notify) { self[':doBlockNotify'] = notify ? 1 : 0; };

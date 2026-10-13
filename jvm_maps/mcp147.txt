@@ -2870,6 +2870,16 @@ M	aje	d	()I	func_71857_b	getRenderType
 M	aje	d	(Lyc;III)Z	func_71854_d	canBlockStay
 M	aje	d_	(I)Z	func_72263_d_	canThisPlantGrowOnThisBlockID
 M	aje	e	(Lyc;III)Laoe;	func_71872_e	getCollisionBoundingBoxFromPool
+M	ajg	a	(I)I	func_71851_a	getBlockTextureFromSide
+M	ajg	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
+M	ajg	a	(Lyc;IIILlq;)V	func_71869_a	onEntityCollidedWithBlock
+M	ajg	b	()Z	func_71886_c	renderAsNormalBlock
+M	ajg	b	(Lyc;III)Z	func_71930_b	canPlaceBlockAt
+M	ajg	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ajg	c	()Z	func_71926_d	isOpaqueCube
+M	ajg	d	()I	func_71857_b	getRenderType
+M	ajg	d	(Lyc;III)Z	func_71854_d	canBlockStay
+M	ajg	e	(Lyc;III)Laoe;	func_71872_e	getCollisionBoundingBoxFromPool
 M	ajw	a	(I)I	func_71851_a	getBlockTextureFromSide
 M	ajw	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	ajw	a	(Lax;)Lbg;	func_82525_a	getIPositionFromBlockSource
@@ -2885,6 +2895,15 @@ M	ajw	r_	()I	func_71859_p_	tickRate
 M	akb	a	(Lyc;)Lany;	func_72274_a	createNewTileEntity
 M	akb	a	(Lyc;IIIII)V	func_71852_a	breakBlock
 M	akb	g	(Lyc;III)V	func_71861_g	onBlockAdded
+M	aly	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	aly	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
+M	aly	b	()Z	func_71886_c	renderAsNormalBlock
+M	aly	b	(Lyc;III)Z	func_71930_b	canPlaceBlockAt
+M	aly	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aly	c	()Z	func_71926_d	isOpaqueCube
+M	aly	d	()I	func_71857_b	getRenderType
+M	aly	d	(Lyc;III)Z	func_71854_d	canBlockStay
+M	aly	e	(Lyc;III)Laoe;	func_71872_e	getCollisionBoundingBoxFromPool
 M	amq	B	()Ljava/lang/String;	func_71931_t	translateBlockName
 M	amq	C	()Z	func_71876_u	getEnableStats
 M	amq	D	()Lamq;	func_71896_v	disableStats
@@ -5751,6 +5770,7 @@ R	func_70307_a	readFromNBT
 R	func_70310_b	writeToNBT
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
+R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
 R	func_72676_a	getBreakSound
 R	func_72145_a	playSoundEffect
