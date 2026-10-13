@@ -1836,7 +1836,8 @@
                 if (window.JVM.tileLoad) window.JVM.tileLoad(vm, Object.keys(javaMods));
                 if (window.JVM.storageReset) window.JVM.storageReset(vm);
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
-                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) ? ['subscribe\tgametick'] : [];
+                if (window.JVM.hookWorldStart) window.JVM.hookWorldStart(vm);
+                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {};
             function genJava(raw) {
@@ -1977,6 +1978,7 @@
                 worldDir = null;
                 if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
                 jgClose(true);
+                hudShow(null);
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
             };
@@ -2015,11 +2017,16 @@
                 var world = M.worldObj(vm);
                 if (e.t === 'gametick') {
                     vm.mcTicks = (vm.mcTicks | 0) + 1;
+                    var hudOn = JV.hudWanted && JV.hudWanted(vm);
+                    if (hudOn) { var hs = jgScale(); JV.hudBegin(vm, Math.ceil(window.innerWidth / hs), Math.ceil(window.innerHeight / hs), hs); }
+                    try {
                     if (r.tickMods.length) {
                         var mc = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
                         r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
+                    if (JV.hookTick) JV.hookTick(vm);
+                    } finally { if (hudOn) hudShow(JV.hudEnd(vm)); }
                     if (JV.shotTick) JV.shotTick(vm);
                     if (JV.mobTick) JV.mobTick(vm);
                     if (JV.accessoryTick) JV.accessoryTick(vm);
@@ -2038,6 +2045,7 @@
                     var cst = M.newStack(vm, cj.id, e.count != null ? e.count | 0 : 1, cj.data);
                     (r.forge && r.forge.crafting || []).forEach(function (h) { call(h, 'onCrafting(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IInventory;)V', [cpl, cst, null]); });
                     r.mods.forEach(function (m) { call(m, 'takenFromCrafting(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/IInventory;)V', [cpl, cst, null]); });
+                    if (JV.hookCrafted) JV.hookCrafted(vm, cst);
                     return;
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
@@ -2049,7 +2057,7 @@
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
                     if (e.t === 'place' && JV.stationBlockSet) JV.stationBlockSet(vm, world, x, y, z, bid, bdata);
-                    if (!blk || !javaMods[blk.$mod]) return;
+                    if (!blk || !javaMods[blk.$mod]) { if (JV.hookVanillaBlock) JV.hookVanillaBlock(vm, e.t, bid, bdata, world, x, y, z, e.player ? M.playerObj(vm, null) : null); return; }
                     var pl = M.playerObj(vm, null);
                     if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
                     else if (e.t === 'place') {
@@ -2065,7 +2073,7 @@
                 }
                 if (e.item && (e.t === 'useItem' || e.t === 'useItemOn')) {
                     var ij = javaOf(e.item, e.data), iid = ij.id, it = r.items[iid];
-                    if (!it || !javaMods[it.$mod]) return;
+                    if (!it || !javaMods[it.$mod]) { if (e.t === 'useItemOn' && JV.hookVanillaItemUse) JV.hookVanillaItemUse(vm, iid, e.count != null ? e.count | 0 : 1, ij.data, world, x, y, z, e.face != null ? e.face | 0 : 1); return; }
                     var pl2 = M.playerObj(vm, null), slot = pl2.$info ? pl2.$info.slot : 0;
                     var count = e.count != null ? e.count | 0 : 1, dmg = ij.data;
                     var stack = M.newStack(vm, iid, count, dmg);
@@ -2237,10 +2245,13 @@
                 ctx.clearRect(0, 0, jg.cv.width, jg.cv.height);
                 ctx.setTransform(s, 0, 0, s, 0, 0);
                 ctx.imageSmoothingEnabled = false;
+                jgPaint(ctx, ops, jg.w, jg.h);
+            }
+            function jgPaint(ctx, ops, W, H) {
                 var standIn = false;
                 ops.forEach(function (o) {
                     switch (o.k) {
-                    case 'dim': { var gr = ctx.createLinearGradient(0, 0, 0, jg.h); gr.addColorStop(0, 'rgba(16,16,16,.75)'); gr.addColorStop(1, 'rgba(16,16,16,.82)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, jg.w, jg.h); break; }
+                    case 'dim': { var gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(16,16,16,.75)'); gr.addColorStop(1, 'rgba(16,16,16,.82)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); break; }
                     case 'tex': {
                         var img = jgImage(o.tex);
                         if (img === 'missing') { img = jgStandIn(); standIn = true; }
@@ -2294,6 +2305,24 @@
                     }
                     }
                 });
+            }
+            var hud = null;
+            function hudShow(ops) {
+                if (!ops || !ops.length) { if (hud) { hud.cv.remove(); hud = null; } return; }
+                var s = jgScale();
+                if (!hud) {
+                    var cv = document.createElement('canvas');
+                    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40;image-rendering:pixelated';
+                    document.body.appendChild(cv);
+                    hud = { cv: cv, ctx: cv.getContext('2d') };
+                }
+                if (hud.cv.width !== window.innerWidth || hud.cv.height !== window.innerHeight) { hud.cv.width = window.innerWidth; hud.cv.height = window.innerHeight; }
+                var ctx = hud.ctx;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, hud.cv.width, hud.cv.height);
+                ctx.setTransform(s, 0, 0, s, 0, 0);
+                ctx.imageSmoothingEnabled = false;
+                jgPaint(ctx, ops, Math.ceil(window.innerWidth / s), Math.ceil(window.innerHeight / s));
             }
             function jgPoint(e) {
                 var b = jg.cv.getBoundingClientRect(), t = e.touches ? (e.touches[0] || e.changedTouches[0]) : e;
@@ -3201,7 +3230,10 @@
                 var t = names && names[kind];
                 if (t && t[name]) return t[name];
                 var alt = kind === 'blocks' ? modernTexture(name) : '';
-                return (alt && t && t[alt]) || [];
+                if (alt && t && t[alt]) return t[alt];
+                var sw = /^([a-z]+)_([a-z]+)$/.exec(name);
+                if (sw && t && t[sw[2] + '_' + sw[1]]) return t[sw[2] + '_' + sw[1]];
+                return [];
             }
 
             function applyAll(ask) {

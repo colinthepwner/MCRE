@@ -2032,6 +2032,8 @@ F	awv	l	field_78291_n	red
 F	awv	m	field_78292_o	blue
 F	awv	n	field_78306_p	green
 F	awv	o	field_78305_q	alpha
+F	aww	c	field_73842_c	rand
+F	aww	d	field_73839_d	mc
 F	awx	j	field_73735_i	zLevel
 F	axr	f	field_73882_e	mc
 F	axr	g	field_73880_f	width
@@ -2446,6 +2448,7 @@ F	net/minecraft/client/Minecraft	k	field_71449_j	session
 F	net/minecraft/client/Minecraft	p	field_71446_o	renderEngine
 F	net/minecraft/client/Minecraft	q	field_71466_p	fontRenderer
 F	net/minecraft/client/Minecraft	s	field_71462_r	currentScreen
+F	net/minecraft/client/Minecraft	w	field_71456_v	ingameGUI
 F	net/minecraft/client/Minecraft	z	field_71474_y	gameSettings
 F	net/minecraft/server/MinecraftServer	a	field_71304_b	theProfiler
 F	net/minecraft/server/MinecraftServer	b	field_71305_c	worldServers
@@ -2553,6 +2556,7 @@ F	tj	c	field_75151_b	inventorySlots
 F	tj	d	field_75152_c	windowId
 F	tj	e	field_75149_d	crafters
 F	tx	a	field_75229_a	thePlayer
+F	uk	b	field_75238_b	thePlayer
 F	ul	a	field_75225_a	slotIndex
 F	ul	f	field_75224_c	inventory
 F	ul	g	field_75222_d	slotNumber
@@ -2844,6 +2848,7 @@ M	aab	a	(Lmp;DDDFZ)Lzw;	func_72876_a	createExplosion
 M	aab	a	(Lmp;Laqx;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	aab	a	(Lmp;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
 M	aab	a	(Lsq;IIIII)V	func_72889_a	playAuxSFXAtEntity
+M	aab	b	()V	func_72835_b	tick
 M	aab	b	(DDDD)Lsq;	func_72846_b	getClosestVulnerablePlayer
 M	aab	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
 M	aab	b	(IIIII)Z	func_72921_c	setBlockMetadataWithNotify
@@ -3280,6 +3285,7 @@ M	awv	b	()Z	func_82883_a	getUnicodeFlag
 M	awv	b	(Ljava/lang/String;I)I	func_78267_b	splitStringWidth
 M	awv	b	(Ljava/lang/String;III)I	func_78276_b	drawString
 M	awv	c	(Ljava/lang/String;I)Ljava/util/List;	func_78271_c	listFormattedStringToWidth
+M	aww	a	(FZII)V	func_73830_a	renderGameOverlay
 M	awx	a	(IIII)V	func_73730_a	drawHorizontalLine
 M	awx	a	(IIIII)V	func_73734_a	drawRect
 M	awx	a	(IIIIII)V	func_73733_a	drawGradientRect
@@ -3311,6 +3317,11 @@ M	axr	l	()Ljava/lang/String;	func_73870_l	getClipboardString
 M	axr	m	()V	func_73862_m	handleInput
 M	axr	o	()Z	func_73861_o	isCtrlKeyDown
 M	axr	p	()Z	func_73877_p	isShiftKeyDown
+M	axs	a	()I	func_78326_a	getScaledWidth
+M	axs	b	()I	func_78328_b	getScaledHeight
+M	axs	c	()D	func_78327_c	getScaledWidth_double
+M	axs	d	()D	func_78324_d	getScaledHeight_double
+M	axs	e	()I	func_78325_e	getScaleFactor
 M	ayl	A_	()V	func_73866_w_	initGui
 M	ayl	a	(CI)V	func_73869_a	keyTyped
 M	ayl	a	(FII)V	func_74185_a	drawGuiContainerBackgroundLayer
@@ -3461,9 +3472,11 @@ M	bet	a	(Lbge;FFFFFF)V	func_70539_a	renderParticle
 M	bet	l_	()V	func_70071_h_	onUpdate
 M	beu	a	()V	func_70088_a	entityInit
 M	beu	a	(Lbge;FFFFFF)V	func_70539_a	renderParticle
+M	beu	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	beu	ap	()Z	func_70075_an	canAttackWithItem
 M	beu	b	()I	func_70537_b	getFXLayer
 M	beu	b	(FFF)V	func_70538_b	setRBGColorF
+M	beu	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	beu	c	()F	func_70534_d	getRedColorF
 M	beu	d	()F	func_70542_f	getGreenColorF
 M	beu	e	(F)Lbeu;	func_70543_e	multiplyVelocity
@@ -3759,10 +3772,12 @@ M	gu	k	()I	func_72394_k	getCurrentPlayerCount
 M	gu	k	(Ljava/lang/String;)V	func_92062_k	sendChatMsg
 M	gu	l	()I	func_72352_l	getMaxPlayers
 M	iz	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
+M	iz	b	()V	func_72835_b	tick
 M	iz	c	(Lmp;)Z	func_72942_c	addWeatherEffect
 M	iz	d	(IIIIII)V	func_72965_b	addBlockEvent
 M	iz	o	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	jc	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	jc	a	(Lka;I)V	func_71064_a	addStat
 M	jc	a	(Llt;)V	func_71007_a	displayGUIChest
@@ -3770,6 +3785,7 @@ M	jc	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	jc	a	(Ltj;II)V	func_71112_a	sendProgressBarUpdate
 M	jc	a	(Ltj;ILwm;)V	func_71111_a	sendSlotContents
 M	jc	b	(I)V	func_70606_j	setEntityHealth
+M	jc	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	jc	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	jc	e	()F	func_70047_e	getEyeHeight
 M	jc	h	()V	func_71053_j	closeScreen
@@ -3891,8 +3907,10 @@ M	ml	toString	()Ljava/lang/String;	toString	toString
 M	mm	a	()V	func_70088_a	entityInit
 M	mm	a	(FF)V	func_70105_a	setSize
 M	mm	a	(I)V	func_70873_a	setGrowingAge
+M	mm	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	mm	a_	(Lsq;)Z	func_70085_c	interact
 M	mm	b	()I	func_70874_b	getGrowingAge
+M	mm	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	mm	c	()V	func_70636_d	onLivingUpdate
 M	mm	h_	()Z	func_70631_g_	isChild
 M	mp	A	()V	func_70066_B	extinguish
@@ -3910,6 +3928,7 @@ M	mp	a	()V	func_70088_a	entityInit
 M	mp	a	(D)Z	func_70112_a	isInRangeToRenderDist
 M	mp	a	(FF)V	func_70105_a	setSize
 M	mp	a	(IIF)Lrh;	func_70054_a	dropItemWithOffset
+M	mp	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	mp	a	(Ljava/lang/String;FF)V	func_85030_a	playSound
 M	mp	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	mp	a	(Lwm;F)Lrh;	func_70099_a	entityDropItem
@@ -3923,6 +3942,7 @@ M	mp	b	(DDD)V	func_70107_b	setPosition
 M	mp	b	(DDDFF)V	func_70012_b	setLocationAndAngles
 M	mp	b	(FF)V	func_70101_b	setRotation
 M	mp	b	(II)Lrh;	func_70025_b	dropItem
+M	mp	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	mp	c	(F)F	func_70013_c	getBrightness
 M	mp	c	(ILwm;)V	func_70062_b	setCurrentItemOrArmor
 M	mp	d	(DDD)V	func_70091_d	moveEntity
@@ -3950,7 +3970,9 @@ M	mv	a	(Lmp;)I	func_75619_a	getEntityID
 M	mv	b	(I)Ljava/lang/String;	func_75617_a	getStringFromID
 M	mv	b	(Lmp;)Ljava/lang/String;	func_75621_b	getEntityString
 M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
+M	net/minecraft/client/Minecraft	a	()V	func_71384_a	startGame
 M	net/minecraft/client/Minecraft	a	(Laxr;)V	func_71373_a	displayGuiScreen
+M	net/minecraft/client/Minecraft	l	()V	func_71407_l	runTick
 M	net/minecraft/client/Minecraft	x	()Lnet/minecraft/client/Minecraft;	func_71410_x	getMinecraft
 M	net/minecraft/server/MinecraftServer	A	()[Ljava/lang/String;	func_71213_z	getAllUsernames
 M	net/minecraft/server/MinecraftServer	D	()Lnet/minecraft/server/MinecraftServer;	func_71276_C	getServer
@@ -3973,6 +3995,7 @@ M	net/minecraft/server/MinecraftServer	g	()Laaj;	func_71265_f	getGameType
 M	net/minecraft/server/MinecraftServer	g	(Ljava/lang/String;)V	func_71236_h	logWarning
 M	net/minecraft/server/MinecraftServer	h	()I	func_71232_g	getDifficulty
 M	net/minecraft/server/MinecraftServer	i	(Ljava/lang/String;)V	func_71201_j	logSevere
+M	net/minecraft/server/MinecraftServer	q	()V	func_71217_p	tick
 M	net/minecraft/server/MinecraftServer	x	()Ljava/lang/String;	func_71249_w	getMinecraftVersion
 M	net/minecraft/server/MinecraftServer	y	()I	func_71233_x	getCurrentPlayerCount
 M	net/minecraft/server/MinecraftServer	z	()I	func_71275_y	getMaxPlayers
@@ -3982,6 +4005,7 @@ M	ng	R	()Z	func_70089_S	isEntityAlive
 M	ng	Y	()Larc;	func_70040_Z	getLookVec
 M	ng	a	()V	func_70088_a	entityInit
 M	ng	a	(DDD)V	func_70634_a	setPositionAndUpdate
+M	ng	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	ng	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	ng	a	(Lmk;)Z	func_70644_a	isPotionActive
 M	ng	a	(Lmp;FF)V	func_70625_a	faceEntity
@@ -4007,6 +4031,7 @@ M	ng	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	ng	az	()Lny;	func_70671_ap	getLookHelper
 M	ng	b	(I)V	func_70606_j	setEntityHealth
 M	ng	b	(IIII)V	func_70598_b	setHomeArea
+M	ng	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	ng	b	(Lmk;)Lml;	func_70660_b	getActivePotionEffect
 M	ng	b	(Lng;)V	func_70624_b	setAttackTarget
 M	ng	b	(ZI)V	func_82160_b	dropEquipment
@@ -4063,7 +4088,9 @@ M	ns	e	(I)Ljava/lang/String;	func_75681_e	getWatchableObjectString
 M	ns	f	(I)Lwm;	func_82710_f	getWatchableObjectItemStack
 M	ns	h	(I)V	func_82708_h	setObjectWatched
 M	nu	a	()V	func_70088_a	entityInit
+M	nu	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	nu	a	(Ljava/lang/String;)V	func_70910_a	setOwner
+M	nu	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	nu	i	(Z)V	func_70908_e	playTameEffect
 M	nu	j	(Z)V	func_70903_f	setTamed
 M	nu	k	(Z)V	func_70904_g	setSitting
@@ -4099,11 +4126,13 @@ M	px	g	()V	func_75499_g	clearPathEntity
 M	pz	a	(Lnr;II)Larc;	func_75463_a	findRandomTarget
 M	pz	a	(Lnr;IILarc;)Larc;	func_75464_a	findRandomTargetBlockTowards
 M	pz	b	(Lnr;IILarc;)Larc;	func_75461_b	findRandomTargetBlockAwayFrom
+M	qh	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	qh	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	qh	a	(Lmp;F)V	func_70785_a	attackEntity
 M	qh	a	(Lqh;)Z	func_70878_b	canMateWith
 M	qh	aQ	()I	func_70627_aG	getTalkInterval
 M	qh	a_	(Lsq;)Z	func_70085_c	interact
+M	qh	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	qh	bm	()Z	func_70692_ba	canDespawn
 M	qh	c	()V	func_70636_d	onLivingUpdate
 M	qh	c	(Lwm;)Z	func_70877_b	isBreedingItem
@@ -4112,14 +4141,18 @@ M	qh	r	()Z	func_70880_s	isInLove
 M	qh	s	()V	func_70875_t	resetInLove
 M	qx	K	()Z	func_70067_L	canBeCollidedWith
 M	qx	a	()V	func_70088_a	entityInit
+M	qx	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	qx	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
+M	qx	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	qx	i	(Lmp;)Z	func_70028_i	isEntityEqual
 M	r	a	(DD)I	func_82372_a	getMovementDirection
 M	rh	H	()Z	func_70072_I	handleWaterMovement
 M	rh	a	()V	func_70088_a	entityInit
+M	rh	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	rh	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	rh	am	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	rh	ap	()Z	func_70075_an	canAttackWithItem
+M	rh	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	rh	d	()Lwm;	func_92059_d	getEntityItem
 M	rh	l_	()V	func_70071_h_	onUpdate
 M	sb	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
@@ -4157,6 +4190,7 @@ M	so	o	()Lwm;	func_70445_o	getItemStack
 M	sq	a	()V	func_70088_a	entityInit
 M	sq	a	(IIIILwm;)Z	func_82247_a	canPlayerEdit
 M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
+M	sq	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	sq	a	(Ljava/lang/String;FF)V	func_85030_a	playSound
 M	sq	a	(Lka;)V	func_71029_a	triggerAchievement
 M	sq	a	(Lka;I)V	func_71064_a	addStat
@@ -4166,6 +4200,7 @@ M	sq	aW	()I	func_70667_aM	getMaxHealth
 M	sq	aZ	()I	func_70658_aO	getTotalArmorValue
 M	sq	al	()V	func_70110_aj	setInWeb
 M	sq	am	()Ljava/lang/String;	func_70023_ak	getEntityName
+M	sq	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	sq	b	(Ljava/lang/String;)V	func_71035_c	addChatMessage
 M	sq	bG	()Lwm;	func_70694_bm	getHeldItem
 M	sq	bV	()Z	func_71039_bw	isUsingItem
@@ -4189,9 +4224,11 @@ M	sq	w	(I)V	func_71023_q	addExperience
 M	ss	Q	()F	func_70053_R	getShadowSize
 M	ss	a	()V	func_70088_a	entityInit
 M	ss	a	(I)V	func_70240_a	setKnockbackStrength
+M	ss	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	ss	a	(Z)V	func_70243_d	setIsCritical
 M	ss	ap	()Z	func_70075_an	canAttackWithItem
 M	ss	b	(D)V	func_70239_b	setDamage
+M	ss	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	ss	c	()D	func_70242_d	getDamage
 M	ss	c	(DDDFF)V	func_70186_c	setThrowableHeading
 M	ss	d	()Z	func_70241_g	getIsCritical
@@ -4201,17 +4238,23 @@ M	su	Q	()F	func_70053_R	getShadowSize
 M	su	a	()V	func_70088_a	entityInit
 M	su	a	(D)Z	func_70112_a	isInRangeToRenderDist
 M	su	a	(Lara;)V	func_70227_a	onImpact
+M	su	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	su	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
+M	su	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	su	c	(F)F	func_70013_c	getBrightness
 M	su	l_	()V	func_70071_h_	onUpdate
 M	sw	Q	()F	func_70053_R	getShadowSize
 M	sw	a	()V	func_70088_a	entityInit
 M	sw	a	(D)Z	func_70112_a	isInRangeToRenderDist
+M	sw	a	(Lbs;)V	func_70037_a	readEntityFromNBT
+M	sw	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	sw	c	()I	func_70198_d	catchFish
 M	sw	c	(DDDFF)V	func_70199_c	calculateVelocity
 M	sw	l_	()V	func_70071_h_	onUpdate
 M	sw	w	()V	func_70106_y	setDead
 M	sx	a	(Lara;)V	func_70227_a	onImpact
+M	sx	a	(Lbs;)V	func_70037_a	readEntityFromNBT
+M	sx	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	sy	c	(DDDFF)V	func_70186_c	setThrowableHeading
 M	sz	K	()Z	func_70067_L	canBeCollidedWith
 M	sz	a	(Lara;)V	func_70227_a	onImpact
@@ -4226,6 +4269,8 @@ M	tb	Q	()F	func_70053_R	getShadowSize
 M	tb	a	()V	func_70088_a	entityInit
 M	tb	a	(D)Z	func_70112_a	isInRangeToRenderDist
 M	tb	a	(Lara;)V	func_70184_a	onImpact
+M	tb	a	(Lbs;)V	func_70037_a	readEntityFromNBT
+M	tb	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	tb	c	()F	func_70182_d	func_70182_d
 M	tb	c	(DDDFF)V	func_70186_c	setThrowableHeading
 M	tb	d	()F	func_70183_g	func_70183_g
@@ -4257,6 +4302,9 @@ M	tq	e	()Llt;	func_85151_d	getLowerChestInventory
 M	tx	a	(I)Lwm;	func_75209_a	decrStackSize
 M	tx	a	(Lsq;Lwm;)V	func_82870_a	onPickupFromSlot
 M	tx	a	(Lwm;)Z	func_75214_a	isItemValid
+M	uk	a	(I)Lwm;	func_75209_a	decrStackSize
+M	uk	a	(Lsq;Lwm;)V	func_82870_a	onPickupFromSlot
+M	uk	a	(Lwm;)Z	func_75214_a	isItemValid
 M	ul	a	()I	func_75219_a	getSlotStackLimit
 M	ul	a	(I)Lwm;	func_75209_a	decrStackSize
 M	ul	a	(Lsq;)Z	func_82869_a	canTakeStack
@@ -4517,6 +4565,7 @@ R	field_71845_a	random
 R	field_71844_b	strength
 R	field_71830_a	S
 R	field_71784_a	key
+R	field_71781_b	parameters
 R	field_74827_c	info
 R	field_74619_a	elements
 R	field_74730_a	elements
@@ -4557,8 +4606,6 @@ R	field_73772_a	mc
 R	field_73910_c	options
 R	field_73923_C	seed
 R	field_73916_E	worldTypeId
-R	field_73842_c	rand
-R	field_73839_d	mc
 R	field_78316_a	pattern
 R	field_78315_c	line
 R	field_78322_c	gameSettings
@@ -4932,7 +4979,6 @@ R	field_82860_h	theWorld
 R	field_82855_n	thePlayer
 R	field_82875_a	theWorld
 R	field_82872_e	anvil
-R	field_75238_b	thePlayer
 R	common	common
 R	field_82809_c	soilId
 R	field_77839_a	blockType
@@ -4951,7 +4997,6 @@ R	func_72980_b	playSound
 R	func_72963_a	initialize
 R	func_72857_a	findNearestEntityWithinAABB
 R	func_72844_a	getEntityPathToXYZ
-R	func_72835_b	tick
 R	func_72915_b	setLightValue
 R	func_72856_b	getClosestVulnerablePlayerToEntity
 R	func_96439_d	notifyBlocksOfNeighborChange
@@ -5188,6 +5233,7 @@ R	func_74564_a	read
 R	func_74565_b	read
 R	func_74552_a	parse
 R	func_74502_a	getType
+R	func_71384_a	startGame
 R	func_74305_a	parseFloat
 R	func_73758_b	scroll
 R	func_73866_w_	initGui
@@ -5248,6 +5294,7 @@ R	func_73773_a	draw
 R	func_78236_a	draw
 R	func_74257_b	isCancelled
 R	func_78764_a	attackEntity
+R	func_72835_b	tick
 R	func_72838_d	spawnEntityInWorld
 R	func_71150_b	setHealth
 R	func_82482_a	dispense
@@ -5390,7 +5437,9 @@ R	func_70115_ae	isRiding
 R	func_82704_a	isEntityApplicable
 R	func_70072_I	handleWaterMovement
 R	func_70088_a	entityInit
+R	func_70037_a	readEntityFromNBT
 R	func_70075_an	canAttackWithItem
+R	func_70014_b	writeEntityToNBT
 R	func_70612_e	moveEntityWithHeading
 R	func_70067_L	canBeCollidedWith
 R	func_70091_d	moveEntity

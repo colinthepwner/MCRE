@@ -249,6 +249,22 @@ VM.prototype.absentClass = function (name) {
 	return c;
 };
 
+VM.prototype.addNativeMethod = function (name, key, fn) {
+	var sp = this.natives[name];
+	if (!sp) return false;
+	sp.methods = sp.methods || {};
+	if (sp.methods[key]) return false;
+	sp.methods[key] = fn;
+	var c = this.classes[name];
+	if (c && c.native && !c.methods[key]) {
+		var p = key.indexOf('(');
+		var m = new JMethod(c, key.substring(0, p), key.substring(p), ACC_PUBLIC);
+		m.fn = fn;
+		c.methods[key] = m;
+		for (var n in this.classes) { var k = this.classes[n]; if (k && k.vcache) k.vcache = Object.create(null); }
+	}
+	return true;
+};
 VM.prototype.defineNativeClass = function (name, spec) {
 	var c = new JClass(this, name);
 	c.native = true;
@@ -489,7 +505,7 @@ var api = {
 	TOP: TOP, parseDesc: parseDesc, isWide: isWide, defaultOf: defaultOf, typeToClassName: typeToClassName,
 	describeThrowable: describeThrowable,
 	ACC_PUBLIC: ACC_PUBLIC, ACC_PRIVATE: ACC_PRIVATE, ACC_STATIC: ACC_STATIC, ACC_FINAL: ACC_FINAL,
-	ACC_SYNCHRONIZED: ACC_SYNCHRONIZED, ACC_NATIVE: ACC_NATIVE, ACC_INTERFACE: ACC_INTERFACE,
+	ACC_SYNCHRONIZED: ACC_SYNCHRONIZED, ACC_NATIVE: ACC_NATIVE, ACC_INTERFACE: ACC_INTERFACE, parseMethodDesc: parseDesc,
 	ACC_ABSTRACT: ACC_ABSTRACT,
 	create: function (opts) { return new VM(opts); },
 };
@@ -6208,6 +6224,7 @@ function installMc152(vm) {
 	if (JVM.installBrain) JVM.installBrain(vm);
 	if (JVM.installParticles) JVM.installParticles(vm);
 	if (JVM.installRecorder) JVM.installRecorder(vm);
+	if (JVM.installHooks) JVM.installHooks(vm);
 	if (JVM.installMenus) JVM.installMenus(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 	if (JVM.installForgeDims) JVM.installForgeDims(vm);
@@ -10890,6 +10907,7 @@ function install(vm) {
 		p.$constructed = true;
 		if (JVM.forgePost && vm.natives[FORGE + 'event/entity/EntityEvent$EntityConstructing'])
 			JVM.forgePost(vm, FORGE + 'event/entity/EntityEvent$EntityConstructing', function (ev) { ev[':entity'] = p; });
+		if (JVM.hookPlayerRead) { var sv = store(vm).saved; JVM.hookPlayerRead(vm, p, sv && sv.nbt); }
 	};
 }
 
@@ -10916,7 +10934,9 @@ JVM.playerDataSave = function (vm) {
 			});
 		}
 	});
-	if (!out.entityData && !(out.ext && Object.keys(out.ext).length)) return;
+	var nbt = JVM.hookPlayerWrite ? JVM.hookPlayerWrite(vm, p) : null;
+	if (nbt) out.nbt = nbt;
+	if (!out.entityData && !(out.ext && Object.keys(out.ext).length) && !out.nbt) return;
 	var txt = JSON.stringify(out);
 	if (txt === s.lastWritten) return;
 	s.lastWritten = txt;
@@ -13830,6 +13850,17 @@ JVM.guiFrame = function (vm, mx, my) {
 	r.on = false;
 	return r.ops;
 };
+JVM.guiRecordStart = function (vm) {
+	if (vm.mcGui) return;
+	var r = R(vm);
+	r.ops = []; r.t = [0, 0]; r.stack = []; r.color = [1, 1, 1, 1]; r.noTex = false; r.on = true; r.hud = true;
+};
+JVM.guiRecordEnd = function (vm) {
+	var r = R(vm);
+	if (!r.hud) return null;
+	r.on = false; r.hud = false;
+	return r.ops;
+};
 JVM.guiMouse = function (vm, mx, my, button, down) {
 	var g = vm.mcGui;
 	if (!g) return;
@@ -14540,7 +14571,11 @@ JVM.javaKind = function (vm, classes, files) {
 	if (mi && !Array.isArray(mi)) mi = mi.modList || mi.modlist || [mi];
 	if (!fj && files['plugin.yml'] && !classes.some(function (c) { return /^mod_[^/$]+$/.test(c); })) { out.loader = ''; out.cant = 'it is a server plugin (Bukkit / Spigot), not a mod for the game'; return out; }
 	if (fj) {
-		var dep = fj.depends && fj.depends.minecraft;
+		var deps = fj.depends || {};
+		var bta = /bta/i.test(String(deps.fabricloader || '')) || !!(deps.halplibe || deps.bta || deps['bta-halplibe']) ||
+			Object.keys(files).some(function (k) { if (!/[.]class$/.test(k)) return false; var b = files[k]; if (!b || b.length > 400000) return false; var t = ''; for (var i = 0; i < b.length; i++) t += String.fromCharCode(b[i]); return t.indexOf('net/minecraft/core/') >= 0; });
+		if (bta) { out.loader = 'BTA'; out.version = 'Better Than Adventure'; if (!JVM.btaLoad) out.cant = 'made for Better Than Adventure (a Beta 1.7.3 overhaul with its own mod system) - support for its mods is being added'; return out; }
+		var dep = deps.minecraft;
 		var babric = (typeof dep === 'string' && /b1[.]7|beta|1[.]0[.]0-beta/.test(dep)) || !!(fj.depends && (fj.depends.stationapi || fj.depends['station-api']));
 		var library = dep == null && !(fj.depends && (fj.depends['fabric-api'] || fj.depends.fabric));
 		if (library) babric = true;
@@ -15416,6 +15451,7 @@ function installStation(vm) {
 	def('net/fabricmc/loader/api/FabricLoader', { access: I, staticMethods: {
 		'getInstance()Lnet/fabricmc/loader/api/FabricLoader;': function (vm) { return vm.$fabric || (vm.$fabric = vm.newObject(vm.loadClass('mcre/FabricLoader'))); },
 	} });
+	def('net/fabricmc/loader/impl/FabricLoaderImpl', { super: 'mcre/FabricLoader', statics: { INSTANCE: null }, clinit: function (vm, c) { c.statics.INSTANCE = vm.$fabric || (vm.$fabric = vm.newObject(vm.loadClass('mcre/FabricLoader'))); }, methods: {} });
 	def('mcre/FabricLoader', { interfaces: ['net/fabricmc/loader/api/FabricLoader'], methods: {
 		'isModLoaded(Ljava/lang/String;)Z': function (vm, self, a) { return loaded(vm, a[0]) ? 1 : 0; },
 		'getModContainer(Ljava/lang/String;)Ljava/util/Optional;': function (vm, self, a) {
@@ -15436,7 +15472,7 @@ function installStation(vm) {
 		'getGameInstance()Ljava/lang/Object;': function (vm) { return vm.callStatic(SRC + 'ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []); },
 	} });
 
-	var logFn = function (level) { return function (vm, self, a) { var t = a[0] == null ? 'null' : String(a[0].$s || a[0]); var args = a[1] && a[1].a ? a[1].a : a.slice(1); args.forEach(function (x) { t = t.replace('{}', x == null ? 'null' : JVM.stringOf ? JVM.stringOf(vm, x) : String(x)); }); vm.log(level === 'error' ? 'warn' : 'out', '[' + (self.$name || 'mod') + '] ' + t); }; };
+	var logFn = function (level) { return function (vm, self, a) { var t = a[0] == null ? 'null' : String(a[0].$s || a[0]); var args = a[1] && a[1].a ? a[1].a : a.slice(1); if (self.$fmt) { try { t = vm.callStatic('java/lang/String', 'format', '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;', [t, JVM.javaArray(vm, 'Ljava/lang/Object;', Array.prototype.slice.call(args))]); } catch (e) { } } else args.forEach(function (x) { t = t.replace('{}', x == null ? 'null' : JVM.stringOf ? JVM.stringOf(vm, x) : String(x)); }); vm.log(level === 'error' ? 'warn' : 'out', '[' + (self.$name || 'mod') + '] ' + t); }; };
 	var logMethods = {};
 	['info', 'warn', 'error', 'debug', 'trace', 'fatal'].forEach(function (lv) {
 		['(' + STR + ')V', '(' + STR + OBJ + ')V', '(' + STR + OBJ + OBJ + ')V', '(' + STR + OBJ + OBJ + OBJ + ')V', '(' + STR + '[' + OBJ + ')V', '(' + OBJ + ')V', '(' + STR + 'Ljava/lang/Throwable;)V'].forEach(function (d) { logMethods[lv + d] = lv === 'debug' || lv === 'trace' ? function () {} : logFn(lv); });
@@ -15450,6 +15486,9 @@ function installStation(vm) {
 		'getLogger(Ljava/lang/String;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { return logger(vm, a[0]); },
 		'getLogger(Ljava/lang/Class;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { return logger(vm, a[0] && a[0].$cls ? a[0].$cls.name.split('/').pop() : 'mod'); },
 		'getLogger()Lorg/apache/logging/log4j/Logger;': function (vm) { return logger(vm, callerSpace(vm)); },
+		'getFormatterLogger(Ljava/lang/String;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { var l = logger(vm, a[0]); l.$fmt = true; return l; },
+		'getFormatterLogger(Ljava/lang/Class;)Lorg/apache/logging/log4j/Logger;': function (vm, n, a) { var l = logger(vm, a[0] && a[0].$cls ? a[0].$cls.name.split('/').pop() : 'mod'); l.$fmt = true; return l; },
+		'getFormatterLogger()Lorg/apache/logging/log4j/Logger;': function (vm) { var l = logger(vm, callerSpace(vm)); l.$fmt = true; return l; },
 	} });
 	def('org/slf4j/LoggerFactory', { staticMethods: {
 		'getLogger(Ljava/lang/String;)Lorg/slf4j/Logger;': function (vm, n, a) { return logger(vm, a[0]); },
@@ -16437,6 +16476,8 @@ function applyInjectMixins(vm, modId, fj, files) {
 				var refs = rm && rm.mappings && rm.mappings[cn] || {};
 				var ms = Object.keys(c.methods).map(function (k) { return c.methods[k]; });
 				var other = ms.some(function (m) { return (m.annotations || []).some(function (a) { return /injection[/](Redirect|ModifyArg|ModifyArgs|ModifyVariable|ModifyConstant);$|[/]Overwrite;$/.test(a.type); }); });
+				var miss = function (why) { (vm.$mixinMiss || (vm.$mixinMiss = [])).push({ mod: modId, cls: cn, why: why, target: tcls.join(',') }); };
+				ms.forEach(function (m) { (m.annotations || []).forEach(function (a) { var k = /injection[/](Redirect|ModifyArg|ModifyArgs|ModifyVariable|ModifyConstant);$|[/](Overwrite);$/.exec(a.type); if (k) miss('kind:' + (k[1] || k[2]) + ' ' + m.name); }); });
 				var inj = ms.map(function (m) { return { m: m, a: JVM.annotation(vm, m.annotations, MX + 'injection/Inject') }; }).filter(function (x) { return x.a; });
 				var merged = mergeMixin(vm, c, ms, tcls);
 				if (!inj.length && !merged) return;
@@ -16444,7 +16485,12 @@ function applyInjectMixins(vm, modId, fj, files) {
 				inj.forEach(function (x) {
 					var at = x.a.values.at, atv = at && (at.items ? at.items[0] : at);
 					var where = atv && atv.ann && atv.ann.values.value ? String(atv.ann.values.value.v) : 'HEAD';
-					if (!/^(HEAD|TAIL|RETURN)$/.test(where)) return;
+					if (/^(INVOKE|INVOKE_ASSIGN|FIELD|NEW|CONSTANT|JUMP|INVOKE_STRING)$/.test(where)) {
+						var ts = injectTargets(vm, x.a, refs)[0], nargs = ts && ts.desc ? JVM.parseMethodDesc ? JVM.parseMethodDesc(ts.desc).args.length : -1 : -1;
+						if (nargs >= 0 && x.m.sig.args.length > nargs + 1) { miss('at:' + where + '+locals ' + x.m.name); return; }
+						where = 'TAIL';
+					}
+					if (!/^(HEAD|TAIL|RETURN)$/.test(where)) { miss('at:' + where + ' ' + x.m.name); return; }
 					var hit = false;
 					injectTargets(vm, x.a, refs).forEach(function (t) {
 						tcls.forEach(function (tn) {
@@ -16459,6 +16505,7 @@ function applyInjectMixins(vm, modId, fj, files) {
 						});
 					});
 					if (hit) ok++;
+					else miss('notarget:' + injectTargets(vm, x.a, refs).map(function (t) { return t.name + (t.desc || ''); }).join('|'));
 				});
 				if (ok === inj.length && !other) {
 					applied.push(cn);
@@ -17269,6 +17316,161 @@ JVM.installAccessoryApi = install;
 (JVM.nativeMixins = JVM.nativeMixins || {})['accessoryapi.mixins.json'] = 'Accessory API';
 ['api/AccessoryRegister', 'api/AccessoryHolder', 'api/PlayerExtraHP', 'api/PlayerVisibility', 'api/TickableInArmorSlot', 'api/Accessory',
 	'api/AccessoryInventory', 'api/helper/AccessoryAccess'].forEach(function (n) { (JVM.preferNative = JVM.preferNative || {})['com/periut/accessoryapi/' + n] = true; });
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', NBT = 'Lnet/minecraft/src/NBTTagCompound;', MC = 'net/minecraft/client/Minecraft';
+var HOOKS = [
+	[MC, 'runTick()V'], [MC, 'startGame()V'], [MC, 'startWorld(Ljava/lang/String;Ljava/lang/String;J)V'],
+	[MC, 'changeWorld(Lnet/minecraft/src/World;Ljava/lang/String;Lnet/minecraft/src/EntityPlayer;)V'],
+	['net/minecraft/client/MinecraftApplet', 'init()V'],
+	[SRC + 'World', 'tick()V'],
+	[SRC + 'EntityPlayer', 'readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V'],
+	[SRC + 'EntityPlayer', 'writeEntityToNBT(Lnet/minecraft/src/NBTTagCompound;)V'],
+	[SRC + 'Slot', 'onPickupFromSlot(Lnet/minecraft/src/ItemStack;)V'],
+	[SRC + 'GuiIngame', 'renderGameOverlay(FZII)V'],
+];
+function install(vm) {
+	if (!vm.natives['net/minecraft/client/MinecraftApplet']) vm.defineNative('net/minecraft/client/MinecraftApplet', { methods: {} });
+	if (!vm.natives[SRC + 'GuiIngame']) vm.defineNative(SRC + 'GuiIngame', { super: SRC + 'Gui', fields: { mc: 'Lnet/minecraft/client/Minecraft;' }, methods: {
+		'<init>(Lnet/minecraft/client/Minecraft;)V': function (vm, self, a) { self[':mc'] = a[0]; },
+		'addChatMessage(Ljava/lang/String;)V': function (vm, self, a) { if (JVM.chat) JVM.chat(vm, String(a[0])); },
+	} });
+	if (!vm.natives[SRC + 'SlotCrafting'] && vm.natives[SRC + 'Slot']) vm.defineNative(SRC + 'SlotCrafting', { super: SRC + 'Slot', methods: {} });
+	HOOKS.forEach(function (h) { vm.addNativeMethod(h[0], h[1], function () {}); });
+	var SR = 'ScaledResolution';
+	if (!vm.natives[SRC + SR]) {
+		var size = function (vm, self) { var h = vm.mcHud || { w: 427, h: 240, s: 2 }; self.$w = h.w; self.$h = h.h; self.$s = h.s; };
+		vm.defineNative(SRC + SR, { methods: {
+			'<init>(Lnet/minecraft/src/GameSettings;II)V': size,
+			'<init>(Lnet/minecraft/client/Minecraft;II)V': size,
+			'getScaledWidth()I': function (vm, self) { return self.$w | 0; },
+			'getScaledHeight()I': function (vm, self) { return self.$h | 0; },
+			'getScaledWidth_double()D': function (vm, self) { return +self.$w; },
+			'getScaledHeight_double()D': function (vm, self) { return +self.$h; },
+			'getScaleFactor()I': function (vm, self) { return self.$s | 0; },
+		} });
+	}
+	var F = 'net/minecraftforge/client/event/RenderGameOverlayEvent';
+	if (vm.natives['net/minecraftforge/event/Event'] && !vm.natives[F]) {
+		var ET = F + '$ElementType', names = ['ALL', 'HELMET', 'PORTAL', 'CROSSHAIRS', 'BOSSHEALTH', 'ARMOR', 'HEALTH', 'FOOD', 'AIR', 'HOTBAR', 'EXPERIENCE', 'TEXT', 'HEALTHMOUNT', 'JUMPBAR', 'CHAT', 'PLAYER_LIST', 'DEBUG'];
+		var st = {}; names.forEach(function (n) { st[n] = null; });
+		vm.defineNative(ET, { super: 'java/lang/Enum', statics: st, clinit: function (vm, c) {
+			c.$values = names.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+		}, staticMethods: { 'values()[Lnet/minecraftforge/client/event/RenderGameOverlayEvent$ElementType;': function (vm) { var c = vm.loadClass(ET); vm.initClass(c); return JVM.javaArray(vm, 'L' + ET + ';', c.$values.slice()); } } });
+		var fields = { partialTicks: 'F', resolution: 'Lnet/minecraft/src/ScaledResolution;', mouseX: 'I', mouseY: 'I', type: 'L' + ET + ';' };
+		vm.defineNative(F, { super: 'net/minecraftforge/event/Event', fields: fields, methods: {} });
+		vm.defineNative(F + '$Pre', { super: F, fields: {}, methods: { 'isCancelable()Z': function () { return 1; } } });
+		vm.defineNative(F + '$Post', { super: F, fields: {}, methods: {} });
+		vm.defineNative(F + '$Text', { super: F + '$Pre', fields: { left: 'Ljava/util/ArrayList;', right: 'Ljava/util/ArrayList;' }, methods: {} });
+	}
+}
+JVM.installHooks = install;
+
+function hooked(vm, cls, key) {
+	for (var k = vm.natives[cls]; k; k = null) { var f = k.methods && k.methods[key]; return !!(f && f.$hooks); }
+	return false;
+}
+function call(vm, obj, key) {
+	var p = key.indexOf('('), args = Array.prototype.slice.call(arguments, 3);
+	JVM.run(vm, function () { vm.callVirtual(obj, key.substring(0, p), key.substring(p), args); });
+}
+function mc(vm) { return JVM.mc152.minecraftObj ? JVM.mc152.minecraftObj(vm) : null; }
+
+JVM.hooksWantTick = function (vm) {
+	return hooked(vm, MC, 'runTick()V') || hooked(vm, SRC + 'World', 'tick()V') || JVM.hudWanted(vm);
+};
+JVM.hookTick = function (vm) {
+	if (hooked(vm, MC, 'runTick()V')) call(vm, mc(vm), 'runTick()V');
+	if (hooked(vm, SRC + 'World', 'tick()V')) call(vm, JVM.mc152.worldObj(vm), 'tick()V');
+};
+JVM.hookWorldStart = function (vm) {
+	var m = mc(vm);
+	if (!vm.$hookStarted) {
+		vm.$hookStarted = true;
+		if (hooked(vm, MC, 'startGame()V')) call(vm, m, 'startGame()V');
+		if (hooked(vm, 'net/minecraft/client/MinecraftApplet', 'init()V')) JVM.run(vm, function () { var ap = vm.newObject(vm.loadClass('net/minecraft/client/MinecraftApplet')); vm.callVirtual(ap, 'init', '()V', []); });
+	}
+	var w = JVM.mc152.worldObj(vm), p = JVM.mc152.playerObj(vm, null);
+	if (hooked(vm, MC, 'startWorld(Ljava/lang/String;Ljava/lang/String;J)V')) call(vm, m, 'startWorld(Ljava/lang/String;Ljava/lang/String;J)V', 'world', 'World', BigInt(vm.mcSeed | 0));
+	if (hooked(vm, MC, 'changeWorld(Lnet/minecraft/src/World;Ljava/lang/String;Lnet/minecraft/src/EntityPlayer;)V')) call(vm, m, 'changeWorld(Lnet/minecraft/src/World;Ljava/lang/String;Lnet/minecraft/src/EntityPlayer;)V', w, 'Loading world', p);
+};
+JVM.hookPlayerRead = function (vm, p, json) {
+	if (!hooked(vm, SRC + 'EntityPlayer', 'readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V')) return;
+	var c = json ? JVM.nbtFromJson(vm, json, '') : null;
+	if (!c) { c = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(c, '<init>', '()V', []); }
+	call(vm, p, 'readEntityFromNBT(Lnet/minecraft/src/NBTTagCompound;)V', c);
+};
+JVM.hookPlayerWrite = function (vm, p) {
+	if (!hooked(vm, SRC + 'EntityPlayer', 'writeEntityToNBT(Lnet/minecraft/src/NBTTagCompound;)V')) return null;
+	var c = null;
+	JVM.run(vm, function () { c = vm.newObject(vm.loadClass(SRC + 'NBTTagCompound')); vm.callVirtual(c, '<init>', '()V', []); vm.callVirtual(p, 'writeEntityToNBT', '(' + NBT + ')V', [c]); });
+	return c ? JVM.nbtToJson(c) : null;
+};
+JVM.hookCrafted = function (vm, stack) {
+	if (!hooked(vm, SRC + 'Slot', 'onPickupFromSlot(Lnet/minecraft/src/ItemStack;)V')) return;
+	JVM.run(vm, function () {
+		var s = vm.newObject(vm.loadClass(SRC + 'SlotCrafting'));
+		vm.callVirtual(s, 'onPickupFromSlot', '(Lnet/minecraft/src/ItemStack;)V', [stack]);
+	});
+};
+
+var BLOCK_USE = 'blockActivated(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;)Z';
+var BLOCK_REMOVED = 'onBlockRemoval(Lnet/minecraft/src/World;III)V';
+var BLOCK_DESTROYED = 'onBlockDestroyedByPlayer(Lnet/minecraft/src/World;IIII)V';
+var ITEM_USE = 'onItemUse(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/World;IIII)Z';
+HOOKS.push([SRC + 'Block', BLOCK_USE], [SRC + 'Block', BLOCK_REMOVED], [SRC + 'Block', BLOCK_DESTROYED], [SRC + 'Item', ITEM_USE]);
+var vanillaBlock = function (vm, id) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); var l = c.statics.blocksList; return l && l.a ? l.a[id] || null : null; };
+var vanillaItem = function (vm, id) { var c = vm.loadClass(SRC + 'Item'); vm.initClass(c); var l = c.statics.itemsList; return l && l.a ? l.a[id] || null : null; };
+JVM.hookVanillaBlock = function (vm, t, id, data, world, x, y, z, player) {
+	var key = t === 'use' ? BLOCK_USE : t === 'break' ? BLOCK_REMOVED : null;
+	if (!key || !hooked(vm, SRC + 'Block', key)) { if (t === 'break' && hooked(vm, SRC + 'Block', BLOCK_DESTROYED)) key = BLOCK_DESTROYED; else return; }
+	var b = vanillaBlock(vm, id);
+	if (!b) return;
+	if (key === BLOCK_USE) call(vm, b, key, world, x, y, z, player || JVM.mc152.playerObj(vm, null));
+	else if (key === BLOCK_REMOVED) { call(vm, b, key, world, x, y, z); if (hooked(vm, SRC + 'Block', BLOCK_DESTROYED)) call(vm, b, BLOCK_DESTROYED, world, x, y, z, data | 0); }
+	else call(vm, b, key, world, x, y, z, data | 0);
+};
+JVM.hookVanillaItemUse = function (vm, id, count, data, world, x, y, z, face) {
+	if (!hooked(vm, SRC + 'Item', ITEM_USE)) return;
+	var it = vanillaItem(vm, id);
+	if (!it) return;
+	call(vm, it, ITEM_USE, JVM.mc152.newStack(vm, id, count, data), JVM.mc152.playerObj(vm, null), world, x, y, z, face);
+};
+
+JVM.hudWanted = function (vm) {
+	var r = JVM.mc152.reg(vm), f = vm.mcReg && vm.mcReg.forge;
+	return !!(hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') || (r.tickMods && r.tickMods.length) || (JVM.forgeWantsTick && JVM.forgeWantsTick(vm)) ||
+		(f && f.buses && f.buses.EVENT_BUS && f.buses.EVENT_BUS.$listeners.some(function (l) { return /RenderGameOverlayEvent/.test(l.type && l.type.name || ''); })));
+};
+JVM.hudBegin = function (vm, w, h, s) {
+	vm.mcHud = { w: w, h: h, s: s };
+	var m = mc(vm);
+	if (m) { m[':displayWidth'] = w * s; m[':displayHeight'] = h * s; }
+	if (JVM.guiRecordStart) JVM.guiRecordStart(vm);
+};
+JVM.hudEnd = function (vm) {
+	var m = mc(vm), hud = vm.mcHud || { w: 427, h: 240, s: 2 };
+	if (hooked(vm, SRC + 'GuiIngame', 'renderGameOverlay(FZII)V') && m) {
+		JVM.run(vm, function () {
+			var g = m[':ingameGUI'];
+			if (!g) { g = m[':ingameGUI'] = vm.newObject(vm.loadClass(SRC + 'GuiIngame')); vm.callVirtual(g, '<init>', '(Lnet/minecraft/client/Minecraft;)V', [m]); }
+			vm.callVirtual(g, 'renderGameOverlay', '(FZII)V', [0, 0, -1, -1]);
+		});
+	}
+	var F = 'net/minecraftforge/client/event/RenderGameOverlayEvent';
+	if (JVM.forgePost && vm.natives[F]) {
+		var res = null;
+		JVM.run(vm, function () { res = vm.newObject(vm.loadClass(SRC + 'ScaledResolution')); vm.callVirtual(res, '<init>', '(Lnet/minecraft/client/Minecraft;II)V', [m, hud.w * hud.s, hud.h * hud.s]); });
+		var et = vm.loadClass(F + '$ElementType'); vm.initClass(et);
+		var fill = function (e) { e[':partialTicks'] = 0; e[':resolution'] = res; e[':mouseX'] = -1; e[':mouseY'] = -1; e[':type'] = et.statics.ALL; };
+		var pre = JVM.forgePost(vm, F + '$Pre', fill);
+		if (!(pre && pre.$canceled)) JVM.forgePost(vm, F + '$Post', fill);
+	}
+	return JVM.guiRecordEnd ? JVM.guiRecordEnd(vm) : null;
+};
 })();
 
 (function () {

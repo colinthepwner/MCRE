@@ -1634,6 +1634,7 @@ F	net/minecraft/client/Minecraft	field_2809	field_2809	session
 F	net/minecraft/client/Minecraft	field_2814	field_2814	renderEngine
 F	net/minecraft/client/Minecraft	field_2815	field_2815	fontRenderer
 F	net/minecraft/client/Minecraft	field_2816	field_2816	currentScreen
+F	net/minecraft/client/Minecraft	field_2820	field_2820	ingameGUI
 F	net/minecraft/client/Minecraft	field_2824	field_2824	gameSettings
 F	net/minecraft/client/Minecraft$class_636	field_2825	field_2825	mc
 F	net/minecraft/client/Minecraft$class_637	field_2826	field_2826	mc
@@ -1713,6 +1714,7 @@ M	net/minecraft/class_18	method_222	(II)I	method_222	getHeightValue
 M	net/minecraft/class_18	method_229	(IIII)Z	method_229	setBlock
 M	net/minecraft/class_18	method_234	(III)Z	method_234	isAirBlock
 M	net/minecraft/class_18	method_239	(III)Z	method_239	blockExists
+M	net/minecraft/class_18	method_242	()V	method_242	tick
 M	net/minecraft/class_18	method_244	(IIII)V	method_244	notifyBlocksOfNeighborChange
 M	net/minecraft/class_18	method_249	(III)Z	method_249	canBlockSeeTheSky
 M	net/minecraft/class_18	method_251	()V	method_251	checkSessionLock
@@ -1736,6 +1738,7 @@ M	net/minecraft/class_124	method_439	(Lnet/minecraft/class_31;)I	method_439	getI
 M	net/minecraft/class_124	method_441	(I)I	method_441	getIconFromDamage
 M	net/minecraft/class_124	method_442	(Lnet/minecraft/class_31;)Ljava/lang/String;	method_442	getItemNameIS
 M	net/minecraft/class_124	method_443	()Ljava/lang/String;	method_443	getItemName
+M	net/minecraft/class_124	method_444	(Lnet/minecraft/class_31;Lnet/minecraft/class_54;Lnet/minecraft/class_18;IIII)Z	method_444	onItemUse
 M	net/minecraft/class_124	method_446	(Lnet/minecraft/class_31;Lnet/minecraft/class_127;Lnet/minecraft/class_127;)Z	method_446	hitEntity
 M	net/minecraft/class_124	method_447	(Lnet/minecraft/class_57;)I	method_447	getDamageVsEntity
 M	net/minecraft/class_124	method_448	()Z	method_448	isFull3D
@@ -1758,6 +1761,7 @@ M	net/minecraft/class_124	method_467	()Lnet/minecraft/class_124;	method_467	getC
 M	net/minecraft/class_124	method_469	()Ljava/lang/String;	method_469	getStatName
 M	net/minecraft/class_133	method_472	()Lnet/minecraft/class_31;	method_472	getStack
 M	net/minecraft/class_133	method_473	(I)Lnet/minecraft/class_31;	method_473	decrStackSize
+M	net/minecraft/class_133	method_474	(Lnet/minecraft/class_31;)V	method_474	onPickupFromSlot
 M	net/minecraft/class_133	method_476	()Z	method_476	getHasStack
 M	net/minecraft/class_133	method_477	(Lnet/minecraft/class_31;)Z	method_477	isItemValid
 M	net/minecraft/class_133	method_478	()V	method_478	onSlotChanged
@@ -1998,8 +2002,10 @@ M	net/minecraft/class_57	method_1351	(Lnet/minecraft/class_57;)F	method_1351	get
 M	net/minecraft/class_57	method_1352	(Lnet/minecraft/class_57;)D	method_1352	getDistanceSqToEntity
 M	net/minecraft/class_57	method_1356	()Z	method_1356	canBeCollidedWith
 M	net/minecraft/class_57	method_1359	()Z	method_1359	isBurning
+M	net/minecraft/class_57	method_1363	(Lnet/minecraft/class_8;)V	method_1363	readEntityFromNBT
 M	net/minecraft/class_57	method_1364	(D)Z	method_1364	isInRangeToRenderDist
 M	net/minecraft/class_57	method_1366	()F	method_1366	getShadowSize
+M	net/minecraft/class_57	method_1368	(Lnet/minecraft/class_8;)V	method_1368	writeEntityToNBT
 M	net/minecraft/class_57	method_1370	()V	method_1370	onUpdate
 M	net/minecraft/class_57	method_1371	(DDD)V	method_1371	moveEntity
 M	net/minecraft/class_57	method_1373	()Z	method_1373	isSneaking
@@ -2048,6 +2054,7 @@ M	net/minecraft/class_17	method_1603	(Ljava/util/Random;)I	method_1603	quantityD
 M	net/minecraft/class_17	method_1605	()V	method_1605	setBlockBoundsForItemRender
 M	net/minecraft/class_17	method_1606	(Lnet/minecraft/class_18;IIII)V	method_1606	onBlockPlaced
 M	net/minecraft/class_17	method_1607	(I)I	method_1607	getBlockTextureFromSide
+M	net/minecraft/class_17	method_1608	(Lnet/minecraft/class_18;IIILnet/minecraft/class_54;)Z	method_1608	blockActivated
 M	net/minecraft/class_17	method_1609	(Lnet/minecraft/class_18;IIII)V	method_1609	onNeighborBlockChange
 M	net/minecraft/class_17	method_1610	(Lnet/minecraft/class_18;IIILnet/minecraft/class_54;)V	method_1610	onBlockClicked
 M	net/minecraft/class_17	method_1611	(Lnet/minecraft/class_18;III)V	method_1611	onBlockAdded
@@ -2064,6 +2071,7 @@ M	net/minecraft/class_17	method_1626	(Lnet/minecraft/class_14;IIII)I	method_1626
 M	net/minecraft/class_17	method_1627	(II)I	method_1627	getBlockTextureFromSideAndMetadata
 M	net/minecraft/class_17	method_1628	(Lnet/minecraft/class_18;Lnet/minecraft/class_54;IIII)V	method_1628	harvestBlock
 M	net/minecraft/class_17	method_1629	(I)I	method_1629	damageDropped
+M	net/minecraft/class_17	method_1630	(Lnet/minecraft/class_18;III)V	method_1630	onBlockRemoval
 M	net/minecraft/class_139	method_1676	()Lnet/minecraft/class_139;	method_1676	registerStat
 M	net/minecraft/class_473	method_1683	(I)Z	method_1683	canThisPlantGrowOnThisBlockID
 M	net/minecraft/class_67	method_1685	()V	method_1685	draw
@@ -2115,6 +2123,8 @@ M	net/minecraft/class_163	method_1819	(F)V	method_1819	renderWithRotation
 M	net/minecraft/class_163	method_1820	(F)V	method_1820	postRender
 M	net/minecraft/class_554	method_1835	()I	method_1835	getHealAmount
 M	net/minecraft/class_555	method_1837	()V	method_1837	updateRenderer
+M	net/minecraft/class_564	method_1857	()I	method_1857	getScaledWidth
+M	net/minecraft/class_564	method_1858	()I	method_1858	getScaledHeight
 M	net/minecraft/class_181	method_1876	()Ljava/lang/String;	method_1876	getText
 M	net/minecraft/class_181	method_1878	(I)V	method_1878	setMaxStringLength
 M	net/minecraft/class_181	method_1879	(III)V	method_1879	mouseClicked
@@ -2133,6 +2143,7 @@ M	net/minecraft/class_584	method_1933	(IIIIII)V	method_1933	drawGradientRect
 M	net/minecraft/class_584	method_1934	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1934	drawCenteredString
 M	net/minecraft/class_584	method_1936	(IIIIII)V	method_1936	drawTexturedModalRect
 M	net/minecraft/class_584	method_1937	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1937	drawString
+M	net/minecraft/class_588	method_1946	(FZII)V	method_1946	renderGameOverlay
 M	net/minecraft/class_588	method_1949	(Ljava/lang/String;)V	method_1949	addChatMessage
 M	net/minecraft/class_591	method_1958	()Ljava/lang/String;	method_1958	getDisplayName
 M	net/minecraft/class_598	method_1975	()V	method_1975	init
@@ -2158,7 +2169,11 @@ M	net/minecraft/class_71	method_2086	(I)Lnet/minecraft/class_31;	method_2086	get
 M	net/minecraft/class_71	method_2087	(Lnet/minecraft/class_54;)V	method_2087	onCraftGuiClosed
 M	net/minecraft/class_71	method_2088	(Lnet/minecraft/class_134;)V	method_2088	onCraftMatrixChanged
 M	net/minecraft/class_71	method_2089	(ILnet/minecraft/class_31;)V	method_2089	putStackInSlot
+M	net/minecraft/client/Minecraft	method_2106	()V	method_2106	startGame
 M	net/minecraft/client/Minecraft	method_2112	(Lnet/minecraft/class_32;)V	method_2112	displayGuiScreen
+M	net/minecraft/client/Minecraft	method_2115	(Lnet/minecraft/class_18;Ljava/lang/String;Lnet/minecraft/class_54;)V	method_2115	changeWorld
+M	net/minecraft/client/Minecraft	method_2120	(Ljava/lang/String;Ljava/lang/String;J)V	method_2120	startWorld
+M	net/minecraft/client/Minecraft	method_2137	()V	method_2137	runTick
 S	net/minecraft/class_24	net/minecraft/class_139	
 S	net/minecraft/class_100	net/minecraft/class_153	
 S	net/minecraft/class_368	net/minecraft/class_153	
