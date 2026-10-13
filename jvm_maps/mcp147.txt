@@ -1934,7 +1934,24 @@ F	bae	c	field_78901_c	jump
 F	bae	d	field_78899_d	sneak
 F	bag	b	field_71158_b	movementInput
 F	bag	c	field_71159_c	mc
+F	ban	a	field_78517_a	anaglyphEnable
+F	ban	ad	field_78537_ab	random
+F	ban	r	field_78531_r	mc
+F	baz	a	field_78398_a	instance
+F	baz	m	field_78402_m	color
+F	baz	o	field_78400_o	hasTexture
+F	baz	w	field_78407_w	yOffset
+F	baz	y	field_78416_y	normal
 F	bba	j	field_78365_j	options
+F	bbb	a	field_78669_a	blockAccess
+F	bbb	d	field_78664_d	overrideBlockTexture
+F	bbb	f	field_78661_f	renderAllFaces
+F	bbb	g	field_83021_g	renderMinX
+F	bbb	h	field_83026_h	renderMaxX
+F	bbb	i	field_83027_i	renderMinY
+F	bbb	j	field_83024_j	renderMaxY
+F	bbb	k	field_83025_k	renderMinZ
+F	bbb	l	field_83022_l	renderMaxZ
 F	bbt	f	field_77077_b	rnd
 F	bbv	d	field_76989_e	shadowSize
 F	bcc	a	field_77071_a	modelBipedMain
@@ -3120,10 +3137,42 @@ M	bag	bn	()V	func_70626_be	updateEntityActionState
 M	bag	c	()V	func_70636_d	onLivingUpdate
 M	bag	d	(DDD)V	func_70091_d	moveEntity
 M	bag	i	()V	func_71053_j	closeScreen
+M	ban	a	()V	func_78464_a	updateRenderer
+M	baz	a	()I	func_78381_a	draw
+M	baz	a	(DD)V	func_78385_a	setTextureUV
+M	baz	a	(DDD)V	func_78377_a	addVertex
+M	baz	a	(DDDDD)V	func_78374_a	addVertexWithUV
+M	baz	a	(FFF)V	func_78386_a	setColorOpaque_F
+M	baz	a	(FFFF)V	func_78369_a	setColorRGBA_F
+M	baz	a	(II)V	func_78384_a	setColorRGBA_I
+M	baz	a	(III)V	func_78376_a	setColorOpaque
+M	baz	a	(IIII)V	func_78370_a	setColorRGBA
+M	baz	b	()V	func_78382_b	startDrawingQuads
+M	baz	b	(DDD)V	func_78373_b	setTranslation
+M	baz	b	(FFF)V	func_78375_b	setNormal
+M	baz	b	(I)V	func_78371_b	startDrawing
+M	baz	c	()V	func_78383_c	disableColor
+M	baz	c	(FFF)V	func_78372_c	addTranslation
+M	baz	c	(I)V	func_78380_c	setBrightness
+M	baz	d	(I)V	func_78378_d	setColorOpaque_I
 M	bb	a	(Lax;Lur;)Lur;	func_82482_a	dispense
 M	bba	a	(Ljava/lang/String;Ljava/lang/String;)I	func_78350_a	getTextureForDownloadableImage
 M	bba	b	(I)V	func_78342_b	bindTexture
 M	bba	b	(Ljava/lang/String;)I	func_78341_b	getTexture
+M	bbb	a	()V	func_78595_a	clearOverrideBlockTexture
+M	bbb	a	(DDDDDD)V	func_83020_a	setRenderBounds
+M	bbb	a	(Lamq;)V	func_83018_a	setRenderBoundsFromBlock
+M	bbb	a	(Lamq;IDDD)V	func_78579_b	renderBlockCropsImpl
+M	bbb	a	(Lamq;IDDDF)V	func_78599_a	drawCrossedSquares
+M	bbb	a	(Lamq;IF)V	func_78600_a	renderBlockAsItem
+M	bbb	a	(Lamq;IIIFFF)Z	func_78578_a	renderStandardBlockWithAmbientOcclusion
+M	bbb	b	()V	func_83017_b	unlockBlockBounds
+M	bbb	b	(DDDDDD)V	func_83019_b	overrideBlockBounds
+M	bbb	b	(Lamq;III)Z	func_78612_b	renderBlockByRenderType
+M	bbb	c	(Lamq;IIIFFF)Z	func_78609_c	renderStandardBlockWithColorMultiplier
+M	bbb	l	(Lamq;III)Z	func_78620_l	renderCrossedSquares
+M	bbb	n	(Lamq;III)Z	func_78614_n	renderBlockCrops
+M	bbb	q	(Lamq;III)Z	func_78570_q	renderStandardBlock
 M	bbk	a	(Llq;DDDFF)V	func_76986_a	doRender
 M	bbk	a	(Lmd;DDDFF)V	func_77031_a	doRenderLiving
 M	bbl	a	(Llq;DDDFF)V	func_76986_a	doRender
@@ -3172,6 +3221,11 @@ M	bd	e	()I	func_82599_e	getFrontOffsetZ
 M	bd	values	()[Lbd;	values	values
 M	bdd	a	(Llq;DDDFF)V	func_76986_a	doRender
 M	bdd	a	(Lmd;DDDFF)V	func_77031_a	doRenderLiving
+M	bdx	a	(Lany;DDDF)V	func_76894_a	renderTileEntityAt
+M	bdx	a	(Lbdw;)V	func_76893_a	setTileEntityRenderer
+M	bdx	a	(Ljava/lang/String;)V	func_76897_a	bindTextureByName
+M	bdx	a	(Lyc;)V	func_76896_a	onWorldChange
+M	bdx	b	()Latq;	func_76895_b	getFontRenderer
 M	bev	a	(Ljava/lang/String;FF)V	func_77366_a	playSoundFX
 M	bev	a	(Ljava/lang/String;FFF)V	func_77368_a	playStreaming
 M	bev	a	(Ljava/lang/String;FFFFF)V	func_77364_b	playSound
@@ -4229,6 +4283,7 @@ R	field_77241_i	right
 R	field_77238_j	left
 R	field_74113_c	mouseX
 R	field_74111_d	mouseY
+R	field_74152_c	renderItem
 R	field_82323_o	beacon
 R	field_73755_j	nextPage
 R	field_74217_o	brewingStand
@@ -4267,19 +4322,14 @@ R	field_78924_a	worldObj
 R	field_78923_c	posX
 R	field_78920_d	posY
 R	field_78921_e	posZ
+R	field_78941_z	tessellator
 R	field_78545_a	instance
-R	field_78537_ab	random
-R	field_78531_r	mc
+R	field_78462_a	image
 R	field_78455_a	mc
 R	field_72762_a	tileEntities
 R	field_72769_h	theWorld
 R	field_72770_i	renderEngine
 R	field_72777_q	mc
-R	field_78398_a	instance
-R	field_78402_m	color
-R	field_78400_o	hasTexture
-R	field_78407_w	yOffset
-R	field_78416_y	normal
 R	field_78563_e	instance
 R	field_78550_b	xPosition
 R	field_78551_c	yPosition
@@ -4557,6 +4607,7 @@ R	field_70978_d	targetZ
 R	field_70287_a	blockID
 R	field_70285_b	metadata
 R	field_70502_e	fuel
+R	field_70500_g	matrix
 R	field_70224_b	targetX
 R	field_70225_c	targetY
 R	field_70222_d	targetZ
@@ -4857,25 +4908,33 @@ R	func_70097_a	attackEntityFrom
 R	func_70062_b	setCurrentItemOrArmor
 R	func_70636_d	onLivingUpdate
 R	func_70047_e	getEyeHeight
+R	func_78907_a	updateRenderer
 R	func_78913_a	setPosition
 R	func_78914_f	markDirty
+R	func_78443_a	renderItem
 R	func_72710_a	markBlockForUpdate
 R	func_72708_a	spawnParticle
 R	func_72704_a	playSound
 R	func_72706_a	playAuxSFX
-R	func_78381_a	draw
 R	func_78379_d	reset
 R	func_78344_a	deleteTexture
 R	func_82772_a	updateDynamicTexture
+R	func_82774_a	setOverrideBlockTexture
 R	func_78547_a	setPosition
 R	func_78558_a	getInstance
 R	func_78559_a	normalize
 R	func_78560_b	init
 R	func_76986_a	doRender
 R	func_77031_a	doRenderLiving
+R	func_78716_a	getFontRenderer
 R	func_78717_a	set
 R	func_82482_a	dispense
 R	func_76846_a	onTick
+R	func_76894_a	renderTileEntityAt
+R	func_76896_a	onWorldChange
+R	func_76893_a	setTileEntityRenderer
+R	func_76954_a	getFontRenderer
+R	func_76949_a	renderTileEntityAt
 R	func_71262_S	isDedicatedServer
 R	func_71225_e	canStructuresSpawn
 R	func_71265_f	getGameType

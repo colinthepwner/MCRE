@@ -5859,6 +5859,7 @@ function installMc152(vm) {
 	if (JVM.installProjectiles) JVM.installProjectiles(vm);
 	if (JVM.installBrain) JVM.installBrain(vm);
 	if (JVM.installParticles) JVM.installParticles(vm);
+	if (JVM.installRecorder) JVM.installRecorder(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 	if (JVM.installForgeDims) JVM.installForgeDims(vm);
 	if (JVM.installWorldServices) JVM.installWorldServices(vm);
@@ -6255,6 +6256,7 @@ JVM.collectContent = function (vm, modId) {
 	var ref = function (id, data) {
 		var o = r.blocks[id] ? r.blocks[id] : r.items[id];
 		if (o) return (o.$mod === modId ? '' : o.$mod + ':') + JVM.contentName(vm, id, data);
+		if (id === 38) return 'minecraft:38:1';
 		return 'minecraft:' + id + (data ? ':' + data : '');
 	};
 	var tex = function (icon) {
@@ -6337,6 +6339,17 @@ JVM.collectContent = function (vm, modId) {
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		var rtype = safe(function () { return vm.callVirtual(b, 'getRenderType', '()I', []); }, 0);
 		if (rtype === 1) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
+		if (JVM.recordBlock && !stFiles) {
+			var rq = safe(function () { return JVM.recordBlock(vm, b, id, meta); }, null);
+			if (rq) {
+				var jq = JVM.quadsJson(vm, rq, function (icon) { var t = tex(icon); if (!t) return null; if (!t.vanilla) out.textures['blocks/' + t.name] = t; return t.name; }, out, 'b' + id, vm.resources);
+				var cube = jq.length === 6 && jq.every(function (q) { var xs = q.p.map(function (v) { return v[0]; }), ys = q.p.map(function (v) { return v[1]; }), zs = q.p.map(function (v) { return v[2]; });
+					var span = function (a) { return Math.max.apply(null, a) - Math.min.apply(null, a); };
+					var flat = [span(xs), span(ys), span(zs)].filter(function (v) { return v < 0.01; }).length === 1;
+					return flat && [xs, ys, zs].every(function (a) { return Math.min.apply(null, a) >= -0.01 && Math.max.apply(null, a) <= 16.01 && (span(a) < 0.01 || span(a) > 15.99); }); });
+				if (jq.length && !cube) { json.quads = jq; json.transparent = true; delete json.shape; }
+			}
+		}
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
 		if (mat === 'wood' || mat === 'cloth' || mat === 'leaves') json.flammable = true;
 		if (r.burn && r.burn[id] && r.burn[id][1] > 0) json.flammable = true;
@@ -6418,6 +6431,17 @@ JVM.collectContent = function (vm, modId) {
 		if (overrides(it, ITEM_SCRIPTED) || it.$scriptedUse) { json.scripted = true; out.scripted.items[id] = true; }
 		var itf = fuelOf(id, meta);
 		if (itf > 0) json.fuel = itf;
+		if (JVM.recordItem && vm.mcReg && vm.mcReg.itemRenderers && vm.mcReg.itemRenderers[id]) {
+			var iq = safe(function () { return JVM.recordItem(vm, id, meta); }, null);
+			if (iq) {
+				var dk = JVM.contentName(vm, id, meta) + '_display';
+				var djq = JVM.quadsJson(vm, iq, function (icon) { var t2 = tex(icon); if (!t2) return null; if (!t2.vanilla) out.textures[(t2.file || t2.sheet != null ? 'items/' : 'blocks/') + t2.name] = t2; return t2.name; }, out, dk, vm.resources);
+				if (djq.length) {
+					out.blocks[dk] = { name: json.name, quads: djq, transparent: true, collision: false, creative: false, drops: 'none', hardness: 0 };
+					json.display_block = dk;
+				}
+			}
+		}
 		out.items[JVM.contentName(vm, id, meta)] = json;
 	}
 	function fuelOf(id, meta) {
@@ -13859,6 +13883,528 @@ JVM.javaKind = function (vm, classes, files) {
 	if (out.version && !JVM.mapTagFor(out.version)) out.cant = 'made for Minecraft ' + out.version + ' (mods for Minecraft 1.4.7, 1.5 and 1.6 run here)';
 	return out;
 };
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+
+function ident() { return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; }
+function mul(a, b) {
+	var r = new Array(16);
+	for (var c = 0; c < 4; c++) for (var row = 0; row < 4; row++) {
+		var s = 0;
+		for (var k = 0; k < 4; k++) s += a[k * 4 + row] * b[c * 4 + k];
+		r[c * 4 + row] = s;
+	}
+	return r;
+}
+function translate(m, x, y, z) { return mul(m, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]); }
+function scale(m, x, y, z) { return mul(m, [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]); }
+function rotate(m, deg, x, y, z) {
+	var l = Math.sqrt(x * x + y * y + z * z);
+	if (!l || !deg) return m;
+	x /= l; y /= l; z /= l;
+	var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), t = 1 - c;
+	return mul(m, [t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0,
+	               t * x * y - s * z, t * y * y + c, t * y * z + s * x, 0,
+	               t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0,
+	               0, 0, 0, 1]);
+}
+function apply(m, p) {
+	return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
+	        m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
+	        m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]];
+}
+
+JVM.recStart = function (vm) { vm.$rec = { m: ident(), stack: [], quads: [], tex: null, tess: null, icons: vm.$recIcons || (vm.$recIcons = {}) }; return vm.$rec; };
+JVM.recStop = function (vm) { var r = vm.$rec; vm.$rec = null; return r ? r.quads : []; };
+function rec(vm) { return vm.$rec; }
+function emit(vm, pts, uvs, pic) {
+	var R = rec(vm);
+	if (!R || R.quads.length > 4000) return;
+	R.quads.push({ p: pts.map(function (p) { return apply(R.m, p); }), uv: uvs, icon: pic && pic.icon || null, img: pic && pic.img || null, iw: pic && pic.iw || 0, ih: pic && pic.ih || 0 });
+}
+
+function install(vm) {
+	var spec = function (n) { return vm.natives[n.indexOf('/') >= 0 ? n : SRC + n]; };
+	var def = function (n, s) { if (!spec(n)) vm.defineNative(n.indexOf('/') >= 0 ? n : SRC + n, s); };
+	var add = function (n, methods) { var s = spec(n); if (s) s.methods = Object.assign({}, s.methods || {}, methods); };
+
+	var GL = spec('org/lwjgl/opengl/GL11');
+	if (GL) {
+		var wrap = function (k, fn) {
+			var prev = GL.staticMethods[k];
+			GL.staticMethods[k] = function (vm, n, a) { var r = prev ? prev(vm, n, a) : undefined; var R = rec(vm); if (R) fn(R, a); return r; };
+		};
+		wrap('glPushMatrix()V', function (R) { R.stack.push(R.m.slice()); });
+		wrap('glPopMatrix()V', function (R) { if (R.stack.length) R.m = R.stack.pop(); });
+		wrap('glLoadIdentity()V', function (R) { R.m = ident(); });
+		wrap('glTranslatef(FFF)V', function (R, a) { R.m = translate(R.m, a[0], a[1], a[2]); });
+		wrap('glTranslated(DDD)V', function (R, a) { R.m = translate(R.m, a[0], a[1], a[2]); });
+		wrap('glRotatef(FFFF)V', function (R, a) { R.m = rotate(R.m, a[0], a[1], a[2], a[3]); });
+		wrap('glRotated(DDDD)V', function (R, a) { R.m = rotate(R.m, a[0], a[1], a[2], a[3]); });
+		wrap('glScalef(FFF)V', function (R, a) { R.m = scale(R.m, a[0], a[1], a[2]); });
+		wrap('glScaled(DDD)V', function (R, a) { R.m = scale(R.m, a[0], a[1], a[2]); });
+	}
+
+	def('EntityRenderer', { statics: { anaglyphEnable: 0 }, methods: {
+		'<init>(Lnet/minecraft/client/Minecraft;)V': function () {},
+		'updateRenderer()V': function () {},
+	} });
+	add('Block', { 'getBlockTexture(Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;': function (vm, self, a) {
+		var meta = 0;
+		try { meta = a[0] ? vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]) : 0; } catch (e) { meta = 0; }
+		return vm.callVirtual(self, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[4], meta]);
+	} });
+	var IRT = 'net/minecraftforge/client/IItemRenderer$ItemRenderType';
+	def(IRT, { super: 'java/lang/Enum', statics: { ENTITY: null, EQUIPPED: null, EQUIPPED_FIRST_PERSON: null, INVENTORY: null, FIRST_PERSON_MAP: null }, clinit: function (vm, c) {
+		c.$values = ['ENTITY', 'EQUIPPED', 'EQUIPPED_FIRST_PERSON', 'INVENTORY', 'FIRST_PERSON_MAP'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
+	} });
+	var IRH = 'net/minecraftforge/client/IItemRenderer$ItemRendererHelper';
+	def(IRH, { super: 'java/lang/Enum', statics: { ENTITY_ROTATION: null, ENTITY_BOBBING: null, EQUIPPED_BLOCK: null, BLOCK_3D: null, INVENTORY_BLOCK: null }, clinit: function (vm, c) {
+		c.$values = ['ENTITY_ROTATION', 'ENTITY_BOBBING', 'EQUIPPED_BLOCK', 'BLOCK_3D', 'INVENTORY_BLOCK'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o.$ordinal = i; c.statics[n] = o; return o; });
+	} });
+	[[IRT, 'IItemRenderer$ItemRenderType'], [IRH, 'IItemRenderer$ItemRendererHelper']].forEach(function (e) {
+		var sp = spec(e[0]);
+		sp.staticMethods = Object.assign({}, sp.staticMethods || {});
+		sp.staticMethods['values()[L' + e[0] + ';'] = function (vm) { var c = vm.loadClass(e[0]); vm.initClass(c); return JVM.javaArray(vm, 'L' + e[0] + ';', c.$values.slice()); };
+		sp.staticMethods['valueOf(Ljava/lang/String;)L' + e[0] + ';'] = function (vm, n, a) { var c = vm.loadClass(e[0]); vm.initClass(c); return c.statics[a[0]] || null; };
+	});
+	var MFC = 'net/minecraftforge/client/MinecraftForgeClient';
+	var regItem = function (vm, n, a) { if (a[1]) ((vm.mcReg || (vm.mcReg = {})).itemRenderers || (vm.mcReg.itemRenderers = {}))[a[0]] = a[1]; };
+	if (spec(MFC)) spec(MFC).staticMethods['registerItemRenderer(ILnet/minecraftforge/client/IItemRenderer;)V'] = regItem;
+	else vm.defineNative(MFC, { staticMethods: {
+		'registerItemRenderer(ILnet/minecraftforge/client/IItemRenderer;)V': regItem,
+		'preloadTexture(Ljava/lang/String;)V': function () {},
+		'getRenderPass()I': function () { return 0; },
+		'getItemRenderer(Lnet/minecraft/src/ItemStack;Lnet/minecraftforge/client/IItemRenderer$ItemRenderType;)Lnet/minecraftforge/client/IItemRenderer;': function (vm, n, a) { var r = vm.mcReg && vm.mcReg.itemRenderers; return r && a[0] ? r[a[0][':itemID']] || null : null; },
+	} });
+	def('TileEntitySpecialRenderer', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {
+		'<init>()V': function () {},
+		'setTileEntityRenderer(Lnet/minecraft/src/TileEntityRenderer;)V': function () {},
+		'onWorldChange(Lnet/minecraft/src/World;)V': function () {},
+		'getFontRenderer()Lnet/minecraft/src/FontRenderer;': function () { return null; },
+	} });
+	var bindRL = function (vm, rl) { var R = rec(vm); if (R && rl) R.tex = (rl.$domain || 'minecraft') + ':' + rl.$path; };
+	var bindStr = function (vm, s) { var R = rec(vm); if (R && s) R.tex = String(s); };
+	['Render', 'TileEntitySpecialRenderer', 'TextureManager', 'RenderEngine'].forEach(function (n) {
+		var s = spec(n);
+		if (!s) return;
+		['bindTexture(Lnet/minecraft/src/ResourceLocation;)V', 'func_110628_a(Lnet/minecraft/src/ResourceLocation;)V'].forEach(function (k) {
+			var prev = s.methods[k];
+			s.methods[k] = function (vm, self, a) { bindRL(vm, a[0]); return prev ? prev(vm, self, a) : undefined; };
+		});
+		['bindTextureByName(Ljava/lang/String;)V', 'loadTexture(Ljava/lang/String;)V', 'bindTexture(Ljava/lang/String;)V'].forEach(function (k) {
+			var prev = s.methods[k];
+			s.methods[k] = function (vm, self, a) { bindStr(vm, a[0]); return prev ? prev(vm, self, a) : undefined; };
+		});
+	});
+
+	var IC = spec('mcre/Icon');
+	if (IC) {
+		var kOf = function (vm, self) {
+			if (!self.$k) { vm.$iconK = (vm.$iconK || 1) + 1; self.$k = vm.$iconK; (vm.$recIcons || (vm.$recIcons = {}))[self.$k] = self; }
+			return self.$k;
+		};
+		Object.assign(IC.methods, {
+			'getMinU()F': function (vm, self) { return kOf(vm, self); }, 'getMaxU()F': function (vm, self) { return kOf(vm, self) + 1; },
+			'getMinV()F': function (vm, self) { return kOf(vm, self); }, 'getMaxV()F': function (vm, self) { return kOf(vm, self) + 1; },
+			'getInterpolatedU(D)F': function (vm, self, a) { return kOf(vm, self) + a[0] / 16; },
+			'getInterpolatedV(D)F': function (vm, self, a) { return kOf(vm, self) + a[0] / 16; },
+		});
+	}
+
+	var MR = spec('ModelRenderer');
+	var picOfModel = function (vm, r) {
+		var R = rec(vm);
+		return { img: R && R.tex, iw: +r[':textureWidth'] || 64, ih: +r[':textureHeight'] || 32 };
+	};
+	var drawBox = function (vm, b, f, pic) {
+		var x = b.x - b.inflate, y = b.y - b.inflate, z = b.z - b.inflate;
+		var X = b.x + b.w + b.inflate, Y = b.y + b.h + b.inflate, Z = b.z + b.d + b.inflate;
+		if (b.mirror) { var t = X; X = x; x = t; }
+		var v7 = [x, y, z], v0 = [X, y, z], v1 = [X, Y, z], v2 = [x, Y, z], v3 = [x, y, Z], v4 = [X, y, Z], v5 = [X, Y, Z], v6 = [x, Y, Z];
+		var u = b.u, v = b.v, w = b.w, h = b.h, d = b.d;
+		var faces = [
+			[[v4, v0, v1, v5], u + d + w, v + d, u + d + w + d, v + d + h],
+			[[v7, v3, v6, v2], u, v + d, u + d, v + d + h],
+			[[v4, v3, v7, v0], u + d, v, u + d + w, v + d],
+			[[v1, v2, v6, v5], u + d + w, v + d, u + d + w + w, v],
+			[[v0, v7, v2, v1], u + d, v + d, u + d + w, v + d + h],
+			[[v3, v4, v5, v6], u + d + w + d, v + d, u + d + w + d + w, v + d + h]];
+		faces.forEach(function (q) {
+			var pts = q[0].map(function (p) { return [p[0] * f, p[1] * f, p[2] * f]; });
+			var uvs = [[q[3], q[2]], [q[1], q[2]], [q[1], q[4]], [q[3], q[4]]];
+			if (b.mirror) { pts.reverse(); uvs.reverse(); }
+			emit(vm, pts, uvs, pic);
+		});
+	};
+	var partTransform = function (R, r, f) {
+		if (r[':offsetX'] || r[':offsetY'] || r[':offsetZ']) R.m = translate(R.m, +r[':offsetX'] || 0, +r[':offsetY'] || 0, +r[':offsetZ'] || 0);
+		R.m = translate(R.m, r[':rotationPointX'] * f, r[':rotationPointY'] * f, r[':rotationPointZ'] * f);
+		var D = 180 / Math.PI;
+		if (r[':rotateAngleZ']) R.m = rotate(R.m, r[':rotateAngleZ'] * D, 0, 0, 1);
+		if (r[':rotateAngleY']) R.m = rotate(R.m, r[':rotateAngleY'] * D, 0, 1, 0);
+		if (r[':rotateAngleX']) R.m = rotate(R.m, r[':rotateAngleX'] * D, 1, 0, 0);
+	};
+	var renderPart = function (vm, r, f) {
+		var R = rec(vm);
+		if (!R || !r[':showModel'] || r[':isHidden']) return;
+		R.stack.push(R.m.slice());
+		partTransform(R, r, f);
+		var pic = picOfModel(vm, r);
+		(r.$boxes || []).forEach(function (b) { drawBox(vm, b, f, pic); });
+		var kids = r[':childModels'];
+		if (kids) Array.prototype.slice.call(vm.callVirtual(kids, 'toArray', '()[Ljava/lang/Object;', []).a).forEach(function (c) { vm.callVirtual(c, 'render', '(F)V', [f]); });
+		R.m = R.stack.pop();
+	};
+	if (MR) {
+		var prevRender = MR.methods['render(F)V'];
+		MR.methods['render(F)V'] = function (vm, self, a) { if (prevRender) prevRender(vm, self, a); if (rec(vm)) renderPart(vm, self, a[0]); };
+		var prevRot = MR.methods['renderWithRotation(F)V'];
+		MR.methods['renderWithRotation(F)V'] = function (vm, self, a) { if (prevRot) prevRot(vm, self, a); if (rec(vm)) renderPart(vm, self, a[0]); };
+		MR.methods['postRender(F)V'] = function (vm, self, a) { var R = rec(vm); if (R) partTransform(R, self, a[0]); };
+	}
+	var MB = spec('ModelBox');
+	if (MB) MB.methods['render(Lnet/minecraft/src/Tessellator;F)V'] = function (vm, self, a) {
+		if (!rec(vm) || !self.$box) return;
+		var R = rec(vm);
+		drawBox(vm, self.$box, a[1], { img: R.tex, iw: 64, ih: 32 });
+	};
+
+	var tessQuad = function (vm, T) {
+		var vs = T.v;
+		if (vs.length < 4) return;
+		var R = rec(vm);
+		var pts = vs.map(function (v) { return [v[0], v[1], v[2]]; }), uvs = vs.map(function (v) { return [v[3], v[4]]; });
+		var cu = (uvs[0][0] + uvs[1][0] + uvs[2][0] + uvs[3][0]) / 4, cv = (uvs[0][1] + uvs[1][1] + uvs[2][1] + uvs[3][1]) / 4;
+		var pic;
+		if (cu >= 2 && Math.floor(cu) === Math.floor(cv) && R.icons[Math.floor(cu)]) {
+			var k = Math.floor(cu);
+			pic = { icon: R.icons[k] };
+			uvs = uvs.map(function (t) { return [Math.max(0, Math.min(16, (t[0] - k) * 16)), Math.max(0, Math.min(16, (t[1] - k) * 16))]; });
+		} else {
+			pic = { img: R.tex, iw: 1, ih: 1 };
+		}
+		var o = T.off;
+		emit(vm, pts.map(function (p) { return [p[0] + o[0], p[1] + o[1], p[2] + o[2]]; }), uvs, pic);
+	};
+	def('Tessellator', { statics: { instance: null }, clinit: function (vm, c) { c.statics.instance = vm.newObject(c); }, methods: {
+		'<init>()V': function () {}, '<init>(I)V': function () {},
+		'startDrawingQuads()V': function (vm, self) { self.$T = { mode: 7, v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
+		'startDrawing(I)V': function (vm, self, a) { self.$T = { mode: a[0], v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
+		'draw()I': function (vm, self) { if (self.$T) self.$T.v = []; return 0; },
+		'setTextureUV(DD)V': function (vm, self, a) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).uv = [a[0], a[1]]; },
+		'addVertexWithUV(DDDDD)V': function (vm, self, a) {
+			var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] });
+			T.v.push([a[0], a[1], a[2], a[3], a[4]]);
+			if (rec(vm) && (T.mode === 7 ? T.v.length === 4 : T.v.length === 3)) { if (T.v.length === 3) T.v.push(T.v[2]); tessQuad(vm, T); T.v = []; }
+			else if (T.v.length >= 4) T.v = [];
+		},
+		'addVertex(DDD)V': function (vm, self, a) {
+			var T = self.$T || (self.$T = { mode: 7, v: [], uv: [0, 0], off: [0, 0, 0] });
+			vm.callVirtual(self, 'addVertexWithUV', '(DDDDD)V', [a[0], a[1], a[2], (T.uv || [0, 0])[0], (T.uv || [0, 0])[1]]);
+		},
+		'setTranslation(DDD)V': function (vm, self, a) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).off = [a[0], a[1], a[2]]; },
+		'addTranslation(FFF)V': function (vm, self, a) { var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] }); T.off = [T.off[0] + a[0], T.off[1] + a[1], T.off[2] + a[2]]; },
+		'setNormal(FFF)V': function () {}, 'setBrightness(I)V': function () {}, 'setColorOpaque_F(FFF)V': function () {},
+		'setColorRGBA_F(FFFF)V': function () {}, 'setColorOpaque_I(I)V': function () {}, 'setColorOpaque(III)V': function () {},
+		'setColorRGBA(IIII)V': function () {}, 'setColorRGBA_I(II)V': function () {}, 'disableColor()V': function () {},
+	} });
+
+	var FACES = {
+		0: function (x0, y0, z0, x1, y1, z1) { return { p: [[x0, y0, z1], [x0, y0, z0], [x1, y0, z0], [x1, y0, z1]], d: [x0, 16 - z1, x1, 16 - z0] }; },
+		1: function (x0, y0, z0, x1, y1, z1) { return { p: [[x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0]], d: [x0, z0, x1, z1] }; },
+		2: function (x0, y0, z0, x1, y1, z1) { return { p: [[x1, y1, z0], [x1, y0, z0], [x0, y0, z0], [x0, y1, z0]], d: [16 - x1, 16 - y1, 16 - x0, 16 - y0] }; },
+		3: function (x0, y0, z0, x1, y1, z1) { return { p: [[x0, y1, z1], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1]], d: [x0, 16 - y1, x1, 16 - y0] }; },
+		4: function (x0, y0, z0, x1, y1, z1) { return { p: [[x0, y1, z0], [x0, y0, z0], [x0, y0, z1], [x0, y1, z1]], d: [z0, 16 - y1, z1, 16 - y0] }; },
+		5: function (x0, y0, z0, x1, y1, z1) { return { p: [[x1, y1, z1], [x1, y0, z1], [x1, y0, z0], [x1, y1, z0]], d: [16 - z1, 16 - y1, 16 - z0, 16 - y0] }; },
+	};
+	var bounds = function (rb) { return ['renderMinX', 'renderMinY', 'renderMinZ', 'renderMaxX', 'renderMaxY', 'renderMaxZ'].map(function (k) { return +rb[':' + k] || 0; }); };
+	var face = function (vm, rb, side, x, y, z, icon) {
+		if (!rec(vm)) return;
+		if (rb[':overrideBlockTexture']) icon = rb[':overrideBlockTexture'];
+		if (!icon) return;
+		var b = bounds(rb).map(function (v) { return v * 16; });
+		var F = FACES[side](b[0], b[1], b[2], b[3], b[4], b[5]);
+		var uv = F.d, C = [[uv[0], uv[1]], [uv[0], uv[3]], [uv[2], uv[3]], [uv[2], uv[1]]];
+		emit(vm, F.p.map(function (p) { return [p[0] / 16 + x, p[1] / 16 + y, p[2] / 16 + z]; }), C, { icon: icon });
+	};
+	var iconAt = function (vm, rb, blk, x, y, z, side) {
+		var w = rb[':blockAccess'];
+		var ic = null;
+		try { if (w) ic = vm.callVirtual(blk, 'getBlockTexture', '(Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;', [w, x, y, z, side]); } catch (e) { ic = null; }
+		if (!ic) { try { ic = vm.callVirtual(blk, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [side, vm.$defTile ? vm.$defTile.data | 0 : 0]); } catch (e2) { ic = null; } }
+		return ic;
+	};
+	var standard = function (vm, self, a) {
+		var blk = a[0], x = a[1], y = a[2], z = a[3];
+		if (!self.$locked) vm.callVirtual(self, 'setRenderBoundsFromBlock', '(Lnet/minecraft/src/Block;)V', [blk]);
+		for (var s = 0; s < 6; s++) face(vm, self, s, x, y, z, iconAt(vm, self, blk, x, y, z, s));
+		return 1;
+	};
+	var cross = function (vm, self, a) {
+		var blk = a[0], x = a[1], y = a[2], z = a[3];
+		var ic = self[':overrideBlockTexture'] || iconAt(vm, self, blk, x, y, z, 0);
+		if (!ic || !rec(vm)) return 1;
+		var q = [[[0.15, 1, 0.15], [0.15, 0, 0.15], [0.85, 0, 0.85], [0.85, 1, 0.85]], [[0.15, 1, 0.85], [0.15, 0, 0.85], [0.85, 0, 0.15], [0.85, 1, 0.15]]];
+		var C = [[0, 0], [0, 16], [16, 16], [16, 0]];
+		q.forEach(function (pts) {
+			emit(vm, pts.map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C, { icon: ic });
+			emit(vm, pts.slice().reverse().map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C.slice().reverse(), { icon: ic });
+		});
+		return 1;
+	};
+	var crops = function (vm, self, blk, meta, x, y, z) {
+		var ic = self[':overrideBlockTexture'] || vm.callVirtual(blk, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [0, meta]);
+		if (!ic || !rec(vm)) return;
+		var C = [[0, 0], [0, 16], [16, 16], [16, 0]];
+		[0.25, 0.75].forEach(function (o) {
+			[[[o, 1, 0], [o, 0, 0], [o, 0, 1], [o, 1, 1]], [[0, 1, o], [0, 0, o], [1, 0, o], [1, 1, o]]].forEach(function (pts) {
+				emit(vm, pts.map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C, { icon: ic });
+				emit(vm, pts.slice().reverse().map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C.slice().reverse(), { icon: ic });
+			});
+		});
+	};
+	var BL = 'Lnet/minecraft/src/Block;', IC2 = 'Lnet/minecraft/src/Icon;';
+	var setB = function (self, a) { ['renderMinX', 'renderMinY', 'renderMinZ', 'renderMaxX', 'renderMaxY', 'renderMaxZ'].forEach(function (k, i) { self[':' + k] = a[i]; }); };
+	var rbMethods = {
+		'<init>()V': function (vm, self) { setB(self, [0, 0, 0, 1, 1, 1]); },
+		'<init>(Lnet/minecraft/src/IBlockAccess;)V': function (vm, self, a) { setB(self, [0, 0, 0, 1, 1, 1]); self[':blockAccess'] = a[0]; },
+		'setRenderBounds(DDDDDD)V': function (vm, self, a) { if (!self.$locked) setB(self, a); },
+		'overrideBlockBounds(DDDDDD)V': function (vm, self, a) { setB(self, a); self.$locked = true; },
+		'unlockBlockBounds()V': function (vm, self) { self.$locked = false; },
+		'setRenderBoundsFromBlock(Lnet/minecraft/src/Block;)V': function (vm, self, a) {
+			if (self.$locked || !a[0]) return;
+			setB(self, ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].map(function (k) { return +a[0][':' + k]; }));
+		},
+		'setOverrideBlockTexture(Lnet/minecraft/src/Icon;)V': function (vm, self, a) { self[':overrideBlockTexture'] = a[0]; },
+		'clearOverrideBlockTexture()V': function (vm, self) { self[':overrideBlockTexture'] = null; },
+		'hasOverrideBlockTexture()Z': function (vm, self) { return self[':overrideBlockTexture'] ? 1 : 0; },
+		'renderStandardBlock(Lnet/minecraft/src/Block;III)Z': standard,
+		'renderStandardBlockWithColorMultiplier(Lnet/minecraft/src/Block;IIIFFF)Z': standard,
+		'renderStandardBlockWithAmbientOcclusion(Lnet/minecraft/src/Block;IIIFFF)Z': standard,
+		'renderBlockByRenderType(Lnet/minecraft/src/Block;III)Z': function (vm, self, a) {
+			var t = vm.callVirtual(a[0], 'getRenderType', '()I', []);
+			return t === 1 ? cross(vm, self, a) : standard(vm, self, a);
+		},
+		'renderCrossedSquares(Lnet/minecraft/src/Block;III)Z': cross,
+		'drawCrossedSquares(Lnet/minecraft/src/Block;IDDDF)V': function (vm, self, a) {
+			var ic = self[':overrideBlockTexture'] || vm.callVirtual(a[0], 'getIcon', '(II)Lnet/minecraft/src/Icon;', [0, a[1]]);
+			if (!ic || !rec(vm)) return;
+			var s = a[5] || 1, lo = 0.5 - 0.45 * s, hi = 0.5 + 0.45 * s, x = a[2], y = a[3], z = a[4];
+			var C = [[0, 0], [0, 16], [16, 16], [16, 0]];
+			[[[lo, s, lo], [lo, 0, lo], [hi, 0, hi], [hi, s, hi]], [[lo, s, hi], [lo, 0, hi], [hi, 0, lo], [hi, s, lo]]].forEach(function (pts) {
+				emit(vm, pts.map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C, { icon: ic });
+				emit(vm, pts.slice().reverse().map(function (p) { return [p[0] + x, p[1] + y, p[2] + z]; }), C.slice().reverse(), { icon: ic });
+			});
+		},
+		'renderBlockCropsImpl(Lnet/minecraft/src/Block;IDDD)V': function (vm, self, a) { crops(vm, self, a[0], a[1], a[2], a[3], a[4]); },
+		'renderBlockCrops(Lnet/minecraft/src/Block;III)Z': function (vm, self, a) {
+			crops(vm, self, a[0], vm.$defTile ? vm.$defTile.data | 0 : 0, a[1], a[2] - 0.0625, a[3]);
+			return 1;
+		},
+		'getBlockIcon(Lnet/minecraft/src/Block;Lnet/minecraft/src/IBlockAccess;IIII)Lnet/minecraft/src/Icon;': function (vm, self, a) { return self[':overrideBlockTexture'] || iconAt(vm, self, a[0], a[2], a[3], a[4], a[5]); },
+		'getBlockIconFromSideAndMetadata(Lnet/minecraft/src/Block;II)Lnet/minecraft/src/Icon;': function (vm, self, a) { return self[':overrideBlockTexture'] || vm.callVirtual(a[0], 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[1], a[2]]); },
+		'getBlockIconFromSide(Lnet/minecraft/src/Block;I)Lnet/minecraft/src/Icon;': function (vm, self, a) { return self[':overrideBlockTexture'] || vm.callVirtual(a[0], 'getIcon', '(II)Lnet/minecraft/src/Icon;', [a[1], vm.$defTile ? vm.$defTile.data | 0 : 0]); },
+		'getBlockIcon(Lnet/minecraft/src/Block;)Lnet/minecraft/src/Icon;': function (vm, self, a) { return self[':overrideBlockTexture'] || vm.callVirtual(a[0], 'getIcon', '(II)Lnet/minecraft/src/Icon;', [1, vm.$defTile ? vm.$defTile.data | 0 : 0]); },
+		'getIconSafe(Lnet/minecraft/src/Icon;)Lnet/minecraft/src/Icon;': function (vm, self, a) { return a[0]; },
+		'renderBlockAsItem(Lnet/minecraft/src/Block;IF)V': function (vm, self, a) { standard(vm, self, [a[0], 0, 0, 0]); },
+	};
+	['renderFaceYNeg', 'renderFaceYPos', 'renderFaceZNeg', 'renderFaceZPos', 'renderFaceXNeg', 'renderFaceXPos'].forEach(function (n, side) {
+		rbMethods[n + '(Lnet/minecraft/src/Block;DDDLnet/minecraft/src/Icon;)V'] = function (vm, self, a) { face(vm, self, side, a[1], a[2], a[3], a[4]); };
+	});
+	def('RenderBlocks', { fields: { renderMinX: 'D', renderMinY: 'D', renderMinZ: 'D', renderMaxX: 'D', renderMaxY: 'D', renderMaxZ: 'D', overrideBlockTexture: 'L' + SRC + 'Icon;', blockAccess: 'L' + SRC + 'IBlockAccess;', renderAllFaces: 'Z' }, methods: rbMethods });
+
+	var reg = function (vm) { var r = vm.mcReg || (vm.mcReg = {}); return r.draw || (r.draw = { handlers: {}, tesr: [] }); };
+	var RR = spec('cpw/mods/fml/client/registry/RenderingRegistry');
+	if (RR) {
+		RR.staticMethods['registerBlockHandler(Lcpw/mods/fml/client/registry/ISimpleBlockRenderingHandler;)V'] = function (vm, n, a) {
+			var h = a[0];
+			if (!h) return;
+			var id = 0;
+			try { id = vm.callVirtual(h, 'getRenderId', '()I', []); } catch (e) { id = 0; }
+			reg(vm).handlers[id] = h;
+		};
+		RR.staticMethods['registerBlockHandler(ILcpw/mods/fml/client/registry/ISimpleBlockRenderingHandler;)V'] = function (vm, n, a) { if (a[1]) reg(vm).handlers[a[0]] = a[1]; };
+	}
+	var CR = spec('cpw/mods/fml/client/registry/ClientRegistry');
+	if (CR) {
+		var prevBind = CR.staticMethods['bindTileEntitySpecialRenderer(Ljava/lang/Class;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'];
+		CR.staticMethods['bindTileEntitySpecialRenderer(Ljava/lang/Class;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'] = function (vm, n, a) {
+			if (prevBind) prevBind(vm, n, a);
+			if (a[0] && a[1]) reg(vm).tesr.push({ cls: a[0].$cls, r: a[1] });
+		};
+		var prevReg = CR.staticMethods['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'];
+		CR.staticMethods['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'] = function (vm, n, a) {
+			if (prevReg) prevReg(vm, n, a);
+			if (a[0] && a[2]) reg(vm).tesr.push({ cls: a[0].$cls, r: a[2] });
+		};
+	}
+	var ML = spec('ModLoader');
+	if (ML) {
+		var prevML = ML.staticMethods['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'];
+		ML.staticMethods['registerTileEntity(Ljava/lang/Class;Ljava/lang/String;Lnet/minecraft/src/TileEntitySpecialRenderer;)V'] = function (vm, n, a) {
+			if (prevML) prevML(vm, n, a);
+			if (a[0] && a[2]) reg(vm).tesr.push({ cls: a[0].$cls, r: a[2] });
+		};
+		var prevUid = ML.staticMethods['getUniqueBlockModelID(Lnet/minecraft/src/BaseMod;Z)I'];
+		ML.staticMethods['getUniqueBlockModelID(Lnet/minecraft/src/BaseMod;Z)I'] = function (vm, n, a) {
+			var id = prevUid ? prevUid(vm, n, a) : 0;
+			if (a[0]) reg(vm).handlers[id] = { modLoader: a[0] };
+			return id;
+		};
+	}
+}
+
+JVM.recordBlock = function (vm, b, id, meta) {
+	var D = vm.mcReg && vm.mcReg.draw;
+	if (!D) return null;
+	var rt = 0;
+	try { rt = vm.callVirtual(b, 'getRenderType', '()I', []); } catch (e) { rt = 0; }
+	var h = D.handlers[rt];
+	var tesr = null, te = null;
+	if (D.tesr.length) {
+		try {
+			var w = JVM.mc152.worldObj(vm);
+			te = null;
+			try { te = vm.callVirtual(b, 'createTileEntity', '(Lnet/minecraft/src/World;I)Lnet/minecraft/src/TileEntity;', [w, meta]); } catch (e1) { te = null; }
+			if (!te) { try { te = vm.callVirtual(b, 'createNewTileEntity', '(Lnet/minecraft/src/World;)Lnet/minecraft/src/TileEntity;', [w]); } catch (e2) { te = null; } }
+			if (te) {
+				for (var i = 0; i < D.tesr.length && !tesr; i++) if (D.tesr[i].cls && te.cls.isSubclassOf(D.tesr[i].cls)) tesr = D.tesr[i].r;
+			}
+		} catch (e3) { tesr = null; }
+	}
+	if (!h && !tesr) return null;
+	var w2 = JVM.mc152.worldObj(vm);
+	var prevDef = vm.$defTile;
+	vm.$defTile = { x: 0, y: 0, z: 0, id: id, data: meta };
+	JVM.recStart(vm);
+	var ok = JVM.run(vm, function () {
+		if (h && h.modLoader) {
+			var rb = vm.newObject(vm.loadClass(SRC + 'RenderBlocks')); vm.callVirtual(rb, '<init>', '(Lnet/minecraft/src/IBlockAccess;)V', [w2]);
+			vm.callVirtual(h.modLoader, 'renderWorldBlock', '(Lnet/minecraft/src/RenderBlocks;Lnet/minecraft/src/IBlockAccess;IIILnet/minecraft/src/Block;I)Z', [rb, w2, 0, 0, 0, b, rt]);
+		} else if (h) {
+			var rb2 = vm.newObject(vm.loadClass(SRC + 'RenderBlocks')); vm.callVirtual(rb2, '<init>', '(Lnet/minecraft/src/IBlockAccess;)V', [w2]);
+			vm.callVirtual(h, 'renderWorldBlock', '(Lnet/minecraft/src/IBlockAccess;IIILnet/minecraft/src/Block;ILnet/minecraft/src/RenderBlocks;)Z', [w2, 0, 0, 0, b, rt, rb2]);
+		}
+	});
+	var ok2 = tesr ? JVM.run(vm, function () {
+		te[':worldObj'] = w2; te[':xCoord'] = 0; te[':yCoord'] = 0; te[':zCoord'] = 0; te[':blockMetadata'] = meta; te[':blockType'] = b;
+		vm.callVirtual(tesr, 'renderTileEntityAt', '(Lnet/minecraft/src/TileEntity;DDDF)V', [te, 0, 0, 0, 0]);
+	}) : { ok: true };
+	ok = { ok: ok.ok || ok2.ok };
+	var quads = JVM.recStop(vm);
+	vm.$defTile = prevDef;
+	return ok.ok && quads.length ? quads : null;
+};
+
+JVM.recordItem = function (vm, id, meta) {
+	var R = vm.mcReg && vm.mcReg.itemRenderers, r = R && R[id];
+	if (!r) return null;
+	var c = vm.loadClass('net/minecraftforge/client/IItemRenderer$ItemRenderType'); vm.initClass(c);
+	var st = JVM.mc152.newStack(vm, id, 1, meta);
+	var type = null;
+	['EQUIPPED', 'ENTITY', 'INVENTORY'].some(function (n) {
+		var t = c.statics[n], ok = 0;
+		try { ok = vm.callVirtual(r, 'handleRenderType', '(Lnet/minecraft/src/ItemStack;Lnet/minecraftforge/client/IItemRenderer$ItemRenderType;)Z', [st, t]); } catch (e) { ok = 0; }
+		if (ok) type = t;
+		return !!ok;
+	});
+	if (!type) return null;
+	var rb = vm.newObject(vm.loadClass(SRC + 'RenderBlocks')); vm.callVirtual(rb, '<init>', '()V', []);
+	var holder = JVM.mc152.playerObj ? null : null;
+	var data = vm.newArray('Ljava/lang/Object;', 2); data.a[0] = rb; data.a[1] = holder;
+	JVM.recStart(vm);
+	var ok = JVM.run(vm, function () { vm.callVirtual(r, 'renderItem', '(Lnet/minecraftforge/client/IItemRenderer$ItemRenderType;Lnet/minecraft/src/ItemStack;[Ljava/lang/Object;)V', [type, st, data]); });
+	var quads = JVM.recStop(vm);
+	if (!ok.ok || !quads.length) return null;
+	var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+	quads.forEach(function (q) { q.p.forEach(function (p) { for (var k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p[k]); hi[k] = Math.max(hi[k], p[k]); } }); });
+	var size = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+	if (!(size > 1e-4)) return null;
+	var k = 1 / size, mid = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+	var ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+	var up = ext[0] >= ext[1] && ext[0] >= ext[2] ? 0 : ext[2] > ext[1] ? 2 : 1;
+	quads.forEach(function (q) {
+		q.p = q.p.map(function (p) {
+			var c = [(p[0] - mid[0]) * k, (p[1] - mid[1]) * k, (p[2] - mid[2]) * k];
+			if (up === 0) c = [-c[1], c[0], c[2]];
+			else if (up === 2) c = [c[0], c[2], -c[1]];
+			return [c[0] + 0.5, c[1] + 0.5, c[2] + 0.5];
+		});
+	});
+	return quads;
+};
+
+JVM.quadsJson = function (vm, quads, texOf, out, keyBase, resources) {
+	var res = [], cells = {};
+	var nm = function (v) { return Math.round(v * 1000) / 1000; };
+	var faceOf = function (p) {
+		var ax = p[1][0] - p[0][0], ay = p[1][1] - p[0][1], az = p[1][2] - p[0][2], bx = p[2][0] - p[0][0], by = p[2][1] - p[0][1], bz = p[2][2] - p[0][2];
+		var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+		var axn = Math.abs(nx), ayn = Math.abs(ny), azn = Math.abs(nz);
+		if (ayn >= axn && ayn >= azn) return ny >= 0 ? 1 : 0;
+		if (azn >= axn) return nz >= 0 ? 3 : 2;
+		return nx >= 0 ? 5 : 4;
+	};
+	var imgPath = function (t) {
+		if (!t) return null;
+		var p = String(t).replace(/^[/]+/, ''), ns = /^([a-z0-9_.-]+):(.+)$/.exec(p);
+		if (ns) p = 'assets/' + ns[1] + '/' + ns[2];
+		return resources[p] ? p : (resources[String(t).replace(/^[/]+/, '')] ? String(t).replace(/^[/]+/, '') : null);
+	};
+	var cellTex = function (path, iw, cx, cy) {
+		var k = path + '|' + cx + '|' + cy;
+		if (cells[k]) return cells[k];
+		var name = ('mdl_' + path.replace(/^assets[/]/, '').replace(/[.]png$/i, '').replace(/[^a-z0-9]+/gi, '_') + '_' + cx + '_' + cy).toLowerCase();
+		out.textures['blocks/' + name] = { name: name, data: resources[path], crop: [cx * 16, cy * 16, 16, 16, iw] };
+		return (cells[k] = name);
+	};
+	var push = function (tex, p, uv) {
+		var f = faceOf(p);
+		res.push({ t: tex, f: f, p: p.map(function (q, i) { return [nm(q[0] * 16), nm(q[1] * 16), nm(q[2] * 16), nm(uv[i][0]), nm(uv[i][1])]; }) });
+	};
+	quads.slice(0, 2000).forEach(function (q) {
+		if (q.icon) {
+			var t = texOf(q.icon);
+			if (t) push(t, q.p, q.uv);
+			return;
+		}
+		var path = imgPath(q.img);
+		if (!path) return;
+		var iw = q.iw > 1 ? q.iw : 16, ih = q.ih > 1 ? q.ih : 16;
+		var uv = q.iw > 1 ? q.uv : q.uv.map(function (t) { return [t[0] * 16, t[1] * 16]; });
+		var a = { u: uv[1][0] - uv[0][0], v: uv[1][1] - uv[0][1] }, bb = { u: uv[3][0] - uv[0][0], v: uv[3][1] - uv[0][1] };
+		var uAlongA = Math.abs(a.u) >= Math.abs(bb.u);
+		var cuts = function (from, to) {
+			var lo = Math.min(from, to), hi = Math.max(from, to), ts = [0, 1];
+			for (var g = Math.floor(lo / 16) + 1; g * 16 < hi; g++) ts.push((g * 16 - from) / (to - from));
+			return ts.sort(function (x, y) { return x - y; });
+		};
+		var ta = uAlongA ? cuts(uv[0][0], uv[1][0]) : cuts(uv[0][1], uv[1][1]);
+		var tb = uAlongA ? cuts(uv[0][1], uv[3][1]) : cuts(uv[0][0], uv[3][0]);
+		var lerp = function (x, y, t) { return x + (y - x) * t; };
+		var at = function (s, t) {
+			var P = [0, 1, 2].map(function (k) { return lerp(lerp(q.p[0][k], q.p[1][k], s), lerp(q.p[3][k], q.p[2][k], s), t); });
+			var U = [0, 1].map(function (k) { return lerp(lerp(uv[0][k], uv[1][k], s), lerp(uv[3][k], uv[2][k], s), t); });
+			return { p: P, uv: U };
+		};
+		for (var i = 0; i + 1 < ta.length; i++) for (var j = 0; j + 1 < tb.length; j++) {
+			var c = [at(ta[i], tb[j]), at(ta[i + 1], tb[j]), at(ta[i + 1], tb[j + 1]), at(ta[i], tb[j + 1])];
+			var mu = (c[0].uv[0] + c[2].uv[0]) / 2, mv = (c[0].uv[1] + c[2].uv[1]) / 2;
+			var cx = Math.floor(mu / 16), cy = Math.floor(mv / 16);
+			if (cx < 0 || cy < 0 || cx * 16 >= iw || cy * 16 >= ih) continue;
+			var tn = cellTex(path, iw, cx, cy);
+			push(tn, c.map(function (x) { return x.p; }), c.map(function (x) { return [Math.max(0, Math.min(16, x.uv[0] - cx * 16)), Math.max(0, Math.min(16, x.uv[1] - cy * 16))]; }));
+		}
+	});
+	return res;
+};
+
+JVM.installRecorder = install;
 })();
 
 (function () {

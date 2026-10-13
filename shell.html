@@ -1618,8 +1618,10 @@
                 return k.length ? '|e' + k.map(function (id) { return id + ':' + e[id]; }).join(',') : '';
             }
             function variantRef(ref) { return /^mod:[^:]+:.+_\d+$/.test(ref || ''); }
+            function gameData(id, data) { return (id | 0) === 38 ? 1 : data; }
             function javaOf(ref, data) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
+                if (/^id:38(\D|$)/.test(ref || '')) return { id: 38, data: 0 };
                 if (m && javaMods[m[1]]) return { id: refToJava(ref), data: window.JVM.contentMeta(vm, m[1], m[2]) };
                 return { id: refToJava(ref), data: data | 0 };
             }
@@ -1654,7 +1656,7 @@
                     case 'settile': {
                         forget(a[0], a[1], a[2]);
                         var sref = a[3] ? blockRef(a[3], a[4]) : 'id:0';
-                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : a[4] | 0, a[5] ? 1 : 0].join('\t'));
+                        return mp(['settile', a[0] | 0, a[1] | 0, a[2] | 0, sref, /^mod:/.test(sref) ? '' : gameData(a[3], a[4] | 0), a[5] ? 1 : 0].join('\t'));
                     }
                     case 'setdata': forget(a[0], a[1], a[2]); return mp(['setdata', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
@@ -1690,7 +1692,7 @@
                         var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
                         return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref, a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
                     }
-                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : a[5] | 0, a[6] == null ? '' : a[6] | 0].join('\t')); }
+                    case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref, a[4] | 0, variantRef(dref) ? 0 : gameData(a[3], a[5] | 0), a[6] == null ? '' : a[6] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
                         return mp('msg\t' + clean(a[0]));
@@ -1719,7 +1721,7 @@
                     case 'setslot':
                         if (actor) { actorOnly('inventory'); return 0; }
                         var sbase = a[1] ? itemRef(a[1], a[3]) : 'id:0', sref2 = a[1] ? sbase + enchSpec(a[4]) : 'id:0';
-                        return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sbase) ? 0 : a[3] | 0].join('\t'));
+                        return mp(['setslot', a[0] | 0, sref2, a[2] | 0, variantRef(sbase) ? 0 : gameData(a[1], a[3] | 0)].join('\t'));
                     case 'slot': {
                         if (actor) { actorOnly('inventory'); return null; }
                         var sl = mp('slot\t' + (a[0] | 0));
@@ -1864,7 +1866,7 @@
                     case 'tile': { var t = genJava(Module._mcJavaGenTile(x, y, z)); return { id: t.id, data: t.data }; }
                     case 'settile': {
                         if (!b) { Module._mcJavaGenSet(x, y, z, 0, 0); return 0; }
-                        var gg = genGame(b | 0, d | 0);
+                        var gg = genGame(b | 0, (b | 0) === 38 ? 1 : d | 0);
                         if (gg) Module._mcJavaGenSet(x, y, z, gg.id, gg.mod ? gg.aux : d | 0);
                         return 0;
                     }
@@ -4037,6 +4039,7 @@
                 var pretty = function (n) { return n.replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); };
                 Object.keys(blocks).forEach(function (key) {
                     var b = blocks[key], j = b.j, t = j.texture;
+                    if ((!t || (typeof t === 'object' && !Object.keys(t).some(function (k) { return t[k]; }))) && Array.isArray(j.quads) && j.quads[0] && j.quads[0].t) t = j.quads[0].t;
                     var faces;
                     if (t && typeof t === 'object') {
                         var side = t.side || t.all, all = t.all || t.side;
@@ -4094,6 +4097,15 @@
                     if (mref !== undefined) {
                         var compiled = compileModel(mref, b.mod, b.file, j.model_rotation);
                         if (compiled) lines.push(['model', key, rot === 'horizontal' ? 4 : 1, compiled].join('\t'));
+                    } else if (Array.isArray(j.quads) && j.quads.length) {
+                        var qn = function (v) { return Math.round(+v * 1000) / 1000; };
+                        var qs = j.quads.slice(0, 2000).map(function (q) {
+                            if (!q || !Array.isArray(q.p) || q.p.length !== 4) return '';
+                            var parts = [cellOf('blocks', b.mod, q.t, b.file), (q.f | 0) % 6, -1, q.shade === false ? 0 : 1];
+                            q.p.forEach(function (c) { parts.push(qn(c[0]), qn(c[1]), qn(c[2]), qn(c[3]), qn(c[4])); });
+                            return parts.join(',');
+                        }).filter(Boolean);
+                        if (qs.length) lines.push(['model', key, rot === 'horizontal' ? 4 : 1, qs.join(';')].join('\t'));
                     } else if (rot) bad(b.mod, b.file, '"rotate" needs a "model" to turn');
                 });
                 Object.keys(items).forEach(function (key) {
@@ -4112,6 +4124,10 @@
                                 Math.max(1, Math.min(64, parseInt(j.stack, 10) || 64)), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
+                    if (j.display_block) {
+                        var dbr = ref(j.display_block, it.mod, it.file);
+                        if (dbr) lines.push(['itemdisplay', 'mod:' + key, dbr].join('\t'));
+                    }
                     if (j.accessory !== undefined) {
                         var at = (Array.isArray(j.accessory) ? j.accessory : [j.accessory]).map(function (x) { return String(x).trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_'); }).filter(Boolean);
                         if (at.length) lines.push(['accessory', 'mod:' + key, at.join(',')].join('\t'));

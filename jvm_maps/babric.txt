@@ -687,6 +687,9 @@ F	net/minecraft/class_6	field_11	field_11	chunk
 F	net/minecraft/class_7	field_21	field_21	dimension
 F	net/minecraft/class_7	field_24	field_24	raining
 F	net/minecraft/class_7	field_26	field_26	thundering
+F	net/minecraft/class_13	field_82	field_82	blockAccess
+F	net/minecraft/class_13	field_83	field_83	overrideBlockTexture
+F	net/minecraft/class_13	field_85	field_85	renderAllFaces
 F	net/minecraft/class_23	field_108	field_108	minDisplayColumn
 F	net/minecraft/class_23	field_109	field_109	minDisplayRow
 F	net/minecraft/class_23	field_110	field_110	maxDisplayColumn
@@ -737,6 +740,7 @@ F	net/minecraft/class_18	field_214	field_214	rand
 F	net/minecraft/class_18	field_216	field_216	worldProvider
 F	net/minecraft/class_18	field_218	field_218	chunkProvider
 F	net/minecraft/class_18	field_220	field_220	worldInfo
+F	net/minecraft/class_66	field_226	field_226	tessellator
 F	net/minecraft/class_66	field_228	field_228	tileEntities
 F	net/minecraft/class_66	field_229	field_229	worldObj
 F	net/minecraft/class_66	field_231	field_231	posX
@@ -872,6 +876,7 @@ F	net/minecraft/class_124	field_488	field_488	axeStone
 F	net/minecraft/class_124	field_489	field_489	swordDiamond
 F	net/minecraft/class_124	field_490	field_490	shovelDiamond
 F	net/minecraft/class_124	field_491	field_491	pickaxeDiamond
+F	net/minecraft/class_130	field_492	field_492	image
 F	net/minecraft/class_133	field_499	field_499	slotNumber
 F	net/minecraft/class_133	field_500	field_500	xDisplayPosition
 F	net/minecraft/class_133	field_501	field_501	yDisplayPosition
@@ -1583,6 +1588,11 @@ M	net/minecraft/class_7	method_18	()I	method_18	getSpawnZ
 M	net/minecraft/class_7	method_19	()J	method_19	getWorldTime
 M	net/minecraft/class_7	method_21	()I	method_21	getDimension
 M	net/minecraft/class_7	method_32	()Ljava/lang/String;	method_32	getWorldName
+M	net/minecraft/class_13	method_50	(Lnet/minecraft/class_17;IIIFFF)Z	method_50	renderStandardBlockWithAmbientOcclusion
+M	net/minecraft/class_13	method_57	(Lnet/minecraft/class_17;III)Z	method_57	renderBlockByRenderType
+M	net/minecraft/class_13	method_58	(Lnet/minecraft/class_17;IIIFFF)Z	method_58	renderStandardBlockWithColorMultiplier
+M	net/minecraft/class_13	method_74	(Lnet/minecraft/class_17;III)Z	method_74	renderBlockCrops
+M	net/minecraft/class_13	method_76	(Lnet/minecraft/class_17;III)Z	method_76	renderStandardBlock
 M	net/minecraft/class_23	method_84	()V	method_84	func_27374_a
 M	net/minecraft/class_25	method_86	(DDD)Lnet/minecraft/class_25;	method_86	addCoord
 M	net/minecraft/class_25	method_87	(DDDDDD)Lnet/minecraft/class_25;	method_87	getBoundingBox
@@ -1655,6 +1665,7 @@ M	net/minecraft/class_18	method_258	()Lnet/minecraft/class_63;	method_258	getSpa
 M	net/minecraft/class_18	method_260	(III)V	method_260	removeBlockTileEntity
 M	net/minecraft/class_18	method_262	()Lnet/minecraft/class_7;	method_262	getWorldInfo
 M	net/minecraft/class_18	method_265	(III)Z	method_265	isBlockIndirectlyGettingPowered
+M	net/minecraft/class_66	method_296	()V	method_296	updateRenderer
 M	net/minecraft/class_66	method_305	()V	method_305	markDirty
 M	net/minecraft/class_75	method_320	()V	method_320	updateEffects
 M	net/minecraft/class_75	method_321	(IIII)V	method_321	addBlockHitEffects
@@ -1841,6 +1852,10 @@ M	net/minecraft/class_24	method_1041	()Lnet/minecraft/class_24;	method_1041	regi
 M	net/minecraft/class_24	method_1042	(Lnet/minecraft/class_241;)Lnet/minecraft/class_24;	method_1042	setStatStringFormatter
 M	net/minecraft/class_24	method_1043	()Ljava/lang/String;	method_1043	getDescription
 M	net/minecraft/class_24	method_1044	()Z	method_1044	getSpecial
+M	net/minecraft/class_330	method_1063	()Lnet/minecraft/class_34;	method_1063	getFontRenderer
+M	net/minecraft/class_330	method_1064	(Ljava/lang/String;)V	method_1064	bindTextureByName
+M	net/minecraft/class_330	method_1065	(Lnet/minecraft/class_331;)V	method_1065	setTileEntityRenderer
+M	net/minecraft/class_330	method_1066	(Lnet/minecraft/class_55;DDDF)V	method_1066	renderTileEntityAt
 M	net/minecraft/class_55	method_1067	(Ljava/lang/Class;Ljava/lang/String;)V	method_1067	addMapping
 M	net/minecraft/class_55	method_1068	(Lnet/minecraft/class_8;)Lnet/minecraft/class_55;	method_1068	createAndLoadEntity
 M	net/minecraft/class_55	method_1069	()I	method_1069	getBlockMetadata
@@ -1870,6 +1885,8 @@ M	net/minecraft/class_173	method_1210	(FFFFFF)V	method_1210	setRotationAngles
 M	net/minecraft/class_173	method_1211	(FFFFFF)V	method_1211	render
 M	net/minecraft/class_97	method_1256	(IIF)V	method_1256	drawScreen
 M	net/minecraft/class_97	method_1259	(Lnet/minecraft/class_33;)V	method_1259	actionPerformed
+M	net/minecraft/class_331	method_1272	()Lnet/minecraft/class_34;	method_1272	getFontRenderer
+M	net/minecraft/class_331	method_1277	(Lnet/minecraft/class_55;DDDF)V	method_1277	renderTileEntityAt
 M	net/minecraft/class_138	method_1281	()Z	method_1281	isBurning
 M	net/minecraft/class_26	method_1292	()V	method_1292	initialize
 M	net/minecraft/class_26	method_1293	(DDD)Lnet/minecraft/class_26;	method_1293	createVectorHelper
@@ -1970,6 +1987,19 @@ M	net/minecraft/class_17	method_1628	(Lnet/minecraft/class_18;Lnet/minecraft/cla
 M	net/minecraft/class_17	method_1629	(I)I	method_1629	damageDropped
 M	net/minecraft/class_139	method_1676	()Lnet/minecraft/class_139;	method_1676	registerStat
 M	net/minecraft/class_473	method_1683	(I)Z	method_1683	canThisPlantGrowOnThisBlockID
+M	net/minecraft/class_67	method_1686	(DD)V	method_1686	setTextureUV
+M	net/minecraft/class_67	method_1687	(DDD)V	method_1687	addVertex
+M	net/minecraft/class_67	method_1688	(DDDDD)V	method_1688	addVertexWithUV
+M	net/minecraft/class_67	method_1689	(FFF)V	method_1689	setColorOpaque_F
+M	net/minecraft/class_67	method_1690	(FFFF)V	method_1690	setColorRGBA_F
+M	net/minecraft/class_67	method_1691	(I)V	method_1691	startDrawing
+M	net/minecraft/class_67	method_1692	(II)V	method_1692	setColorRGBA_I
+M	net/minecraft/class_67	method_1693	(III)V	method_1693	setColorOpaque
+M	net/minecraft/class_67	method_1694	(IIII)V	method_1694	setColorRGBA
+M	net/minecraft/class_67	method_1695	()V	method_1695	startDrawingQuads
+M	net/minecraft/class_67	method_1697	(FFF)V	method_1697	setNormal
+M	net/minecraft/class_67	method_1698	(I)V	method_1698	setColorOpaque_I
+M	net/minecraft/class_67	method_1699	()V	method_1699	disableColor
 M	net/minecraft/class_257	method_1702	()Z	method_1702	isValid
 M	net/minecraft/class_257	method_1703	(III)I	method_1703	getNibble
 M	net/minecraft/class_257	method_1704	(IIII)V	method_1704	setNibble
@@ -2004,6 +2034,7 @@ M	net/minecraft/class_163	method_1818	(FFFIIIF)V	method_1818	addBox
 M	net/minecraft/class_163	method_1819	(F)V	method_1819	renderWithRotation
 M	net/minecraft/class_163	method_1820	(F)V	method_1820	postRender
 M	net/minecraft/class_554	method_1835	()I	method_1835	getHealAmount
+M	net/minecraft/class_555	method_1837	()V	method_1837	updateRenderer
 M	net/minecraft/class_181	method_1876	()Ljava/lang/String;	method_1876	getText
 M	net/minecraft/class_181	method_1878	(I)V	method_1878	setMaxStringLength
 M	net/minecraft/class_181	method_1879	(III)V	method_1879	mouseClicked
@@ -2012,6 +2043,7 @@ M	net/minecraft/class_181	method_1881	(Z)V	method_1881	setFocused
 M	net/minecraft/class_181	method_1882	()V	method_1882	updateCursorCounter
 M	net/minecraft/class_181	method_1883	()V	method_1883	drawTextBox
 M	net/minecraft/class_34	method_1901	(Ljava/lang/String;)I	method_1901	getStringWidth
+M	net/minecraft/class_578	method_1914	()Lnet/minecraft/class_34;	method_1914	getFontRenderer
 M	net/minecraft/class_583	method_1927	()V	method_1927	disableStandardItemLighting
 M	net/minecraft/class_583	method_1930	()V	method_1930	enableStandardItemLighting
 M	net/minecraft/class_584	method_1932	(IIIII)V	method_1932	drawRect
