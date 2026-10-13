@@ -2223,8 +2223,10 @@
                     if (!e.item || !JV.itemReleased) return;
                     var rj = javaOf(e.item, e.data), rc = e.count != null ? e.count | 0 : 1, rpl = M.playerObj(vm, null), rslot = rpl.$info ? rpl.$info.slot : 0;
                     var rout = JV.itemReleased(vm, rj.id, rc, rj.data, e.left | 0);
-                    if (rout && (rout[':itemID'] !== rj.id || rout[':stackSize'] !== rc || rout[':itemDamage'] !== rj.data))
-                        bridge.op('setslot', rslot, rout[':stackSize'] > 0 ? rout[':itemID'] : 0, Math.max(0, rout[':stackSize']), rout[':itemDamage']);
+                    if (rout && (rout[':itemID'] !== rj.id || rout[':stackSize'] !== rc || rout[':itemDamage'] !== rj.data)) {
+                        var rid = rout[':stackSize'] > 0 ? rout[':itemID'] : 0, rn = Math.max(0, rout[':stackSize']), rd = rout[':itemDamage'];
+                        Promise.resolve().then(function () { try { bridge.op('setslot', rslot, rid, rn, rd); } catch (x) { console.warn('[java] hand', x); } });
+                    }
                     return;
                 }
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
@@ -2257,9 +2259,12 @@
                     var stack = M.newStack(vm, iid, count, dmg);
                     var res = e.t === 'useItem' ? call(it, SIG.rightClick, [stack, world, pl2]) : call(it, SIG.itemUse, [stack, pl2, world, x, y, z, e.face | 0, 0.5, 0.5, 0.5]);
                     var out = e.t === 'useItem' && res.ok ? res.value : stack;
-                    if (out && (out[':itemID'] !== iid || out[':stackSize'] !== count || out[':itemDamage'] !== dmg))
-                        bridge.op('setslot', slot, out[':stackSize'] > 0 ? out[':itemID'] : 0, out[':stackSize'], out[':itemDamage']);
-                    else if (!out) bridge.op('setslot', slot, 0, 0, 0);
+                    var put = null;
+                    if (out && (out[':itemID'] !== iid || out[':stackSize'] !== count || out[':itemDamage'] !== dmg)) {
+                        var oid = out[':stackSize'] > 0 ? out[':itemID'] : 0, on = out[':stackSize'], od = out[':itemDamage'];
+                        put = function () { bridge.op('setslot', slot, oid, on, od); };
+                    } else if (!out) put = function () { bridge.op('setslot', slot, 0, 0, 0); };
+                    if (put) Promise.resolve().then(function () { try { put(); } catch (x) { console.warn('[java] hand', x); } });
                 }
             };
             J.reports = {};
