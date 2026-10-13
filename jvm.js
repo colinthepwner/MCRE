@@ -85,6 +85,24 @@ JClass.prototype.findMethod = function (key) {
 			q.push.apply(q, it.interfaces);
 		}
 	}
+	if (!m) {
+		var pre = key.substring(0, key.indexOf(')') + 1);
+		for (var c3 = this; c3 && !m; c3 = c3.superClass) for (var k3 in c3.methods) if (k3.indexOf(pre) === 0 && !(c3.methods[k3].access & ACC_ABSTRACT)) { m = c3.methods[k3]; break; }
+	}
+	if (!m) {
+		var nm = key.substring(0, key.indexOf('(')), want = parseDesc(key.substring(key.indexOf('('))).args;
+		for (var c4 = this; c4 && !m; c4 = c4.superClass) {
+			if (!c4.native) continue;
+			for (var k4 in c4.methods) {
+				if (k4.substring(0, k4.indexOf('(')) !== nm) continue;
+				var mm = c4.methods[k4], got = mm.sig.args;
+				if (got.length !== want.length || (mm.access & ACC_ABSTRACT)) continue;
+				var ok = true;
+				for (var ai = 0; ai < got.length && ok; ai++) ok = got[ai] === want[ai] || (got[ai] === 'Ljava/lang/Object;' && /^[L[]/.test(want[ai]));
+				if (ok) { m = mm; break; }
+			}
+		}
+	}
 	return (this.vcache[key] = m);
 };
 JClass.prototype.findDeclared = function (key) {
@@ -5477,6 +5495,7 @@ function loadMap(vm, text, tag) {
 	var mcpParentsFn = function (mcp) {
 		var o = rev[mcp];
 		var ps = o !== undefined ? sup[o] : null;
+		if (!ps && sup[mcp]) ps = sup[mcp];
 		return ps ? ps.map(function (x) { return cls[x] || x; }) : null;
 	};
 	if (!vm.$mapsReady) vm.$mapBase = vm.mapClass;
@@ -5484,6 +5503,8 @@ function loadMap(vm, text, tag) {
 	var mapClassFn = function (n) {
 		var m = cls[n];
 		if (m) return m;
+		if (n.indexOf('org/spongepowered/include/') === 0) return n.substring('org/spongepowered/include/'.length);
+		if (key === 'bta') return null;
 		if (n.indexOf('net/minecraft/') === 0 && n.indexOf(SRC) !== 0 && !vm.natives[n]) {
 			var simple = n.substring(n.lastIndexOf('/') + 1);
 			if (rev[SRC + simple] !== undefined || vm.natives[SRC + simple]) return SRC + simple;
@@ -5605,8 +5626,9 @@ var L = function (n) { return 'L' + SRC + n + ';'; };
 
 var VANILLA_BLOCKS = 'stone 1,grass 2,dirt 3,cobblestone 4,planks 5,sapling 6,bedrock 7,waterMoving 8,waterStill 9,lavaMoving 10,lavaStill 11,sand 12,gravel 13,oreGold 14,oreIron 15,oreCoal 16,wood 17,leaves 18,sponge 19,glass 20,oreLapis 21,blockLapis 22,dispenser 23,sandStone 24,music 25,bed 26,railPowered 27,railDetector 28,pistonStickyBase 29,web 30,tallGrass 31,deadBush 32,pistonBase 33,pistonExtension 34,cloth 35,pistonMoving 36,plantYellow 37,plantRed 38,mushroomBrown 39,mushroomRed 40,blockGold 41,blockIron 42,stoneDoubleSlab 43,stoneSingleSlab 44,brick 45,tnt 46,bookShelf 47,cobblestoneMossy 48,obsidian 49,torchWood 50,fire 51,mobSpawner 52,stairsWoodOak 53,chest 54,redstoneWire 55,oreDiamond 56,blockDiamond 57,workbench 58,crops 59,tilledField 60,furnaceIdle 61,furnaceBurning 62,signPost 63,doorWood 64,ladder 65,rail 66,stairsCobblestone 67,signWall 68,lever 69,pressurePlateStone 70,doorIron 71,pressurePlatePlanks 72,oreRedstone 73,oreRedstoneGlowing 74,torchRedstoneIdle 75,torchRedstoneActive 76,stoneButton 77,snow 78,ice 79,blockSnow 80,cactus 81,blockClay 82,reed 83,jukebox 84,fence 85,pumpkin 86,netherrack 87,slowSand 88,glowStone 89,portal 90,pumpkinLantern 91,cake 92,redstoneRepeaterIdle 93,redstoneRepeaterActive 94,lockedChest 95,trapdoor 96,silverfish 97,stoneBrick 98,mushroomCapBrown 99,mushroomCapRed 100,fenceIron 101,thinGlass 102,melon 103,pumpkinStem 104,melonStem 105,vine 106,fenceGate 107,stairsBrick 108,stairsStoneBrick 109,mycelium 110,waterlily 111,netherBrick 112,netherFence 113,stairsNetherBrick 114,netherStalk 115,enchantmentTable 116,brewingStand 117,cauldron 118,endPortal 119,endPortalFrame 120,whiteStone 121,dragonEgg 122,redstoneLampIdle 123,redstoneLampActive 124,woodDoubleSlab 125,woodSingleSlab 126,cocoaPlant 127,stairsSandStone 128,oreEmerald 129,enderChest 130,tripWireSource 131,tripWire 132,blockEmerald 133,stairsWoodSpruce 134,stairsWoodBirch 135,stairsWoodJungle 136,commandBlock 137,beacon 138,cobblestoneWall 139,flowerPot 140,carrot 141,potato 142,woodenButton 143,skull 144,anvil 145,chestTrapped 146,pressurePlateGold 147,pressurePlateIron 148,redstoneComparatorIdle 149,redstoneComparatorActive 150,daylightSensor 151,blockRedstone 152,oreNetherQuartz 153,hopperBlock 154,blockNetherQuartz 155,stairsNetherQuartz 156,railActivator 157,dropper 158,stainedClay 159,hay 170,carpet 171,hardenedClay 172,coalBlock 173';
 var VANILLA_ITEMS = 'shovelIron 256,pickaxeIron 257,axeIron 258,flintAndSteel 259,appleRed 260,bow 261,arrow 262,coal 263,diamond 264,ingotIron 265,ingotGold 266,swordIron 267,swordWood 268,shovelWood 269,pickaxeWood 270,axeWood 271,swordStone 272,shovelStone 273,pickaxeStone 274,axeStone 275,swordDiamond 276,shovelDiamond 277,pickaxeDiamond 278,axeDiamond 279,stick 280,bowlEmpty 281,bowlSoup 282,swordGold 283,shovelGold 284,pickaxeGold 285,axeGold 286,silk 287,feather 288,gunpowder 289,hoeWood 290,hoeStone 291,hoeIron 292,hoeDiamond 293,hoeGold 294,seeds 295,wheat 296,bread 297,helmetLeather 298,plateLeather 299,legsLeather 300,bootsLeather 301,helmetChain 302,plateChain 303,legsChain 304,bootsChain 305,helmetIron 306,plateIron 307,legsIron 308,bootsIron 309,helmetDiamond 310,plateDiamond 311,legsDiamond 312,bootsDiamond 313,helmetGold 314,plateGold 315,legsGold 316,bootsGold 317,flint 318,porkRaw 319,porkCooked 320,painting 321,appleGold 322,sign 323,doorWood 324,bucketEmpty 325,bucketWater 326,bucketLava 327,minecartEmpty 328,saddle 329,doorIron 330,redstone 331,snowball 332,boat 333,leather 334,bucketMilk 335,brick 336,clay 337,reed 338,paper 339,book 340,slimeBall 341,minecartCrate 342,minecartPowered 343,egg 344,compass 345,fishingRod 346,pocketSundial 347,lightStoneDust 348,fishRaw 349,fishCooked 350,dyePowder 351,bone 352,sugar 353,cake 354,bed 355,redstoneRepeater 356,cookie 357,map 358,shears 359,melon 360,pumpkinSeeds 361,melonSeeds 362,beefRaw 363,beefCooked 364,chickenRaw 365,chickenCooked 366,rottenFlesh 367,enderPearl 368,blazeRod 369,ghastTear 370,goldNugget 371,netherStalkSeeds 372,potion 373,glassBottle 374,spiderEye 375,fermentedSpiderEye 376,blazePowder 377,magmaCream 378,brewingStand 379,cauldron 380,eyeOfEnder 381,speckledMelon 382,monsterPlacer 383,expBottle 384,fireballCharge 385,writableBook 386,writtenBook 387,emerald 388,itemFrame 389,flowerPot 390,carrot 391,potato 392,bakedPotato 393,poisonousPotato 394,emptyMap 395,goldenCarrot 396,skull 397,carrotOnAStick 398,netherStar 399,pumpkinPie 400,firework 401,fireworkCharge 402,enchantedBook 403,comparator 404,netherrackBrick 405,netherQuartz 406,tntMinecart 407,hopperMinecart 408,record13 2256,recordCat 2257,recordBlocks 2258,recordChirp 2259,recordFar 2260,recordMall 2261,recordMellohi 2262,recordStal 2263,recordStrad 2264,recordWard 2265,record11 2266,recordWait 2267,glowstone 348,minecartHopper 408,horseArmorIron 417,horseArmorGold 418,horseArmorDiamond 419,leash 420,nameTag 421';
-var VANILLA_IDS = {};
-(VANILLA_BLOCKS + ',' + VANILLA_ITEMS).split(',').forEach(function (kv) { VANILLA_IDS[+kv.split(' ')[1]] = true; });
+var VANILLA_IDS = {}, VANILLA_ITEM_IDS = {};
+VANILLA_BLOCKS.split(',').forEach(function (kv) { VANILLA_IDS[+kv.split(' ')[1]] = true; });
+VANILLA_ITEMS.split(',').forEach(function (kv) { VANILLA_ITEM_IDS[+kv.split(' ')[1]] = true; });
 var MATERIALS = ['air', 'grass', 'ground', 'wood', 'rock', 'iron', 'anvil', 'water', 'lava', 'leaves', 'plants', 'vine',
 	'sponge', 'cloth', 'fire', 'sand', 'circuits', 'glass', 'redstoneLight', 'tnt', 'coral', 'ice', 'snow', 'craftedSnow',
 	'cactus', 'clay', 'pumpkin', 'dragonEgg', 'portal', 'cake', 'web', 'piston'];
@@ -5942,6 +5964,16 @@ function installMc152(vm) {
 		if (id < 0 || id >= 4096) return;
 		var list = c.statics.blocksList.a;
 		var prev = list[id];
+		var onItem = id >= 256 && VANILLA_ITEM_IDS[id] && !reg(vm).vanilla && !self.$vanilla;
+		if (onItem) {
+			var mk0 = reg(vm).forge && reg(vm).forge.markers || {}, nid0 = 0;
+			for (var j0 = 4095; j0 > 256; j0--) if (!list[j0] && !mk0[j0] && !VANILLA_ITEM_IDS[j0]) { nid0 = j0; break; }
+			if (nid0) {
+				vm.warnOnce('itemclash:b:' + id + ':' + vm.currentMod, 'block id ' + id + ' is a vanilla item number - the block moved to ' + nid0);
+				if (reg(vm).forge && reg(vm).forge.markers) reg(vm).forge.markers[nid0] = true;
+				id = nid0; self[':blockID'] = id; prev = list[id];
+			}
+		}
 		if (prev && prev !== self && !prev.$vanilla && !reg(vm).vanilla && prev.$mod && prev.$mod !== (vm.currentMod || '')) {
 			var mk = reg(vm).forge && reg(vm).forge.markers || {}, nid = 0;
 			for (var j = 4095; j > 256; j--) if (!list[j] && !mk[j]) { nid = j; break; }
@@ -6043,7 +6075,7 @@ function installMc152(vm) {
 			}
 		} else if (prevI && !prevI.$vanilla && !reg(vm).vanilla && !prevI.$blockItem) vm.log('warn', 'item id ' + id + ' is used twice');
 		list[id] = self;
-		if (!reg(vm).vanilla && !self.$blockItem) { reg(vm).items[id] = self; self.$mod = vm.currentMod || ''; if (VANILLA_IDS[id]) self.$override = true; }
+		if (!reg(vm).vanilla && !self.$blockItem) { reg(vm).items[id] = self; self.$mod = vm.currentMod || ''; if (VANILLA_ITEM_IDS[id]) self.$override = true; }
 	}
 	def('ItemBlock', { super: SRC + 'Item', methods: {
 		'<init>(I)V': function (vm, self, a) { self.$blockItem = true; initItem(vm, self, a[0] + 256); self[':blockID'] = a[0] + 256; },
@@ -6225,6 +6257,7 @@ function installMc152(vm) {
 	if (JVM.installParticles) JVM.installParticles(vm);
 	if (JVM.installRecorder) JVM.installRecorder(vm);
 	if (JVM.installHooks) JVM.installHooks(vm);
+	if (JVM.installBta) JVM.installBta(vm);
 	if (JVM.installMenus) JVM.installMenus(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 	if (JVM.installForgeDims) JVM.installForgeDims(vm);
@@ -6662,6 +6695,47 @@ JVM.collectContent = function (vm, modId) {
 		if (stFiles && JVM.stationConnected && safe(function () { return JVM.stationConnected(vm, b, stFiles); }, false)) b.$stConnected = true;
 		JVM.variantsOf(vm, b).forEach(function (meta) { blockEntry(b, id, meta); });
 	});
+	function keyName(o) {
+		var k = (o[':key'] ? String(o[':key']) : null) || o.$btaKey || null;
+		if (!k) return null;
+		var p = String(k).split('.').slice(2);
+		if (!p.length) return null;
+		return p.join(' ').replace(/_/g, ' ').replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+	}
+	function kinds() {
+	if (kinds.$t) return kinds.$t;
+	var PLANT = { cross: true, tool: 'none', sound: 'grass', see: true };
+	var KINDS = {
+		BlockReed: PLANT, BlockCrops: PLANT, BlockFlower: PLANT, BlockSapling: PLANT, BlockTallGrass: PLANT, BlockDeadBush: PLANT,
+		BlockMushroom: PLANT, BlockStem: PLANT, BlockNetherStalk: PLANT, BlockBush: PLANT, BlockCarrot: PLANT, BlockPotato: PLANT, BlockWeb: PLANT,
+		BlockLeaves: { see: true, tool: 'none', sound: 'grass' }, BlockLeavesBase: { see: true, tool: 'none', sound: 'grass' },
+		BlockGlass: { see: true, sound: 'glass', tool: 'none' }, BlockBreakable: { see: true, sound: 'glass' }, BlockIce: { see: true, sound: 'glass' },
+		BlockPane: { see: true, box: [7, 0, 7, 9, 16, 9] }, BlockFence: { see: true, box: [6, 0, 6, 10, 16, 10], tool: 'axe', sound: 'wood' },
+		BlockWall: { see: true, box: [4, 0, 4, 12, 16, 12] }, BlockFenceGate: { see: true, box: [0, 0, 6, 16, 16, 10], tool: 'axe', sound: 'wood' },
+		BlockTorch: { see: true, box: [7, 0, 7, 9, 10, 9], walk: true, tool: 'none', sound: 'wood', light: 14 },
+		BlockLadder: { see: true, box: [0, 0, 15, 16, 16, 16], tool: 'axe', sound: 'wood' }, BlockVine: { see: true, box: [0, 0, 15, 16, 16, 16], walk: true, sound: 'grass', tool: 'none' },
+		BlockHalfSlab: { see: true, box: [0, 0, 0, 16, 8, 16] }, BlockStep: { see: true, box: [0, 0, 0, 16, 8, 16] }, BlockWoodSlab: { see: true, box: [0, 0, 0, 16, 8, 16], tool: 'axe', sound: 'wood' },
+		BlockSnow: { see: true, box: [0, 0, 0, 16, 2, 16], tool: 'shovel', sound: 'cloth' }, BlockLilyPad: { see: true, box: [0, 0, 0, 16, 1, 16], sound: 'grass', tool: 'none' },
+		BlockCarpet: { see: true, box: [0, 0, 0, 16, 1, 16], sound: 'cloth', tool: 'none' }, BlockPressurePlate: { see: true, box: [1, 0, 1, 15, 1, 15], walk: true },
+		BlockButton: { see: true, box: [5, 6, 0, 11, 10, 2], walk: true }, BlockTrapDoor: { see: true, box: [0, 0, 0, 16, 3, 16], tool: 'axe', sound: 'wood' },
+		BlockCactus: { box: [1, 0, 1, 15, 16, 15], sound: 'cloth', tool: 'none' }, BlockLog: { tool: 'axe', sound: 'wood' }, BlockWood: { tool: 'axe', sound: 'wood' },
+		BlockOre: { tool: 'pickaxe' }, BlockOreStorage: { tool: 'pickaxe', sound: 'metal' }, BlockSand: { tool: 'shovel', sound: 'sand' },
+		BlockGravel: { tool: 'shovel', sound: 'gravel' }, BlockDirt: { tool: 'shovel', sound: 'gravel' }, BlockGrass: { tool: 'shovel', sound: 'grass' },
+		BlockCloth: { sound: 'cloth', tool: 'none' }, BlockFarmland: { box: [0, 0, 0, 16, 15, 16], tool: 'shovel', sound: 'gravel' },
+	};
+	var RTYPES = { 1: PLANT, 6: PLANT, 19: PLANT, 2: KINDS.BlockTorch, 8: KINDS.BlockLadder, 11: KINDS.BlockFence, 18: KINDS.BlockPane, 20: KINDS.BlockVine, 23: KINDS.BlockLilyPad, 13: KINDS.BlockCactus, 32: KINDS.BlockWall, 21: KINDS.BlockFenceGate };
+	return (kinds.$t = { KINDS: KINDS, RTYPES: RTYPES });
+	}
+	function vanillaKind(b, rtype) {
+		var KINDS = kinds().KINDS, RTYPES = kinds().RTYPES;
+		if (RTYPES[rtype]) return RTYPES[rtype];
+		for (var k = b.cls; k; k = k.superClass) {
+			var n = k.name.substring(k.name.lastIndexOf('/') + 1);
+			if (KINDS[n] && k.name.indexOf(SRC) === 0) return KINDS[n];
+			if (k.name === SRC + 'Block') break;
+		}
+		return null;
+	}
 	function blockEntry(b, id, meta) {
 		var faces = {}, FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
 		for (var s = 0; s < 6; s++) {
@@ -6684,7 +6758,9 @@ JVM.collectContent = function (vm, modId) {
 			});
 		}
 		var uniq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-		var json = { name: langOf(b, meta) || ('Block ' + id + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
+		var given = langOf(b, meta) || keyName(b);
+		var json = { name: given || ('Block ' + id + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
+		if (!given && !uniq.length) json.creative = false;
 		json.hardness = b[':blockHardness'];
 		var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
 		json.tool = TOOL_OF[mat] || 'none';
@@ -6704,6 +6780,16 @@ JVM.collectContent = function (vm, modId) {
 		var box = ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].map(function (k) { return Math.round(b[':' + k] * 16); });
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		var rtype = safe(function () { return vm.callVirtual(b, 'getRenderType', '()I', []); }, 0);
+		var kind = vanillaKind(b, rtype);
+		if (kind) {
+			if (kind.cross) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
+			if (kind.box && !json.shape) json.shape = kind.box;
+			if (kind.box && kind.walk) json.collision = false;
+			if (kind.see) json.transparent = true;
+			if (kind.tool) json.tool = kind.tool;
+			if (kind.sound && (!json.sound || json.sound === 'stone')) json.sound = kind.sound;
+			if (kind.light && !json.light) json.light = kind.light;
+		}
 		if (rtype === 1) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
 		if (JVM.recordBlock && !stFiles) {
 			var rq = safe(function () { return JVM.recordBlock(vm, b, id, meta); }, null);
@@ -6785,7 +6871,7 @@ JVM.collectContent = function (vm, modId) {
 	function itemEntry(it, id, meta) {
 		var t = stationTex(it, -1, meta) || legacy(it, 0, meta) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [meta]); }, null));
 		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
-		var json = { name: langOf(it, meta) || ('Item ' + id + (meta ? ':' + meta : '')), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
+		var json = { name: langOf(it, meta) || keyName(it) || ('Item ' + id + (meta ? ':' + meta : '')), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
 		var acc = JVM.accessoryTypesOf ? JVM.accessoryTypesOf(vm, it, meta) : null;
 		if (acc && acc.length) json.accessory = acc;
 		if (it.$food) json.food = { hunger: it.$food[0], saturation: it.$food[1] };
@@ -6819,6 +6905,7 @@ JVM.collectContent = function (vm, modId) {
 			hs.forEach(function (h) { best = Math.max(best, safe(function () { return vm.callVirtual(h, 'getBurnTime', '(Lnet/minecraft/src/ItemStack;)I', [st]); }, 0) | 0); });
 		}
 		if (JVM.stationFuel && (r.stFuel || r.stFuelTags)) best = Math.max(best, JVM.stationFuel(vm, id) | 0);
+		if (r.btaFuel && r.btaFuel[id]) best = Math.max(best, r.btaFuel[id]);
 		return best;
 	}
 	if (JVM.stationVanillaFuels) JVM.stationVanillaFuels(vm, modId).forEach(function (f) {
@@ -8915,13 +9002,29 @@ function install(vm) {
 		57: 'diamond_block', 73: 'redstone_ore', 78: 'snow', 79: 'ice', 80: 'snow', 81: ['cactus_bottom', 'cactus_top', 'cactus_side'], 82: 'clay', 87: 'netherrack',
 		88: 'soul_sand', 89: 'glowstone', 98: 'stonebrick', 110: ['dirt', 'mycelium_top', 'mycelium_side'], 112: 'nether_brick', 121: 'end_stone', 129: 'emerald_ore',
 		133: 'emerald_block', 152: 'redstone_block', 155: 'quartz_block_side', 172: 'hardened_clay', 173: 'coal_block' };
+	[[30, 'web'], [32, 'deadbush'], [37, 'flower_dandelion'], [38, 'flower_rose'], [39, 'mushroom_brown'], [40, 'mushroom_red'],
+		[46, ['tnt_bottom', 'tnt_top', 'tnt_side']], [50, 'torch_on'], [52, 'mob_spawner'], [53, 'planks_oak'], [58, ['planks_oak', 'crafting_table_top', 'crafting_table_side']],
+		[59, 'wheat_stage_7'], [60, ['dirt', 'farmland_wet', 'dirt']], [65, 'ladder'], [83, 'reeds'], [86, ['pumpkin_top', 'pumpkin_top', 'pumpkin_side']],
+		[90, 'portal'], [103, ['melon_top', 'melon_top', 'melon_side']], [106, 'vine'], [111, 'waterlily'], [115, 'nether_wart_stage_2']
+	].forEach(function (e) { if (!VTEX[e[0]]) VTEX[e[0]] = e[1]; });
+	var VTEX_META = {
+		5: ['planks_oak', 'planks_spruce', 'planks_birch', 'planks_jungle'],
+		6: ['sapling_oak', 'sapling_spruce', 'sapling_birch', 'sapling_jungle'],
+		17: [['log_oak_top', 'log_oak_top', 'log_oak'], ['log_oak_top', 'log_oak_top', 'log_spruce'], ['log_oak_top', 'log_oak_top', 'log_birch'], ['log_oak_top', 'log_oak_top', 'log_jungle']],
+		18: ['leaves_oak', 'leaves_spruce', 'leaves_birch', 'leaves_jungle'],
+		31: ['deadbush', 'tallgrass', 'fern'],
+		98: ['stonebrick', 'stonebrick_mossy', 'stonebrick_cracked', 'stonebrick_carved'],
+	};
 	var vIcons = {};
 	var vIcon = function (n) { if (!vIcons[n]) { var o = vm.newObject(vm.loadClass('mcre/Icon')); o.$name = n; o.$vanilla = true; vIcons[n] = o; } return vIcons[n]; };
 	if (BL && BL.methods && !BL.$vtex) {
 		BL.$vtex = true;
 		var gi = BL.methods['getIcon(II)Lnet/minecraft/src/Icon;'];
 		BL.methods['getIcon(II)Lnet/minecraft/src/Icon;'] = function (vm, self, a) {
-			if (self.$vanilla && VTEX[self[':blockID']]) { var v = VTEX[self[':blockID']]; return vIcon(typeof v === 'string' ? v : v[a[0] === 0 ? 0 : a[0] === 1 ? 1 : 2]); }
+			if (self.$vanilla) {
+				var id = self[':blockID'], vm2 = VTEX_META[id], v = vm2 ? vm2[(a[1] & 15) < vm2.length ? a[1] & 15 : (a[1] & 3) % vm2.length] : VTEX[id];
+				if (v) return vIcon(typeof v === 'string' ? v : v[a[0] === 0 ? 0 : a[0] === 1 ? 1 : 2]);
+			}
 			return gi(vm, self, a);
 		};
 	}
@@ -11099,10 +11202,14 @@ function installMobs(vm) {
 		var list = vm.newArray('L' + SRC + 'BiomeGenBase;', 256);
 		BIOMES.split(',').forEach(function (kv, i) {
 			var p = kv.indexOf(' '), o = vm.newObject(c);
-			o[':biomeName'] = kv.substring(p + 1); o[':biomeID'] = i;
 			c.statics[kv.substring(0, p)] = o; list.a[i] = o;
 		});
 		c.statics.biomeList = list;
+		BIOMES.split(',').forEach(function (kv, i) {
+			var p = kv.indexOf(' '), o = list.a[i];
+			try { biomeInit(vm, o, i); } catch (e) { if (!(e instanceof JVM.JavaThrow)) throw e; }
+			o[':biomeName'] = kv.substring(p + 1); o[':biomeID'] = i;
+		});
 	}, methods: {
 		'<init>(I)V': function (vm, self, a) { biomeInit(vm, self, a[0]); },
 		'setColor(I)Lnet/minecraft/src/BiomeGenBase;': function (vm, self, a) { self[':color'] = a[0]; return self; },
@@ -14517,7 +14624,7 @@ JVM.javaReport = function (vm, modId, o) {
 JVM.javaReportText = function (rep) {
 	var head = (rep.loader ? rep.loader + ' mod' : 'Java mod') + (rep.version ? ' for Minecraft ' + rep.version : '');
 	if (rep.status === 'cant') return head + ' - Can\'t run: ' + rep.reason;
-	if (rep.status === 'works') return head + ' - Works';
+	if (rep.status === 'works') return head + ' - Loads, nothing missing found';
 	var bits = [];
 	if (rep.missing.length) bits.push('not here yet: ' + rep.missing.join(', '));
 	if (rep.needs.length) bits.push('needs ' + rep.needs.join(', '));
@@ -14574,7 +14681,15 @@ JVM.javaKind = function (vm, classes, files) {
 		var deps = fj.depends || {};
 		var bta = /bta/i.test(String(deps.fabricloader || '')) || !!(deps.halplibe || deps.bta || deps['bta-halplibe']) ||
 			Object.keys(files).some(function (k) { if (!/[.]class$/.test(k)) return false; var b = files[k]; if (!b || b.length > 400000) return false; var t = ''; for (var i = 0; i < b.length; i++) t += String.fromCharCode(b[i]); return t.indexOf('net/minecraft/core/') >= 0; });
-		if (bta) { out.loader = 'BTA'; out.version = 'Better Than Adventure'; if (!JVM.btaLoad) out.cant = 'made for Better Than Adventure (a Beta 1.7.3 overhaul with its own mod system) - support for its mods is being added'; return out; }
+		if (bta) {
+			out.loader = 'BTA'; out.version = 'Better Than Adventure';
+			if (!JVM.btaLoad) { out.cant = 'made for Better Than Adventure (a Beta 1.7.3 overhaul with its own mod system) - support for its mods is being added'; return out; }
+			var bkb = JVM.babricKind ? JVM.babricKind(fj, files) : { runnable: true, mixins: 0 };
+			out.mixins = bkb.mixins;
+			var runs = bkb.runnable || Object.keys(fj.entrypoints || {}).some(function (k) { return k !== 'modmenu' && (fj.entrypoints[k] || []).length; });
+			if (!runs) out.cant = bkb.mixins ? "it only changes the game's own code (mixins), which can't be done here" : 'nothing in it runs (no entrypoints)';
+			return out;
+		}
 		var dep = deps.minecraft;
 		var babric = (typeof dep === 'string' && /b1[.]7|beta|1[.]0[.]0-beta/.test(dep)) || !!(fj.depends && (fj.depends.stationapi || fj.depends['station-api']));
 		var library = dep == null && !(fj.depends && (fj.depends['fabric-api'] || fj.depends.fabric));
@@ -16243,12 +16358,15 @@ function entrypointObject(vm, v) {
 	vm.initClass(cls);
 	if (p[1]) { var f = cls.findField(p[1]); return f ? f.owner.statics[p[1]] : null; }
 	if (cls.statics && cls.statics.INSTANCE && cls.statics.INSTANCE.cls === cls) return cls.statics.INSTANCE;
+	var cache = vm.$epInstances || (vm.$epInstances = Object.create(null));
+	if (cache[cn]) return cache[cn];
 	var ctor = cls.findDeclared('<init>()V');
-	if (!ctor) return { $cls: cls };
+	if (!ctor) return (cache[cn] = { $cls: cls });
 	var o = vm.newObject(cls);
 	vm.invoke(ctor, o, []);
-	return o;
+	return (cache[cn] = o);
 }
+JVM.stationEntrypointObject = entrypointObject;
 
 var GC3 = 'net/glasslauncher/mods/gcapi3/api/', GC2 = 'net/glasslauncher/mods/api/gcapi/api/';
 function gcAnn(vm, list, names) { for (var i = 0; i < names.length; i++) { var a = JVM.annotation(vm, list, names[i]); if (a) return a; } return null; }
@@ -16716,20 +16834,26 @@ function jsonRecipe(vm, modId, j, file) {
 }
 
 var FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
+function btaModelFile(files, id) { var p = String(id).split(':'); return p.length > 1 && !!files['assets/' + p[0] + '/models/' + p[1] + '.json']; }
 function texFile(id) {
 	var p = String(id).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
 	return { ns: ns, path: path, file: 'assets/' + ns + '/stationapi/textures/' + path + '.png' };
 }
 function texRef(files, id) {
 	var t = texFile(id);
-	if (t.ns === 'minecraft') return { mod: null, name: vanillaTexName(/^items?[/]/.test(t.path) ? 'items' : 'blocks', t.path.replace(/^(block|item)s?[/]/, '')) };
+	if (t.ns === 'minecraft') {
+		var bare = t.path.replace(/^(block|item)s?[/]/, ''), kind = /^items?[/]/.test(t.path) ? 'items' : 'blocks';
+		if (JVM.btaTexAlias) bare = JVM.btaTexAlias(kind, bare);
+		return { mod: null, name: vanillaTexName(kind, bare) };
+	}
+	if (!files[t.file] && files['assets/' + t.ns + '/textures/' + t.path + '.png']) t.file = 'assets/' + t.ns + '/textures/' + t.path + '.png';
 	if (!files[t.file]) return null;
 	return { mod: null, name: (t.ns + '_' + t.path).toLowerCase().replace(/[^a-z0-9]+/g, '_'), file: t.file };
 }
 function modelTextures(files, modelId, depth) {
 	if (!modelId || depth > 8) return {};
 	var p = String(modelId).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
-	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json');
+	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json') || json(files, 'assets/' + ns + '/models/' + path + '.json');
 	if (!j) return { $parent: path };
 	var base = j.parent ? modelTextures(files, j.parent, depth + 1) : {};
 	var out = Object.assign({}, base, j.textures || {});
@@ -16791,6 +16915,12 @@ JVM.stationTexture = function (vm, o, side, files, meta) {
 function posAt(vm) { var p = vm.newObject(vm.loadClass(SRC + 'ChunkPosition')); p[':x'] = 0; p[':y'] = 64; p[':z'] = 0; return p; }
 function stationTex0(vm, o, side, files, meta) {
 	var s = st(vm), isBlock = side >= 0;
+	if (o.$stTexSides && isBlock && o.$stTexSides[side]) return texRef(files, o.$stTexSides[side]);
+	if (isBlock && (o.$btaModel || (o.$stTex && !texRef(files, o.$stTex) && btaModelFile(files, o.$stTex)))) {
+		var mm = o.$btaModelsMeta && o.$btaModelsMeta.length > 1 && o.$btaModelsMeta[meta | 0] || o.$btaModel || o.$stTex;
+		var bf = modelFaces(files, modelTextures(files, mm, 0));
+		if (bf && bf[FACE[side]]) return texRef(files, bf[FACE[side]]);
+	}
 	if (o.$stTex) return texRef(files, o.$stTex);
 	var id = o.$stId;
 	if (isBlock) {
@@ -18047,6 +18177,746 @@ JVM.collectBiomes = function (vm, modId, ref, safe) {
 (function () {
 'use strict';
 
+var SRC = 'net/minecraft/src/', CORE = 'net/minecraft/core/', CLIENT = 'net/minecraft/client/';
+var NSID = CORE + 'util/collection/NamespaceID', TAG = CORE + 'data/tag/Tag', REG = CORE + 'data/registry/Registry';
+var RCP = CORE + 'data/registry/recipe/', LOGIC = CORE + 'block/BlockLogic';
+var STR = 'Ljava/lang/String;', OBJ = 'Ljava/lang/Object;';
+
+function reg(vm) { return JVM.mc152.reg(vm); }
+function D() { return JVM.BTA_DATA || { blocks: [], items: [], blockTags: [], itemTags: [], materials: [], sounds: [], registries: [], logics: [], models: [], side: [], direction: [] }; }
+function str(x) { return x == null ? null : String(x.$s !== undefined ? x.$s : x); }
+
+var BLOCK_EXACT = {
+	air: [0], stone: [1], basalt: [1], limestone: [1], granite: [1], marble: [1], slate: [1], permafrost: [1], sandstone: [24],
+	obsidian: [49], glass: [20], grass: [2], 'grass.retro': [2], 'grass.scorched': [2], 'path.dirt': [3], dirt: [3], mud: [3], 'mud.baked': [45],
+	'sponge.dry': [19], 'sponge.wet': [19], sand: [12], gravel: [13], bedrock: [7], wool: [35], 'brick.clay': [45], bookshelf: [47],
+	'fluid.water.flowing': [8], 'fluid.water.still': [9], 'fluid.lava.flowing': [10], 'fluid.lava.still': [11],
+	'log.pine': [17, 1], 'log.birch': [17, 2], 'leaves.pine': [18, 1], 'leaves.birch': [18, 2], 'sapling.pine': [6, 1], 'sapling.birch': [6, 2],
+	tallgrass: [31, 1], 'tallgrass.fern': [31, 2], deadbush: [32], 'flower.yellow': [37], 'flower.red': [38], 'mushroom.brown': [39], 'mushroom.red': [40],
+	'torch.coal': [50], 'ladder.oak': [65], 'wire.redstone': [55], 'torch.redstone.idle': [75], 'torch.redstone.active': [76],
+	'button.stone': [77], 'button.planks': [143], 'lever.cobble.stone': [69], 'pressureplate.stone': [70], 'pressureplate.planks.oak': [72],
+	'repeater.idle': [93], 'repeater.active': [94], 'piston.base': [33], 'piston.base.sticky': [29], 'piston.head': [34], noteblock: [25],
+	rail: [66], 'rail.powered': [27], 'rail.detector': [28], 'dispenser.cobble.stone': [23], tnt: [46], bed: [26], cobweb: [30], fire: [51],
+	mobspawner: [52], workbench: [58], 'furnace.stone.idle': [61], 'furnace.stone.active': [62], 'furnace.blast.idle': [61], 'furnace.blast.active': [62],
+	'crops.wheat': [59], 'crops.pumpkin': [104], 'farmland.dirt': [60], 'sign.post.planks.oak': [63], 'sign.wall.planks.oak': [68],
+	'layer.snow': [78], ice: [79], 'ice.perma': [79], 'block.snow': [80], cactus: [81], 'block.clay': [82], sugarcane: [83], jukebox: [84],
+	pumpkin: [86], 'pumpkin.carved.idle': [86], 'pumpkin.carved.active': [91], netherrack: [87], soulsand: [88], glowstone: [89],
+	'portal.nether': [90], cake: [92], 'lamp.idle': [123], 'lamp.active': [124], 'block.coal': [173], 'block.iron': [42], 'block.gold': [41],
+	'block.lapis': [22], 'block.redstone': [152], 'block.diamond': [57], 'block.quartz': [155], 'block.olivine': [133], 'block.steel': [42],
+	'block.nethercoal': [173], 'block.charcoal': [173], 'fence.chainlink': [101], 'jar.glass': [20], 'trapdoor.iron': [96],
+};
+var BLOCK_PREFIX = [
+	[/^cobble\.(stone|basalt|limestone|granite|permafrost)\.mossy$/, [48]], [/^cobble\.netherrack/, [87]], [/^cobble\./, [4]],
+	[/^(pillar|capstone)\.marble$/, [155, 2]], [/carved$/, [98, 3]], [/polished$/, [98]],
+	[/^planks\./, [5]], [/^fence\.planks/, [85]], [/^fencegate/, [107]], [/^brick\.(stone|basalt|limestone|granite|marble|slate|permafrost)/, [98]],
+	[/^brick\.netherrack/, [112]], [/^brick\.sandstone/, [24, 2]], [/^brick\./, [45]],
+	[/^slab\.planks/, [44, 2]], [/^slab\.cobble/, [44, 3]], [/^slab\.sandstone/, [44, 1]], [/^slab\.brick\.clay/, [44, 4]], [/^slab\.brick\.netherrack/, [44, 6]],
+	[/^slab\.(brick|stone|granite|limestone|basalt|slate|permafrost|capstone)/, [44, 5]], [/^slab\./, [44]],
+	[/^stairs\.planks/, [53]], [/^stairs\.cobble/, [67]], [/^stairs\.brick\.clay/, [108]], [/^stairs\.brick\.netherrack/, [114]], [/^stairs\.(sandstone|brick\.sandstone)/, [128]], [/^stairs\./, [109]],
+	[/^glass\./, [20]], [/^moss\./, [48]], [/^log\./, [17]], [/^leaves\./, [18]], [/^sapling\./, [6]], [/^flower\./, [38]],
+	[/^ore\.coal/, [16]], [/^ore\.iron/, [15]], [/^ore\.gold/, [14]], [/^ore\.lapis/, [21]], [/^ore\.redstone\.glowing/, [74]], [/^ore\.redstone/, [73]],
+	[/^ore\.diamond/, [56]], [/^ore\.nethercoal/, [153]], [/^button\./, [77]], [/^pressureplate\.planks/, [72]], [/^pressureplate\./, [70]],
+	[/^trapdoor\./, [96]], [/^door\.iron/, [71]], [/^door\.steel/, [71]], [/^door\./, [64]], [/^chest\./, [54]], [/^sign\.post/, [63]], [/^sign\.wall/, [68]],
+	[/^lamp\./, [123]], [/^piston\./, [33]], [/^fence\./, [85]], [/^layer\./, [78]], [/^pumpkin/, [86]], [/^statue\./, [1]], [/^gloomstone/, [87]],
+	[/^brimstone|^brimsand|^boulder/, [87]], [/^lantern\./, [89]], [/^rubyglass|^brick\.rubyglass/, [20]],
+];
+function blockRefOf(key) {
+	if (BLOCK_EXACT[key]) return BLOCK_EXACT[key];
+	for (var i = 0; i < BLOCK_PREFIX.length; i++) if (BLOCK_PREFIX[i][0].test(key)) return BLOCK_PREFIX[i][1];
+	return [1];
+}
+var ITEM_EXACT = {
+	'ingot.steel': [265], 'ingot.steel.crude': [265], nethercoal: [263], quartz: [406], olivine: [388], 'ore.raw.iron': [15], 'ore.raw.gold': [14],
+	sulfur: [289], 'food.cherry': [260], cloth: [287], rope: [287], chainlink: [101], 'bucket.iron': [325], 'bucket.steel': [325], dough: [296],
+	'food.venison.raw': [363], 'food.venison.cooked': [364], 'seeds.pumpkin': [361], 'food.pumpkin_pie': [400], jar: [374], label: [339],
+	flag: [323], paintbrush: [280], 'door.oak.painted': [324], 'door.glass': [324], 'door.steel': [330], 'sign.painted': [323],
+	'armor.quiver': [262], 'armor.quiver.gold': [262], 'ammo.pebble': [318], 'ammo.arrow.gold': [262], 'ammo.arrow.purple': [262], 'ammo.arrow.flaming': [262],
+	'record.13': [2256], seat: [53], basket: [54], timer: [356], 'tool.firestriker.steel': [259], 'tool.calendar': [347], 'rubyglass.crystal': [331],
+};
+var ITEM_PREFIX = [
+	[/^tool\.(sword|shovel|pickaxe|axe|hoe)\.steel$/, function (m) { return [{ sword: 267, shovel: 256, pickaxe: 257, axe: 258, hoe: 292 }[m[1]]]; }],
+	[/^armor\.(helmet|chestplate|leggings|boots)\.steel$/, function (m) { return [{ helmet: 306, chestplate: 307, leggings: 308, boots: 309 }[m[1]]]; }],
+	[/^record\./, function () { return [2257]; }], [/^statue\./, function () { return [1]; }], [/^lantern\./, function () { return [89]; }],
+	[/^jar\./, function () { return [374]; }], [/^armor\.wolf\./, function () { return [329]; }], [/^handcannon/, function () { return [261]; }],
+	[/^wand\./, function () { return [280]; }], [/^ammo\./, function () { return [262]; }],
+];
+function itemRefOf(key, id) {
+	if (ITEM_EXACT[key]) return ITEM_EXACT[key];
+	for (var i = 0; i < ITEM_PREFIX.length; i++) { var m = ITEM_PREFIX[i][0].exec(key); if (m) return ITEM_PREFIX[i][1](m); }
+	if (id >= 16384 && id <= 16486) return [id - 16128];
+	return [280];
+}
+var TEX_ALIAS = { cobble_stone: 'cobblestone', planks_oak: 'planks_oak', log_oak_side: 'log_oak', log_oak_top: 'log_oak_top', brick_clay: 'brick',
+	block_iron: 'iron_block', block_gold: 'gold_block', block_diamond: 'diamond_block', block_lapis: 'lapis_block', ore_iron_stone: 'iron_ore',
+	ore_gold_stone: 'gold_ore', ore_coal_stone: 'coal_ore', ore_diamond_stone: 'diamond_ore', workbench_top: 'crafting_table_top',
+	furnace_stone_front: 'furnace_front_off', furnace_stone_side: 'furnace_side', furnace_stone_top: 'furnace_top', granite: 'stone',
+	basalt: 'stone', limestone: 'stone', marble: 'quartz_block_side', slate: 'stone', permafrost: 'stone', ingot_iron: 'iron_ingot', ingot_steel: 'iron_ingot',
+	ingot_gold: 'gold_ingot', stick: 'stick', diamond: 'diamond', coal: 'coal' };
+JVM.btaTexAlias = function (kind, n) { return TEX_ALIAS[n] || n; };
+
+function add(vm, cls, key, fn) { if (!vm.addNativeMethod(cls, key, fn)) {   } }
+function wrap(vm, cls, key, make) {
+	var sp = vm.natives[cls];
+	if (!sp || !sp.methods[key]) return add(vm, cls, key, make(function () { return 0; }));
+	var orig = sp.methods[key], fn = make(orig);
+	sp.methods[key] = fn;
+	var c = vm.classes[cls]; if (c && c.methods[key]) c.methods[key].fn = fn;
+}
+function addInterface(vm, cls, iface) {
+	var sp = vm.natives[cls]; if (!sp) return;
+	sp.interfaces = (sp.interfaces || []).concat([iface]);
+	var c = vm.classes[cls]; if (c) { var ic = vm.loadClass(iface); if (c.interfaces.indexOf(ic) < 0) c.interfaces.push(ic); }
+}
+function newNs(vm, s) {
+	var o = vm.newObject(vm.loadClass(NSID)); s = String(s || '');
+	var i = s.indexOf(':'); o.$ns = i < 0 ? 'minecraft' : s.slice(0, i); o.$v = i < 0 ? s : s.slice(i + 1);
+	return o;
+}
+function nsText(x) { return x == null ? null : x.$ns !== undefined ? x.$ns + ':' + x.$v : str(x); }
+function list(vm, a) { return JVM.newList(vm, a || []); }
+function arr(vm, t, a) { return JVM.javaArray(vm, t, a); }
+function blocksList(vm) { var c = vm.loadClass(SRC + 'Block'); vm.initClass(c); return c.statics.blocksList.a; }
+function itemsList(vm) { var c = vm.loadClass(SRC + 'Item'); vm.initClass(c); return c.statics.itemsList.a; }
+function vanillaBlock(vm, key) { var r = blockRefOf(key); return blocksList(vm)[r[0]] || null; }
+function vanillaItem(vm, key, id) { var r = itemRefOf(key, id); return itemsList(vm)[r[0]] || (r[0] < 256 ? blocksList(vm)[r[0]] : null); }
+function stackOf(vm, conv, n, meta) {
+	var s = vm.newObject(vm.loadClass(SRC + 'ItemStack'));
+	var id = conv == null ? 0 : conv[':blockID'] !== undefined && vm.isInstance(conv, vm.loadClass(SRC + 'Block')) ? conv[':blockID'] : conv[':itemID'] | 0;
+	s[':itemID'] = id; s[':stackSize'] = n == null ? 1 : n; s[':itemDamage'] = meta | 0;
+	return s;
+}
+
+function install(vm) {
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	var I = JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT | JVM.ACC_PUBLIC;
+
+	var nsInit = function (vm, self, a) { var s = a.length > 1 ? str(a[0]) + ':' + str(a[1]) : (a[0] && a[0].$ns !== undefined ? nsText(a[0]) : str(a[0])); var t = newNs(vm, s); self.$ns = t.$ns; self.$v = t.$v; };
+	var nsMake = function (vm, n, a) { return newNs(vm, a.length > 1 ? str(a[0]) + ':' + str(a[1]) : str(a[0])); };
+	def(NSID, { interfaces: ['java/lang/CharSequence', 'java/lang/Comparable'], statics: { DEFAULT_NAMESPACE: 'minecraft' }, methods: {
+		'<init>(Ljava/lang/String;)V': nsInit, '<init>(Ljava/lang/String;Ljava/lang/String;)V': nsInit, '<init>(Lnet/minecraft/core/util/collection/NamespaceID;)V': nsInit,
+		'namespace()Ljava/lang/String;': function (vm, self) { return self.$ns; },
+		'value()Ljava/lang/String;': function (vm, self) { return self.$v; },
+		'toString()Ljava/lang/String;': function (vm, self) { return nsText(self); },
+		'length()I': function (vm, self) { return nsText(self).length; },
+		'charAt(I)C': function (vm, self, a) { return nsText(self).charCodeAt(a[0]); },
+		'subSequence(II)Ljava/lang/CharSequence;': function (vm, self, a) { return nsText(self).substring(a[0], a[1]); },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && nsText(a[0]) === nsText(self) ? 1 : 0; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(nsText(self)); },
+		'compareTo(Ljava/lang/Object;)I': function (vm, self, a) { var x = nsText(self), y = nsText(a[0]); return x < y ? -1 : x > y ? 1 : 0; },
+		'makePermanent()Lnet/minecraft/core/util/collection/NamespaceID;': function (vm, self) { return self; },
+	}, staticMethods: {
+		'fromPool(Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake, 'fromPool(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake,
+		'getPermanent(Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake, 'getPermanent(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake,
+		'getTemp(Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake, 'getTemp(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/core/util/collection/NamespaceID;': nsMake,
+	} });
+
+	def(CORE + 'item/IItemConvertible', { access: I, abstractMethods: { 'asItem()Lnet/minecraft/src/Item;': true, 'getDefaultStack()Lnet/minecraft/src/ItemStack;': true } });
+	var tagNew = function (vm, name) { var t = vm.newObject(vm.loadClass(TAG)); t.$name = String(name); t.$els = []; return t; };
+	var tagsByName = {};
+	var tagOf = function (vm, name) { name = String(name); return tagsByName[name] || (tagsByName[name] = tagNew(vm, name)); };
+	def(CORE + 'data/tag/ITaggable', { access: I, methods: {} });
+	def(TAG, { methods: {
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$name = str(a[0]); self.$els = []; },
+		'<init>(Ljava/lang/String;Ljava/util/Set;)V': function (vm, self, a) { self.$name = str(a[0]); self.$els = JVM.iterate(vm, a[1]); },
+		'getName()Ljava/lang/String;': function (vm, self) { return self.$name; },
+		'tag(Lnet/minecraft/core/data/tag/ITaggable;)V': function (vm, self, a) { if (self.$els.indexOf(a[0]) < 0) self.$els.push(a[0]); },
+		'tagAll(Ljava/util/Collection;)V': function (vm, self, a) { JVM.iterate(vm, a[0]).forEach(function (x) { if (self.$els.indexOf(x) < 0) self.$els.push(x); }); },
+		'removeAll(Ljava/util/Collection;)V': function (vm, self, a) { var r = JVM.iterate(vm, a[0]); self.$els = self.$els.filter(function (x) { return r.indexOf(x) < 0; }); },
+		'appliesTo(Lnet/minecraft/core/data/tag/ITaggable;)Z': function (vm, self, a) { return self.$els.indexOf(a[0]) >= 0 || (a[0] && a[0].$tags && a[0].$tags.indexOf(self) >= 0) ? 1 : 0; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$name; },
+	}, staticMethods: {
+		'of(Ljava/lang/String;)Lnet/minecraft/core/data/tag/Tag;': function (vm, n, a) { return tagOf(vm, str(a[0])); },
+		'of(Ljava/lang/String;Ljava/util/Set;)Lnet/minecraft/core/data/tag/Tag;': function (vm, n, a) { var t = tagOf(vm, str(a[0])); JVM.iterate(vm, a[1]).forEach(function (x) { t.$els.push(x); }); return t; },
+	} });
+	var tagHolder = function (cls, names) {
+		var st = { TAG_LIST: null }; names.forEach(function (n) { st[n] = null; });
+		def(cls, { statics: st, clinit: function (vm, c) { var all = []; names.forEach(function (n) { c.statics[n] = tagOf(vm, 'minecraft:' + n.toLowerCase()); all.push(c.statics[n]); }); c.statics.TAG_LIST = list(vm, all); }, methods: {} });
+	};
+	tagHolder(CORE + 'block/tag/BlockTags', D().blockTags);
+	tagHolder(CORE + 'item/tag/ItemTags', D().itemTags);
+
+	var regMethods = {
+		'<init>()V': function (vm, self) { self.$keys = []; self.$map = {}; },
+		'register(Ljava/lang/String;Ljava/lang/Object;)V': function (vm, self, a) { regPut(self, str(a[0]), a[1]); },
+		'unregister(Ljava/lang/String;)V': function (vm, self, a) { var k = str(a[0]); delete self.$map[k]; self.$keys = self.$keys.filter(function (x) { return x !== k; }); },
+		'getItem(Ljava/lang/String;)Ljava/lang/Object;': function (vm, self, a) { regInit(self); var v = self.$map[str(a[0])]; return v === undefined ? null : v; },
+		'getKey(Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { regInit(self); for (var i = 0; i < self.$keys.length; i++) if (self.$map[self.$keys[i]] === a[0]) return self.$keys[i]; return null; },
+		'getNumericIdOfItem(Ljava/lang/Object;)I': function (vm, self, a) { regInit(self); for (var i = 0; i < self.$keys.length; i++) if (self.$map[self.$keys[i]] === a[0]) return i; return -1; },
+		'getNumericIdOfKey(Ljava/lang/String;)I': function (vm, self, a) { regInit(self); return self.$keys.indexOf(str(a[0])); },
+		'getItemByNumericId(I)Ljava/lang/Object;': function (vm, self, a) { regInit(self); var k = self.$keys[a[0]]; return k === undefined ? null : self.$map[k]; },
+		'size()I': function (vm, self) { regInit(self); return self.$keys.length; },
+		'values()Ljava/util/Collection;': function (vm, self) { regInit(self); return list(vm, self.$keys.map(function (k) { return self.$map[k]; })); },
+		'keySet()Ljava/util/Set;': function (vm, self) { regInit(self); var s = vm.newObject(vm.loadClass('java/util/LinkedHashSet')); vm.callVirtual(s, '<init>', '()V', []); self.$keys.forEach(function (k) { vm.callVirtual(s, 'add', '(' + OBJ + ')Z', [k]); }); return s; },
+		'iterator()Ljava/util/Iterator;': function (vm, self) { regInit(self); return vm.callVirtual(list(vm, self.$keys.map(function (k) { return self.$map[k]; })), 'iterator', '()Ljava/util/Iterator;', []); },
+		'addCallback(Lnet/minecraft/core/data/registry/Registry$ItemAddedCallback;)V': function () {},
+		'getParent()Lnet/minecraft/core/data/registry/Registry;': function () { return null; },
+	};
+	function regInit(r) { if (!r.$keys) { r.$keys = []; r.$map = {}; } }
+	function regPut(r, k, v) { regInit(r); if (!(k in r.$map)) r.$keys.push(k); r.$map[k] = v; if (r.$onPut) r.$onPut(k, v); }
+	def(REG, { interfaces: ['java/lang/Iterable'], methods: regMethods });
+	var regNew = function (vm, cls) { var r = vm.newObject(vm.loadClass(cls || REG)); regInit(r); return r; };
+
+	var GROUPS = { 'minecraft:planks': [5], 'minecraft:logs': [17], 'minecraft:cobblestones': [4], 'minecraft:stones': [1], 'minecraft:wool': [35],
+		'minecraft:coal': [263], 'minecraft:chests': [54], 'minecraft:sand': [12], 'minecraft:slabs': [44], 'minecraft:stairs': [53], 'minecraft:leaves': [18],
+		'minecraft:saplings': [6], 'minecraft:flowers': [38], 'minecraft:dyes': [351], 'minecraft:workbenches': [58], 'minecraft:furnaces': [61],
+		'minecraft:glass': [20], 'minecraft:sandstones': [24], 'minecraft:ingots_iron': [265], 'minecraft:fuel': [263] };
+	var groupStack = function (vm, g) {
+		g = String(g || '');
+		var items = reg(vm).$btaGroups && reg(vm).$btaGroups[g];
+		if (items && items.length) return items[0];
+		var r = GROUPS[g] || (/plank/.test(g) ? [5] : /log/.test(g) ? [17] : /cobble/.test(g) ? [4] : /stone/.test(g) ? [1] : /wool/.test(g) ? [35] : /coal/.test(g) ? [263] : /iron/.test(g) ? [265] : /gold/.test(g) ? [266] : null);
+		if (!r) return null;
+		return r[0] < 256 ? blocksList(vm)[r[0]] : itemsList(vm)[r[0]];
+	};
+	var symbolObj = function (vm, s) { return !s ? null : s.$stack || (s.$group ? groupStack(vm, s.$group) : null); };
+	def(RCP + 'RecipeSymbol', { methods: {
+		'<init>(Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$stack = a[0]; },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$group = str(a[0]); },
+		'<init>(CLnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$ch = a[0]; self.$stack = a[1]; },
+		'<init>(CLnet/minecraft/src/ItemStack;Ljava/lang/String;)V': function (vm, self, a) { self.$ch = a[0]; self.$stack = a[1]; self.$group = str(a[2]); },
+		'<init>(Ljava/util/List;)V': function (vm, self, a) { var l = JVM.iterate(vm, a[0]); self.$stack = l[0] || null; },
+		'getStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return self.$stack || null; },
+		'getItemGroup()Ljava/lang/String;': function (vm, self) { return self.$group || null; },
+		'getSymbol()C': function (vm, self) { return self.$ch | 0; },
+		'resolve()Ljava/util/List;': function (vm, self) { var o = symbolObj(vm, self); return list(vm, o ? [o] : []); },
+	} });
+	def(RCP + 'RecipeEntryBase', { methods: {} });
+	var E = RCP + 'entry/';
+	def(E + 'RecipeEntryCrafting', { super: RCP + 'RecipeEntryBase', methods: {} });
+	def(E + 'RecipeEntryCraftingShaped', { super: E + 'RecipeEntryCrafting', methods: {
+		'<init>(II[Lnet/minecraft/core/data/registry/recipe/RecipeSymbol;Lnet/minecraft/src/ItemStack;Z)V': function (vm, self, a) { self.$k = 'shaped'; self.$w = a[0]; self.$h = a[1]; self.$in = Array.prototype.slice.call(a[2] ? a[2].a : []); self.$out = a[3]; },
+		'<init>(II[Lnet/minecraft/core/data/registry/recipe/RecipeSymbol;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$k = 'shaped'; self.$w = a[0]; self.$h = a[1]; self.$in = Array.prototype.slice.call(a[2] ? a[2].a : []); self.$out = a[3]; },
+	} });
+	def(E + 'RecipeEntryCraftingShapeless', { super: E + 'RecipeEntryCrafting', methods: {
+		'<init>(Ljava/util/List;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$k = 'shapeless'; self.$in = JVM.iterate(vm, a[0]); self.$out = a[1]; },
+		'<init>(Ljava/util/List;Lnet/minecraft/src/ItemStack;Z)V': function (vm, self, a) { self.$k = 'shapeless'; self.$in = JVM.iterate(vm, a[0]); self.$out = a[1]; },
+	} });
+	['RecipeEntryFurnace', 'RecipeEntryBlastFurnace'].forEach(function (n) {
+		def(E + n, { super: RCP + 'RecipeEntryBase', methods: {
+			'<init>(Lnet/minecraft/core/data/registry/recipe/RecipeSymbol;Lnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self.$k = 'smelt'; self.$in = [a[0]]; self.$out = a[1]; },
+		} });
+	});
+	var addEntry = function (vm, e) {
+		if (!e || !e.$k || !e.$out) return;
+		var mod = vm.currentMod;
+		if (e.$k === 'smelt') {
+			var inObj = symbolObj(vm, e.$in[0]); if (!inObj) return;
+			var isStack = vm.isInstance(inObj, vm.loadClass(SRC + 'ItemStack'));
+			var inId = isStack ? inObj[':itemID'] : inObj[':blockID'] !== undefined && vm.isInstance(inObj, vm.loadClass(SRC + 'Block')) ? inObj[':blockID'] : inObj[':itemID'];
+			reg(vm).smelting.push({ mod: mod, input: inId, meta: isStack ? inObj[':itemDamage'] : 0, out: e.$out });
+			return;
+		}
+		if (e.$k === 'shapeless') { reg(vm).recipes.push({ mod: mod, shaped: false, out: e.$out, args: e.$in.map(function (s) { return symbolObj(vm, s); }).filter(Boolean) }); return; }
+		var letters = 'ABCDEFGHI', key = [], rows = [];
+		for (var y = 0; y < e.$h; y++) {
+			var row = '';
+			for (var x = 0; x < e.$w; x++) {
+				var sy = e.$in[x + y * e.$w], o = symbolObj(vm, sy);
+				if (!o) { row += ' '; continue; }
+				var k = -1; for (var j = 0; j < key.length; j++) if (key[j] === o) k = j;
+				if (k < 0) { key.push(o); k = key.length - 1; }
+				row += letters[k];
+			}
+			rows.push(row);
+		}
+		var args = rows.slice(); key.forEach(function (o, i) { args.push(JVM.box(vm, letters.charCodeAt(i), 'C'), o); });
+		reg(vm).recipes.push({ mod: mod, shaped: true, out: e.$out, args: args });
+	};
+	def(RCP + 'RecipeGroup', { super: REG, methods: {
+		'<init>(Lnet/minecraft/core/data/registry/recipe/RecipeSymbol;)V': function (vm, self, a) { regInit(self); self.$machine = a[0]; },
+		'register(Ljava/lang/String;Ljava/lang/Object;)V': function (vm, self, a) { regPut(self, str(a[0]), a[1]); addEntry(vm, a[1]); },
+		'getMachine()Lnet/minecraft/core/data/registry/recipe/RecipeSymbol;': function (vm, self) { return self.$machine; },
+	} });
+	def(RCP + 'RecipeNamespace', { super: REG, methods: {} });
+	def(RCP + 'RecipeRegistry', { super: REG, methods: {} });
+	var rst = {}; D().registries.forEach(function (n) { if (n !== 'init') rst[n] = null; });
+	def(CORE + 'data/registry/Registries', { statics: rst, clinit: function (vm, c) {
+		Object.keys(rst).forEach(function (n) { c.statics[n] = regNew(vm, n === 'RECIPES' || n === 'RECIPES_LOCAL_COPY' ? RCP + 'RecipeRegistry' : REG); });
+		c.statics.ITEM_GROUPS.$onPut = function (k, v) { var g = reg(vm).$btaGroups || (reg(vm).$btaGroups = {}); try { g[k] = JVM.iterate(vm, v); } catch (e) { g[k] = [v]; } };
+	}, staticMethods: { 'init()V': function () {} } });
+	def(CORE + 'data/DataLoader', { staticMethods: {
+		'loadRecipesFromFile(Ljava/lang/String;)V': function (vm) { vm.warnOnce('bta:jsonrecipes', 'BTA recipe files (loadRecipesFromFile) are not read yet'); },
+	} });
+
+	['LookupFuelFurnace', 'LookupFuelFurnaceBlast'].forEach(function (n) {
+		var cn = CORE + 'crafting/' + n;
+		def(cn, { statics: { instance: null }, clinit: function (vm, c) { c.statics.instance = vm.newObject(c); }, methods: {
+			'addFuelEntry(II)V': function (vm, self, a) { var f = reg(vm).btaFuel || (reg(vm).btaFuel = {}); f[a[0]] = a[1]; },
+			'addAdvancedFuelEntry(Ljava/util/function/Predicate;I)V': function () {},
+			'getFuelYield(I)I': function (vm, self, a) { var f = reg(vm).btaFuel; return f && f[a[0]] || 0; },
+			'getFuelYield(Lnet/minecraft/src/ItemStack;)I': function (vm, self, a) { var f = reg(vm).btaFuel; return f && a[0] && f[a[0][':itemID']] || 0; },
+		} });
+	});
+	var MAT = { AIR: 'air', GRASS: 'grass', DIRT: 'ground', WOOD: 'wood', STONE: 'rock', BASALT: 'rock', LIMESTONE: 'rock', GRANITE: 'rock', PERMAFROST: 'rock',
+		MARBLE: 'rock', SLATE: 'rock', NETHERRACK: 'rock', GLOOMSTONE: 'rock', METAL: 'iron', DIAMOND: 'iron', IRON: 'iron', GOLD: 'iron', LAPIS: 'rock',
+		OLIVINE: 'rock', QUARTZ: 'rock', STEEL: 'iron', WATER: 'water', LAVA: 'lava', LEAVES: 'leaves', PLANT: 'plants', SPONGE: 'sponge', CLOTH: 'cloth',
+		FIRE: 'fire', SAND: 'sand', SOUL_SAND: 'sand', DECORATION: 'circuits', GLASS: 'glass', EXPLOSIVE: 'tnt', CORAL: 'coral', ICE: 'ice', TOP_SNOW: 'snow',
+		SNOW: 'craftedSnow', TOP_ASH: 'snow', ASH: 'sand', CACTUS: 'cactus', CLAY: 'clay', VEGETABLE: 'pumpkin', PORTAL: 'portal', CAKE: 'cake', WEB: 'web',
+		PISTON: 'piston', MOSS: 'rock', WOOD_WET: 'wood', ACID: 'water' };
+	var mst = {}; D().materials.forEach(function (n) { mst[n] = null; });
+	def(CORE + 'block/material/Materials', { statics: mst, clinit: function (vm, c) {
+		var M = vm.loadClass(SRC + 'Material'); vm.initClass(M);
+		Object.keys(mst).forEach(function (n) { c.statics[n] = M.statics[MAT[n] || 'rock'] || M.statics.rock; });
+	}, methods: {} });
+	def(CORE + 'block/material/MaterialColor', { statics: {}, methods: {}, anyInit: function () {} });
+	add(vm, SRC + 'Material', '<init>(Lnet/minecraft/core/block/material/MaterialColor;)V', function (vm, self) { self.$name = 'rock'; });
+	['blocksLight()Z', 'blocksMotion()Z', 'isSolidBlocking()Z', 'isAlwaysDestroyable()Z', 'isStone()Z', 'isMetal()Z', 'isFlammable()Z', 'isReplaceable()Z'].forEach(function (k) {
+		add(vm, SRC + 'Material', k, function (vm, self) {
+			var n = self.$name;
+			if (k === 'isStone()Z') return n === 'rock' ? 1 : 0;
+			if (k === 'isMetal()Z') return n === 'iron' ? 1 : 0;
+			if (k === 'isFlammable()Z') return ['wood', 'leaves', 'cloth', 'tnt', 'plants', 'vine'].indexOf(n) >= 0 ? 1 : 0;
+			if (k === 'isReplaceable()Z') return ['air', 'water', 'lava', 'snow', 'vine', 'fire'].indexOf(n) >= 0 ? 1 : 0;
+			return ['air', 'water', 'lava', 'plants', 'vine', 'fire', 'circuits', 'snow', 'portal', 'web'].indexOf(n) < 0 ? 1 : 0;
+		});
+	});
+	['setAsStone', 'setAsMetal', 'notSolidBlocking', 'notAlwaysDestroyable', 'flammable', 'replaceable', 'destroyOnPush', 'notPushable'].forEach(function (n) {
+		add(vm, SRC + 'Material', n + '()Lnet/minecraft/src/Material;', function (vm, self) { return self; });
+	});
+	var SND = { DEFAULT: 'soundStoneFootstep', WOOD: 'soundWoodFootstep', GRAVEL: 'soundGravelFootstep', GRASS: 'soundGrassFootstep', STONE: 'soundStoneFootstep',
+		METAL: 'soundMetalFootstep', GLASS: 'soundGlassFootstep', CLOTH: 'soundClothFootstep', SAND: 'soundSandFootstep', FIRE: 'soundStoneFootstep',
+		PERMAFROST: 'soundStoneFootstep', ASH: 'soundSandFootstep', SOULSAND: 'soundSandFootstep', GLOOMSTONE: 'soundStoneFootstep', BRIMSTONE: 'soundStoneFootstep', CRYSTAL: 'soundGlassFootstep' };
+	var sst = {}; D().sounds.forEach(function (n) { sst[n] = null; });
+	def(CORE + 'sound/BlockSounds', { statics: sst, clinit: function (vm, c) {
+		var B = vm.loadClass(SRC + 'Block'); vm.initClass(B);
+		Object.keys(sst).forEach(function (n) { c.statics[n] = B.statics[SND[n] || 'soundStoneFootstep']; });
+	}, methods: {} });
+
+	var B = SRC + 'Block', BL = 'Lnet/minecraft/src/Block;';
+	addInterface(vm, B, CORE + 'item/IItemConvertible');
+	addInterface(vm, B, CORE + 'data/tag/ITaggable');
+	var self_ = function (fn) { return function (vm, self, a) { fn(vm, self, a); return self; }; };
+	var tool = { 'minecraft:mineable_by_pickaxe': 'pickaxe', 'minecraft:mineable_by_axe': 'axe', 'minecraft:mineable_by_shovel': 'shovel' };
+	var withTags = function (vm, self, a) {
+		var ts = a[0] && a[0].a ? Array.prototype.slice.call(a[0].a) : [];
+		self.$tags = (self.$tags || []).concat(ts);
+		ts.forEach(function (t) { if (t && tool[t.$name]) self.$harvest = { tool: tool[t.$name], level: 0 }; });
+	};
+	var hasTag = function (vm, self, a) { return a[0] && ((self.$tags && self.$tags.indexOf(a[0]) >= 0) || a[0].$els.indexOf(self) >= 0) ? 1 : 0; };
+	var blockMethods = {
+		'id()I': function (vm, self) { return self[':blockID'] | 0; },
+		'getKey()Ljava/lang/String;': function (vm, self) { return self.$btaKey || ('tile.' + (self[':unlocalizedName'] || '')); },
+		'namespaceId()Lnet/minecraft/core/util/collection/NamespaceID;': function (vm, self) { return self.$nsid || newNs(vm, 'minecraft:block/' + (self[':unlocalizedName'] || 'block')); },
+		'getLogic()Lnet/minecraft/core/block/BlockLogic;': function (vm, self) { return self.$logic || null; },
+		'init()V': function () {},
+		'withHardness(F)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self[':blockHardness'] = a[0]; if (!(self[':blockResistance'] > a[0] * 5)) self[':blockResistance'] = a[0] * 5; }),
+		'withBlastResistance(F)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self[':blockResistance'] = a[0] * 3; }),
+		'withLightEmission(F)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self.$light = Math.round(a[0] * 15); self[':lightValue'] = self.$light; }),
+		'withLightEmission(I)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self.$light = a[0]; self[':lightValue'] = a[0]; }),
+		'withLightBlock(I)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self[':lightOpacity'] = a[0]; }),
+		'withSound(Lnet/minecraft/src/StepSound;)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { if (a[0]) self[':stepSound'] = a[0]; }),
+		'withSetUnbreakable()Lnet/minecraft/src/Block;': self_(function (vm, self) { self[':blockHardness'] = -1; self[':blockResistance'] = 6000000; }),
+		'withTags([Lnet/minecraft/core/data/tag/Tag;)Lnet/minecraft/src/Block;': self_(withTags),
+		'withDisabledStats()Lnet/minecraft/src/Block;': self_(function () {}),
+		'withLitInteriorSurface(Z)Lnet/minecraft/src/Block;': self_(function () {}),
+		'withOverrideColor(Lnet/minecraft/core/block/material/MaterialColor;)Lnet/minecraft/src/Block;': self_(function () {}),
+		'withEntity(Ljava/util/function/Supplier;)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self.$teSupplier = a[0]; self[':isBlockContainer'] = 1; }),
+		'setBlockItem(Ljava/util/function/Supplier;)Lnet/minecraft/src/Block;': self_(function () {}),
+		'setBlockItem(Ljava/util/function/Function;)Lnet/minecraft/src/Block;': self_(function () {}),
+		'setStatParent(Ljava/util/function/Supplier;)Lnet/minecraft/src/Block;': self_(function () {}),
+		'setTicking(Z)Lnet/minecraft/src/Block;': self_(function (vm, self, a) { self[':needsRandomTick'] = a[0]; }),
+		'getSound()Lnet/minecraft/src/StepSound;': function (vm, self) { return self[':stepSound']; },
+		'getHardness()F': function (vm, self) { return self[':blockHardness']; },
+		'hasTag(Lnet/minecraft/core/data/tag/Tag;)Z': hasTag, 'isIn(Lnet/minecraft/core/data/tag/Tag;)Z': hasTag,
+		'asItem()Lnet/minecraft/src/Item;': function (vm, self) { return itemsList(vm)[self[':blockID']] || null; },
+		'getDefaultStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return stackOf(vm, self, 1, 0); },
+		'getMaterial()Lnet/minecraft/src/Material;': function (vm, self) { return self[':blockMaterial']; },
+		'shouldTick()Z': function (vm, self) { return self[':needsRandomTick'] ? 1 : 0; },
+		'solid()Z': function (vm, self) { return self.$opaque === false ? 0 : 1; },
+		'translucent()Z': function (vm, self) { return self.$opaque === false ? 1 : 0; },
+		'lightEmission()I': function (vm, self) { return self.$light | 0; },
+		'lightBlock()I': function (vm, self) { return self[':lightOpacity'] | 0; },
+		'isEntityTile()Z': function (vm, self) { return self.$teSupplier ? 1 : 0; },
+	};
+	Object.keys(blockMethods).forEach(function (k) { add(vm, B, k, blockMethods[k]); });
+	vm.natives[B].staticMethods = vm.natives[B].staticMethods || {};
+	vm.natives[B].staticMethods['hasLogicClass(Lnet/minecraft/src/Block;Ljava/lang/Class;)Z'] = function (vm, n, a) { var l = a[0] && a[0].$logic; return l && a[1] && vm.isInstance(l, a[1].$cls) ? 1 : 0; };
+	wrap(vm, B, 'getRenderType()I', function (orig) { return function (vm, self, a) { return self.$renderType != null ? self.$renderType : orig(vm, self, a); }; });
+	wrap(vm, B, 'isOpaqueCube()Z', function (orig) { return function (vm, self, a) { return self.$opaque === false ? 0 : orig(vm, self, a); }; });
+	wrap(vm, B, 'renderAsNormalBlock()Z', function (orig) { return function (vm, self, a) { return self.$opaque === false ? 0 : orig(vm, self, a); }; });
+
+	var logicLook = function (vm, self, b) {
+		var n = self.cls.name;
+		for (var k = self.cls; k; k = k.superClass) { if (k.name.indexOf(LOGIC) === 0) { n = k.name; break; } }
+		var all = []; for (var k2 = self.cls; k2; k2 = k2.superClass) all.push(k2.name.split('/').pop());
+		var s = all.join(' ');
+		if (/Flower|Sapling|TallGrass|Mushroom|Crops|Plant|DeadBush|Reed|Sugarcane|Spinifex/.test(s)) { b.$renderType = 1; b.$opaque = false; }
+		else if (/Leaves|Glass|Transparent|Ice|Mesh|Web|Torch|Ladder|Fence|Door|Trapdoor|Rail|Lamp/.test(s)) b.$opaque = false;
+		if (/Slab/.test(s)) { b[':maxY'] = 0.5; b.$opaque = false; }
+		if (/Layer/.test(s)) { b[':maxY'] = 0.125; b.$opaque = false; }
+		if (/Torch/.test(s)) b.$renderType = 2;
+	};
+	var logicInit = function (vm, self, args) {
+		var Bc = vm.loadClass(B), Mc = vm.loadClass(SRC + 'Material');
+		var b = null, m = null;
+		(args || []).forEach(function (x) { if (x && typeof x === 'object') { if (!b && vm.isInstance(x, Bc)) b = x; else if (!m && vm.isInstance(x, Mc)) m = x; } });
+		self[':block'] = b; self[':material'] = m;
+		if (b) { b.$logic = self; if (m) b[':blockMaterial'] = m; logicLook(vm, self, b); }
+	};
+	var lb = function (vm, self) { return self[':block']; };
+	def(LOGIC, { interfaces: [CORE + 'item/IItemConvertible'], fields: { block: BL, material: 'Lnet/minecraft/src/Material;' }, anyInit: logicInit, methods: {
+		'<init>(Lnet/minecraft/src/Block;Lnet/minecraft/src/Material;)V': function (vm, self, a) { logicInit(vm, self, a); },
+		'initializeBlock()V': function () {},
+		'id()I': function (vm, self) { var b = lb(vm, self); return b ? b[':blockID'] : 0; },
+		'getKey()Ljava/lang/String;': function (vm, self) { var b = lb(vm, self); return b ? vm.callVirtual(b, 'getKey', '()Ljava/lang/String;', []) : ''; },
+		'namespaceId()Lnet/minecraft/core/util/collection/NamespaceID;': function (vm, self) { var b = lb(vm, self); return b ? b.$nsid || null : null; },
+		'getMaterial()Lnet/minecraft/src/Material;': function (vm, self) { return self[':material']; },
+		'asItem()Lnet/minecraft/src/Item;': function (vm, self) { var b = lb(vm, self); return b ? itemsList(vm)[b[':blockID']] || null : null; },
+		'getDefaultStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return stackOf(vm, lb(vm, self), 1, 0); },
+		'setBlockBounds(DDDDDD)V': function (vm, self, a) { var b = lb(vm, self); if (!b) return; ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { b[':' + k] = a[i]; }); if (a[4] < 1 || a[1] > 0 || a[0] > 0 || a[3] < 1) b.$opaque = false; },
+		'isCubeShaped()Z': function (vm, self) { var b = lb(vm, self); return b && b.$opaque === false ? 0 : 1; },
+		'isSolidRender()Z': function (vm, self) { var b = lb(vm, self); return b && b.$opaque === false ? 0 : 1; },
+		'blocksLight()Z': function (vm, self) { var b = lb(vm, self); return b && b.$opaque === false ? 0 : 1; },
+		'isCollidable()Z': function () { return 1; },
+		'canCollideCheck(IZ)Z': function () { return 1; },
+		'tickDelay()I': function () { return 10; },
+		'getBlastResistance(Lnet/minecraft/src/Entity;)F': function (vm, self) { var b = lb(vm, self); return b ? b[':blockResistance'] / 5 : 0; },
+	} });
+	D().logics.forEach(function (p) { if (p[0] !== LOGIC) def(p[0], { super: p[1].indexOf(LOGIC) === 0 || p[1] === 'java/lang/Object' && p[0].indexOf(LOGIC) === 0 ? (p[1] === 'java/lang/Object' ? LOGIC : p[1]) : LOGIC, anyInit: logicInit, methods: {} }); });
+	def(CORE + 'block/BlockLogicSupplier', { access: I, abstractMethods: { 'get(Lnet/minecraft/src/Block;)Lnet/minecraft/core/block/BlockLogic;': true } });
+
+	var bst = { blocksList: null, highestBlockId: null }; D().blocks.forEach(function (b) { bst[b[0]] = null; });
+	def(CORE + 'block/Blocks', { statics: bst, clinit: function (vm, c) {
+		var bl = new Array(16384).fill(null);
+		D().blocks.forEach(function (b) { var o = vanillaBlock(vm, b[1]); c.statics[b[0]] = o; if (b[3] < 16384) bl[b[3]] = o; });
+		c.statics.blocksList = arr(vm, BL, bl);
+		c.statics.highestBlockId = 1130;
+	}, methods: {}, staticMethods: {
+		'register(Ljava/lang/String;Ljava/lang/String;ILnet/minecraft/core/block/BlockLogicSupplier;)Lnet/minecraft/src/Block;': function (vm, n, a) { return registerBlock(vm, str(a[0]), str(a[1]), a[2], a[3]); },
+		'getBlock(I)Lnet/minecraft/src/Block;': function (vm, n, a) { var c = vm.loadClass(CORE + 'block/Blocks'); vm.initClass(c); return c.statics.blocksList.a[a[0]] || null; },
+		'init()V': function () {},
+		'getBlocksByKey()Ljava/util/Map;': function (vm) { return JVM.newMap(vm); },
+	} });
+	function freeBlockId(vm, want) {
+		var l = blocksList(vm);
+		if (want >= 256 && want < 4096 && !l[want]) return want;
+		for (var j = 4095; j > 256; j--) if (!l[j]) return j;
+		return -1;
+	}
+	function registerBlock(vm, key, nsid, id, supplier) {
+		var gid = freeBlockId(vm, id);
+		if (gid !== id) vm.warnOnce('bta:bid:' + id, 'BTA block id ' + id + ' (' + key + ') is block ' + gid + ' here');
+		var b = vm.newObject(vm.loadClass(B));
+		var M = vm.loadClass(SRC + 'Material'); vm.initClass(M);
+		vm.callVirtual(b, '<init>', '(ILnet/minecraft/src/Material;)V', [gid, M.statics.rock]);
+		b.$btaKey = 'tile.' + key; b.$btaId = id; b.$nsid = newNs(vm, nsid); b.$stTex = nsid;
+		b[':unlocalizedName'] = key;
+		var c = vm.loadClass(CORE + 'block/Blocks'); vm.initClass(c);
+		if (id >= 0 && id < 16384) c.statics.blocksList.a[id] = b;
+		if (supplier) {
+			var logic = vm.callInterface ? null : null;
+			logic = vm.callVirtual(supplier, 'get', '(Lnet/minecraft/src/Block;)Lnet/minecraft/core/block/BlockLogic;', [b]);
+			if (logic && !b.$logic) { b.$logic = logic; logicLook(vm, logic, b); }
+		}
+		return b;
+	}
+
+	var IT = SRC + 'Item', IL = 'Lnet/minecraft/src/Item;';
+	addInterface(vm, IT, CORE + 'item/IItemConvertible');
+	addInterface(vm, IT, CORE + 'data/tag/ITaggable');
+	var itemInit = function (vm, self, key, nsid, id) {
+		vm.invoke(vm.loadClass(IT).methods['<init>(I)V'], self, [id - 256]);
+		self.$btaKey = 'item.' + key; self[':unlocalizedName'] = key; self[':key'] = 'item.' + key;
+		self.$nsid = nsid && nsid.$ns !== undefined ? nsid : newNs(vm, nsid || ('minecraft:item/' + key));
+		self.$stTex = nsText(self.$nsid);
+	};
+	var itemMethods = {
+		'<init>(Ljava/lang/String;Ljava/lang/String;I)V': function (vm, self, a) { itemInit(vm, self, str(a[0]), str(a[1]), a[2]); },
+		'<init>(Lnet/minecraft/core/util/collection/NamespaceID;Ljava/lang/String;I)V': function (vm, self, a) { itemInit(vm, self, str(a[1]), a[0], a[2]); },
+		'withTags([Lnet/minecraft/core/data/tag/Tag;)Lnet/minecraft/src/Item;': function (vm, self, a) { withTags(vm, self, a); return self; },
+		'hasTag(Lnet/minecraft/core/data/tag/Tag;)Z': hasTag, 'isIn(Lnet/minecraft/core/data/tag/Tag;)Z': hasTag,
+		'asItem()Lnet/minecraft/src/Item;': function (vm, self) { return self; },
+		'getDefaultStack()Lnet/minecraft/src/ItemStack;': function (vm, self) { return stackOf(vm, self, 1, 0); },
+		'setStatParent(Ljava/util/function/Supplier;)Lnet/minecraft/src/Item;': function (vm, self) { return self; },
+		'getKey()Ljava/lang/String;': function (vm, self) { return self[':key'] || self.$btaKey || ('item.' + (self[':unlocalizedName'] || 'item' + self[':itemID'])); },
+		'getHasSubtypes()Z': function (vm, self) { return self[':hasSubtypes'] ? 1 : 0; },
+	};
+	Object.keys(itemMethods).forEach(function (k) { add(vm, IT, k, itemMethods[k]); });
+	wrap(vm, IT, 'getUnlocalizedName()Ljava/lang/String;', function (orig) { return function (vm, self, a) { return self[':key'] ? String(self[':key']) : orig(vm, self, a); }; });
+	add(vm, SRC + 'ItemFood', '<init>(Ljava/lang/String;Ljava/lang/String;IIIZI)V', function (vm, self, a) {
+		vm.invoke(vm.loadClass(SRC + 'ItemFood').methods['<init>(IIZ)V'], self, [a[2] - 256, a[3], a[5]]);
+		self.$btaKey = 'item.' + str(a[0]); self[':unlocalizedName'] = str(a[0]); self.$nsid = newNs(vm, str(a[1])); self.$stTex = str(a[1]);
+		self[':maxStackSize'] = a[6] || 1;
+	});
+	var TM = CORE + 'item/material/ToolMaterial';
+	def(TM, { statics: { wood: null, stone: null, iron: null, steel: null, diamond: null, gold: null }, clinit: function (vm, c) {
+		var mk = function (h, u, e, d, s) { var o = vm.newObject(c); o.$m = [h, u, e, d, s ? 1 : 0]; return o; };
+		c.statics.wood = mk(0, 64, 2, 0); c.statics.stone = mk(1, 128, 4, 1); c.statics.iron = mk(2, 256, 6, 2); c.statics.steel = mk(3, 4608, 7, 2);
+		c.statics.diamond = mk(3, 1536, 14, 3); c.statics.gold = mk(2, 64, 12, 0, true);
+	}, methods: {
+		'<init>()V': function (vm, self) { self.$m = [0, 64, 2, 0, 0]; },
+		'getMiningLevel()I': function (vm, self) { return self.$m[0]; }, 'getDurability()I': function (vm, self) { return self.$m[1]; },
+		'getEfficiency(Z)F': function (vm, self) { return self.$m[2]; }, 'getDamage()I': function (vm, self) { return self.$m[3]; },
+		'isSilkTouch()Z': function (vm, self) { return self.$m[4] ? 1 : 0; },
+		'setMiningLevel(I)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self, a) { self.$m[0] = a[0]; return self; },
+		'setDurability(I)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self, a) { self.$m[1] = a[0]; return self; },
+		'setDamage(I)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self, a) { self.$m[3] = a[0]; return self; },
+		'setEfficiency(FF)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self, a) { self.$m[2] = a[0]; return self; },
+		'setSilkTouch(Z)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self, a) { self.$m[4] = a[0] ? 1 : 0; return self; },
+		'setBlockHitDelay(I)Lnet/minecraft/core/item/material/ToolMaterial;': function (vm, self) { return self; },
+	} });
+	var enumMat = function (vm, tm) {
+		var c = vm.loadClass(SRC + 'EnumToolMaterial'); vm.initClass(c);
+		var e = vm.newObject(c), m = tm && tm.$m ? tm.$m : [2, 250, 6, 2, 0];
+		e.$m = [m[0], m[1], m[2], m[3], 14]; e.$name = 'BTA'; e[':name'] = 'BTA';
+		return e;
+	};
+	[['ItemSword', 'sword'], ['ItemPickaxe', 'pickaxe'], ['ItemAxe', 'axe'], ['ItemSpade', 'shovel'], ['ItemHoe', 'hoe']].forEach(function (t) {
+		add(vm, SRC + t[0], '<init>(Ljava/lang/String;Ljava/lang/String;ILnet/minecraft/core/item/material/ToolMaterial;)V', function (vm, self, a) {
+			vm.invoke(vm.loadClass(SRC + t[0]).methods['<init>(ILnet/minecraft/src/EnumToolMaterial;)V'], self, [a[2] - 256, enumMat(vm, a[3])]);
+			self[':material'] = a[3];
+			self.$btaKey = 'item.' + str(a[0]); self[':unlocalizedName'] = str(a[0]); self.$nsid = newNs(vm, str(a[1])); self.$stTex = str(a[1]);
+		});
+	});
+	add(vm, SRC + 'ItemTool', '<init>(Ljava/lang/String;Ljava/lang/String;IILnet/minecraft/core/item/material/ToolMaterial;Lnet/minecraft/core/data/tag/Tag;)V', function (vm, self, a) {
+		vm.invoke(vm.loadClass(SRC + 'Item').methods['<init>(I)V'], self, [a[2] - 256]);
+		self.$btaKey = 'item.' + str(a[0]); self[':unlocalizedName'] = str(a[0]); self.$nsid = newNs(vm, str(a[1])); self.$stTex = str(a[1]);
+		var m = a[4] && a[4].$m ? a[4].$m : [2, 250, 6, 2];
+		self[':material'] = a[4]; self[':maxStackSize'] = 1; self[':maxDamage'] = m[1]; self[':damageVsEntity'] = a[3] + m[3]; self[':efficiencyOnProperMaterial'] = m[2];
+		self.$tool = a[5] && tool[a[5].$name] || 'pickaxe';
+	});
+	['ItemTool', 'ItemSword', 'ItemHoe'].forEach(function (n) { add(vm, SRC + n, 'getMaterial()Lnet/minecraft/core/item/material/ToolMaterial;', function (vm, self) { return self[':material'] || null; }); });
+	var ist = { itemsList: null }; D().items.forEach(function (b) { ist[b[0]] = null; });
+	def(CORE + 'item/Items', { statics: ist, clinit: function (vm, c) { D().items.forEach(function (b) { c.statics[b[0]] = vanillaItem(vm, b[1], b[3]); }); }, methods: {}, staticMethods: { 'init()V': function () {} } });
+	add(vm, SRC + 'ItemBlock', '<init>(Lnet/minecraft/src/Block;)V', function (vm, self, a) {
+		var b = a[0]; vm.invoke(vm.loadClass(SRC + 'ItemBlock').methods['<init>(I)V'], self, [(b ? b[':blockID'] : 1) - 256]);
+	});
+	add(vm, SRC + 'ItemBlock', 'getBlock()Lnet/minecraft/src/Block;', function (vm, self) { return blocksList(vm)[self[':itemID']] || null; });
+
+	def('mcre/Obj2Int', { interfaces: ['java/util/Map'], methods: {
+		'<init>()V': function (vm, self) { self.$m = {}; },
+		'put(Ljava/lang/Object;I)I': function (vm, self, a) { var k = str(a[0]), o = self.$m[k]; self.$m[k] = a[1]; return o == null ? 0 : o; },
+		'getInt(Ljava/lang/Object;)I': function (vm, self, a) { var v = self.$m[str(a[0])]; return v == null ? 0 : v; },
+		'containsKey(Ljava/lang/Object;)Z': function (vm, self, a) { return str(a[0]) in self.$m ? 1 : 0; },
+		'remove(Ljava/lang/Object;I)Z': function (vm, self, a) { var k = str(a[0]); if (self.$m[k] === a[1]) { delete self.$m[k]; return 1; } return 0; },
+		'removeInt(Ljava/lang/Object;)I': function (vm, self, a) { var k = str(a[0]), v = self.$m[k]; delete self.$m[k]; return v == null ? 0 : v; },
+		'size()I': function (vm, self) { return Object.keys(self.$m).length; },
+	} });
+	(function () {
+		var ic = vm.loadClass(IT); vm.initClass(ic);
+		var m = vm.newObject(vm.loadClass('mcre/Obj2Int')); m.$m = {};
+		ic.fields.nameToIdMap = { name: 'nameToIdMap', desc: 'Lit/unimi/dsi/fastutil/objects/Object2IntMap;', static: true };
+		ic.statics.nameToIdMap = m;
+	})();
+	['net/minecraft/client/render/block/color/BlockColorDispatcher', 'net/minecraft/client/render/EntityRendererDispatcher', 'net/minecraft/client/render/TileEntityRenderDispatcher'].forEach(function (n) {
+		def(n, { methods: { 'addDispatch(Ljava/lang/Object;Ljava/lang/Object;)V': function () {} }, anyInit: function () {} });
+	});
+
+	var IS = SRC + 'ItemStack';
+	var convInit = function (vm, self, a) { var o = a[0], id = 0; if (o) id = o[':blockID'] !== undefined && vm.isInstance(o, vm.loadClass(B)) ? o[':blockID'] : o[':itemID'] !== undefined ? o[':itemID'] : (o[':block'] ? o[':block'][':blockID'] : 0); self[':itemID'] = id; self[':stackSize'] = a.length > 1 ? a[1] : 1; self[':itemDamage'] = a.length > 2 ? a[2] : 0; };
+	add(vm, IS, '<init>(Lnet/minecraft/core/item/IItemConvertible;)V', convInit);
+	add(vm, IS, '<init>(Lnet/minecraft/core/item/IItemConvertible;I)V', convInit);
+	add(vm, IS, '<init>(Lnet/minecraft/core/item/IItemConvertible;II)V', convInit);
+	add(vm, IS, 'getMetadata()I', function (vm, self) { return self[':itemDamage'] | 0; });
+	add(vm, IS, 'setMetadata(I)V', function (vm, self, a) { self[':itemDamage'] = a[0]; });
+	add(vm, IS, 'consumeItem(Lnet/minecraft/src/EntityPlayer;)Z', function (vm, self) { self[':stackSize']--; return 1; });
+
+	def(CORE + 'lang/I18n', { methods: {
+		'translateKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var k = str(a[0]); var v = JVM.mc152.langOf ? JVM.mc152.langOf(vm, k) : reg(vm).lang[k]; return v != null ? v : k; },
+		'translateKeyAndFormat(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { var k = str(a[0]), v = reg(vm).lang[k]; return vm.callStatic('java/lang/String', 'format', '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;', [v != null ? v : k, a[1]]); },
+		'translateNameKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var k = str(a[0]) + '.name', v = reg(vm).lang[k]; return v != null ? v : k; },
+		'translateDescKey(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var k = str(a[0]) + '.desc', v = reg(vm).lang[k]; return v != null ? v : ''; },
+	}, staticMethods: {
+		'getInstance()Lnet/minecraft/core/lang/I18n;': function (vm) { return vm.$i18n || (vm.$i18n = vm.newObject(vm.loadClass(CORE + 'lang/I18n'))); },
+		'initialize(Ljava/lang/String;)V': function () {},
+	} });
+
+	var IC = CLIENT + 'render/texture/stitcher/IconCoordinate';
+	var icon = function (vm, id) { var o = vm.newObject(vm.loadClass(IC)); o.$id = nsText(id && id.$ns !== undefined ? id : newNs(vm, str(id))); o[':namespaceId'] = newNs(vm, o.$id); o[':width'] = 16; o[':height'] = 16; return o; };
+	def(IC, { methods: { 'toString()Ljava/lang/String;': function (vm, self) { return self.$id; }, 'getIconUMin()D': function () { return 0; }, 'getIconUMax()D': function () { return 1; }, 'getIconVMin()D': function () { return 0; }, 'getIconVMax()D': function () { return 1; } } });
+	def(CLIENT + 'render/texture/stitcher/TextureRegistry', { statics: { excludedNamespaces: null }, clinit: function (vm, c) { c.statics.excludedNamespaces = list(vm, []); }, methods: {}, staticMethods: {
+		'getTexture(Ljava/lang/String;)Lnet/minecraft/client/render/texture/stitcher/IconCoordinate;': function (vm, n, a) { return icon(vm, a[0]); },
+		'getTexture(Lnet/minecraft/core/util/collection/NamespaceID;)Lnet/minecraft/client/render/texture/stitcher/IconCoordinate;': function (vm, n, a) { return icon(vm, a[0]); },
+		'hasTexture(Ljava/lang/String;)Z': function () { return 1; },
+	} });
+	var IM = CLIENT + 'render/item/model/';
+	def(IM + 'ItemModel', { anyInit: function (vm, self, a) { var it = a && a[0]; self.$item = it; }, methods: {} });
+	def(IM + 'ItemModelStandard', { super: IM + 'ItemModel', anyInit: function (vm, self, a) { self.$item = a && a[0]; if (a && typeof a[1] === 'string' && self.$item) self.$item.$stTex = a[1]; }, methods: {
+		'setIcon(Ljava/lang/String;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self, a) { if (self.$item) self.$item.$stTex = str(a[0]); return self; },
+		'setIcon(Lnet/minecraft/core/util/collection/NamespaceID;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self, a) { if (self.$item) self.$item.$stTex = nsText(a[0]); return self; },
+		'setFullBright()Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self) { return self; },
+		'setDisplayPos(Ljava/lang/String;Lorg/useless/dragonfly/DisplayPos;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self) { return self; },
+	} });
+	def(IM + 'ItemModelDispatcher', { statics: {}, methods: {
+		'addDispatch(Lnet/minecraft/client/render/item/model/ItemModel;)V': function () {},
+		'addDispatch(Ljava/lang/Object;Ljava/lang/Object;)V': function () {},
+	}, staticMethods: { 'getInstance()Lnet/minecraft/client/render/item/model/ItemModelDispatcher;': function (vm) { return vm.$imd || (vm.$imd = vm.newObject(vm.loadClass(IM + 'ItemModelDispatcher'))); } } });
+	var BM = CLIENT + 'render/block/model/';
+	var sideIdx = function (s) { return s ? (s.$ordinal != null ? s.$ordinal : s[':ordinal'] | 0) : 0; };
+	var faceSet = function (b, idx, t) { if (!b) return; var s = b.$stTexSides || (b.$stTexSides = [null, null, null, null, null, null]); s[idx] = t; };
+	var allTex = function (b, t) { if (b) { b.$stTex = t; b.$stTexSides = null; } };
+	var bmInit = function (vm, self, a) {
+		var Bc = vm.loadClass(B); (a || []).forEach(function (x) { if (!self.$block && x && typeof x === 'object' && vm.isInstance(x, Bc)) self.$block = x; });
+		var n = self.cls.name; if (self.$block && /CrossedSquares|Flower|Sapling|Crops|TallGrass/.test(n)) { self.$block.$renderType = 1; self.$block.$opaque = false; }
+	};
+	var texArg = function (x) { return x && x.$id ? x.$id : str(x); };
+	def(BM + 'BlockModel', { anyInit: bmInit, methods: {} });
+	def(BM + 'BlockModelStandard', { super: BM + 'BlockModel', anyInit: bmInit, methods: {
+		'setTex(Ljava/lang/String;[Lnet/minecraft/core/util/helper/Side;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { var t = str(a[0]); (a[1] ? Array.prototype.slice.call(a[1].a) : []).forEach(function (s) { faceSet(self.$block, sideIdx(s), t); }); return self; },
+		'setTex(Lnet/minecraft/client/render/texture/stitcher/IconCoordinate;[Lnet/minecraft/core/util/helper/Side;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { var t = texArg(a[0]); (a[1] ? Array.prototype.slice.call(a[1].a) : []).forEach(function (s) { faceSet(self.$block, sideIdx(s), t); }); return self; },
+		'setAllTextures(Ljava/lang/String;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { allTex(self.$block, str(a[0])); return self; },
+		'setAllTextures(Lnet/minecraft/client/render/texture/stitcher/IconCoordinate;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { allTex(self.$block, texArg(a[0])); return self; },
+		'withTextures(Ljava/lang/String;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { allTex(self.$block, str(a[0])); return self; },
+		'withTextures(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { var b = self.$block; [0, 1].forEach(function (i) { faceSet(b, i, str(a[0])); }); [2, 3, 4, 5].forEach(function (i) { faceSet(b, i, str(a[1])); }); return self; },
+		'withTextures(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { var b = self.$block; faceSet(b, 1, str(a[0])); faceSet(b, 0, str(a[1])); [2, 3, 4, 5].forEach(function (i) { faceSet(b, i, str(a[2])); }); return self; },
+		'withTextures(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self, a) { for (var i = 0; i < 6; i++) faceSet(self.$block, i, str(a[i])); return self; },
+		'setDisplayPos(Ljava/lang/String;Lorg/useless/dragonfly/DisplayPos;)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self) { return self; },
+		'onRenderLayer(I)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self) { return self; },
+		'withCustomItemBounds(DDDDDD)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self) { return self; },
+	} });
+	D().models.forEach(function (p) { if (p[0] !== BM + 'BlockModel' && p[0] !== BM + 'BlockModelStandard' && !/Dispatcher/.test(p[0])) def(p[0], { super: p[1].indexOf(BM) === 0 ? p[1] : BM + 'BlockModelStandard', anyInit: bmInit, methods: {} }); });
+	var DF = 'org/useless/dragonfly/';
+	var modelArg = function (a) { for (var i = 0; a && i < a.length; i++) { var x = a[i]; if (x && typeof x === 'object' && x.$model) return x.$model; if (typeof x === 'string' && /:/.test(x)) return x; } return null; };
+	var modelInit = function (vm, self, a) { self.$model = modelArg(a); };
+	def(DF + 'data/block/mojang/BlockModelMojangData', { anyInit: modelInit, methods: {
+		'asModel()Lorg/useless/dragonfly/models/block/StaticBlockModel;': function (vm, self) { var o = vm.newObject(vm.loadClass(DF + 'models/block/StaticBlockModel')); o.$model = self.$model; return o; },
+	} });
+	def(DF + 'models/block/StaticBlockModel', { anyInit: modelInit, methods: {} });
+	def(DF + 'models/block/BlockModelBase', { anyInit: modelInit, methods: {} });
+	def(DF + 'DisplayPos', { anyInit: function () {}, methods: {} });
+	var bmModelInit = function (vm, self, a) {
+		bmInit(vm, self, a);
+		var m = modelArg(a);
+		if (self.$block) { if (m && !self.$block.$btaModel) self.$block.$btaModel = m.replace(/[.]json$/, ''); vm.$curBlockModel = self; self.$block.$btaModelsMeta = []; }
+	};
+	def(BM + 'generic/BlockModelGeneric', { super: BM + 'BlockModelStandard', anyInit: bmModelInit, methods: {} });
+	def(BM + 'BlockModelDispatcher', { statics: {}, methods: {
+		'addDispatch(Lnet/minecraft/client/render/block/model/BlockModel;)V': function (vm) { vm.$curBlockModel = null; },
+		'addDispatch(Lnet/minecraft/src/Block;Lnet/minecraft/client/render/block/model/BlockModel;)V': function () {},
+		'addDispatch(Ljava/lang/Object;Ljava/lang/Object;)V': function () {},
+		'getDispatch(Ljava/lang/Object;)Ljava/lang/Object;': function () { return null; },
+	}, staticMethods: {
+		'getInstance()Lnet/minecraft/client/render/block/model/BlockModelDispatcher;': function (vm) { return vm.$bmd || (vm.$bmd = vm.newObject(vm.loadClass(BM + 'BlockModelDispatcher'))); },
+		'loadDataModel(Ljava/lang/String;)Lorg/useless/dragonfly/data/block/mojang/BlockModelMojangData;': function (vm, n, a) {
+			var o = vm.newObject(vm.loadClass(DF + 'data/block/mojang/BlockModelMojangData')); o.$model = str(a[0]).replace(/[.]json$/, '');
+			var cur = vm.$curBlockModel; if (cur && cur.$block && cur.$block.$btaModelsMeta) cur.$block.$btaModelsMeta.push(o.$model);
+			return o;
+		},
+	} });
+
+	def('mcre/BtaRunOnce', { interfaces: ['java/util/function/Consumer'], methods: {
+		'accept(Ljava/lang/Object;)V': function (vm, self, a) {
+			var l = a[0]; if (!l || self.$fired.indexOf(l) >= 0) return;
+			self.$fired.push(l);
+			if (self.$arg) vm.callVirtual(l, 'accept', '(Ljava/lang/Object;)V', [self.$arg]);
+			else vm.callVirtual(l, 'run', '()V', []);
+		},
+	} });
+	var enumDef = function (cls, names) {
+		var st = {}; names.forEach(function (n) { st[n] = null; });
+		def(cls, { super: 'java/lang/Enum', statics: st, clinit: function (vm, c) { c.$values = names.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; o.$ordinal = i; c.statics[n] = o; return o; }); }, methods: {
+			'getId()I': function (vm, self) { return self.$ordinal; },
+		}, staticMethods: (function () { var s = {}; s['values()[L' + cls + ';'] = function (vm) { var c = vm.loadClass(cls); vm.initClass(c); return arr(vm, 'L' + cls + ';', c.$values.slice()); }; return s; })() });
+	};
+	var DYES = ['WHITE', 'ORANGE', 'MAGENTA', 'LIGHT_BLUE', 'YELLOW', 'LIME', 'PINK', 'GRAY', 'SILVER', 'CYAN', 'PURPLE', 'BLUE', 'BROWN', 'GREEN', 'RED', 'BLACK'];
+	var DY = CORE + 'util/helper/DyeColor', dst = { COLOR_AMOUNT: 16, MASK_COLOR: 15 };
+	DYES.forEach(function (n) { dst[n] = null; });
+	def(DY, { super: 'java/lang/Enum', statics: dst, fields: { blockMeta: 'I', itemMeta: 'I', colorID: STR }, clinit: function (vm, c) {
+		c.$values = DYES.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; o.$ordinal = i; o[':blockMeta'] = i; o[':itemMeta'] = 15 - i; o[':colorID'] = n.toLowerCase(); c.statics[n] = o; return o; });
+	}, methods: {}, staticMethods: {
+		'values()[Lnet/minecraft/core/util/helper/DyeColor;': function (vm) { var c = vm.loadClass(DY); vm.initClass(c); return arr(vm, 'L' + DY + ';', c.$values.slice()); },
+		'colorFromBlockMeta(I)Lnet/minecraft/core/util/helper/DyeColor;': function (vm, n, a) { var c = vm.loadClass(DY); vm.initClass(c); return c.$values[a[0] & 15]; },
+		'colorFromItemMeta(I)Lnet/minecraft/core/util/helper/DyeColor;': function (vm, n, a) { var c = vm.loadClass(DY); vm.initClass(c); return c.$values[15 - (a[0] & 15)]; },
+		'blockOrderedColors()Ljava/util/List;': function (vm) { var c = vm.loadClass(DY); vm.initClass(c); return list(vm, c.$values.slice()); },
+		'itemOrderedColors()Ljava/util/List;': function (vm) { var c = vm.loadClass(DY); vm.initClass(c); return list(vm, c.$values.slice().reverse()); },
+	} });
+	enumDef(CORE + 'util/helper/Side', D().side.length ? D().side : ['BOTTOM', 'TOP', 'NORTH', 'SOUTH', 'WEST', 'EAST']);
+	enumDef(CORE + 'util/helper/Direction', D().direction.length ? D().direction : ['DOWN', 'UP', 'NORTH', 'SOUTH', 'WEST', 'EAST']);
+}
+JVM.installBta = install;
+
+function json(files, n) { var b = n && files[n]; try { return b ? JSON.parse(new TextDecoder().decode(b).replace(/^﻿/, '')) : null; } catch (e) { return null; } }
+
+function entryObjects(vm, list) {
+	var out = [];
+	(list || []).forEach(function (v) {
+		var r = JVM.run(vm, function () { return JVM.stationEntrypointObject ? JVM.stationEntrypointObject(vm, v) : null; });
+		if (r.ok && r.value && r.value.cls) out.push(r.value);
+	});
+	return out;
+}
+function each(vm, objs, name, desc, modId, what) {
+	objs.forEach(function (o) {
+		var m = o.cls.findMethod(name + desc);
+		if (!m || (m.access & JVM.ACC_ABSTRACT)) return;
+		var r = JVM.run(vm, function () { vm.callVirtual(o, name, desc, []); });
+		if (!r.ok) vm.log('error', modId + ': ' + what + ' failed');
+	});
+}
+
+var HE = 'turniplabs/halplibe/event/defs/CommonEvents', HC = 'turniplabs/halplibe/event/defs/ClientEvents';
+function halpEvents(vm, cls) {
+	cls = cls || HE;
+	var c = vm.classes[cls];
+	if (!c && (vm.sources[cls] || vm.natives[cls])) { var r = JVM.run(vm, function () { var k = vm.loadClass(cls); vm.initClass(k); return k; }); c = r.ok ? r.value : null; }
+	return c && c.statics ? c.statics : null;
+}
+function halpRearm(vm) { halpRearm1(vm, HE); halpRearm1(vm, HC); }
+function halpRearm1(vm, cls) {
+	var st = halpEvents(vm, cls); if (!st) return;
+	JVM.run(vm, function () {
+		Object.keys(st).forEach(function (k) {
+			var ev = st[k]; if (!ev || typeof ev !== 'object' || !(':listeners' in ev || ':listeners' in ev)) return;
+			if (ev[':listeners'] === null) { var l = vm.newObject(vm.loadClass('java/util/ArrayList')); vm.callVirtual(l, '<init>', '()V', []); ev[':listeners'] = l; }
+			if (ev[':listenerMap'] === null) { var m = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); ev[':listenerMap'] = m; }
+		});
+	});
+}
+function halpEmit(vm, name, modId, cls, arg) {
+	var st = halpEvents(vm, cls); if (!st || !st[name]) return;
+	var fired = vm.$btaFired || (vm.$btaFired = []);
+	var r = JVM.run(vm, function () {
+		var c = vm.newObject(vm.loadClass('mcre/BtaRunOnce'));
+		c.$fired = fired; c.$arg = arg || null;
+		vm.callVirtual(st[name], 'emit', '(Ljava/util/function/Consumer;)V', [c]);
+	});
+	if (!r.ok) vm.log('error', modId + ': ' + name + ' failed');
+}
+JVM.btaHalpEmit = halpEmit;
+
+JVM.btaLoad = function (vm, modId, fj, files, classes) {
+	vm.$bta = true;
+	var lr = reg(vm).lang;
+	Object.keys(files).forEach(function (k) {
+		if (!/(^|[/])lang[/](en_us[.]lang|en_us[/][^/]+[.]lang)$/i.test(k)) return;
+		try { new TextDecoder().decode(files[k]).split(/\r?\n/).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && !/^\s*#/.test(l)) { var key = l.slice(0, i).trim(); if (lr[key] == null) lr[key] = l.slice(i + 1).trim(); } }); } catch (e) { }
+	});
+	halpRearm(vm);
+	JVM.babricLoad(vm, modId, fj, files, classes);
+	var eps = fj.entrypoints || {};
+	var get = function (k) { return entryObjects(vm, eps[k]); };
+	halpEmit(vm, 'BEFORE_GAME_START', modId);
+	each(vm, get('beforeGameStart'), 'beforeGameStart', '()V', modId, 'beforeGameStart');
+	halpEmit(vm, 'AFTER_BLOCK_INIT', modId);
+	halpEmit(vm, 'AFTER_ITEM_INIT', modId);
+	var rec = get('recipesReady');
+	each(vm, rec, 'initNamespaces', '()V', modId, 'initNamespaces');
+	halpEmit(vm, 'RECIPES_NAMESPACE_INIT', modId);
+	each(vm, rec, 'onRecipesReady', '()V', modId, 'onRecipesReady');
+	halpEmit(vm, 'RECIPES_READY', modId);
+	each(vm, get('afterGameStart'), 'afterGameStart', '()V', modId, 'afterGameStart');
+	halpEmit(vm, 'AFTER_GAME_START', modId);
+	halpEmit(vm, 'BEFORE_CLIENT_START', modId, HC);
+	each(vm, get('beforeClientStart'), 'beforeClientStart', '()V', modId, 'beforeClientStart');
+	var disp = function (cls) { var r = JVM.run(vm, function () { return vm.callStatic(cls, 'getInstance', '()L' + cls + ';', []); }); return r.ok ? r.value : null; };
+	var dispNew = function (cls) { var r = JVM.run(vm, function () { return vm.newObject(vm.loadClass(cls)); }); return r.ok ? r.value : null; };
+	halpEmit(vm, 'BLOCK_MODEL_RELOAD', modId, HC, disp('net/minecraft/client/render/block/model/BlockModelDispatcher'));
+	halpEmit(vm, 'ITEM_MODEL_RELOAD', modId, HC, disp('net/minecraft/client/render/item/model/ItemModelDispatcher'));
+	halpEmit(vm, 'BLOCK_COLOR_RELOAD', modId, HC, dispNew('net/minecraft/client/render/block/color/BlockColorDispatcher'));
+	halpEmit(vm, 'ENTITY_RENDERER_RELOAD', modId, HC, dispNew('net/minecraft/client/render/EntityRendererDispatcher'));
+	halpEmit(vm, 'TILE_ENTITY_RENDERER_RELOAD', modId, HC, dispNew('net/minecraft/client/render/TileEntityRenderDispatcher'));
+	each(vm, get('afterClientStart'), 'afterClientStart', '()V', modId, 'afterClientStart');
+	halpEmit(vm, 'AFTER_CLIENT_START', modId, HC);
+	var mdl = get('initModels');
+	['initBlockModels', 'initItemModels', 'initEntityModels', 'initTileEntityModels', 'initBlockColors', 'initItemColors'].forEach(function (n) {
+		each(vm, mdl, n, '()V', modId, n);
+	});
+};
+})();
+
+(function () {
+'use strict';
+
 var SRC = 'net/minecraft/src/';
 function reg(vm) { return JVM.mc152.reg(vm); }
 var VANILLA = [['protection', 0, 4], ['fireProtection', 1, 4], ['featherFalling', 2, 4], ['blastProtection', 3, 4], ['projectileProtection', 4, 4],
@@ -18168,6 +19038,8 @@ JVM.collectEnchantments = function (vm, modId, safe) {
 	return out;
 };
 })();
+
+JVM.BTA_DATA = {"blocks":[["AIR","air","minecraft:block/air",0],["STONE","stone","minecraft:block/stone",1],["BASALT","basalt","minecraft:block/basalt",2],["LIMESTONE","limestone","minecraft:block/limestone",3],["GRANITE","granite","minecraft:block/granite",4],["MARBLE","marble","minecraft:block/marble",5],["SLATE","slate","minecraft:block/slate",6],["PERMAFROST","permafrost","minecraft:block/permafrost",7],["COBBLE_STONE","cobble.stone","minecraft:block/cobble_stone",10],["COBBLE_STONE_MOSSY","cobble.stone.mossy","minecraft:block/cobble_stone_mossy",11],["COBBLE_BASALT","cobble.basalt","minecraft:block/cobble_basalt",12],["COBBLE_LIMESTONE","cobble.limestone","minecraft:block/cobble_limestone",13],["COBBLE_GRANITE","cobble.granite","minecraft:block/cobble_granite",14],["COBBLE_PERMAFROST","cobble.permafrost","minecraft:block/cobble_permafrost",15],["COBBLE_BASALT_MOSSY","cobble.basalt.mossy","minecraft:block/cobble_basalt_mossy",16],["COBBLE_LIMESTONE_MOSSY","cobble.limestone.mossy","minecraft:block/cobble_limestone_mossy",17],["COBBLE_GRANITE_MOSSY","cobble.granite.mossy","minecraft:block/cobble_granite_mossy",18],["PILLAR_MARBLE","pillar.marble","minecraft:block/pillar_marble",20],["CAPSTONE_MARBLE","capstone.marble","minecraft:block/capstone_marble",21],["SANDSTONE","sandstone","minecraft:block/sandstone",30],["STONE_CARVED","stone.carved","minecraft:block/stone_carved",40],["GRANITE_CARVED","granite.carved","minecraft:block/granite_carved",41],["LIMESTONE_CARVED","limestone.carved","minecraft:block/limestone_carved",42],["BASALT_CARVED","basalt.carved","minecraft:block/basalt_carved",43],["PERMAFROST_CARVED","permafrost.carved","minecraft:block/permafrost_carved",44],["NETHERRACK_CARVED","netherrack.carved","minecraft:block/netherrack_carved",45],["GLOOMSTONE_CARVED","gloomstone.carved","minecraft:block/gloomstone_carved",46],["PLANKS_OAK","planks.oak","minecraft:block/planks_oak",50],["PLANKS_OAK_PAINTED","planks.oak.painted","minecraft:block/planks_oak_painted",51],["TORCH_COAL","torch.coal","minecraft:block/torch_coal",60],["LADDER_OAK","ladder.oak","minecraft:block/ladder_oak",70],["FENCE_PLANKS_OAK","fence.planks.oak","minecraft:block/fence_planks_oak",80],["FENCE_PLANKS_OAK_PAINTED","fence.planks.oak.painted","minecraft:block/fence_planks_oak_painted",81],["FENCE_GATE_PLANKS_OAK","fencegate.planks.oak","minecraft:block/fence_gate_planks_oak",90],["FENCE_GATE_PLANKS_OAK_PAINTED","fencegate.planks.oak.painted","minecraft:block/fence_gate_planks_oak_painted",91],["BOOKSHELF_PLANKS_OAK","bookshelf.planks.oak","minecraft:block/bookshelf_planks_oak",100],["WOOL","wool","minecraft:block/wool",110],["ROPE","rope","minecraft:block/rope",111],["BRICK_CLAY","brick.clay","minecraft:block/brick_clay",120],["BRICK_STONE_POLISHED","brick.stone.polished","minecraft:block/brick_stone_polished",121],["BRICK_STONE_POLISHED_MOSSY","brick.stone.polished.mossy","minecraft:block/brick_stone_polished_mossy",122],["BRICK_SANDSTONE","brick.sandstone","minecraft:block/brick_sandstone",123],["BRICK_GOLD","brick.gold","minecraft:block/brick_gold",124],["BRICK_LAPIS","brick.lapis","minecraft:block/brick_lapis",125],["BRICK_BASALT","brick.basalt","minecraft:block/brick_basalt",126],["BRICK_LIMESTONE","brick.limestone","minecraft:block/brick_limestone",127],["BRICK_GRANITE","brick.granite","minecraft:block/brick_granite",128],["BRICK_MARBLE","brick.marble","minecraft:block/brick_marble",129],["BRICK_SLATE","brick.slate","minecraft:block/brick_slate",130],["BRICK_STONE","brick.stone","minecraft:block/brick_stone",131],["BRICK_PERMAFROST","brick.permafrost","minecraft:block/brick_permafrost",132],["BRICK_IRON","brick.iron","minecraft:block/brick_iron",133],["BRICK_STEEL","brick.steel","minecraft:block/brick_steel",134],["BRICK_OLIVINE","brick.olivine","minecraft:block/brick_olivine",135],["BRICK_QUARTZ","brick.quartz","minecraft:block/brick_quartz",136],["BRICK_DIAMOND","brick.diamond","minecraft:block/brick_diamond",137],["SLAB_PLANKS_OAK","slab.planks.oak","minecraft:block/slab_planks_oak",140],["SLAB_COBBLE_STONE","slab.cobble.stone","minecraft:block/slab_cobble_stone",141],["SLAB_SANDSTONE","slab.sandstone","minecraft:block/slab_sandstone",142],["SLAB_BRICK_STONE_POLISHED","slab.brick.stone.polished","minecraft:block/slab_brick_stone_polished",143],["SLAB_STONE_POLISHED","slab.stone.carved","minecraft:block/slab_stone_carved",144],["SLAB_BRICK_MARBLE","slab.brick.marble","minecraft:block/slab_brick_marble",145],["SLAB_BRICK_CLAY","slab.brick.clay","minecraft:block/slab_brick_clay",146],["SLAB_CAPSTONE_MARBLE","slab.capstone.marble","minecraft:block/slab_capstone_marble",147],["SLAB_COBBLE_BASALT","slab.cobble.basalt","minecraft:block/slab_cobble_basalt",148],["SLAB_COBBLE_LIMESTONE","slab.cobble.limestone","minecraft:block/slab_cobble_limestone",149],["SLAB_COBBLE_GRANITE","slab.cobble.granite","minecraft:block/slab_cobble_granite",150],["SLAB_BRICK_BASALT","slab.brick.basalt","minecraft:block/slab_brick_basalt",151],["SLAB_BRICK_LIMESTONE","slab.brick.limestone","minecraft:block/slab_brick_limestone",152],["SLAB_BRICK_GRANITE","slab.brick.granite","minecraft:block/slab_brick_granite",153],["SLAB_PLANKS_PAINTED","slab.planks.oak.painted","minecraft:block/slab_planks_oak_painted",154],["SLAB_BRICK_SLATE","slab.brick.slate","minecraft:block/slab_brick_slate",155],["SLAB_BRICK_STONE","slab.brick.stone","minecraft:block/slab_brick_stone",156],["SLAB_GRANITE_POLISHED","slab.granite.carved","minecraft:block/slab_granite_carved",157],["SLAB_LIMESTONE_POLISHED","slab.limestone.carved","minecraft:block/slab_limestone_carved",158],["SLAB_BASALT_POLISHED","slab.basalt.carved","minecraft:block/slab_basalt_carved",159],["STAIRS_PLANKS_OAK","stairs.planks.oak","minecraft:block/stairs_planks_oak",160],["STAIRS_COBBLE_STONE","stairs.cobble.stone","minecraft:block/stairs_cobble_stone",161],["STAIRS_BRICK_STONE_POLISHED","stairs.brick.stone.polished","minecraft:block/stairs_brick_stone_polished",162],["STAIRS_BRICK_MARBLE","stairs.brick.marble","minecraft:block/stairs_brick_marble",163],["STAIRS_COBBLE_BASALT","stairs.cobble.basalt","minecraft:block/stairs_cobble_basalt",164],["STAIRS_COBBLE_LIMESTONE","stairs.cobble.limestone","minecraft:block/stairs_cobble_limestone",165],["STAIRS_COBBLE_GRANITE","stairs.cobble.granite","minecraft:block/stairs_cobble_granite",166],["STAIRS_BRICK_BASALT","stairs.brick.basalt","minecraft:block/stairs_brick_basalt",167],["STAIRS_BRICK_LIMESTONE","stairs.brick.limestone","minecraft:block/stairs_brick_limestone",168],["STAIRS_BRICK_GRANITE","stairs.brick.granite","minecraft:block/stairs_brick_granite",169],["STAIRS_BRICK_CLAY","stairs.brick.clay","minecraft:block/stairs_brick_clay",170],["STAIRS_PLANKS_PAINTED","stairs.planks.oak.painted","minecraft:block/stairs_planks_oak_painted",171],["STAIRS_BRICK_SLATE","stairs.brick.slate","minecraft:block/stairs_brick_slate",172],["STAIRS_BRICK_STONE","stairs.brick.stone","minecraft:block/stairs_brick_stone",173],["STAIRS_SANDSTONE","stairs.sandstone","minecraft:block/stairs_sandstone",174],["STAIRS_BRICK_SANDSTONE","stairs.brick.sandstone","minecraft:block/stairs_brick_sandstone",175],["STAIRS_COBBLE_PERMAFROST","stairs.cobble.permafrost","minecraft:block/stairs_cobble_permafrost",176],["STAIRS_BRICK_PERMAFROST","stairs.brick.permafrost","minecraft:block/stairs_brick_permafrost",177],["OBSIDIAN","obsidian","minecraft:block/obsidian",180],["GLASS","glass","minecraft:block/glass",190],["GLASS_TINTED","glass.tinted","minecraft:block/glass_tinted",191],["GLASS_STEEL","glass.steel","minecraft:block/glass_steel",192],["GRASS","grass","minecraft:block/grass",200],["GRASS_RETRO","grass.retro","minecraft:block/grass_retro",201],["GRASS_SCORCHED","grass.scorched","minecraft:block/grass_scorched",202],["PATH_DIRT","path.dirt","minecraft:block/path_dirt",210],["DIRT","dirt","minecraft:block/dirt",220],["DIRT_SCORCHED","dirt.scorched","minecraft:block/dirt_scorched",221],["DIRT_SCORCHED_RICH","dirt.scorched.rich","minecraft:block/dirt_scorched_rich",222],["MUD","mud","minecraft:block/mud",225],["MUD_BAKED","mud.baked","minecraft:block/mud_baked",226],["SPONGE_DRY","sponge.dry","minecraft:block/sponge_dry",230],["SPONGE_WET","sponge.wet","minecraft:block/sponge_wet",231],["PUMICE_DRY","pumice.dry","minecraft:block/pumice_dry",232],["PUMICE_WET","pumice.wet","minecraft:block/pumice_wet",233],["MOSS_STONE","moss.stone","minecraft:block/moss_stone",240],["MOSS_BASALT","moss.basalt","minecraft:block/moss_basalt",241],["MOSS_LIMESTONE","moss.limestone","minecraft:block/moss_limestone",242],["MOSS_GRANITE","moss.granite","minecraft:block/moss_granite",243],["SAND","sand","minecraft:block/sand",250],["GRAVEL","gravel","minecraft:block/gravel",251],["BEDROCK","bedrock","minecraft:block/bedrock",260],["BONESHALE","boneshale","minecraft:block/boneshale",261],["FLUID_WATER_FLOWING","fluid.water.flowing","minecraft:block/fluid_water_flowing",270],["FLUID_WATER_STILL","fluid.water.still","minecraft:block/fluid_water_still",271],["FLUID_LAVA_FLOWING","fluid.lava.flowing","minecraft:block/fluid_lava_flowing",272],["FLUID_LAVA_STILL","fluid.lava.still","minecraft:block/fluid_lava_still",273],["LOG_OAK","log.oak","minecraft:block/log_oak",280],["LOG_PINE","log.pine","minecraft:block/log_pine",281],["LOG_BIRCH","log.birch","minecraft:block/log_birch",282],["LOG_CHERRY","log.cherry","minecraft:block/log_cherry",283],["LOG_EUCALYPTUS","log.eucalyptus","minecraft:block/log_eucalyptus",284],["LOG_OAK_MOSSY","log.oak.mossy","minecraft:block/log_oak_mossy",285],["LOG_THORN","log.thorn","minecraft:block/log_thorn",286],["LOG_PALM","log.palm","minecraft:block/log_palm",287],["LEAVES_OAK","leaves.oak","minecraft:block/leaves_oak",290],["LEAVES_OAK_RETRO","leaves.oak.retro","minecraft:block/leaves_oak_retro",291],["LEAVES_PINE","leaves.pine","minecraft:block/leaves_pine",292],["LEAVES_BIRCH","leaves.birch","minecraft:block/leaves_birch",293],["LEAVES_CHERRY","leaves.cherry","minecraft:block/leaves_cherry",294],["LEAVES_EUCALYPTUS","leaves.eucalyptus","minecraft:block/leaves_eucalyptus",295],["LEAVES_SHRUB","leaves.shrub","minecraft:block/leaves_shrub",296],["LEAVES_CHERRY_FLOWERING","leaves.cherry.flowering","minecraft:block/leaves_cherry_flowering",297],["LEAVES_CACAO","leaves.cacao","minecraft:block/leaves_cacao",298],["LEAVES_THORN","leaves.thorn","minecraft:block/leaves_thorn",299],["LEAVES_PALM","leaves.palm","minecraft:block/leaves_palm",300],["SAPLING_OAK","sapling.oak","minecraft:block/sapling_oak",310],["SAPLING_OAK_RETRO","sapling.oak.retro","minecraft:block/sapling_oak_retro",311],["SAPLING_PINE","sapling.pine","minecraft:block/sapling_pine",312],["SAPLING_BIRCH","sapling.birch","minecraft:block/sapling_birch",313],["SAPLING_CHERRY","sapling.cherry","minecraft:block/sapling_cherry",314],["SAPLING_EUCALYPTUS","sapling.eucalyptus","minecraft:block/sapling_eucalyptus",315],["SAPLING_SHRUB","sapling.shrub","minecraft:block/sapling_shrub",316],["SAPLING_CACAO","sapling.cacao","minecraft:block/sapling_cacao",317],["SAPLING_THORN","sapling.thorn","minecraft:block/sapling_thorn",318],["SAPLING_PALM","sapling.palm","minecraft:block/sapling_palm",319],["TALLGRASS","tallgrass","minecraft:block/tallgrass",320],["TALLGRASS_FERN","tallgrass.fern","minecraft:block/tallgrass_fern",321],["DEADBUSH","deadbush","minecraft:block/deadbush",322],["SPINIFEX","spinifex","minecraft:block/spinifex",323],["ALGAE","algae","minecraft:block/algae",324],["FLOWER_YELLOW","flower.yellow","minecraft:block/flower_yellow",330],["FLOWER_RED","flower.red","minecraft:block/flower_red",331],["FLOWER_PINK","flower.pink","minecraft:block/flower_pink",332],["FLOWER_PURPLE","flower.purple","minecraft:block/flower_purple",333],["FLOWER_LIGHT_BLUE","flower.lightblue","minecraft:block/flower_light_blue",334],["FLOWER_ORANGE","flower.orange","minecraft:block/flower_orange",335],["MUSHROOM_BROWN","mushroom.brown","minecraft:block/mushroom_brown",340],["MUSHROOM_RED","mushroom.red","minecraft:block/mushroom_red",341],["ORE_COAL_STONE","ore.coal.stone","minecraft:block/ore_coal_stone",350],["ORE_COAL_BASALT","ore.coal.basalt","minecraft:block/ore_coal_basalt",351],["ORE_COAL_LIMESTONE","ore.coal.limestone","minecraft:block/ore_coal_limestone",352],["ORE_COAL_GRANITE","ore.coal.granite","minecraft:block/ore_coal_granite",353],["ORE_COAL_PERMAFROST","ore.coal.permafrost","minecraft:block/ore_coal_permafrost",354],["ORE_IRON_STONE","ore.iron.stone","minecraft:block/ore_iron_stone",360],["ORE_IRON_BASALT","ore.iron.basalt","minecraft:block/ore_iron_basalt",361],["ORE_IRON_LIMESTONE","ore.iron.limestone","minecraft:block/ore_iron_limestone",362],["ORE_IRON_GRANITE","ore.iron.granite","minecraft:block/ore_iron_granite",363],["ORE_IRON_PERMAFROST","ore.iron.permafrost","minecraft:block/ore_iron_permafrost",364],["ORE_GOLD_STONE","ore.gold.stone","minecraft:block/ore_gold_stone",370],["ORE_GOLD_BASALT","ore.gold.basalt","minecraft:block/ore_gold_basalt",371],["ORE_GOLD_LIMESTONE","ore.gold.limestone","minecraft:block/ore_gold_limestone",372],["ORE_GOLD_GRANITE","ore.gold.granite","minecraft:block/ore_gold_granite",373],["ORE_GOLD_PERMAFROST","ore.gold.permafrost","minecraft:block/ore_gold_permafrost",374],["ORE_LAPIS_STONE","ore.lapis.stone","minecraft:block/ore_lapis_stone",380],["ORE_LAPIS_BASALT","ore.lapis.basalt","minecraft:block/ore_lapis_basalt",381],["ORE_LAPIS_LIMESTONE","ore.lapis.limestone","minecraft:block/ore_lapis_limestone",382],["ORE_LAPIS_GRANITE","ore.lapis.granite","minecraft:block/ore_lapis_granite",383],["ORE_LAPIS_PERMAFROST","ore.lapis.permafrost","minecraft:block/ore_lapis_permafrost",384],["ORE_REDSTONE_STONE","ore.redstone.stone","minecraft:block/ore_redstone_stone",390],["ORE_REDSTONE_BASALT","ore.redstone.basalt","minecraft:block/ore_redstone_basalt",391],["ORE_REDSTONE_LIMESTONE","ore.redstone.limestone","minecraft:block/ore_redstone_limestone",392],["ORE_REDSTONE_GRANITE","ore.redstone.granite","minecraft:block/ore_redstone_granite",393],["ORE_REDSTONE_PERMAFROST","ore.redstone.permafrost","minecraft:block/ore_redstone_permafrost",394],["ORE_REDSTONE_GLOWING_STONE","ore.redstone.glowing.stone","minecraft:block/ore_redstone_glowing_stone",400],["ORE_REDSTONE_GLOWING_BASALT","ore.redstone.glowing.basalt","minecraft:block/ore_redstone_glowing_basalt",401],["ORE_REDSTONE_GLOWING_LIMESTONE","ore.redstone.glowing.limestone","minecraft:block/ore_redstone_glowing_limestone",402],["ORE_REDSTONE_GLOWING_GRANITE","ore.redstone.glowing.granite","minecraft:block/ore_redstone_glowing_granite",403],["ORE_REDSTONE_GLOWING_PERMAFROST","ore.redstone.glowing.permafrost","minecraft:block/ore_redstone_glowing_permafrost",404],["ORE_DIAMOND_STONE","ore.diamond.stone","minecraft:block/ore_diamond_stone",410],["ORE_DIAMOND_BASALT","ore.diamond.basalt","minecraft:block/ore_diamond_basalt",411],["ORE_DIAMOND_LIMESTONE","ore.diamond.limestone","minecraft:block/ore_diamond_limestone",412],["ORE_DIAMOND_GRANITE","ore.diamond.granite","minecraft:block/ore_diamond_granite",413],["ORE_DIAMOND_PERMAFROST","ore.diamond.permafrost","minecraft:block/ore_diamond_permafrost",414],["ORE_NETHERCOAL_NETHERRACK","ore.nethercoal.netherrack","minecraft:block/ore_nethercoal_netherrack",420],["ORE_NETHERCOAL_BASALT","ore.nethercoal.basalt","minecraft:block/ore_nethercoal_basalt",421],["ORE_NETHERCOAL_GLOOMSTONE","ore.nethercoal.gloomstone","minecraft:block/ore_nethercoal_gloomstone",422],["BLOCK_COAL","block.coal","minecraft:block/block_coal",430],["BLOCK_IRON","block.iron","minecraft:block/block_iron",431],["BLOCK_GOLD","block.gold","minecraft:block/block_gold",432],["BLOCK_LAPIS","block.lapis","minecraft:block/block_lapis",433],["BLOCK_REDSTONE","block.redstone","minecraft:block/block_redstone",434],["BLOCK_DIAMOND","block.diamond","minecraft:block/block_diamond",435],["BLOCK_NETHER_COAL","block.nethercoal","minecraft:block/block_nethercoal",436],["BLOCK_STEEL","block.steel","minecraft:block/block_steel",437],["BLOCK_QUARTZ","block.quartz","minecraft:block/block_quartz",438],["BLOCK_OLIVINE","block.olivine","minecraft:block/block_olivine",439],["BLOCK_CHARCOAL","block.charcoal","minecraft:block/block_charcoal",440],["WIRE_REDSTONE","wire.redstone","minecraft:block/wire_redstone",450],["TORCH_REDSTONE_IDLE","torch.redstone.idle","minecraft:block/torch_redstone_idle",460],["TORCH_REDSTONE_ACTIVE","torch.redstone.active","minecraft:block/torch_redstone_active",461],["BUTTON_STONE","button.stone","minecraft:block/button_stone",470],["BUTTON_PLANKS_OAK","button.planks","minecraft:block/button_planks",471],["BUTTON_PLANKS_PAINTED","button.planks.painted","minecraft:block/button_planks_painted",472],["LEVER_COBBLE_STONE","lever.cobble.stone","minecraft:block/lever_cobble_stone",480],["PRESSURE_PLATE_STONE","pressureplate.stone","minecraft:block/pressure_plate_stone",490],["PRESSURE_PLATE_PLANKS_OAK","pressureplate.planks.oak","minecraft:block/pressure_plate_planks_oak",491],["PRESSURE_PLATE_COBBLE_STONE","pressureplate.cobble.stone","minecraft:block/pressure_plate_cobble_stone",492],["PRESSURE_PLATE_PLANKS_OAK_PAINTED","pressureplate.planks.oak.painted","minecraft:block/pressure_plate_planks_oak_painted",493],["MOTION_SENSOR_IDLE","motionsensor.idle","minecraft:block/motion_sensor_idle",500],["MOTION_SENSOR_ACTIVE","motionsensor.active","minecraft:block/motion_sensor_active",501],["REPEATER_IDLE","repeater.idle","minecraft:block/repeater_idle",510],["REPEATER_ACTIVE","repeater.active","minecraft:block/repeater_active",511],["TIMER","timer","minecraft:block/timer",512],["PISTON_BASE","piston.base","minecraft:block/piston_base",520],["PISTON_BASE_STICKY","piston.base.sticky","minecraft:block/piston_base_sticky",521],["PISTON_HEAD","piston.head","minecraft:block/piston_head",522],["PISTON_MOVING","piston.moving","minecraft:block/piston_moving",523],["PISTON_BASE_STEEL","piston.base.steel","minecraft:block/piston_base_steel",524],["PISTON_HEAD_STEEL","piston.head.steel","minecraft:block/piston_head_steel",525],["NOTEBLOCK","noteblock","minecraft:block/noteblock",530],["RAIL","rail","minecraft:block/rail",540],["RAIL_POWERED","rail.powered","minecraft:block/rail_powered",541],["RAIL_DETECTOR","rail.detector","minecraft:block/rail_detector",542],["SPIKES","spikes","minecraft:block/spikes",550],["DISPENSER_COBBLE_STONE","dispenser.cobble.stone","minecraft:block/dispenser_cobble_stone",560],["ACTIVATOR","activator.cobble.netherrack","minecraft:block/activator_cobble_netherrack",561],["TRAPDOOR_PLANKS_OAK","trapdoor.planks.oak","minecraft:block/trapdoor_planks_oak",570],["TRAPDOOR_IRON","trapdoor.iron","minecraft:block/trapdoor_iron",571],["TRAPDOOR_GLASS","trapdoor.glass","minecraft:block/trapdoor_glass",572],["TRAPDOOR_PLANKS_PAINTED","trapdoor.planks.oak.painted","minecraft:block/trapdoor_planks_oak_painted",573],["TRAPDOOR_STEEL","trapdoor.steel","minecraft:block/trapdoor_steel",574],["TNT","tnt","minecraft:block/tnt",580],["DOOR_PLANKS_OAK_BOTTOM","door.planks.oak.bottom","minecraft:block/door_planks_oak_bottom",590],["DOOR_PLANKS_OAK_TOP","door.planks.oak.top","minecraft:block/doors_planks_oak_top",591],["DOOR_IRON_BOTTOM","door.iron.bottom","minecraft:block/door_iron_bottom",592],["DOOR_IRON_TOP","door.iron.top","minecraft:block/door_iron_top",593],["DOOR_PLANKS_PAINTED_BOTTOM","door.planks.oak.painted.bottom","minecraft:block/door_planks_oak_painted_bottom",594],["DOOR_PLANKS_PAINTED_TOP","door.planks.oak.painted.top","minecraft:block/door_planks_oak_painted_top",595],["DOOR_GLASS_BOTTOM","door.glass.bottom","minecraft:block/door_glass_bottom",596],["DOOR_GLASS_TOP","door.glass.top","minecraft:block/door_glass_top",597],["DOOR_STEEL_BOTTOM","door.steel.bottom","minecraft:block/door_steel_bottom",598],["DOOR_STEEL_TOP","door.steel.top","minecraft:block/door_steel_top",599],["MESH","mesh","minecraft:block/mesh",600],["MESH_GOLD","mesh.gold","minecraft:block/mesh_gold",601],["BED","bed","minecraft:block/bed",610],["SEAT","seat","minecraft:block/seat",611],["COBWEB","cobweb","minecraft:block/cobweb",620],["FIRE","fire","minecraft:block/fire",630],["BRAZIER_INACTIVE","brazier.inactive","minecraft:block/brazier_inactive",631],["BRAZIER_ACTIVE","brazier.active","minecraft:block/brazier_active",632],["FIRE_COLD","fire_cold","minecraft:block/fire_cold",633],["FIRE_SULFURIC","fire_sulfuric","minecraft:block/fire_sulfuric",634],["MOBSPAWNER","mobspawner","minecraft:block/mobspawner",640],["MOBSPAWNER_DEACTIVATED","mobspawner.deactivated","minecraft:block/mobspawner_deactivated",641],["WORKBENCH","workbench","minecraft:block/workbench",650],["FURNACE_STONE_IDLE","furnace.stone.idle","minecraft:block/furnace_stone_idle",660],["FURNACE_STONE_ACTIVE","furnace.stone.active","minecraft:block/furnace_stone_active",661],["FURNACE_BLAST_IDLE","furnace.blast.idle","minecraft:block/furnace_blast_idle",662],["FURNACE_BLAST_ACTIVE","furnace.blast.active","minecraft:block/furnace_blast_active",663],["TROMMEL_IDLE","trommel.idle","minecraft:block/trommel_idle",670],["TROMMEL_ACTIVE","trommel.active","minecraft:block/trommel_active",671],["CHEST_LEGACY","chest.legacy","minecraft:block/chest_legacy",680],["CHEST_LEGACY_PAINTED","chest.legacy.painted","minecraft:block/chest_legacy_painted",681],["CHEST_PLANKS_OAK","chest.planks.oak","minecraft:block/chest_planks_oak",682],["CHEST_PLANKS_OAK_PAINTED","chest.planks.oak.painted","minecraft:block/chest_planks_oak_painted",683],["CROPS_WHEAT","crops.wheat","minecraft:block/crops_wheat",690],["CROPS_PUMPKIN","crops.pumpkin","minecraft:block/crops_pumpkin",691],["FARMLAND_DIRT","farmland.dirt","minecraft:block/farmland_dirt",700],["SIGN_POST_PLANKS_OAK","sign.post.planks.oak","minecraft:block/sign_post_planks_oak",710],["SIGN_WALL_PLANKS_OAK","sign.wall.planks.oak","minecraft:block/sign_wall_planks_oak",711],["FLAG","flag","minecraft:block/flag",712],["SIGN_POST_PLANKS_OAK_PAINTED","sign.post.planks.oak.painted","minecraft:block/sign_post_planks_oak_painted",713],["SIGN_WALL_PLANKS_OAK_PAINTED","sign.wall.planks.oak.painted","minecraft:block/sign_wall_planks_oak_painted",714],["LAYER_SNOW","layer.snow","minecraft:block/layer_snow",720],["LAYER_LEAVES_OAK","layer.leaves.oak","minecraft:block/layer_leaves_oak",721],["LAYER_SLATE","layer.slate","minecraft:block/layer_slate",722],["LAYER_ASH","layer.ash","minecraft:block/layer_ash",723],["ICE","ice","minecraft:block/ice",730],["PERMAICE","ice.perma","minecraft:block/permaice",731],["BLOCK_SNOW","block.snow","minecraft:block/block_snow",740],["BLOCK_ASH","block.ash","minecraft:block/block_ash",741],["CACTUS","cactus","minecraft:block/cactus",750],["BLOCK_CLAY","block.clay","minecraft:block/block_clay",760],["SUGARCANE","sugarcane","minecraft:block/sugarcane",770],["BLOCK_SUGARCANE","block.sugarcane","minecraft:block/block_sugarcane",771],["BLOCK_SUGARCANE_BAKED","block.sugarcane.baked","minecraft:block/block_sugarcane_baked",772],["JUKEBOX","jukebox","minecraft:block/jukebox",780],["PUMPKIN","pumpkin","minecraft:block/pumpkin",790],["PUMPKIN_CARVED_IDLE","pumpkin.carved.idle","minecraft:block/pumpkin_carved_idle",791],["PUMPKIN_CARVED_ACTIVE","pumpkin.carved.active","minecraft:block/pumpkin_carved_active",792],["PUMPKIN_REDSTONE","pumpkin.redstone","minecraft:block/pumpkin_redstone",793],["COBBLE_NETHERRACK","cobble.netherrack","minecraft:block/cobble_netherrack",800],["MAGMA","magma","minecraft:block/magma",801],["COBBLE_NETHERRACK_CRYSTALLINE","cobble.netherrack.crystalline","minecraft:block/cobble_netherrack_mossy",802],["NETHERRACK","netherrack","minecraft:block/netherrack",803],["BRICK_NETHERRACK","brick.netherrack","minecraft:block/brick_netherrack",804],["SLAB_NETHERRACK_POLISHED","slab.netherrack.carved","minecraft:block/slab_netherrack_carved",805],["SLAB_COBBLE_NETHERRACK","slab.cobble.netherrack","minecraft:block/slab_cobble_netherrack",806],["SLAB_BRICK_NETHERRACK","slab.brick.netherrack","minecraft:block/slab_brick_netherrack",807],["STAIRS_COBBLE_NETHERRACK","stairs.cobble.netherrack","minecraft:block/stairs_cobble_netherrack",808],["STAIRS_BRICK_NETHERRACK","stairs.brick.netherrack","minecraft:block/stairs_brick_netherrack",809],["SOULSAND","soulsand","minecraft:block/soulsand",810],["SOULSCHIST","soulschist","minecraft:block/soulschist",811],["GLOWSTONE","glowstone","minecraft:block/glowstone",820],["RUBYGLASS_COLUMN","rubyglass.column","minecraft:block/rubyglass_column",821],["BLOCK_RUBYGLASS","block.rubyglass","minecraft:block/rubyglass_block",822],["RUBYGLASS_CRYSTAL","rubyglass.crystal","minecraft:block/rubyglass_crystal",823],["CONDUIT","rubyglass.conduit","minecraft:block/conduit",824],["RUBYGLASS_GROWTH","rubyglass.growth","minecraft:block/rubyglass_growth",825],["RUBYGLASS_NODE","rubyglass.node","minecraft:block/rubyglass_node",826],["BRICK_RUBYGLASS","brick.rubyglass","minecraft:block/rubyglass_brick",827],["PORTAL_NETHER","portal.nether","minecraft:block/portal_nether",830],["PORTAL_DRIFT","portal.drift","minecraft:block/portal_drift",831],["CAKE","cake","minecraft:block/cake",840],["PUMPKIN_PIE","pumpkin_pie","minecraft:block/pumpkin_pie",841],["LAMP_IDLE","lamp.idle","minecraft:block/lamp_idle",850],["LAMP_ACTIVE","lamp.active","minecraft:block/lamp_active",851],["LAMP_INVERTED_IDLE","lamp.inverted.idle","minecraft:block/lamp_inverted_idle",852],["LAMP_INVERTED_ACTIVE","lamp.inverted.active","minecraft:block/lamp_inverted_active",853],["STONE_POLISHED","stone.polished","minecraft:block/stone_polished",860],["GRANITE_POLISHED","granite.polished","minecraft:block/granite_polished",861],["LIMESTONE_POLISHED","limestone.polished","minecraft:block/limestone_polished",862],["BASALT_POLISHED","basalt.polished","minecraft:block/basalt_polished",863],["SLATE_POLISHED","slate.polished","minecraft:block/slate_polished",864],["PERMAFROST_POLISHED","permafrost.polished","minecraft:block/permafrost_polished",865],["NETHERRACK_POLISHED","netherrack.polished","minecraft:block/netherrack_polished",866],["GLOOMSTONE_POLISHED","gloomstone.polished","minecraft:block/gloomstone_polished",867],["LANTERN_FIREFLY_GREEN","lantern.firefly.green","minecraft:block/lantern_firefly_green",870],["LANTERN_FIREFLY_BLUE","lantern.firefly.blue","minecraft:block/lantern_firefly_blue",871],["LANTERN_FIREFLY_ORANGE","lantern.firefly.orange","minecraft:block/lantern_firefly_orange",872],["LANTERN_FIREFLY_RED","lantern.firefly.red","minecraft:block/lantern_firefly_red",873],["JAR_GLASS","jar.glass","minecraft:block/jar_glass",874],["OVERLAY_PEBBLES","overlay.pebbles","minecraft:block/overlay_pebbles",880],["FENCE_CHAINLINK","fence.chainlink","minecraft:block/fence_chainlink",890],["FENCE_PAPER_WALL","fence.paper_wall","minecraft:block/fence_paper_wall",891],["FENCE_STEEL","fence.steel","minecraft:block/fence_steel",892],["BASKET","basket","minecraft:block/basket",900],["PAPER_WALL","paper_wall","minecraft:block/paper_wall",910],["JAR_BUTTERFLY_BLUE","jar.butterfly.blue","minecraft:block/jar_butterfly_blue",920],["JAR_BUTTERFLY_ORANGE","jar.butterfly.orange","minecraft:block/jar_butterfly_orange",921],["JAR_BUTTERFLY_PINK","jar.butterfly.pink","minecraft:block/jar_butterfly_pink",922],["JAR_BUTTERFLY_SILVER","jar.butterfly.silver","minecraft:block/jar_butterfly_silver",923],["SLAB_BRICK_RUBYGLASS","slab.brick.rubyglass","minecraft:block/slab_brick_rubyglass",998],["SLAB_BRICK_DIAMOND","slab.brick.diamond","minecraft:block/slab_brick_diamond",999],["SLAB_BRICK_SANDSTONE","slab.brick.sandstone","minecraft:block/slab_brick_sandstone",1000],["SLAB_COBBLE_PERMAFROST","slab.cobble.permafrost","minecraft:block/slab_cobble_permafrost",1001],["SLAB_BRICK_PERMAFROST","slab.brick.permafrost","minecraft:block/slab_brick_permafrost",1002],["SLAB_PERMAFROST_POLISHED","slab.permafrost.carved","minecraft:block/slab_permafrost_carved",1003],["SLAB_BRICK_IRON","slab.brick.iron","minecraft:block/slab_brick_iron",1004],["SLAB_BRICK_GOLD","slab.brick.gold","minecraft:block/slab_brick_gold",1005],["SLAB_BRICK_STEEL","slab.brick.steel","minecraft:block/slab_brick_steel",1006],["SLAB_BRICK_LAPIS","slab.brick.lapis","minecraft:block/slab_brick_lapis",1007],["SLAB_BRICK_OLIVINE","slab.brick.olivine","minecraft:block/slab_brick_olivine",1008],["SLAB_BRICK_QUARTZ","slab.brick.quartz","minecraft:block/slab_brick_quartz",1009],["STATUE_STONE_LOWER","statue.stone.lower","minecraft:block/statue_stone_lower",1010],["STATUE_STONE_UPPER","statue.stone.upper","minecraft:block/statue_stone_upper",1011],["STATUE_BASALT_LOWER","statue.basalt.lower","minecraft:block/statue_basalt_lower",1012],["STATUE_BASALT_UPPER","statue.basalt.upper","minecraft:block/statue_basalt_upper",1013],["STATUE_LIMESTONE_LOWER","statue.limestone.lower","minecraft:block/statue_limestone_lower",1014],["STATUE_LIMESTONE_UPPER","statue.limestone.upper","minecraft:block/statue_limestone_upper",1015],["STATUE_GRANITE_LOWER","statue.granite.lower","minecraft:block/statue_granite_lower",1016],["STATUE_GRANITE_UPPER","statue.granite.upper","minecraft:block/statue_granite_upper",1017],["STATUE_MARBLE_LOWER","statue.marble.lower","minecraft:block/statue_marble_lower",1018],["STATUE_MARBLE_UPPER","statue.marble.upper","minecraft:block/statue_marble_upper",1019],["STATUE_PIGMAN_LOWER","statue.pigman.lower","minecraft:block/statue_pigman_lower",1020],["STATUE_PIGMAN_UPPER","statue.pigman.upper","minecraft:block/statue_pigman_upper",1021],["THERMAL_VENT","vent","minecraft:block/thermal_vent",1025],["BONE_PILE","bone_pile","minecraft:block/bone_pile",1030],["SOUL_CATCHER","soul_catcher","minecraft:block/soul_catcher",1031],["GLOOMSTONE","gloomstone","minecraft:block/gloomstone",1032],["COBBLE_GLOOMSTONE","cobble.gloomstone","minecraft:block/cobble_gloomstone",1033],["BRICK_GLOOMSTONE","brick.gloomstone","minecraft:block/brick_gloomstone",1034],["SLAB_GLOOMSTONE_POLISHED","slab.gloomstone.carved","minecraft:block/slab_gloomstone_carved",1035],["SLAB_COBBLE_GLOOMSTONE","slab.cobble.gloomstone","minecraft:block/slab_cobble_gloomstone",1036],["SLAB_BRICK_GLOOMSTONE","slab.brick.gloomstone","minecraft:block/slab_brick_gloomstone",1037],["STAIRS_COBBLE_GLOOMSTONE","stairs.cobble.gloomstone","minecraft:block/stairs_cobble_gloomstone",1038],["STAIRS_BRICK_GLOOMSTONE","stairs.brick.gloomstone","minecraft:block/stairs_brick_gloomstone",1039],["MATCHER","matcher","minecraft:block/matcher",1040],["MATCHER_ACTIVE","matcher.active","minecraft:block/matcher_active",1041],["STAIRS_BRICK_RUBYGLASS","stairs.brick.rubyglass","minecraft:block/stairs_brick_rubyglass",1048],["STAIRS_BRICK_DIAMOND","stairs.brick.diamond","minecraft:block/stairs_brick_diamond",1049],["STAIRS_BRICK_IRON","stairs.brick.iron","minecraft:block/stairs_brick_iron",1050],["STAIRS_BRICK_GOLD","stairs.brick.gold","minecraft:block/stairs_brick_gold",1051],["STAIRS_BRICK_STEEL","stairs.brick.steel","minecraft:block/stairs_brick_steel",1052],["STAIRS_BRICK_LAPIS","stairs.brick.lapis","minecraft:block/stairs_brick_lapis",1053],["STAIRS_BRICK_OLIVINE","stairs.brick.olivine","minecraft:block/stairs_brick_olivine",1054],["STAIRS_BRICK_QUARTZ","stairs.brick.quartz","minecraft:block/stairs_brick_quartz",1055],["BOULDER_MAGMATIC","boulder.magmatic","minecraft:block/boulder_magmatic",1060],["BOULDER_SULFURIC","boulder.sulfuric","minecraft:block/boulder_sulfuric",1061],["FLUID_ACID_FLOWING","fluid.acid.flowing","minecraft:block/fluid_acid_flowing",1062],["FLUID_ACID_STILL","fluid.acid.still","minecraft:block/fluid_acid_still",1063],["EMBER","ember","minecraft:block/ember",1065],["SLATE_CARVED","slate.carved","minecraft:block/slate_carved",1070],["SLAB_SLATE_POLISHED","slab.slate.carved","minecraft:block/slab_slate_carved",1071],["LOG_SCORCHED","log.scorched","minecraft:block/log_scorched",1072],["STATUE_SLATE_LOWER","statue.slate.lower","minecraft:block/statue_slate_lower",1075],["STATUE_SLATE_UPPER","statue.slate.upper","minecraft:block/statue_slate_upper",1076],["STATUE_PERMAFROST_LOWER","statue.permafrost.lower","minecraft:block/statue_permafrost_lower",1077],["STATUE_PERMAFROST_UPPER","statue.permafrost.upper","minecraft:block/statue_permafrost_upper",1078],["STATUE_NETHERRACK_LOWER","statue.netherrack.lower","minecraft:block/statue_netherrack_lower",1079],["STATUE_NETHERRACK_UPPER","statue.netherrack.upper","minecraft:block/statue_netherrack_upper",1080],["STATUE_GLOOMSTONE_LOWER","statue.gloomstone.lower","minecraft:block/statue_gloomstone_lower",1081],["STATUE_GLOOMSTONE_UPPER","statue.gloomstone.upper","minecraft:block/statue_gloomstone_upper",1082],["BRIMSAND","brimsand","minecraft:block/brimsand",1085],["BRIMSTONE","brimstone","minecraft:block/brimstone",1086],["SLAB_BRIMSTONE","slab.brimstone","minecraft:block/slab_brimstone",1087],["STAIRS_BRIMSTONE","stairs.brimstone","minecraft:block/stairs_brimstone",1088],["BRICK_BRIMSTONE","brick.brimstone","minecraft:block/brick_brimstone",1089],["SLAB_BRICK_BRIMSTONE","slab.brick.brimstone","minecraft:block/slab_brick_brimstone",1090],["STAIRS_BRICK_BRIMSTONE","stairs.brick.brimstone","minecraft:block/stairs_brick_brimstone",1091],["BRIMTHAW","brimthaw","minecraft:block/brimthaw",1092],["SULFUR","sulfur","minecraft:block/sulfur",1098],["PRESSURE_PLATE_COBBLE_BASALT","pressureplate.cobble.basalt","minecraft:block/pressure_plate_cobble_basalt",1100],["PRESSURE_PLATE_COBBLE_LIMESTONE","pressureplate.cobble.limestone","minecraft:block/pressure_plate_cobble_limestone",1101],["PRESSURE_PLATE_COBBLE_GRANITE","pressureplate.cobble.granite","minecraft:block/pressure_plate_cobble_granite",1102],["PRESSURE_PLATE_COBBLE_PERMAFROST","pressureplate.cobble.permafrost","minecraft:block/pressure_plate_cobble_permafrost",1103],["PRESSURE_PLATE_COBBLE_NETHERRACK","pressureplate.cobble.netherrack","minecraft:block/pressure_plate_cobble_netherrack",1104],["PRESSURE_PLATE_COBBLE_GLOOMSTONE","pressureplate.cobble.gloomstone","minecraft:block/pressure_plate_cobble_gloomstone",1105],["PRESSURE_PLATE_BASALT","pressureplate.basalt","minecraft:block/pressure_plate_basalt",1110],["PRESSURE_PLATE_LIMESTONE","pressureplate.limestone","minecraft:block/pressure_plate_limestone",1111],["PRESSURE_PLATE_GRANITE","pressureplate.granite","minecraft:block/pressure_plate_granite",1112],["PRESSURE_PLATE_PERMAFROST","pressureplate.permafrost","minecraft:block/pressure_plate_permafrost",1113],["PRESSURE_PLATE_NETHERRACK","pressureplate.netherrack","minecraft:block/pressure_plate_netherrack",1114],["PRESSURE_PLATE_GLOOMSTONE","pressureplate.gloomstone","minecraft:block/pressure_plate_gloomstone",1115],["PRESSURE_PLATE_SANDSTONE","pressureplate.sandstone","minecraft:block/pressure_plate_sandstone",1116],["PRESSURE_PLATE_BRIMSTONE","pressureplate.brimstone","minecraft:block/pressure_plate_brimstone",1117],["PRESSURE_PLATE_MARBLE","pressureplate.marble","minecraft:block/pressure_plate_marble",1118],["PRESSURE_PLATE_SLATE","pressureplate.slate","minecraft:block/pressure_plate_slate",1119],["BUTTON_BASALT","button.basalt","minecraft:block/button_basalt",1120],["BUTTON_LIMESTONE","button.limestone","minecraft:block/button_limestone",1121],["BUTTON_GRANITE","button.granite","minecraft:block/button_granite",1122],["BUTTON_PERMAFROST","button.permafrost","minecraft:block/button_permafrost",1123],["BUTTON_NETHERRACK","button.netherrack","minecraft:block/button_netherrack",1124],["BUTTON_GLOOMSTONE","button.gloomstone","minecraft:block/button_gloomstone",1125],["BUTTON_SANDSTONE","button.sandstone","minecraft:block/button_sandstone",1126],["BUTTON_BRIMSTONE","button.brimstone","minecraft:block/button_brimstone",1127],["BUTTON_MARBLE","button.marble","minecraft:block/button_marble",1128],["BUTTON_SLATE","button.slate","minecraft:block/button_slate",1129]],"items":[["TOOL_SHOVEL_IRON","tool.shovel.iron","minecraft:item/tool_shovel_iron",16384],["TOOL_PICKAXE_IRON","tool.pickaxe.iron","minecraft:item/tool_pickaxe_iron",16385],["TOOL_AXE_IRON","tool.axe.iron","minecraft:item/tool_axe_iron",16386],["TOOL_FIRESTRIKER_IRON","tool.firestriker.iron","minecraft:item/tool_firestriker_iron",16387],["FOOD_APPLE","food.apple","minecraft:item/food_apple",16388],["TOOL_BOW","tool.bow","minecraft:item/tool_bow",16389],["AMMO_ARROW","ammo.arrow","minecraft:item/ammo_arrow",16390],["COAL","coal","minecraft:item/coal",16391],["DIAMOND","diamond","minecraft:item/diamond",16392],["INGOT_IRON","ingot.iron","minecraft:item/ingot_iron",16393],["INGOT_GOLD","ingot.gold","minecraft:item/ingot_gold",16394],["TOOL_SWORD_IRON","tool.sword.iron","minecraft:item/tool_sword_iron",16395],["TOOL_SWORD_WOOD","tool.sword.wood","minecraft:item/tool_sword_wood",16396],["TOOL_SHOVEL_WOOD","tool.shovel.wood","minecraft:item/tool_shovel_wood",16397],["TOOL_PICKAXE_WOOD","tool.pickaxe.wood","minecraft:item/tool_pickaxe_wood",16398],["TOOL_AXE_WOOD","tool.axe.wood","minecraft:item/tool_axe_wood",16399],["TOOL_SWORD_STONE","tool.sword.stone","minecraft:item/tool_sword_stone",16400],["TOOL_SHOVEL_STONE","tool.shovel.stone","minecraft:item/tool_shovel_stone",16401],["TOOL_PICKAXE_STONE","tool.pickaxe.stone","minecraft:item/tool_pickaxe_stone",16402],["TOOL_AXE_STONE","tool.axe.stone","minecraft:item/tool_axe_stone",16403],["TOOL_SWORD_DIAMOND","tool.sword.diamond","minecraft:item/tool_sword_diamond",16404],["TOOL_SHOVEL_DIAMOND","tool.shovel.diamond","minecraft:item/tool_shovel_diamond",16405],["TOOL_PICKAXE_DIAMOND","tool.pickaxe.diamond","minecraft:item/tool_pickaxe_diamond",16406],["TOOL_AXE_DIAMOND","tool.axe.diamond","minecraft:item/tool_axe_diamond",16407],["STICK","stick","minecraft:item/stick",16408],["BOWL","bowl","minecraft:item/bowl",16409],["FOOD_STEW_MUSHROOM","food.stew.mushroom","minecraft:item/food_stew_mushroom",16410],["TOOL_SWORD_GOLD","tool.sword.gold","minecraft:item/tool_sword_gold",16411],["TOOL_SHOVEL_GOLD","tool.shovel.gold","minecraft:item/tool_shovel_gold",16412],["TOOL_PICKAXE_GOLD","tool.pickaxe.gold","minecraft:item/tool_pickaxe_gold",16413],["TOOL_AXE_GOLD","tool.axe.gold","minecraft:item/tool_axe_gold",16414],["STRING","string","minecraft:item/string",16415],["FEATHER_CHICKEN","feather.chicken","minecraft:item/feather_chicken",16416],["GUNPOWDER","gunpowder","minecraft:item/gunpowder",16417],["TOOL_HOE_WOOD","tool.hoe.wood","minecraft:item/tool_hoe_wood",16418],["TOOL_HOE_STONE","tool.hoe.stone","minecraft:item/tool_hoe_stone",16419],["TOOL_HOE_IRON","tool.hoe.iron","minecraft:item/tool_hoe_iron",16420],["TOOL_HOE_DIAMOND","tool.hoe.diamond","minecraft:item/tool_hoe_diamond",16421],["TOOL_HOE_GOLD","tool.hoe.gold","minecraft:item/tool_hoe_gold",16422],["SEEDS_WHEAT","seeds.wheat","minecraft:item/seeds_wheat",16423],["WHEAT","wheat","minecraft:item/wheat",16424],["FOOD_BREAD","food.bread","minecraft:item/food_bread",16425],["ARMOR_HELMET_LEATHER","armor.helmet.leather","minecraft:item/armor_helmet_leather",16426],["ARMOR_CHESTPLATE_LEATHER","armor.chestplate.leather","minecraft:item/armor_chestplate_leather",16427],["ARMOR_LEGGINGS_LEATHER","armor.leggings.leather","minecraft:item/armor_leggings_leather",16428],["ARMOR_BOOTS_LEATHER","armor.boots.leather","minecraft:item/armor_boots_leather",16429],["ARMOR_HELMET_CHAINMAIL","armor.helmet.chainmail","minecraft:item/armor_helmet_chainmail",16430],["ARMOR_CHESTPLATE_CHAINMAIL","armor.chestplate.chainmail","minecraft:item/armor_chestplate_chainmail",16431],["ARMOR_LEGGINGS_CHAINMAIL","armor.leggings.chainmail","minecraft:item/armor_leggings_chainmail",16432],["ARMOR_BOOTS_CHAINMAIL","armor.boots.chainmail","minecraft:item/armor_boots_chainmail",16433],["ARMOR_HELMET_IRON","armor.helmet.iron","minecraft:item/armor_helmet_iron",16434],["ARMOR_CHESTPLATE_IRON","armor.chestplate.iron","minecraft:item/armor_chestplate_iron",16435],["ARMOR_LEGGINGS_IRON","armor.leggings.iron","minecraft:item/armor_leggings_iron",16436],["ARMOR_BOOTS_IRON","armor.boots.iron","minecraft:item/armor_boots_iron",16437],["ARMOR_HELMET_DIAMOND","armor.helmet.diamond","minecraft:item/armor_helmet_diamond",16438],["ARMOR_CHESTPLATE_DIAMOND","armor.chestplate.diamond","minecraft:item/armor_chestplate_diamond",16439],["ARMOR_LEGGINGS_DIAMOND","armor.leggings.diamond","minecraft:item/armor_leggings_diamond",16440],["ARMOR_BOOTS_DIAMOND","armor.boots.diamond","minecraft:item/armor_boots_diamond",16441],["ARMOR_HELMET_GOLD","armor.helmet.gold","minecraft:item/armor_helmet_gold",16442],["ARMOR_CHESTPLATE_GOLD","armor.chestplate.gold","minecraft:item/armor_chestplate_gold",16443],["ARMOR_LEGGINGS_GOLD","armor.leggings.gold","minecraft:item/armor_leggings_gold",16444],["ARMOR_BOOTS_GOLD","armor.boots.gold","minecraft:item/armor_boots_gold",16445],["FLINT","flint","minecraft:item/flint",16446],["FOOD_PORKCHOP_RAW","food.porkchop.raw","minecraft:item/food_porkchop_raw",16447],["FOOD_PORKCHOP_COOKED","food.porkchop.cooked","minecraft:item/food_porkchop_cooked",16448],["PAINTING","painting","minecraft:item/painting",16449],["FOOD_APPLE_GOLD","food.apple.gold","minecraft:item/food_apple_gold",16450],["SIGN","sign","minecraft:item/sign",16451],["DOOR_OAK","door.oak","minecraft:item/door_oak",16452],["MINECART","minecart","minecraft:item/minecart",16456],["SADDLE","saddle","minecraft:item/saddle",16457],["DOOR_IRON","door.iron","minecraft:item/door_iron",16458],["DUST_REDSTONE","dust.redstone","minecraft:item/dust_redstone",16459],["AMMO_SNOWBALL","ammo.snowball","minecraft:item/ammo_snowball",16460],["BOAT","boat","minecraft:item/boat",16461],["LEATHER","leather","minecraft:item/leather",16462],["BRICK_CLAY","brick.clay","minecraft:item/brick_clay",16464],["CLAY","clay","minecraft:item/clay",16465],["SUGARCANE","sugarcane","minecraft:item/sugarcane",16466],["PAPER","paper","minecraft:item/paper",16467],["BOOK","book","minecraft:item/book",16468],["SLIMEBALL","slimeball","minecraft:item/slimeball",16469],["MINECART_CHEST","minecart.chest","minecraft:item/minecart_chest",16470],["MINECART_FURNACE","minecart.furnace","minecraft:item/minecart_furnace",16471],["EGG_CHICKEN","egg.chicken","minecraft:item/egg_chicken",16472],["TOOL_COMPASS","tool.compass","minecraft:item/tool_compass",16473],["TOOL_FISHINGROD","tool.fishingrod","minecraft:item/tool_fishingrod",16474],["TOOL_CLOCK","tool.clock","minecraft:item/tool_clock",16475],["DUST_GLOWSTONE","dust.glowstone","minecraft:item/dust_glowstone",16476],["FOOD_FISH_RAW","food.fish.raw","minecraft:item/food_fish_raw",16477],["FOOD_FISH_COOKED","food.fish.cooked","minecraft:item/food_fish_cooked",16478],["DYE","dye","minecraft:item/dye",16479],["BONE","bone","minecraft:item/bone",16480],["DUST_SUGAR","dust.sugar","minecraft:item/dust_sugar",16481],["FOOD_CAKE","food.cake","minecraft:item/food_cake",16482],["BED","bed","minecraft:item/bed",16483],["REPEATER","repeater","minecraft:item/repeater",16484],["FOOD_COOKIE","food.cookie","minecraft:item/food_cookie",16485],["MAP","map","minecraft:item/map",16486],["RECORD_13","record.13","C418",16487],["RECORD_CAT","record.cat","C418",18385],["RECORD_BLOCKS","record.blocks","C418",18386],["RECORD_CHIRP","record.chirp","C418",18387],["RECORD_FAR","record.far","C418",18388],["RECORD_MALL","record.mall","C418",18389],["RECORD_MELLOHI","record.mellohi","C418",18390],["RECORD_STAL","record.stal","C418",18391],["RECORD_STRAD","record.strad","C418",18392],["RECORD_WARD","record.ward","C418",18393],["RECORD_WAIT","record.wait","C418",18394],["RECORD_DOG","record.dog","C418",18395],["NETHERCOAL","nethercoal","minecraft:item/nethercoal",16488],["ARMOR_HELMET_STEEL","armor.helmet.steel","minecraft:item/armor_helmet_steel",16489],["ARMOR_CHESTPLATE_STEEL","armor.chestplate.steel","minecraft:item/armor_chestplate_steel",16490],["ARMOR_LEGGINGS_STEEL","armor.leggings.steel","minecraft:item/armor_leggings_steel",16491],["ARMOR_BOOTS_STEEL","armor.boots.steel","minecraft:item/armor_boots_steel",16492],["TOOL_SWORD_STEEL","tool.sword.steel","minecraft:item/tool_sword_steel",16493],["TOOL_SHOVEL_STEEL","tool.shovel.steel","minecraft:item/tool_shovel_steel",16494],["TOOL_PICKAXE_STEEL","tool.pickaxe.steel","minecraft:item/tool_pickaxe_steel",16495],["TOOL_AXE_STEEL","tool.axe.steel","minecraft:item/tool_axe_steel",16496],["TOOL_HOE_STEEL","tool.hoe.steel","minecraft:item/tool_hoe_steel",16497],["INGOT_STEEL","ingot.steel","minecraft:item/ingot_steel",16498],["INGOT_STEEL_CRUDE","ingot.steel.crude","minecraft:item/ingot_steel_crude",16499],["AMMO_FIREBALL","ammo.fireball","minecraft:item/ammo_fireball",16500],["ARMOR_QUIVER_GOLD","armor.quiver.gold","minecraft:item/armor_quiver_gold",16501],["HANDCANNON_UNLOADED","handcannon.unloaded","minecraft:item/handcannon_unloaded",16502],["CHAINLINK","chainlink","minecraft:item/chainlink",16503],["CLOTH","cloth","minecraft:item/cloth",16504],["AMMO_CHARGE_EXPLOSIVE","ammo.charge.explosive","minecraft:item/ammo_charge_explosive",16505],["HANDCANNON_LOADED","handcannon.loaded","minecraft:item/handcannon_loaded",16506],["AMMO_ARROW_GOLD","ammo.arrow.gold","minecraft:item/ammo_arrow_gold",16507],["ARMOR_QUIVER","armor.quiver","minecraft:item/armor_quiver",16508],["TOOL_CALENDAR","tool.calendar","minecraft:item/tool_calendar",16509],["ORE_RAW_GOLD","ore.raw.gold","minecraft:item/ore_raw_gold",16510],["ORE_RAW_IRON","ore.raw.iron","minecraft:item/ore_raw_iron",16511],["QUARTZ","quartz","minecraft:item/quartz",16512],["OLIVINE","olivine","minecraft:item/olivine",16513],["AMMO_PEBBLE","ammo.pebble","minecraft:item/ammo_pebble",16514],["FOOD_CHERRY","food.cherry","minecraft:item/food_cherry",16515],["AMMO_ARROW_PURPLE","ammo.arrow.purple","minecraft:item/ammo_arrow_purple",16517],["LABEL","label","minecraft:item/label",16518],["JAR","jar","minecraft:item/jar",16519],["LANTERN_FIREFLY_GREEN","lantern.firefly.green","minecraft:item/lantern_firefly_green",16520],["LANTERN_FIREFLY_BLUE","lantern.firefly.blue","minecraft:item/lantern_firefly_blue",16521],["LANTERN_FIREFLY_ORANGE","lantern.firefly.orange","minecraft:item/lantern_firefly_orange",16522],["LANTERN_FIREFLY_RED","lantern.firefly.red","minecraft:item/lantern_firefly_red",16523],["TIMER","timer","minecraft:item/timer",16524],["BASKET","basket","minecraft:item/basket",16525],["FLAG","flag","minecraft:item/flag",16526],["ARMOR_BOOTS_ICESKATES","armor.boots.iceskates","minecraft:item/armor_boots_iceskates",16527],["TOOL_FIRESTRIKER_STEEL","tool.firestriker.steel","minecraft:item/tool_firestriker_steel",16528],["SEEDS_PUMPKIN","seeds.pumpkin","minecraft:item/seeds_pumpkin",16530],["SEAT","seat","minecraft:item/seat",16531],["DOOR_OAK_PAINTED","door.oak.painted","minecraft:item/door_oak_painted",16532],["DOOR_GLASS","door.glass","minecraft:item/door_glass",16533],["ROPE","rope","minecraft:item/rope",16534],["FOOD_PUMPKIN_PIE","food.pumpkin_pie","minecraft:item/food_pumpkin_pie",16535],["WAND_MONSTER_SPAWNER","wand.monster","minecraft:item/wand_monster",16536],["DOOR_STEEL","door.steel","minecraft:item/door_steel",16537],["PAINTBRUSH","paintbrush","minecraft:item/paintbrush",16538],["JAR_BUTTERFLY_BLUE","jar.butterfly.blue","minecraft:item/jar_butterfly_blue",16539],["JAR_BUTTERFLY_ORANGE","jar.butterfly.orange","minecraft:item/jar_butterfly_orange",16540],["JAR_BUTTERFLY_PINK","jar.butterfly.pink","minecraft:item/jar_butterfly_pink",16541],["JAR_BUTTERFLY_SILVER","jar.butterfly.silver","minecraft:item/jar_butterfly_silver",16542],["STATUE_STONE","statue.stone","minecraft:item/statue_stone",16543],["STATUE_BASALT","statue.basalt","minecraft:item/statue_basalt",16544],["STATUE_LIMESTONE","statue.limestone","minecraft:item/statue_limestone",16545],["STATUE_GRANITE","statue.granite","minecraft:item/statue_granite",16546],["STATUE_MARBLE","statue.marble","minecraft:item/statue_marble",16547],["STATUE_PIGMAN","statue.pigman","minecraft:item/statue_pigman",16548],["SIGN_PAINTED","sign.painted","minecraft:item/sign_painted",16549],["FOOD_VENISON_RAW","food.venison.raw","minecraft:item/food_venison_raw",16550],["FOOD_VENISON_COOKED","food.venison.cooked","minecraft:item/food_venison_cooked",16551],["DOUGH","dough","minecraft:item/dough",16552],["WAND_NBT","wand.nbt","minecraft:item/wand_nbt",16553],["RUBYGLASS","rubyglass.crystal","minecraft:item/rubyglass_crystal",16555],["ARMOR_WOLF_LEATHER","armor.wolf.leather","minecraft:item/armor_wolf_leather",16556],["ARMOR_WOLF_CHAINMAIL","armor.wolf.chainmail","minecraft:item/armor_wolf_chainmail",16557],["ARMOR_WOLF_IRON","armor.wolf.iron","minecraft:item/armor_wolf_iron",16558],["ARMOR_WOLF_DIAMOND","armor.wolf.diamond","minecraft:item/armor_wolf_diamond",16559],["ARMOR_WOLF_GOLD","armor.wolf.gold","minecraft:item/armor_wolf_gold",16560],["ARMOR_WOLF_STEEL","armor.wolf.steel","minecraft:item/armor_wolf_steel",16561],["BUCKET_IRON","bucket.iron","minecraft:item/bucket_iron",16562],["BUCKET_STEEL","bucket.steel","minecraft:item/bucket_steel",16563],["SULFUR","sulfur","minecraft:item/sulfur",16567],["AMMO_ARROW_FLAMING","ammo.arrow.flaming","minecraft:item/ammo_arrow_flaming",16568],["STATUE_SLATE","statue.slate","minecraft:item/statue_slate",16571],["STATUE_PERMAFROST","statue.permafrost","minecraft:item/statue_permafrost",16572],["STATUE_NETHERRACK","statue.netherrack","minecraft:item/statue_netherrack",16573],["STATUE_GLOOMSTONE","statue.gloomstone","minecraft:item/statue_gloomstone",16574]],"blockTags":["MINEABLE_BY_PICKAXE","MINEABLE_BY_AXE","MINEABLE_BY_SHOVEL","MINEABLE_BY_HOE","MINEABLE_BY_SWORD","MINEABLE_BY_SHEARS","IS_WATER","IS_LAVA","IS_ACID","GROWS_FLOWERS","GROWS_SUGAR_CANE","GROWS_CACTI","GROWS_TREES","GROWS_SPINIFEX","BROKEN_BY_FLUIDS","PLACE_OVERWRITES","PASSIVE_MOBS_SPAWN","FIREFLIES_CAN_SPAWN","FENCES_CONNECT","NOT_IN_CREATIVE_MENU","SHEARS_DO_SILK_TOUCH","SKATEABLE","CAVE_GEN_REPLACES_SURFACE","CAVES_CUT_THROUGH","CAN_HANG_OFF","OVERRIDE_STEPSOUND","CHAINLINK_FENCES_CONNECT","PREVENT_MOB_SPAWNS","PLANTABLE_IN_JAR","INFINITE_BURN","INFINITE_BURN_COLD","INFINITE_BURN_SULFURIC","SULFURIC_FIRE_OVERLAY_SOURCE","BOAT_BREAKS","EXTENDS_MOTION_SENSOR_RANGE","INSTANT_PICKUP","SHEEPS_FAVOURITE_BLOCK","PIGS_FAVOURITE_BLOCK","NETHER_MOBS_SPAWN","PISTON_CRUSHING","OVERRIDE_FRICTION","NETHER_SURFACE_BLOCK","GROWS_RUBYGLASS"],"itemTags":["PREVENT_CREATIVE_MINING","IS_SILK_TOUCH","NOT_IN_CREATIVE_MENU","PREVENT_LEFT_CLICK_INTERACTIONS","CHICKENS_FAVOURITE_ITEM","COWS_FAVOURITE_ITEM","IS_FIRE_PROOF","IS_BLAST_PROOF","IS_INDESTRUCTIBLE","IS_PERSISTENT"],"materials":["AIR","GRASS","DIRT","WOOD","STONE","BASALT","LIMESTONE","GRANITE","PERMAFROST","MARBLE","SLATE","NETHERRACK","GLOOMSTONE","METAL","DIAMOND","IRON","GOLD","LAPIS","OLIVINE","QUARTZ","STEEL","WATER","LAVA","LEAVES","PLANT","SPONGE","CLOTH","FIRE","SAND","SOUL_SAND","DECORATION","GLASS","EXPLOSIVE","CORAL","ICE","TOP_SNOW","SNOW","TOP_ASH","ASH","CACTUS","CLAY","VEGETABLE","PORTAL","CAKE","WEB","PISTON","MOSS","WOOD_WET","ACID"],"sounds":["DEFAULT","WOOD","GRAVEL","GRASS","STONE","METAL","GLASS","CLOTH","SAND","FIRE","PERMAFROST","ASH","SOULSAND","GLOOMSTONE","BRIMSTONE","CRYSTAL"],"registries":["NAMESPACES","WORLD_TYPES","BIOMES","GAME_RULES","GAMEMODES","RECIPE_TYPES","ITEM_GROUPS","RECIPES","RECIPES_LOCAL_COPY","init"],"logics":[["net/minecraft/core/block/BlockLogic","java/lang/Object"],["net/minecraft/core/block/BlockLogicActivator","net/minecraft/core/block/BlockLogicVeryRotatable"],["net/minecraft/core/block/BlockLogicAir","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicAlgae","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicAsh","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicAxisAligned","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBasket","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBed","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBedrock","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBonePile","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicBoneShale","net/minecraft/core/block/BlockLogicFullyRotatable"],["net/minecraft/core/block/BlockLogicBookshelf","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBoulderMagmatic","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicBoulderSulfuric","net/minecraft/core/block/BlockLogicBoulderMagmatic"],["net/minecraft/core/block/BlockLogicBrazier","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBrimstone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicBrimthaw","net/minecraft/core/block/BlockLogicMagma"],["net/minecraft/core/block/BlockLogicButton","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicButtonPainted","net/minecraft/core/block/BlockLogicButtonPlanksOak"],["net/minecraft/core/block/BlockLogicButtonPlanksOak","net/minecraft/core/block/BlockLogicButton"],["net/minecraft/core/block/BlockLogicCactus","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicCake","net/minecraft/core/block/BlockLogicEdible"],["net/minecraft/core/block/BlockLogicChest","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicChestLegacy","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicChestPainted","net/minecraft/core/block/BlockLogicChest"],["net/minecraft/core/block/BlockLogicClay","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicCobble","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicCobweb","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicConduit","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicCropsPumpkin","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicCropsWheat","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicDeadBush","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicDispenser","net/minecraft/core/block/BlockLogicVeryRotatable"],["net/minecraft/core/block/BlockLogicDoor","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicDoorPainted","net/minecraft/core/block/BlockLogicDoor"],["net/minecraft/core/block/BlockLogicEdible","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicEmber","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFallingBlock","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFarmland","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFence","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFenceChainlink","net/minecraft/core/block/BlockLogicFenceThin"],["net/minecraft/core/block/BlockLogicFenceGate","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFenceGatePainted","net/minecraft/core/block/BlockLogicFenceGate"],["net/minecraft/core/block/BlockLogicFencePainted","net/minecraft/core/block/BlockLogicFence"],["net/minecraft/core/block/BlockLogicFenceSteel","net/minecraft/core/block/BlockLogicFenceThin"],["net/minecraft/core/block/BlockLogicFenceThin","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFenceWallPaper","net/minecraft/core/block/BlockLogicFenceThin"],["net/minecraft/core/block/BlockLogicFire","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFireCold","net/minecraft/core/block/BlockLogicFire"],["net/minecraft/core/block/BlockLogicFireSulfuric","net/minecraft/core/block/BlockLogicFire"],["net/minecraft/core/block/BlockLogicFlag","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFlower","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFlowerStackable","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicFluid","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFluidFlowing","net/minecraft/core/block/BlockLogicFluid"],["net/minecraft/core/block/BlockLogicFluidStill","net/minecraft/core/block/BlockLogicFluid"],["net/minecraft/core/block/BlockLogicFullyRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicFurnace","net/minecraft/core/block/BlockLogicRotatable"],["net/minecraft/core/block/BlockLogicFurnaceBlast","net/minecraft/core/block/BlockLogicRotatable"],["net/minecraft/core/block/BlockLogicGlass","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicGlassSteel","net/minecraft/core/block/BlockLogicGlass"],["net/minecraft/core/block/BlockLogicGlassTinted","net/minecraft/core/block/BlockLogicGlass"],["net/minecraft/core/block/BlockLogicGlowStone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicGrass","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicGravel","net/minecraft/core/block/BlockLogicFallingBlock"],["net/minecraft/core/block/BlockLogicGrowthRubyglass","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicIce","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicJar","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicJarButterfly","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicJukebox","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLadder","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLamp","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLanternFirefly","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLayerAsh","net/minecraft/core/block/BlockLogicLayerSupportable"],["net/minecraft/core/block/BlockLogicLayerBase","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLayerLeaves","net/minecraft/core/block/BlockLogicLayerSupportable"],["net/minecraft/core/block/BlockLogicLayerSlate","net/minecraft/core/block/BlockLogicLayerBase"],["net/minecraft/core/block/BlockLogicLayerSnow","net/minecraft/core/block/BlockLogicLayerSupportable"],["net/minecraft/core/block/BlockLogicLayerSupportable","net/minecraft/core/block/BlockLogicLayerBase"],["net/minecraft/core/block/BlockLogicLeavesBase","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLeavesCacao","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLeavesCherry","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLeavesCherryFlowering","net/minecraft/core/block/BlockLogicLeavesCherry"],["net/minecraft/core/block/BlockLogicLeavesEucalyptus","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLeavesOak","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLeavesPine","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLeavesShrub","net/minecraft/core/block/BlockLogicLeavesBase"],["net/minecraft/core/block/BlockLogicLever","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicLog","net/minecraft/core/block/BlockLogicAxisAligned"],["net/minecraft/core/block/BlockLogicMagma","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicMatcher","net/minecraft/core/block/BlockLogicAxisAligned"],["net/minecraft/core/block/BlockLogicMesh","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicMeshGold","net/minecraft/core/block/BlockLogicMesh"],["net/minecraft/core/block/BlockLogicMobSpawner","net/minecraft/core/block/BlockLogicMobSpawnerDeactivated"],["net/minecraft/core/block/BlockLogicMobSpawnerDeactivated","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicMoss","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicMotionSensor","net/minecraft/core/block/BlockLogicVeryRotatable"],["net/minecraft/core/block/BlockLogicMud","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicMushroom","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicNodeRubyglass","net/minecraft/core/block/BlockLogicRubyglass"],["net/minecraft/core/block/BlockLogicNote","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicObsidian","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreCoal","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreDiamond","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreGold","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreIron","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreLapis","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreNetherCoal","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOreRedstone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicOverlayPebbles","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPathDirt","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPermaIce","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPiePumpkin","net/minecraft/core/block/BlockLogicEdible"],["net/minecraft/core/block/BlockLogicPlanks","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPlanksPainted","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPortal","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicPressurePlate","net/minecraft/core/entity/Entity"],["net/minecraft/core/block/BlockLogicPressurePlatePainted","net/minecraft/core/entity/Entity"],["net/minecraft/core/block/BlockLogicPumice","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicPumpkin","net/minecraft/core/block/BlockLogicVeryRotatable"],["net/minecraft/core/block/BlockLogicPumpkinRedstone","net/minecraft/core/block/BlockLogicVeryRotatable"],["net/minecraft/core/block/BlockLogicRail","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRailDetector","net/minecraft/core/block/BlockLogicRail"],["net/minecraft/core/block/BlockLogicRedstone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRepeater","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRope","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRubyglass","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicRubyglassCrystal","net/minecraft/core/block/BlockLogicTransparent"],["net/minecraft/core/block/BlockLogicSandstone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSaplingBase","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicSaplingBirch","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingCacao","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingCherry","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingEucalyptus","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingOak","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingPalm","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingPine","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingRetro","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingShrub","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSaplingThorn","net/minecraft/core/block/BlockLogicSaplingBase"],["net/minecraft/core/block/BlockLogicSeat","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSign","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSignPainted","net/minecraft/core/block/BlockLogicSign"],["net/minecraft/core/block/BlockLogicSlab","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSlabPaintable","net/minecraft/core/block/BlockLogicSlab"],["net/minecraft/core/block/BlockLogicSlabPainted","net/minecraft/core/block/BlockLogicSlab"],["net/minecraft/core/block/BlockLogicSnow","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSoulCatcher","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicSoulSand","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSpikes","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSpinifex","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicSponge","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicStairs","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicStairsPaintable","net/minecraft/core/block/BlockLogicStairs"],["net/minecraft/core/block/BlockLogicStairsPainted","net/minecraft/core/block/BlockLogicStairs"],["net/minecraft/core/block/BlockLogicStalk","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicStatue","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicStone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSugarcane","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSulfur","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicSupplier","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTNT","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTallGrass","net/minecraft/core/block/BlockLogicFlower"],["net/minecraft/core/block/BlockLogicThermalVent","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTimer","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTorch","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTorchRedstone","net/minecraft/core/block/BlockLogicTorch"],["net/minecraft/core/block/BlockLogicTransparent","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTrapDoor","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicTrapDoorPainted","net/minecraft/core/block/BlockLogicTrapDoor"],["net/minecraft/core/block/BlockLogicTrommel","net/minecraft/core/block/BlockLogicRotatable"],["net/minecraft/core/block/BlockLogicVeryRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicWireRedstone","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicWool","net/minecraft/core/block/BlockLogic"],["net/minecraft/core/block/BlockLogicWorkbench","net/minecraft/core/block/BlockLogicRotatable"]],"models":[["net/minecraft/client/render/block/model/BlockModel","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelAxisAligned","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelConduit","net/minecraft/core/block/BlockLogicConduit"],["net/minecraft/client/render/block/model/BlockModelCrossedSquares","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelCrossedSquaresRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelDispatcher","net/minecraft/client/util/dispatch/Dispatcher"],["net/minecraft/client/render/block/model/BlockModelDoor","net/minecraft/core/block/BlockLogicDoor"],["net/minecraft/client/render/block/model/BlockModelEmpty","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelFence","net/minecraft/core/block/BlockLogicFence"],["net/minecraft/client/render/block/model/BlockModelFenceGate","net/minecraft/core/block/BlockLogicFenceGate"],["net/minecraft/client/render/block/model/BlockModelFenceThin","net/minecraft/core/block/BlockLogicFenceThin"],["net/minecraft/client/render/block/model/BlockModelFire","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelFluid","net/minecraft/core/block/BlockLogicFluid"],["net/minecraft/client/render/block/model/BlockModelFullyRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelGlass","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelHorizontalRotation","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelLayer","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelLeaves","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelRail","net/minecraft/core/block/BlockLogicRail"],["net/minecraft/client/render/block/model/BlockModelRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelSignPainted","net/minecraft/core/block/BlockLogicSignPainted"],["net/minecraft/client/render/block/model/BlockModelSlab","net/minecraft/core/block/BlockLogicSlab"],["net/minecraft/client/render/block/model/BlockModelStairs","net/minecraft/core/block/BlockLogicStairs"],["net/minecraft/client/render/block/model/BlockModelStandard","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelTransparent","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelTrapDoor","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelVeryRotatable","net/minecraft/core/block/BlockLogic"],["net/minecraft/client/render/block/model/BlockModelWireRedstone","net/minecraft/core/block/BlockLogic"]],"side":["BOTTOM","TOP","NORTH","SOUTH","WEST","EAST"],"direction":["DOWN","UP","NORTH","SOUTH","WEST","EAST"]};
 
 (function () {
 'use strict';

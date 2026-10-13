@@ -952,6 +952,86 @@
             }, 500);
         })();
     </script>
+    <script>
+        (function () {
+            var ov = document.createElement('div');
+            ov.id = 'mcLoading';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+                'background:#2b2014;image-rendering:pixelated;font-family:monospace;color:#fff;user-select:none;transition:opacity .35s';
+            var d = document.createElement('canvas'); d.width = d.height = 16;
+            var dc = d.getContext('2d'), seed = 7;
+            var rnd = function () { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+            var tones = [[134, 96, 67], [121, 85, 58], [150, 108, 74], [104, 74, 52], [89, 64, 45], [165, 120, 84]];
+            for (var y = 0; y < 16; y++) for (var x = 0; x < 16; x++) {
+                var t = tones[Math.floor(rnd() * (rnd() < 0.15 ? 6 : 3))], k = 0.25;
+                dc.fillStyle = 'rgb(' + Math.round(t[0] * k) + ',' + Math.round(t[1] * k) + ',' + Math.round(t[2] * k) + ')';
+                dc.fillRect(x, y, 1, 1);
+            }
+            ov.style.backgroundImage = 'url(' + d.toDataURL() + ')';
+            ov.style.backgroundSize = '64px 64px';
+            var pix = function (text, scale, color) {
+                var c = document.createElement('canvas'), x = c.getContext('2d');
+                x.font = 'bold 10px monospace';
+                var w = Math.ceil(x.measureText(text).width) + 2;
+                c.width = w; c.height = 12;
+                x.font = 'bold 10px monospace'; x.textBaseline = 'top';
+                x.fillStyle = 'rgba(0,0,0,.6)'; x.fillText(text, 1, 1);
+                x.fillStyle = color; x.fillText(text, 0, 0);
+                var im = x.getImageData(0, 0, c.width, c.height);
+                for (var i = 3; i < im.data.length; i += 4) im.data[i] = im.data[i] > 100 ? 255 : 0;
+                x.putImageData(im, 0, 0);
+                c.style.cssText = 'width:' + (c.width * scale) + 'px;height:' + (c.height * scale) + 'px;image-rendering:pixelated;max-width:92vw';
+                return c;
+            };
+            var big = Math.max(3, Math.min(7, Math.floor(window.innerWidth / 120)));
+            var logo = document.createElement('img');
+            logo.alt = 'Minecraft RE';
+            logo.style.cssText = 'width:min(640px,86vw);height:auto;image-rendering:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))';
+            logo.onerror = function () { logo.replaceWith(pix('MINECRAFT RE', big + 2, '#c6c6c6')); };
+            logo.src = 'icons/logo.png';
+            ov.appendChild(logo);
+            var gap = document.createElement('div'); gap.style.height = (big * 6) + 'px'; ov.appendChild(gap);
+            var title = pix('Loading', Math.max(2, big - 2), '#ffffff'); ov.appendChild(title);
+            var bar = document.createElement('div');
+            bar.style.cssText = 'margin-top:' + (big * 3) + 'px;width:min(400px,70vw);height:' + Math.max(4, big) + 'px;background:#808080;border:0';
+            var fill = document.createElement('div');
+            fill.style.cssText = 'height:100%;width:0;background:#80ff80;transition:width .2s';
+            bar.appendChild(fill); ov.appendChild(bar);
+            var line = document.createElement('div');
+            line.style.cssText = 'margin-top:' + (big * 3) + 'px;font:bold ' + (big * 3) + 'px monospace;color:#c6c6c6;text-shadow:2px 2px 0 #3f3f3f;min-height:1.2em;text-align:center;padding:0 12px';
+            line.textContent = 'Building terrain';
+            ov.appendChild(line);
+            document.body.appendChild(ov);
+
+            var shown = 0;
+            var set = function (frac, text) {
+                frac = Math.max(shown, Math.min(1, frac));
+                shown = frac;
+                fill.style.width = (frac * 100).toFixed(1) + '%';
+                if (text) line.textContent = text;
+            };
+            var prevStatus = Module.setStatus, maxDeps = 0;
+            Module.setStatus = function (text) {
+                var m = /\((\d+(?:\.\d+)?)\/(\d+)\)/.exec(text || '');
+                if (m) set(0.85 * (+m[1] / +m[2]), 'Downloading the game (' + Math.round(100 * +m[1] / +m[2]) + '%)');
+                else if (text) set(shown, /download/i.test(text) ? 'Downloading the game' : 'Getting ready');
+                if (prevStatus) return prevStatus.apply(this, arguments);
+            };
+            var prevDeps = Module.monitorRunDependencies;
+            Module.monitorRunDependencies = function (left) {
+                maxDeps = Math.max(maxDeps, left);
+                if (maxDeps) set(0.85 + 0.1 * (1 - left / maxDeps), left ? 'Preparing the world' : 'Starting');
+                if (prevDeps) return prevDeps.apply(this, arguments);
+            };
+            Module.postRun = Module.postRun || [];
+            if (typeof Module.postRun === 'function') Module.postRun = [Module.postRun];
+            var gone = false;
+            var hide = function () { if (gone) return; gone = true; set(1); ov.style.opacity = '0'; setTimeout(function () { ov.remove(); }, 400); };
+            Module.mcTitleShown = function () { setTimeout(hide, 150); };
+            Module.postRun.push(function () { set(0.97, 'Starting'); setTimeout(hide, 20000); });
+            window.mcLoadingFail = function (why) { line.textContent = String(why || 'Something went wrong'); };
+        })();
+    </script>
     <script type='text/javascript'>
         (function () {
             var LIB = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
@@ -2428,6 +2508,7 @@
                 if (files['fabric.mod.json']) {
                     var fk = JVM.javaKind({ sources: {}, nameMap: null }, [], files);
                     if (fk.loader === 'Babric') return Promise.resolve({ tag: 'babric', said: 'Beta 1.7.3' });
+                    if (fk.loader === 'BTA') return Promise.resolve({ tag: 'bta', said: 'Better Than Adventure' });
                 }
                 try {
                     var mi = files['mcmod.info'] && JSON.parse(new TextDecoder().decode(files['mcmod.info']).replace(/^\uFEFF/, ''));
@@ -2518,7 +2599,7 @@
                     if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag] || '1.5.2';
                     if (ver.guessed && ver.said && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag]; }
                     Object.keys(files).forEach(function (k) {
-                        if (!/(^|[/])lang[/]en_us[.]lang$/i.test(k)) return;
+                        if (!/(^|[/])lang[/](en_us[.]lang|en_us[/][^/]+[.]lang)$/i.test(k)) return;
                         var lr = JVM.mc152.reg(vm).lang;
                         try { new TextDecoder().decode(files[k]).split(/\r?\n/).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && !/^\s*#/.test(l)) { var key = l.slice(0, i).trim(); if (lr[key] == null) lr[key] = window.JVM.langValue ? window.JVM.langValue(l.slice(i + 1)) : l.slice(i + 1).trim(); } }); } catch (e) { }
                     });
@@ -2529,12 +2610,13 @@
                     }
                     var forgeMods = JVM.findForgeMods ? JVM.findForgeMods(vm, classes) : [];
                     var errorsBefore = errorCount;
-                    if (kind.loader === 'Babric' && JVM.babricLoad) {
+                    if ((kind.loader === 'Babric' && JVM.babricLoad) || (kind.loader === 'BTA' && JVM.btaLoad)) {
                         var fjson = null;
                         try { fjson = JSON.parse(new TextDecoder().decode(files['fabric.mod.json']).replace(/^\uFEFF/, '')); } catch (e) { fjson = {}; }
                         (vm.$stFiles = vm.$stFiles || {})[modId] = files;
                         (vm.$stSaved = vm.$stSaved || {})[modId] = Module.mcMods && Module.mcMods.savedSettings ? Module.mcMods.savedSettings(modId) : null;
-                        JVM.babricLoad(vm, modId, fjson, files, classes);
+                        if (kind.loader === 'BTA') JVM.btaLoad(vm, modId, fjson, files, classes);
+                        else JVM.babricLoad(vm, modId, fjson, files, classes);
                     }
                     entry.forEach(function (cn) {
                         JVM.run(vm, function () {
@@ -5055,7 +5137,7 @@
                 if (rep && rep.status) supportSeen[id] = rep.status === 'cant' ? 0 : rep.status === 'partly' ? 1 : 2;
                 else if (/^(Java|Forge|Babric|ModLoader|Jar) mod\b/.test(x.contents || '')) {
                     var c = x.contents;
-                    supportSeen[id] = /Can't run/.test(c) ? 0 : /Partly works/.test(c) ? 1 : /- Works\b/.test(c) ? 2 : supportSeen[id];
+                    supportSeen[id] = /Can't run/.test(c) ? 0 : /Partly works/.test(c) ? 1 : /- (Works\b|Loads, nothing missing)/.test(c) ? 2 : supportSeen[id];
                 }
                 if (supportSeen[id] != null) return supportSeen[id];
                 if (x.m && x.m.java) return '';
@@ -5172,6 +5254,7 @@
                 var k = LIB_KNOWN[key], slug = k ? k.slug : String(key).toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
                 var gv = /^Beta /.test(mcVersion || '') ? 'b' + mcVersion.slice(5) : mcVersion;
                 var tries = k ? [{ loaders: k.loaders, gv: k.any ? null : gv }]
+                    : /Better Than Adventure/i.test(mcVersion || '') ? [{ loaders: ['bta-babric'], gv: null }, { loaders: ['babric'], gv: 'b1.7.3' }]
                     : /^b1[.]/.test(gv || '') ? [{ loaders: ['babric'], gv: gv }, { loaders: ['fabric'], gv: gv }]
                     : [{ loaders: ['forge'], gv: gv }, { loaders: ['modloader'], gv: gv }];
                 var api = 'https://api.modrinth.com/v2/project/' + encodeURIComponent(slug) + '/version?loaders=';

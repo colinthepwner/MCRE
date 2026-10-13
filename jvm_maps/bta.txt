@@ -1,0 +1,1303 @@
+# Better Than Adventure: its classes that ARE the game's own kinds of thing, as the stand-ins' (jvm/74_bta)
+C	net/minecraft/core/block/Block	net/minecraft/src/Block
+C	net/minecraft/core/item/Item	net/minecraft/src/Item
+C	net/minecraft/core/item/ItemStack	net/minecraft/src/ItemStack
+C	net/minecraft/core/item/ItemFood	net/minecraft/src/ItemFood
+C	net/minecraft/core/item/ItemArmor	net/minecraft/src/ItemArmor
+C	net/minecraft/core/item/tool/ItemTool	net/minecraft/src/ItemTool
+C	net/minecraft/core/item/tool/ItemToolSword	net/minecraft/src/ItemSword
+C	net/minecraft/core/item/tool/ItemToolPickaxe	net/minecraft/src/ItemPickaxe
+C	net/minecraft/core/item/tool/ItemToolAxe	net/minecraft/src/ItemAxe
+C	net/minecraft/core/item/tool/ItemToolShovel	net/minecraft/src/ItemSpade
+C	net/minecraft/core/item/tool/ItemToolHoe	net/minecraft/src/ItemHoe
+C	net/minecraft/core/item/block/ItemBlock	net/minecraft/src/ItemBlock
+C	net/minecraft/core/block/material/Material	net/minecraft/src/Material
+C	net/minecraft/core/sound/BlockSound	net/minecraft/src/StepSound
+C	net/minecraft/core/world/World	net/minecraft/src/World
+C	net/minecraft/core/world/WorldSource	net/minecraft/src/IBlockAccess
+C	net/minecraft/core/entity/Entity	net/minecraft/src/Entity
+C	net/minecraft/core/entity/Mob	net/minecraft/src/EntityLiving
+C	net/minecraft/core/entity/player/Player	net/minecraft/src/EntityPlayer
+C	net/minecraft/core/entity/EntityItem	net/minecraft/src/EntityItem
+C	net/minecraft/core/block/entity/TileEntity	net/minecraft/src/TileEntity
+C	com/mojang/nbt/tags/CompoundTag	net/minecraft/src/NBTTagCompound
+C	com/mojang/nbt/tags/ListTag	net/minecraft/src/NBTTagList
+F	net/minecraft/core/item/Item	id	id	itemID
+F	net/minecraft/core/item/Item	maxStackSize	maxStackSize	maxStackSize
+F	net/minecraft/core/item/Item	hasSubtypes	hasSubtypes	hasSubtypes
+F	net/minecraft/core/block/Block	blockHardness	blockHardness	blockHardness
+S	net/minecraft/client/render/particle/ParticleFirefly	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleHeart	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticlePuffRGB	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleBlockBreaking	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleDispatcher	net/minecraft/client/util/dispatch/Dispatcher	
+S	net/minecraft/client/render/particle/ParticleFlame	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleLava	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleRubyglassLightning	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleDispatcher$1	java/lang/Object	net/minecraft/client/render/particle/ParticleEntry
+S	net/minecraft/client/render/particle/ParticleSiphon	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticlePickupAnimation	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleItemBreaking	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleArrowGolden	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleAsh	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleBubble	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleSiphon$Look	java/lang/Enum	
+S	net/minecraft/client/render/particle/ParticleSnowShovel	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleSplash	net/minecraft/client/render/particle/ParticleWaterDrop	
+S	net/minecraft/client/render/particle/ParticleExplode	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleBubbleBoiling	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleFlame$Type	java/lang/Enum	
+S	net/minecraft/client/render/particle/ParticleDispatcher$2	java/lang/Object	net/minecraft/client/render/particle/ParticleEntry
+S	net/minecraft/client/render/particle/ParticleSlimeChunk	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleLeaf	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticlePortal	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleFluidDrip	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleNote	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleAcidBoiling	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleSmoke	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleWaterDrop	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleVentSmoke	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleRedstoneDust	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleFootstep	net/minecraft/client/render/particle/Particle	
+S	net/minecraft/client/render/particle/ParticleDispatcher$3	java/lang/Object	net/minecraft/client/render/particle/ParticleEntry
+S	net/minecraft/client/render/dynamictexture/DynamicTextureCompass	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureFireflyJar	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureWaterStill	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureFire	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureLavaFlowing	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureRotating	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureClock	net/minecraft/client/render/dynamictexture/DynamicTextureAbstractClock	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureCalendar	net/minecraft/client/render/dynamictexture/DynamicTextureAbstractClock	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureTrommel	net/minecraft/client/render/dynamictexture/DynamicTextureRotating	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureWaterFlow	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureLavaStill	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTexturePortal	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureCustom	net/minecraft/client/render/dynamictexture/DynamicTexture	
+S	net/minecraft/client/render/dynamictexture/DynamicTextureAbstractClock	net/minecraft/client/render/dynamictexture/DynamicTextureRotating	
+S	net/minecraft/client/render/uniform/UniformBlockManager$1	java/lang/Object	net/minecraft/client/render/uniform/BufferAdapter
+S	net/minecraft/client/render/terrain/ChunkRendererMultiDraw	net/minecraft/client/render/terrain/ChunkRenderer	
+S	net/minecraft/client/render/terrain/TerrainRendererMultiDraw	net/minecraft/client/render/terrain/TerrainRenderer	
+S	net/minecraft/client/render/shader/ShaderProviderExternal	java/lang/Object	net/minecraft/client/render/shader/ShaderProvider
+S	net/minecraft/client/render/shader/ShadersRenderer	java/lang/Object	net/minecraft/client/render/Renderer
+S	net/minecraft/client/render/shader/PhotoModeRenderer	net/minecraft/client/render/shader/ShadersRenderer	
+S	net/minecraft/client/render/shader/ShaderGeometry	net/minecraft/client/render/shader/Shader	
+S	net/minecraft/client/render/shader/ShaderProviderInternal	java/lang/Object	net/minecraft/client/render/shader/ShaderProvider
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferTextureMultiSample	net/minecraft/client/render/shader/framebuffer/FrameBufferTexture	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentMultiSample
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferMultiSample	net/minecraft/client/render/shader/framebuffer/FrameBuffer	
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferTextureSingleSample	net/minecraft/client/render/shader/framebuffer/FrameBufferTexture	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentSingleSample
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentSingleSample	java/lang/Object	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachment
+S	net/minecraft/client/render/shader/framebuffer/RenderBufferMultiSample	net/minecraft/client/render/shader/framebuffer/RenderBuffer	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentMultiSample
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferTexture	java/lang/Object	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachment
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentMultiSample	java/lang/Object	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachment
+S	net/minecraft/client/render/shader/framebuffer/RenderBufferSingleSample	net/minecraft/client/render/shader/framebuffer/RenderBuffer	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachmentSingleSample
+S	net/minecraft/client/render/shader/framebuffer/FrameBuffer$AttachmentType	java/lang/Enum	
+S	net/minecraft/client/render/shader/framebuffer/RenderBuffer	java/lang/Object	net/minecraft/client/render/shader/framebuffer/FrameBufferAttachment
+S	net/minecraft/client/render/shader/framebuffer/FrameBufferSingleSample	net/minecraft/client/render/shader/framebuffer/FrameBuffer	
+S	net/minecraft/client/render/camera/EntityCameraIsometric	net/minecraft/client/render/camera/EntityCamera	
+S	net/minecraft/client/render/camera/EntityCameraThirdPersonFront	net/minecraft/client/render/camera/EntityCameraThirdPersonRear	
+S	net/minecraft/client/render/camera/EntityCamera	java/lang/Object	net/minecraft/client/render/camera/ICamera
+S	net/minecraft/client/render/camera/EntityCameraSleeping	net/minecraft/client/render/camera/EntityCamera	
+S	net/minecraft/client/render/camera/EntityCameraFirstPerson	net/minecraft/client/render/camera/EntityCamera	
+S	net/minecraft/client/render/camera/EntityCameraThirdPersonRear	net/minecraft/client/render/camera/EntityCamera	
+S	net/minecraft/client/render/tileentity/TileEntityRendererMovingPiston	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererJarButterfly	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererMeshGold	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererFlowerJar	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererMobSpawner	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererStatue	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererFlag	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/tileentity/TileEntityRendererSign	net/minecraft/client/render/tileentity/TileEntityRenderer	
+S	net/minecraft/client/render/font/FontRenderer$1	net/minecraft/client/render/font/RenderIntegerBase	
+S	net/minecraft/client/render/font/FontMonospace	net/minecraft/client/render/font/FontFile	
+S	net/minecraft/client/render/font/FontRenderer$2	net/minecraft/client/render/font/RenderDoubleBase	
+S	net/minecraft/client/render/font/FontRenderer$8	net/minecraft/client/render/font/RenderDoubleConstrainedBase	
+S	net/minecraft/client/render/font/Alignment	java/lang/Enum	
+S	net/minecraft/client/render/font/FontUnicode	net/minecraft/client/render/font/FontFile	
+S	net/minecraft/client/render/font/FontRenderer$6	net/minecraft/client/render/font/RenderDoubleConstrainedBase	
+S	net/minecraft/client/render/font/FontRendererDefault	net/minecraft/client/render/font/FontRenderer	
+S	net/minecraft/client/render/font/FontDefault	net/minecraft/client/render/font/FontFile	
+S	net/minecraft/client/render/font/FontRenderer$5	net/minecraft/client/render/font/RenderIntegerConstrainedBase	
+S	net/minecraft/client/render/font/FontRenderer$4	net/minecraft/client/render/font/RenderDoubleBase	
+S	net/minecraft/client/render/font/FontFile	java/lang/Object	net/minecraft/client/render/font/Font
+S	net/minecraft/client/render/font/FontRenderer$7	net/minecraft/client/render/font/RenderIntegerConstrainedBase	
+S	net/minecraft/client/render/font/FontRenderer$3	net/minecraft/client/render/font/RenderIntegerBase	
+S	net/minecraft/client/render/window/CursorShape	java/lang/Enum	
+S	net/minecraft/client/render/window/GameWindowGLFW	java/lang/Object	net/minecraft/client/render/window/GameWindow
+S	net/minecraft/client/render/texture/meta/AnimationPropertiesAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/client/render/texture/meta/TexturePropertiesAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/client/render/texture/meta/gui/GuiTexturePropertiesAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/client/render/texture/TextureBuffered	net/minecraft/client/render/texture/TextureFile	
+S	net/minecraft/client/render/texture/TextureDownloaded	net/minecraft/client/render/texture/TextureFile	
+S	net/minecraft/client/render/texture/TextureFile	net/minecraft/client/render/texture/Texture	
+S	net/minecraft/client/render/texture/TextureMultisampled	net/minecraft/client/render/texture/Texture	
+S	net/minecraft/client/render/texturepack/TexturePackException	java/lang/RuntimeException	
+S	net/minecraft/client/render/texturepack/Manifest$ManifestException	java/lang/RuntimeException	
+S	net/minecraft/client/render/texturepack/TexturePackDefault	net/minecraft/client/render/texturepack/TexturePack	
+S	net/minecraft/client/render/texturepack/TexturePackCustom	net/minecraft/client/render/texturepack/TexturePack	
+S	net/minecraft/client/render/texturepack/ManifestFallback	net/minecraft/client/render/texturepack/ManifestBase	
+S	net/minecraft/client/render/texturepack/Manifest	net/minecraft/client/render/texturepack/ManifestBase	
+S	net/minecraft/client/render/FallbackRenderer	java/lang/Object	net/minecraft/client/render/Renderer
+S	net/minecraft/client/render/entity/MobRendererDeer	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererHuman	net/minecraft/client/render/entity/MobRendererBiped	
+S	net/minecraft/client/render/entity/MobRenderer	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererGiant	net/minecraft/client/render/entity/MobRendererZombie	
+S	net/minecraft/client/render/entity/MobRendererBiped	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/EntityRendererDefault	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/EntityRendererCannonball	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/EntityRendererGeneric	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererZombie	net/minecraft/client/render/entity/MobRendererBipedArmored	
+S	net/minecraft/client/render/entity/EntityRendererTNT	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererScorpion	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererSnowman	net/minecraft/client/render/entity/MobRendererBiped	
+S	net/minecraft/client/render/entity/MobRendererPig	net/minecraft/client/render/entity/MobRendererQuadruped	
+S	net/minecraft/client/render/entity/EntityRendererFishingBobber	net/minecraft/client/render/entity/EntityRendererSprite	
+S	net/minecraft/client/render/entity/MobRendererFireflyCluster	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererZombieArmored	net/minecraft/client/render/entity/MobRendererBipedArmored	
+S	net/minecraft/client/render/entity/EntityRendererLightningBolt	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererSheep	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererBipedArmored	net/minecraft/client/render/entity/MobRendererBiped	
+S	net/minecraft/client/render/entity/EntityRendererSprite	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererGhast	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/EntityRendererFallingBlock	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/EntityRendererPainting	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/EntityRendererItem	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererChicken	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererSkeleton	net/minecraft/client/render/entity/MobRendererBipedArmored	
+S	net/minecraft/client/render/entity/EntityRendererBoat	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererButterfly	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererWolf	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererSlime	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/EntityRendererMinecart	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererPlayer	net/minecraft/client/render/entity/MobRendererBipedArmored	
+S	net/minecraft/client/render/entity/MobRendererSquid	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererCreeper	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/EntityRendererArrow	net/minecraft/client/render/entity/EntityRenderer	
+S	net/minecraft/client/render/entity/MobRendererSpider	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/entity/MobRendererQuadruped	net/minecraft/client/render/entity/MobRenderer	
+S	net/minecraft/client/render/DirtyChunkRendererSorter	java/lang/Object	java/util/Comparator
+S	net/minecraft/client/render/worldtype/WorldTypeFXDrift	net/minecraft/client/render/worldtype/WorldTypeFX	
+S	net/minecraft/client/render/worldtype/WorldTypeFXNether	net/minecraft/client/render/worldtype/WorldTypeFX	
+S	net/minecraft/client/render/worldtype/WorldTypeFXDispatcher	net/minecraft/client/util/dispatch/Dispatcher	
+S	net/minecraft/client/render/worldtype/WorldTypeFXEmpty	net/minecraft/client/render/worldtype/WorldTypeFX	
+S	net/minecraft/client/render/worldtype/WorldTypeFXOverworld	net/minecraft/client/render/worldtype/WorldTypeFX	
+S	net/minecraft/client/render/renderer/BlendFactor	java/lang/Enum	
+S	net/minecraft/client/render/renderer/DrawMode	java/lang/Enum	
+S	net/minecraft/client/render/renderer/CompareFunc	java/lang/Enum	
+S	net/minecraft/client/render/renderer/CullFace	java/lang/Enum	
+S	net/minecraft/client/render/renderer/FrontFace	java/lang/Enum	
+S	net/minecraft/client/render/renderer/State	java/lang/Enum	
+S	net/minecraft/client/render/PanelCrashReport	java/awt/Panel	
+S	net/minecraft/client/render/tessellator/TessellatorNormal	java/lang/Object	net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/tessellator/TessellatorTerrainImpl$TerrainVertexData	net/minecraft/client/render/terrain/VertexData	
+S	net/minecraft/client/render/tessellator/TessellatorLODShader$LODVertexConfig	java/lang/Object	net/minecraft/client/render/terrain/VertexConfig
+S	net/minecraft/client/render/tessellator/TessellatorTerrainImpl	java/lang/Object	net/minecraft/client/render/tessellator/TessellatorGeneral
+S	net/minecraft/client/render/tessellator/TessellatorColor	java/lang/Object	net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/tessellator/TessellatorFont$FontRenderBuffer	java/lang/Record	
+S	net/minecraft/client/render/tessellator/TessellatorLODShader$LODVertexData	net/minecraft/client/render/terrain/VertexData	
+S	net/minecraft/client/render/tessellator/TessellatorBase	java/lang/Object	net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/tessellator/TessellatorGeneral	java/lang/Object	net/minecraft/client/render/tessellator/TessellatorColor,net/minecraft/client/render/tessellator/TessellatorTextured,net/minecraft/client/render/tessellator/TessellatorLightmap,net/minecraft/client/render/tessellator/TessellatorNormal,net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/tessellator/TessellatorTerrainImpl$TerrainVertexConfig	java/lang/Object	net/minecraft/client/render/terrain/VertexConfig
+S	net/minecraft/client/render/tessellator/TessellatorShader	net/minecraft/client/render/tessellator/TessellatorBase	net/minecraft/client/render/tessellator/TessellatorGeneral
+S	net/minecraft/client/render/tessellator/TessellatorTextured	java/lang/Object	net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/tessellator/TessellatorParticleShader	java/lang/Object	net/minecraft/client/render/tessellator/TessellatorParticle
+S	net/minecraft/client/render/tessellator/RenderBuffer	java/lang/Record	
+S	net/minecraft/client/render/tessellator/TessellatorLODShader	java/lang/Object	net/minecraft/client/render/tessellator/TessellatorLOD
+S	net/minecraft/client/render/tessellator/TessellatorLightmap	java/lang/Object	net/minecraft/client/render/tessellator/Tessellator
+S	net/minecraft/client/render/canvas/CanvasMojangLogo	java/awt/Canvas	
+S	net/minecraft/client/render/canvas/CanvasCrashReport	java/awt/Canvas	
+S	net/minecraft/client/render/item/model/ItemModelBow	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelQuiver	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelSignPainted	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelNone	net/minecraft/client/render/item/model/ItemModel	
+S	net/minecraft/client/render/item/model/ItemModelCoal	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelDispatcher	net/minecraft/client/util/dispatch/Dispatcher	
+S	net/minecraft/client/render/item/model/ItemModelFishingRod	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelPaintbrush	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelStandard	net/minecraft/client/render/item/model/ItemModel	
+S	net/minecraft/client/render/item/model/ItemModelMap	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelBucket	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelBucketSteel	net/minecraft/client/render/item/model/ItemModelBucket	
+S	net/minecraft/client/render/item/model/ItemModelBlock	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelBucketIron	net/minecraft/client/render/item/model/ItemModelBucket	
+S	net/minecraft/client/render/item/model/ItemModelLabel	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelDoorPainted	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/item/model/ItemModelDye	net/minecraft/client/render/item/model/ItemModelStandard	
+S	net/minecraft/client/render/PlayerSkinParser	java/lang/Object	net/minecraft/client/render/ImageParser
+S	net/minecraft/client/render/block/color/BlockColorDefault	net/minecraft/client/render/block/color/BlockColor	
+S	net/minecraft/client/render/block/color/BlockColorDispatcher	net/minecraft/client/util/dispatch/Dispatcher	
+S	net/minecraft/client/render/block/color/BlockColorLeavesOak	net/minecraft/client/render/block/color/BlockColorCustom	
+S	net/minecraft/client/render/block/color/BlockColorTallGrass	net/minecraft/client/render/block/color/BlockColorCustom	
+S	net/minecraft/client/render/block/color/BlockColorWireRedstone	net/minecraft/client/render/block/color/BlockColor	
+S	net/minecraft/client/render/block/color/BlockColorWater	net/minecraft/client/render/block/color/BlockColorCustom	
+S	net/minecraft/client/render/block/color/BlockColorConduit	net/minecraft/client/render/block/color/BlockColor	
+S	net/minecraft/client/render/block/color/BlockColorCustom	net/minecraft/client/render/block/color/BlockColor	
+S	net/minecraft/client/render/block/color/BlockColorPortal	net/minecraft/client/render/block/color/BlockColor	
+S	net/minecraft/client/render/block/model/BlockModelLeaves	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelCrossedSquaresRotatable	net/minecraft/client/render/block/model/BlockModelCrossedSquares	
+S	net/minecraft/client/render/block/model/BlockModelDoor	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelTrapDoor	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFence	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelHorizontalRotation	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFire	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelEmpty	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFenceThin	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFenceGatePainted	net/minecraft/client/render/block/model/generic/BlockModelGenericFenceGate	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRubyglassGrowth	net/minecraft/client/render/block/model/BlockModel	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFenceGate	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPebbles	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGeneric	net/minecraft/client/render/block/model/BlockModel	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFurnace	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericCullBounderies	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLayerAsh	net/minecraft/client/render/block/model/generic/BlockModelGenericLayer	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericActivator	net/minecraft/client/render/block/model/generic/BlockModelGenericVeryRotatable	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLeaves	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericAxis	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericSlab	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRope	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPie	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPressurePlate	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericSpikes	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericTrapdoor	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFarmland	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericBed	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLever	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericWool	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericBrazier	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericTimer	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPortal	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericDoorPainted	net/minecraft/client/render/block/model/generic/BlockModelGenericDoor	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericVeryRotatable	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFencePainted	net/minecraft/client/render/block/model/generic/BlockModelGenericFence	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericButton	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRotatable	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericSlabPainted	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericGrass	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPiston	net/minecraft/client/render/block/model/generic/BlockModelGenericVeryRotatable	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericShifted	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLeavesCacao	net/minecraft/client/render/block/model/generic/BlockModelGenericLeaves	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericCake	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRepeater	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericStairs	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericDoor	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericCropsWheat	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLeavesCherryFlowering	net/minecraft/client/render/block/model/generic/BlockModelGenericLeaves	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLantern	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericButtonPainted	net/minecraft/client/render/block/model/generic/BlockModelGenericButton	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericJar	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericChest	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPressurePlatePainted	net/minecraft/client/render/block/model/generic/BlockModelGenericPressurePlate	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLamp	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericCropsPumpkin	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFence	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPlanksPainted	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericLayer	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFullyRotatable	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericWorkbench	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericBasket	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericTorch	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFlowerStackable	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRubyglassCrystal	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericMatcher	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericPistonHead	net/minecraft/client/render/block/model/generic/BlockModelGenericVeryRotatable	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericFenceThin	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericChestPainted	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericStairsPainted	net/minecraft/client/render/block/model/generic/BlockModelGenericStairs	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericTrapdoorPainted	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/generic/BlockModelGenericRocks	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/block/model/BlockModelSlab	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFenceGate	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelAxisAligned	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelSignPainted	net/minecraft/client/render/block/model/BlockModelEmpty	
+S	net/minecraft/client/render/block/model/BlockModelStandard	net/minecraft/client/render/block/model/BlockModel	
+S	net/minecraft/client/render/block/model/BlockModelTransparent	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelCrossedSquares	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFullyRotatable	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelGlass	net/minecraft/client/render/block/model/BlockModelTransparent	
+S	net/minecraft/client/render/block/model/BlockModelRail	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelFluid	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelStairs	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelVeryRotatable	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelLayer	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelRotatable	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelWireRedstone	net/minecraft/client/render/block/model/BlockModelStandard	
+S	net/minecraft/client/render/block/model/BlockModelDispatcher	net/minecraft/client/util/dispatch/Dispatcher	
+S	net/minecraft/client/render/block/model/BlockModelConduit$ModelState	java/lang/Record	
+S	net/minecraft/client/render/block/model/BlockModelConduit	net/minecraft/client/render/block/model/generic/BlockModelGeneric	
+S	net/minecraft/client/render/RenderGlobal	java/lang/Object	net/minecraft/core/world/LevelListener
+S	net/minecraft/client/render/FogManager$FogState$Mode	java/lang/Enum	
+S	net/minecraft/client/render/FrameBufferMultisampled	net/minecraft/client/render/FrameBuffer	
+S	net/minecraft/client/render/LoadingScreenRenderer	java/lang/Object	net/minecraft/core/world/ProgressListener
+S	net/minecraft/core/sound/SoundCategory	java/lang/Enum	
+S	net/minecraft/core/current/wire/SimpleQueue	java/util/AbstractQueue	
+S	net/minecraft/core/current/wire/SimpleQueue$SimpleIterator	java/lang/Object	java/util/Iterator
+S	net/minecraft/core/current/wire/PriorityQueue	java/util/AbstractQueue	
+S	net/minecraft/core/current/wire/WireNode$Medium	java/lang/Enum	
+S	net/minecraft/core/current/wire/WireNode	net/minecraft/core/current/wire/Node	
+S	net/minecraft/core/MinecraftError	java/lang/Error	
+S	net/minecraft/core/NextTickListEntry	java/lang/Object	java/lang/Comparable
+S	net/minecraft/core/entity/Mob	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/EntityItem	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/animal/MobWolf	net/minecraft/core/entity/animal/MobAnimal	net/minecraft/core/entity/IItemHolding,net/minecraft/core/entity/IArmorWearing
+S	net/minecraft/core/entity/animal/MobDeer$RoamingBrainState	net/minecraft/core/entity/animal/MobDeer$BrainState	
+S	net/minecraft/core/entity/animal/MobButterfly$ButterflyEntry	java/lang/Record	
+S	net/minecraft/core/entity/animal/MobDeer$TransitionalBrainState	net/minecraft/core/entity/animal/MobDeer$BrainState	
+S	net/minecraft/core/entity/animal/MobAnimal	net/minecraft/core/entity/MobPathfinder	net/minecraft/core/entity/animal/Creature
+S	net/minecraft/core/entity/animal/MobFireflyCluster	net/minecraft/core/entity/MobFlying	net/minecraft/core/entity/animal/AmbientCreature,net/minecraft/core/entity/ICapturable
+S	net/minecraft/core/entity/animal/MobChicken	net/minecraft/core/entity/animal/MobAnimal	
+S	net/minecraft/core/entity/animal/MobDeer$SpookedBrainState	net/minecraft/core/entity/animal/MobDeer$BrainState	
+S	net/minecraft/core/entity/animal/MobSheep	net/minecraft/core/entity/animal/MobAnimal	
+S	net/minecraft/core/entity/animal/MobPig	net/minecraft/core/entity/animal/MobAnimal	
+S	net/minecraft/core/entity/animal/MobDeer$FleeingBrainState	net/minecraft/core/entity/animal/MobDeer$BrainState	
+S	net/minecraft/core/entity/animal/MobSquid	net/minecraft/core/entity/animal/MobWaterAnimal	
+S	net/minecraft/core/entity/animal/MobButterfly	net/minecraft/core/entity/MobFlying	net/minecraft/core/entity/animal/AmbientCreature,net/minecraft/core/entity/ICapturable$Singular
+S	net/minecraft/core/entity/animal/MobWaterAnimal	net/minecraft/core/entity/MobPathfinder	net/minecraft/core/entity/animal/WaterCreature
+S	net/minecraft/core/entity/animal/MobDeer	net/minecraft/core/entity/animal/MobAnimal	
+S	net/minecraft/core/entity/animal/MobDeer$SniffingBrainState	net/minecraft/core/entity/animal/MobDeer$BrainState	
+S	net/minecraft/core/entity/animal/MobCow	net/minecraft/core/entity/animal/MobAnimal	
+S	net/minecraft/core/entity/MobPathfinder	net/minecraft/core/entity/Mob	
+S	net/minecraft/core/entity/EntityLightning	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/EntityFishingBobber	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/projectile/ProjectileSnowball	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/projectile/ProjectileArrowPurple	net/minecraft/core/entity/projectile/ProjectileArrow	
+S	net/minecraft/core/entity/projectile/ProjectilePebble	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/projectile/ProjectileEgg	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/projectile/ProjectileCannonball	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/projectile/ProjectileArrowGolden	net/minecraft/core/entity/projectile/ProjectileArrow	
+S	net/minecraft/core/entity/projectile/ProjectileArrowFlaming	net/minecraft/core/entity/projectile/ProjectileArrow	
+S	net/minecraft/core/entity/projectile/Projectile	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/projectile/ProjectileFireball	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/projectile/ProjectileCannonballBouncy	net/minecraft/core/entity/projectile/ProjectileCannonball	
+S	net/minecraft/core/entity/projectile/ProjectileArrow	net/minecraft/core/entity/projectile/Projectile	
+S	net/minecraft/core/entity/EntityPrimedTNT	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/factories/EntityDontUseFactory	java/lang/Object	net/minecraft/core/entity/factories/EntityFactory
+S	net/minecraft/core/entity/EntityFallingBlock	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/monster/MobGiant	net/minecraft/core/entity/monster/MobZombie	
+S	net/minecraft/core/entity/monster/MobMonster	net/minecraft/core/entity/MobPathfinder	net/minecraft/core/entity/monster/Enemy
+S	net/minecraft/core/entity/monster/MobSlime	net/minecraft/core/entity/Mob	net/minecraft/core/entity/monster/Enemy
+S	net/minecraft/core/entity/monster/MobHuman	net/minecraft/core/entity/monster/MobMonster	
+S	net/minecraft/core/entity/monster/MobMonsterArmored	net/minecraft/core/entity/monster/MobMonster	net/minecraft/core/entity/IArmorWearing,net/minecraft/core/entity/IItemHolding
+S	net/minecraft/core/entity/monster/MobSpider	net/minecraft/core/entity/monster/MobMonster	
+S	net/minecraft/core/entity/monster/MobGhast	net/minecraft/core/entity/MobFlying	net/minecraft/core/entity/monster/Enemy
+S	net/minecraft/core/entity/monster/MobScorpion	net/minecraft/core/entity/monster/MobMonster	
+S	net/minecraft/core/entity/monster/MobZombieArmored	net/minecraft/core/entity/monster/MobZombie	net/minecraft/core/entity/IItemHolding
+S	net/minecraft/core/entity/monster/MobSkeleton	net/minecraft/core/entity/monster/MobMonsterArmored	
+S	net/minecraft/core/entity/monster/MobCreeper	net/minecraft/core/entity/monster/MobMonster	
+S	net/minecraft/core/entity/monster/MobZombie	net/minecraft/core/entity/monster/MobMonsterArmored	
+S	net/minecraft/core/entity/monster/MobSnowman	net/minecraft/core/entity/monster/MobMonster	
+S	net/minecraft/core/entity/monster/MobZombiePig	net/minecraft/core/entity/monster/MobZombie	
+S	net/minecraft/core/entity/vehicle/EntityMinecart	net/minecraft/core/entity/Entity	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/entity/vehicle/EntityBoat	net/minecraft/core/entity/Entity	net/minecraft/core/entity/ICollidable
+S	net/minecraft/core/entity/player/Player	net/minecraft/core/entity/Mob	net/minecraft/core/entity/IArmorWearing,net/minecraft/core/entity/IItemHolding
+S	net/minecraft/core/entity/player/Player$PlayerConfig$HurtSound	java/lang/Enum	
+S	net/minecraft/core/entity/player/Player$SortByUsername	java/lang/Object	java/util/Comparator
+S	net/minecraft/core/entity/player/Player$FluidPlacement	java/lang/Record	
+S	net/minecraft/core/entity/EntityItemHoming	net/minecraft/core/entity/EntityItem	
+S	net/minecraft/core/entity/ICapturable$Singular	java/lang/Object	net/minecraft/core/entity/ICapturable
+S	net/minecraft/core/entity/EntityPainting	net/minecraft/core/entity/Entity	
+S	net/minecraft/core/entity/MobFlying	net/minecraft/core/entity/Mob	
+S	net/minecraft/core/entity/Entity	java/lang/Object	net/minecraft/core/world/IVehicle
+S	net/minecraft/core/data/gamerule/GameRuleBoolean	net/minecraft/core/data/gamerule/GameRule	
+S	net/minecraft/core/data/gamerule/GameRuleEnum	net/minecraft/core/data/gamerule/GameRule	
+S	net/minecraft/core/data/gamerule/GameRuleInteger	net/minecraft/core/data/gamerule/GameRule	
+S	net/minecraft/core/data/DataLoader$2	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$8	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$9	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$5	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$4	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$7	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$6	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/Id	java/lang/Object	java/lang/Comparable
+S	net/minecraft/core/data/registry/recipe/RecipeNamespace	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryRepairable	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingShaped	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCrafting	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryUndyeing	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCrafting	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryFurnace	net/minecraft/core/data/registry/recipe/RecipeEntryBase	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryMapDuplication	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryLabel	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryDyeing	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryLabelDye	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryScrap	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryTrommel	net/minecraft/core/data/registry/recipe/RecipeEntryBase	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryBlastFurnace	net/minecraft/core/data/registry/recipe/RecipeEntryBase	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingWithTool	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCrafting	net/minecraft/core/data/registry/recipe/RecipeEntryBase	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryRepairableStackable	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingDynamic	
+S	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCraftingShapeless	net/minecraft/core/data/registry/recipe/entry/RecipeEntryCrafting	net/minecraft/core/data/registry/recipe/HasJsonAdapter
+S	net/minecraft/core/data/registry/recipe/RecipeGroup	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/core/data/registry/recipe/RecipeRegistry	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/core/data/registry/recipe/SearchQuery$QueryType	java/lang/Enum	
+S	net/minecraft/core/data/registry/recipe/SearchQuery$SearchMode	java/lang/Enum	
+S	net/minecraft/core/data/registry/recipe/SearchQuery$SearchScope	java/lang/Enum	
+S	net/minecraft/core/data/registry/recipe/adapter/WeightedRandomLootObjectJsonAdapter	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/core/data/registry/recipe/adapter/WeightedRandomBagJsonAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/core/data/registry/recipe/adapter/ItemStackJsonAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeTrommelJsonAdapter$2	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeTrommelJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeEntryDyeingJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeEntryRepairableJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeBlastFurnaceJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeEntryScrapJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeSymbolJsonAdapter	java/lang/Object	com/google/gson/JsonDeserializer,com/google/gson/JsonSerializer
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeTrommelJsonAdapter$1	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeFurnaceJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter	java/lang/Object	com/google/gson/JsonSerializer,com/google/gson/JsonDeserializer
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeCraftingShapedJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeEntryUndyeingJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeEntryCraftingWithToolJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/recipe/adapter/RecipeCraftingShapelessJsonAdapter	java/lang/Object	net/minecraft/core/data/registry/recipe/adapter/RecipeJsonAdapter
+S	net/minecraft/core/data/registry/Registry	java/lang/Object	java/lang/Iterable
+S	net/minecraft/core/data/registry/Registries	net/minecraft/core/data/registry/Registry	
+S	net/minecraft/core/data/DataLoader$1	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/data/DataLoader$3	com/google/gson/reflect/TypeToken	
+S	net/minecraft/core/crafting/LookupFuelFurnaceBlast	net/minecraft/core/crafting/LookupFuelFurnace	
+S	net/minecraft/core/lang/text/ChainText	net/minecraft/core/lang/text/Text	
+S	net/minecraft/core/lang/text/TranslatableText	net/minecraft/core/lang/text/Text	
+S	net/minecraft/core/lang/text/LiteralText	net/minecraft/core/lang/text/Text	
+S	net/minecraft/core/lang/text/FormattedText	net/minecraft/core/lang/text/Text	
+S	net/minecraft/core/lang/text/FunctionText	net/minecraft/core/lang/text/Text	
+S	net/minecraft/core/lang/text/Text	java/lang/Object	net/minecraft/core/lang/text/IntoText
+S	net/minecraft/core/lang/Language$Default	net/minecraft/core/lang/Language	
+S	net/minecraft/core/net/CertificateHelper$X509DualTrustManager	java/lang/Object	javax/net/ssl/X509TrustManager
+S	net/minecraft/core/net/NetworkManager$1	java/lang/Thread	
+S	net/minecraft/core/net/entity/IPacketEntry	java/lang/Object	net/minecraft/core/net/entity/INetworkEntry
+S	net/minecraft/core/net/entity/IVehicleEntry	java/lang/Object	net/minecraft/core/net/entity/IPacketEntry
+S	net/minecraft/core/net/entity/entries/NetEntryBoat	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryFirefly	net/minecraft/core/net/entity/entries/NetEntryAnimal	
+S	net/minecraft/core/net/entity/entries/NetEntryPrimedTNT	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryPebble	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryItem	java/lang/Object	net/minecraft/core/net/entity/IPacketEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryPainting	java/lang/Object	net/minecraft/core/net/entity/IPacketEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryCannonball	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryArrow	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryBobber	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryEgg	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryAnimal	java/lang/Object	net/minecraft/core/net/entity/IPacketEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntrySnowball	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryMinecart	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntrySquid	net/minecraft/core/net/entity/entries/NetEntryAnimal	
+S	net/minecraft/core/net/entity/entries/NetEntryPlayerServer	java/lang/Object	net/minecraft/core/net/entity/IPacketEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryFallingBlock	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/entries/NetEntryFireball	java/lang/Object	net/minecraft/core/net/entity/IVehicleEntry,net/minecraft/core/net/entity/ITrackedEntry
+S	net/minecraft/core/net/entity/ITrackedEntry	java/lang/Object	net/minecraft/core/net/entity/INetworkEntry
+S	net/minecraft/core/net/packet/PacketBlockEvent	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketRespawn	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketRequestCommandManager	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketEntityNickname	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPhotoMode	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetEntityMotion	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketKeepAlive	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlayerGamemode	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSyncIDs	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerOpen	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMoveEntity$Pos	net/minecraft/core/net/packet/PacketMoveEntity	
+S	net/minecraft/core/net/packet/PacketMovePlayer$PosRot	net/minecraft/core/net/packet/PacketMovePlayer	
+S	net/minecraft/core/net/packet/PacketMessage	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAddItemEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketUpdatePlayerState	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketRecipeSync	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSleep	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerSetData	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAESSendKey	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketGameRule	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketEntityInteract	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketRemoveEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketUseOrPlaceItemStack	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlayerConfig	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAnimate	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetRiding	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlaySound	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketFlagOpen	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMessageTranslatable	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetPaintingArt	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlayerList	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketWeatherEffect	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketLogin	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAddPainting	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAddPlayer	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketUpdatePlayerProfile	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlaySoundDirect	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAddParticle	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMovePlayer$Rot	net/minecraft/core/net/packet/PacketMovePlayer	
+S	net/minecraft/core/net/packet/PacketAddEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetHeldObject	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerSetContent	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketStatistic	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketTeleportEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerSetSlot	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMovePlayer	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketServerIcon	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerAck	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketVehicleControl	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketCustomPayload	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketBlockUpdate	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerClick	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketHandshake	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetMobSpawner	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketCommandManager	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketGuidebook	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketTileEntityData	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetHotbarOffset	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketDisconnect	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetEquippedItem	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketAddMob	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetSpawnPosition	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetCarriedItem	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetEntityData	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMoveEntity$PosRot	net/minecraft/core/net/packet/PacketMoveEntity	
+S	net/minecraft/core/net/packet/PacketSetHealth	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMoveEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSignUpdate	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketContainerClose	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetTime	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketChunkBlocksUpdate	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketSetItemName	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketChunkVisibility	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMoveEntity$Rot	net/minecraft/core/net/packet/PacketMoveEntity	
+S	net/minecraft/core/net/packet/PacketEntityEvent	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMapData	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketExplosion	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketEntityFling	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketTakeItemEntity	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPingHandshake	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketWeatherStatus	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketPlayerAction	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketMovePlayer$Pos	net/minecraft/core/net/packet/PacketMovePlayer	
+S	net/minecraft/core/net/packet/PacketEntityTagData	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/packet/PacketBlockRegionUpdate	net/minecraft/core/net/packet/Packet	
+S	net/minecraft/core/net/NetworkManager$2	java/lang/Thread	
+S	net/minecraft/core/net/command/commands/CommandGameMode	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandMobSpawning	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandGameRule	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandTestFor	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSummon	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandChunk	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSeed	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandBiome	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandPlace	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandParticle	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSpawn	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandAchievement	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandPlaySound	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandClone$CloneMode	java/lang/Enum	
+S	net/minecraft/core/net/command/commands/CommandTime	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSetSpawn	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandTeleport	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandHeal	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandDamage	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandStructure	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandClone	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandFill	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandKill	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSay	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandMessage	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandTellRaw	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandHelp	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandClear	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandWeather	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandGive	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/commands/CommandSetBlock	java/lang/Object	net/minecraft/core/net/command/CommandManager$CommandRegistry
+S	net/minecraft/core/net/command/TextFormatting$Base	java/lang/Record	
+S	net/minecraft/core/net/command/TextFormatting$Base$Color	java/lang/Enum	
+S	net/minecraft/core/net/command/util/ConcatIterable	java/lang/Object	java/lang/Iterable
+S	net/minecraft/core/net/command/util/ConcatIterable$1	java/lang/Object	java/util/Iterator
+S	net/minecraft/core/net/command/helpers/BlockArgumentParser	net/minecraft/core/net/command/helpers/ArgumentParser	
+S	net/minecraft/core/net/command/helpers/MinMaxBounds$Integers	net/minecraft/core/net/command/helpers/MinMaxBounds	
+S	net/minecraft/core/net/command/helpers/MinMaxBounds$Doubles	net/minecraft/core/net/command/helpers/MinMaxBounds	
+S	net/minecraft/core/net/command/helpers/ItemStackArgumentParser	net/minecraft/core/net/command/helpers/ArgumentParser	
+S	net/minecraft/core/net/command/arguments/ArgumentTypeBlock	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeChunkCoordinates	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeIntegerCoordinates	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeVector3d	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeSeason	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeDamageType	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeGameMode	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeItemStack	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeEntity	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeEntitySummon	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeSoundId	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeWeather	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeSoundCategory	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeDimension	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeGameruleGeneric	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeAchievement	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeWorldFeature	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeTime	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeParticleId	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/net/command/arguments/ArgumentTypeBiome	java/lang/Object	com/mojang/brigadier/arguments/ArgumentType
+S	net/minecraft/core/item/ItemWandSpawner	net/minecraft/core/item/Item	net/minecraft/core/item/IDispensable
+S	net/minecraft/core/item/ItemDye	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemSnowball	net/minecraft/core/item/Item	net/minecraft/core/item/IDispensable
+S	net/minecraft/core/item/ItemQuiver	net/minecraft/core/item/Item	net/minecraft/core/item/IArmorItem,net/minecraft/core/item/IDispensable
+S	net/minecraft/core/item/ItemFishingRod	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemPlaceablePair	net/minecraft/core/item/Item	net/minecraft/core/item/IPlaceable
+S	net/minecraft/core/item/IPlaceable$PlaceableBlock	java/lang/Object	net/minecraft/core/item/IPlaceable
+S	net/minecraft/core/item/ItemDoorPainted	net/minecraft/core/item/ItemDoor	
+S	net/minecraft/core/item/ItemPlaceable	net/minecraft/core/item/Item	net/minecraft/core/item/IPlaceable$PlaceableBlock
+S	net/minecraft/core/item/ItemSeeds	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemIceSkates	net/minecraft/core/item/Item	net/minecraft/core/item/IArmorItem
+S	net/minecraft/core/item/ItemPaintBrush	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemRope	net/minecraft/core/item/ItemPlaceable	
+S	net/minecraft/core/item/ItemRubyglassGrowth	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemBucketIron	net/minecraft/core/item/ItemBucket	
+S	net/minecraft/core/item/ItemJar	net/minecraft/core/item/ItemPlaceable	
+S	net/minecraft/core/item/ItemFireStriker	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemBucket	net/minecraft/core/item/ItemFood	net/minecraft/core/item/IItemContainer
+S	net/minecraft/core/item/ItemDiscMusic	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/IAccumulatable	java/lang/Object	net/minecraft/core/item/IPlaceable$PlaceableBlock
+S	net/minecraft/core/item/ItemFood	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemPebble	net/minecraft/core/item/Item	net/minecraft/core/item/IDispensable,net/minecraft/core/item/IAccumulatable
+S	net/minecraft/core/item/ItemBed	net/minecraft/core/item/ItemPlaceablePair	
+S	net/minecraft/core/item/ItemSign	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemEgg	net/minecraft/core/item/Item	net/minecraft/core/item/IDispensable
+S	net/minecraft/core/item/ItemMap	net/minecraft/core/item/Item	net/minecraft/core/item/IComplexItem
+S	net/minecraft/core/item/ItemSaddle	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemBow	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemBoat	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemMinecart	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemQuiverEndless	net/minecraft/core/item/Item	net/minecraft/core/item/IArmorItem,net/minecraft/core/item/IDispensable
+S	net/minecraft/core/item/IArmorItem	java/lang/Object	net/minecraft/core/item/IItemConvertible
+S	net/minecraft/core/item/ItemBucket$BucketState	java/lang/Record	
+S	net/minecraft/core/item/ItemLabel	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemDoor	net/minecraft/core/item/ItemPlaceablePair	
+S	net/minecraft/core/item/ItemArmor	net/minecraft/core/item/Item	net/minecraft/core/item/IArmorItem
+S	net/minecraft/core/item/ItemSoup	net/minecraft/core/item/ItemFood	
+S	net/minecraft/core/item/ItemCoal	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/Item	java/lang/Object	net/minecraft/core/data/tag/ITaggable,net/minecraft/core/item/IItemConvertible
+S	net/minecraft/core/item/ItemHandCannonLoaded	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemWandNBT	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemStatue	net/minecraft/core/item/ItemPlaceablePair	
+S	net/minecraft/core/item/block/ItemBlockLayerLeaves	net/minecraft/core/item/block/ItemBlockLayer	
+S	net/minecraft/core/item/block/ItemBlockStairsPainted	net/minecraft/core/item/block/ItemBlock	
+S	net/minecraft/core/item/block/ItemBlockPainted	net/minecraft/core/item/block/ItemBlock	
+S	net/minecraft/core/item/block/ItemBlockLayer	net/minecraft/core/item/block/ItemBlock	net/minecraft/core/item/IAccumulatable
+S	net/minecraft/core/item/block/ItemBlockSlab	net/minecraft/core/item/block/ItemBlock	net/minecraft/core/item/IAccumulatable
+S	net/minecraft/core/item/block/ItemBlock	net/minecraft/core/item/Item	net/minecraft/core/item/IPlaceable$PlaceableBlock
+S	net/minecraft/core/item/block/ItemBlockSlabPainted	net/minecraft/core/item/block/ItemBlockSlab	
+S	net/minecraft/core/item/block/ItemBlockAlgae	net/minecraft/core/item/block/ItemBlock	
+S	net/minecraft/core/item/block/ItemBlockLadder	net/minecraft/core/item/block/ItemBlock	
+S	net/minecraft/core/item/block/ItemBlockLayerSnow	net/minecraft/core/item/block/ItemBlockLayer	
+S	net/minecraft/core/item/block/ItemBlockLamp	net/minecraft/core/item/block/ItemBlock	
+S	net/minecraft/core/item/ItemSlimeball	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemFlag	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemHandCannonUnloaded	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemPainting	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemSignPainted	net/minecraft/core/item/ItemSign	
+S	net/minecraft/core/item/tool/ItemToolHoe	net/minecraft/core/item/tool/ItemTool	
+S	net/minecraft/core/item/tool/ItemToolPickaxe	net/minecraft/core/item/tool/ItemTool	
+S	net/minecraft/core/item/tool/ItemToolSword	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/tool/ItemToolAxe	net/minecraft/core/item/tool/ItemTool	
+S	net/minecraft/core/item/tool/ItemToolShears	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/tool/ItemToolShovel	net/minecraft/core/item/tool/ItemTool	
+S	net/minecraft/core/item/tool/ItemTool	net/minecraft/core/item/Item	
+S	net/minecraft/core/item/ItemBucketSteel	net/minecraft/core/item/ItemBucket	
+S	net/minecraft/core/InventoryAction	java/lang/Enum	
+S	net/minecraft/core/player/inventory/menu/MenuFurnaceBlast	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuGuidebook	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuDispenser	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuInventory	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuCrafting	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuInventoryCreative	net/minecraft/core/player/inventory/menu/MenuInventory	
+S	net/minecraft/core/player/inventory/menu/MenuFlag	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuTrommel	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuFurnace	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuContainer	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/menu/MenuActivator	net/minecraft/core/player/inventory/menu/MenuAbstract	
+S	net/minecraft/core/player/inventory/container/ContainerInventory	java/lang/Object	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/player/inventory/container/ContainerCompound	java/lang/Object	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/player/inventory/container/ContainerResult	java/lang/Object	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/player/inventory/container/ContainerCrafting	java/lang/Object	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/player/inventory/container/ContainerSimple	java/lang/Object	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/player/inventory/slot/SlotResult	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/core/player/inventory/slot/SlotArmor	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/core/player/inventory/slot/SlotFurnace	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/core/player/inventory/slot/SlotCreative	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/core/player/inventory/slot/SlotDye	net/minecraft/core/player/inventory/slot/Slot	
+S	net/minecraft/core/enums/HorizontalTextAlignment	java/lang/Enum	
+S	net/minecraft/core/enums/EnumBlockSoundEffectType$2	net/minecraft/core/enums/EnumBlockSoundEffectType	
+S	net/minecraft/core/enums/ChatVisibility	java/lang/Enum	
+S	net/minecraft/core/enums/EnumSignPicture	java/lang/Enum	
+S	net/minecraft/core/enums/EnumFireSpread	java/lang/Enum	
+S	net/minecraft/core/enums/EnumBlockSoundEffectType$5	net/minecraft/core/enums/EnumBlockSoundEffectType	
+S	net/minecraft/core/enums/HumanArmorShape	java/lang/Enum	net/minecraft/core/enums/IArmorShape
+S	net/minecraft/core/enums/PlacementMode	java/lang/Enum	net/minecraft/core/util/helper/ITranslatable
+S	net/minecraft/core/enums/EnumBlockSoundEffectType$4	net/minecraft/core/enums/EnumBlockSoundEffectType	
+S	net/minecraft/core/enums/EnumBlockSoundEffectType	java/lang/Enum	
+S	net/minecraft/core/enums/ArmorHiddenState	java/lang/Enum	
+S	net/minecraft/core/enums/MobCategory	java/lang/Enum	
+S	net/minecraft/core/enums/EnumOS	java/lang/Enum	
+S	net/minecraft/core/enums/LightLayer	java/lang/Enum	
+S	net/minecraft/core/enums/VerticalTextAlignment	java/lang/Enum	
+S	net/minecraft/core/enums/WolfArmorShape	java/lang/Enum	net/minecraft/core/enums/IArmorShape
+S	net/minecraft/core/enums/EnumDropCause	java/lang/Enum	
+S	net/minecraft/core/enums/EnumSleepStatus	java/lang/Enum	
+S	net/minecraft/core/enums/Difficulty	java/lang/Enum	
+S	net/minecraft/core/enums/EnumBlockSoundEffectType$1	net/minecraft/core/enums/EnumBlockSoundEffectType	
+S	net/minecraft/core/enums/EnumBlockSoundEffectType$3	net/minecraft/core/enums/EnumBlockSoundEffectType	
+S	net/minecraft/core/util/helper/JTextAreaWriter	java/io/Writer	
+S	net/minecraft/core/util/helper/Direction	java/lang/Enum	
+S	net/minecraft/core/util/helper/Side	java/lang/Enum	
+S	net/minecraft/core/util/helper/Axis	java/lang/Enum	
+S	net/minecraft/core/util/helper/LoggedPrintStream	java/io/PrintStream	
+S	net/minecraft/core/util/helper/GetSkinUrlThread	java/lang/Thread	
+S	net/minecraft/core/util/helper/NeighborUpdates$Diamond	java/lang/Record	
+S	net/minecraft/core/util/helper/DyeColor	java/lang/Enum	
+S	net/minecraft/core/util/helper/GetMonsterSkinUrlThread	java/lang/Thread	
+S	net/minecraft/core/util/collection/NamespaceID$1	java/lang/Object	net/minecraft/core/util/pool/ObjectPool$PooledObjectFactory
+S	net/minecraft/core/util/collection/NamespaceID	java/lang/Object	java/lang/Comparable,java/lang/CharSequence,net/minecraft/core/util/pool/Poolable
+S	net/minecraft/core/util/Option$None	net/minecraft/core/util/Option	
+S	net/minecraft/core/util/Option$Some	net/minecraft/core/util/Option	
+S	net/minecraft/core/util/phys/AABB	java/lang/Object	net/minecraft/core/util/pool/Poolable
+S	net/minecraft/core/util/phys/Vec3	java/lang/Object	net/minecraft/core/util/pool/Poolable,net/minecraft/core/util/Into
+S	net/minecraft/core/util/phys/HitResult$Tile	net/minecraft/core/util/phys/HitResult	
+S	net/minecraft/core/util/phys/BoundingVolume$Line	java/lang/Enum	
+S	net/minecraft/core/util/phys/HitResult$Clip	net/minecraft/core/util/phys/HitResult	
+S	net/minecraft/core/util/phys/AABB$1	java/lang/Object	net/minecraft/core/util/pool/ObjectPool$PooledObjectFactory
+S	net/minecraft/core/util/phys/Vec3$1	java/lang/Object	net/minecraft/core/util/pool/ObjectPool$PooledObjectFactory
+S	net/minecraft/core/util/phys/HitResult$Entity	net/minecraft/core/util/phys/HitResult	
+S	net/minecraft/core/util/Option$UnwrapError	java/lang/Error	
+S	net/minecraft/core/util/HardIllegalArgumentException	java/lang/Exception	
+S	net/minecraft/core/MinecraftException	java/lang/RuntimeException	
+S	net/minecraft/core/block/BlockLogicAsh	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicCactus	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable
+S	net/minecraft/core/block/BlockLogicLeavesCherry	net/minecraft/core/block/BlockLogicLeavesBase	
+S	net/minecraft/core/block/BlockLogicSpinifex	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicBasket	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicBoneShale	net/minecraft/core/block/BlockLogicFullyRotatable	
+S	net/minecraft/core/block/Block	java/lang/Object	net/minecraft/core/data/tag/ITaggable,net/minecraft/core/item/IItemConvertible,net/minecraft/core/block/BlockInterface
+S	net/minecraft/core/block/logic/RailDirection	java/lang/Enum	
+S	net/minecraft/core/block/BlockLogicMeshGold	net/minecraft/core/block/BlockLogicMesh	net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicGlass	net/minecraft/core/block/BlockLogicTransparent	
+S	net/minecraft/core/block/BlockLogicBedrock	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFireSulfuric	net/minecraft/core/block/BlockLogicFire	
+S	net/minecraft/core/block/BlockLogicMoss	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable
+S	net/minecraft/core/block/BlockLogicSaplingBirch	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicTrapDoorPainted	net/minecraft/core/block/BlockLogicTrapDoor	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicStatue	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicChest	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked	java/lang/Object	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicCobble	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicSoulCatcher	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicTallGrass	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/piston/MovingLine$LineDirection	java/lang/Enum	
+S	net/minecraft/core/block/piston/PistonCommon$MovingType	java/lang/Enum	
+S	net/minecraft/core/block/piston/BlockLogicPistonMoving	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/piston/BlockLogicPistonHead	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/piston/TileEntityMovingPistonBlock	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/block/piston/IMovingBlock
+S	net/minecraft/core/block/piston/BlockLogicPistonBase	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/piston/BlockLogicPistonBase$Movability	java/lang/Enum	
+S	net/minecraft/core/block/BlockLogicBed	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicFireCold	net/minecraft/core/block/BlockLogicFire	
+S	net/minecraft/core/block/BlockLogicSaplingBase	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicBrimstone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicNote$Instrument	java/lang/Record	
+S	net/minecraft/core/block/BlockLogicLayerSnow	net/minecraft/core/block/BlockLogicLayerSupportable	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicOverlayPebbles	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicLeavesBase	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicObsidian	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicPathDirt	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreNetherCoal	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFlower	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicSnow	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicAxisAligned	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicRotatable	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicStairsPaintable	net/minecraft/core/block/BlockLogicStairs	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/block/BlockLogicJar	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency,net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicLayerSlate	net/minecraft/core/block/BlockLogicLayerBase	
+S	net/minecraft/core/block/motion/CarriedBlock	java/lang/Object	net/minecraft/core/world/ICarriable,net/minecraft/core/block/motion/ICarriedBlock
+S	net/minecraft/core/block/BlockLogicConduit	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicFenceThin	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicGlassSteel	net/minecraft/core/block/BlockLogicGlass	
+S	net/minecraft/core/block/BlockLogicFenceWallPaper	net/minecraft/core/block/BlockLogicFenceThin	
+S	net/minecraft/core/block/FluidWater	java/lang/Object	net/minecraft/core/block/Fluid
+S	net/minecraft/core/block/BlockLogicTrommel	net/minecraft/core/block/BlockLogicRotatable	
+S	net/minecraft/core/block/BlockLogicSaplingRetro	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicSaplingPine	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicRailDetector	net/minecraft/core/block/BlockLogicRail	
+S	net/minecraft/core/block/BlockLogicGrowthRubyglass	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicLadder	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable
+S	net/minecraft/core/block/BlockLogicButtonPlanksOak	net/minecraft/core/block/BlockLogicButton	
+S	net/minecraft/core/block/BlockLogicLeavesCacao	net/minecraft/core/block/BlockLogicLeavesBase	net/minecraft/core/item/IBonemealable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicWireRedstone	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicPortal$Bounds	java/lang/Record	
+S	net/minecraft/core/block/BlockLogicSeat	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicRepeater	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicBrazier	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicTransparent	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreGold	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicSugarcane	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable
+S	net/minecraft/core/block/material/MaterialLiquid	net/minecraft/core/block/material/Material	
+S	net/minecraft/core/block/material/MaterialPortal	net/minecraft/core/block/material/Material	
+S	net/minecraft/core/block/material/MaterialGas	net/minecraft/core/block/material/Material	
+S	net/minecraft/core/block/material/MaterialDecoration	net/minecraft/core/block/material/Material	
+S	net/minecraft/core/block/BlockLogicPiePumpkin	net/minecraft/core/block/BlockLogicEdible	
+S	net/minecraft/core/block/BlockLogicPumice	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicMushroom	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicFallingBlock	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicGrass	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicBoulderMagmatic	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicGlowStone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicGravel	net/minecraft/core/block/BlockLogicFallingBlock	
+S	net/minecraft/core/block/BlockLogicBoulderSulfuric	net/minecraft/core/block/BlockLogicBoulderMagmatic	
+S	net/minecraft/core/block/BlockLogicLeavesEucalyptus	net/minecraft/core/block/BlockLogicLeavesBase	
+S	net/minecraft/core/block/BlockLogicSulfur	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreLapis	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicStalk	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable
+S	net/minecraft/core/block/BlockLogicFurnaceBlast	net/minecraft/core/block/BlockLogicRotatable	
+S	net/minecraft/core/block/BlockLogicChestLegacy	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogic	java/lang/Object	net/minecraft/core/block/BlockInterface,net/minecraft/core/item/IItemConvertible
+S	net/minecraft/core/block/BlockLogicFarmland	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicIce	net/minecraft/core/block/BlockLogicTransparent	
+S	net/minecraft/core/block/FluidLava	java/lang/Object	net/minecraft/core/block/Fluid
+S	net/minecraft/core/block/BlockLogicFencePainted	net/minecraft/core/block/BlockLogicFence	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicThermalVent	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/entity/TileEntityMeshGold	net/minecraft/core/block/entity/TileEntityMesh	
+S	net/minecraft/core/block/entity/TileEntityBasket$BasketEntry	java/lang/Record	
+S	net/minecraft/core/block/entity/TileEntitySign	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityChest	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityStatue	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/entity/IArmorWearing,net/minecraft/core/entity/IItemHolding
+S	net/minecraft/core/block/entity/TileEntityThermalVent	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/block/entity/TileEntity$AnimationTicking
+S	net/minecraft/core/block/entity/TileEntityMesh	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntitySensor	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntity	java/lang/Object	net/minecraft/core/world/ICarriable
+S	net/minecraft/core/block/entity/TileEntityMobSpawner	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntitySeat	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/world/IVehicle
+S	net/minecraft/core/block/entity/TileEntityNoteblock	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityFurnaceBlast	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityJarButterfly	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityFlag	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container
+S	net/minecraft/core/block/entity/TileEntityTrommel	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityDispenser	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityTimer	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityJukebox	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityFlowerJar	net/minecraft/core/block/entity/TileEntity	
+S	net/minecraft/core/block/entity/TileEntityFurnace	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityStatue$Pose	java/lang/Enum	
+S	net/minecraft/core/block/entity/TileEntityActivator	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/player/inventory/container/Container,net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/entity/TileEntityBasket	net/minecraft/core/block/entity/TileEntity	net/minecraft/core/world/ICarrySource
+S	net/minecraft/core/block/BlockLogicPumpkinRedstone	net/minecraft/core/block/BlockLogicVeryRotatable	
+S	net/minecraft/core/block/BlockLogicFurnace	net/minecraft/core/block/BlockLogicRotatable	
+S	net/minecraft/core/block/BlockLogicPressurePlate	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicChestPainted	net/minecraft/core/block/BlockLogicChest	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicStone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFluidStill	net/minecraft/core/block/BlockLogicFluid	
+S	net/minecraft/core/block/BlockLogicMagma	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicLanternFirefly	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable
+S	net/minecraft/core/block/BlockLogicSign	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked,net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicFlowerStackable	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicFenceSteel	net/minecraft/core/block/BlockLogicFenceThin	
+S	net/minecraft/core/block/BlockLogicCropsWheat	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicJarButterfly	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicFenceGate	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicMud	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicStairs	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicSaplingShrub	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicStairsPainted	net/minecraft/core/block/BlockLogicStairs	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicCake	net/minecraft/core/block/BlockLogicEdible	
+S	net/minecraft/core/block/BlockLogicFlag	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicButton	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicBonePile	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicDoorPainted	net/minecraft/core/block/BlockLogicDoor	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicLever	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicNodeRubyglass	net/minecraft/core/block/BlockLogicRubyglass	
+S	net/minecraft/core/block/BlockLogicPumpkin	net/minecraft/core/block/BlockLogicVeryRotatable	
+S	net/minecraft/core/block/BlockLogicPlanks	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/block/BlockLogicLayerLeaves	net/minecraft/core/block/BlockLogicLayerSupportable	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicRubyglassCrystal	net/minecraft/core/block/BlockLogicTransparent	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicPortal	net/minecraft/core/block/BlockLogicTransparent	net/minecraft/core/block/IPainted,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicMatcher	net/minecraft/core/block/BlockLogicAxisAligned	
+S	net/minecraft/core/block/BlockLogicWorkbench	net/minecraft/core/block/BlockLogicRotatable	
+S	net/minecraft/core/block/BlockLogicTorch	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable
+S	net/minecraft/core/block/BlockLogicSandstone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicSaplingEucalyptus	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicLayerBase	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicSoulSand	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicTorchRedstone	net/minecraft/core/block/BlockLogicTorch	
+S	net/minecraft/core/block/BlockLogicSaplingCherry	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicBrimthaw	net/minecraft/core/block/BlockLogicMagma	
+S	net/minecraft/core/block/BlockLogicFluidFlowing	net/minecraft/core/block/BlockLogicFluid	
+S	net/minecraft/core/block/BlockLogicRail	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicButtonPainted	net/minecraft/core/block/BlockLogicButtonPlanksOak	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicRedstone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicAir	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicPlanksPainted	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPainted,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicFence	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/block/BlockLogicChest$Type	java/lang/Enum	
+S	net/minecraft/core/block/BlockLogicRubyglass	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreCoal	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicSaplingOak	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicRope	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicLayerSupportable	net/minecraft/core/block/BlockLogicLayerBase	net/minecraft/core/block/support/ISupportable
+S	net/minecraft/core/block/BlockLogicLeavesPine	net/minecraft/core/block/BlockLogicLeavesBase	
+S	net/minecraft/core/block/BlockLogicClay	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicSpikes	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicMobSpawner	net/minecraft/core/block/BlockLogicMobSpawnerDeactivated	net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicFullyRotatable	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicTNT	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicTrapDoor	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicLeavesShrub	net/minecraft/core/block/BlockLogicLeavesBase	
+S	net/minecraft/core/block/BlockLogicAlgae	net/minecraft/core/block/BlockLogic	net/minecraft/core/item/IBonemealable
+S	net/minecraft/core/block/BlockLogicWool	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPainted,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicCropsPumpkin	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicSlab	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicBookshelf	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreRedstone	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicMobSpawnerDeactivated	net/minecraft/core/block/BlockLogicTransparent	
+S	net/minecraft/core/block/BlockLogicSaplingCacao	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicLamp	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicLayerAsh	net/minecraft/core/block/BlockLogicLayerSupportable	
+S	net/minecraft/core/block/BlockLogicEmber	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFluid	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicLeavesCherryFlowering	net/minecraft/core/block/BlockLogicLeavesCherry	net/minecraft/core/item/IBonemealable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicSaplingThorn	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicSaplingPalm	net/minecraft/core/block/BlockLogicSaplingBase	
+S	net/minecraft/core/block/BlockLogicGlassTinted	net/minecraft/core/block/BlockLogicGlass	
+S	net/minecraft/core/block/BlockLogicPressurePlatePainted	net/minecraft/core/block/BlockLogicPressurePlate	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicOreDiamond	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicOreIron	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicDeadBush	net/minecraft/core/block/BlockLogicFlower	
+S	net/minecraft/core/block/BlockLogicSlabPainted	net/minecraft/core/block/BlockLogicSlab	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicJukebox	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency,net/minecraft/core/block/BlockLogic$MatcherEntityEquivalency
+S	net/minecraft/core/block/BlockLogicSlabPaintable	net/minecraft/core/block/BlockLogicSlab	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/block/BlockLogicActivator	net/minecraft/core/block/BlockLogicVeryRotatable	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/support/FullSupport	java/lang/Object	net/minecraft/core/block/support/ISupport
+S	net/minecraft/core/block/support/PartialSupport	java/lang/Object	net/minecraft/core/block/support/ISupport
+S	net/minecraft/core/block/BlockLogicMotionSensor	net/minecraft/core/block/BlockLogicVeryRotatable	
+S	net/minecraft/core/block/BlockLogicSponge	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFire	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicNote	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicSignPainted	net/minecraft/core/block/BlockLogicSign	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/IPainted	java/lang/Object	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/block/BlockLogicFenceChainlink	net/minecraft/core/block/BlockLogicFenceThin	
+S	net/minecraft/core/block/BlockLogicMesh	net/minecraft/core/block/BlockLogicTransparent	
+S	net/minecraft/core/block/BlockLogicVeryRotatable	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicFenceGatePainted	net/minecraft/core/block/BlockLogicFenceGate	net/minecraft/core/block/IPainted
+S	net/minecraft/core/block/BlockLogicTimer	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/support/ISupportable,net/minecraft/core/block/BlockLogic$MatcherDataEquivalency$Masked
+S	net/minecraft/core/block/BlockLogicLeavesOak	net/minecraft/core/block/BlockLogicLeavesBase	
+S	net/minecraft/core/block/BlockLogicCobweb	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/FluidAcid	java/lang/Object	net/minecraft/core/block/Fluid
+S	net/minecraft/core/block/BlockLogicEdible	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/BlockLogic$MatcherDataEquivalency
+S	net/minecraft/core/block/BlockLogicDispenser	net/minecraft/core/block/BlockLogicVeryRotatable	
+S	net/minecraft/core/block/BlockLogicPermaIce	net/minecraft/core/block/BlockLogic	
+S	net/minecraft/core/block/BlockLogicLog	net/minecraft/core/block/BlockLogicAxisAligned	
+S	net/minecraft/core/block/BlockLogicDoor	net/minecraft/core/block/BlockLogic	net/minecraft/core/block/IPaintable
+S	net/minecraft/core/achievement/Achievement	net/minecraft/core/achievement/stat/Stat	
+S	net/minecraft/core/achievement/Achievement$Type	java/lang/Record	
+S	net/minecraft/core/achievement/stat/StatBasic	net/minecraft/core/achievement/stat/Stat	
+S	net/minecraft/core/achievement/stat/SimpleValueFormatter	java/lang/Object	net/minecraft/core/achievement/stat/StatValueFormatter
+S	net/minecraft/core/achievement/stat/StatItem	net/minecraft/core/achievement/stat/Stat	
+S	net/minecraft/core/achievement/stat/DistanceValueFormatter	java/lang/Object	net/minecraft/core/achievement/stat/StatValueFormatter
+S	net/minecraft/core/achievement/stat/StatMob	net/minecraft/core/achievement/stat/Stat	
+S	net/minecraft/core/achievement/stat/TimeValueFormatter	java/lang/Object	net/minecraft/core/achievement/stat/StatValueFormatter
+S	net/minecraft/core/BuildChannel	java/lang/Enum	
+S	net/minecraft/core/world/saveddata/maps/ItemMapSavedData$FlagError	java/lang/Enum	
+S	net/minecraft/core/world/saveddata/maps/ItemMapSavedData	net/minecraft/core/world/saveddata/SavedData	
+S	net/minecraft/core/world/noise/FractalNoise2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/Noise3D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/ImprovedPerlinNoise	java/lang/Object	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/ImprovedPerlinNoise$LegacyNoiseType	java/lang/Enum	
+S	net/minecraft/core/world/noise/FractalNoise3D	net/minecraft/core/world/noise/FractalNoise2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Normalize3D	net/minecraft/core/world/noise/operator/Normalize2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Constant3D	net/minecraft/core/world/noise/operator/Constant2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Rotate2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Warp3D	net/minecraft/core/world/noise/operator/Warp2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Warp2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Normalize2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Constant2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Emboss3D	net/minecraft/core/world/noise/operator/Emboss2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Scale2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Emboss2D	java/lang/Object	net/minecraft/core/world/noise/Noise2D
+S	net/minecraft/core/world/noise/operator/Scale3D	net/minecraft/core/world/noise/operator/Scale2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/operator/Rotate3D	net/minecraft/core/world/noise/operator/Rotate2D	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/SimplexNoise	java/lang/Object	net/minecraft/core/world/noise/Noise2D,net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/noise/WorleyNoise	java/lang/Object	net/minecraft/core/world/noise/Noise3D
+S	net/minecraft/core/world/structure/EditableStructure	java/lang/Object	net/minecraft/core/world/structure/Structure
+S	net/minecraft/core/world/structure/DummyStructure	java/lang/Object	net/minecraft/core/world/structure/Structure
+S	net/minecraft/core/world/structure/SavedStructure	java/lang/Object	net/minecraft/core/world/structure/Structure
+S	net/minecraft/core/world/generate/feature/WorldFeatureFlowers	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeature	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureSoulCatcherPatch	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureAlgae	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeaturePillar	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureMoss	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherSpring	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureClay	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureBoulderGlowstone	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureRubyglassGrowthPatch	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureSugarCane	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeaturePumice	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureRubyglassCrystal	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureLiquid	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureRubyglassCrystalline	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeEucalyptus	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeTaigaBushy	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeNormal	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeStick	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeCone	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeProcedural	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTree	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeProcedural	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTree	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeStick	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTree	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeMangrove	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeRound	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreePalm	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTree	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeRound	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeProcedural	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeRainforest	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeProcedural	
+S	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeBamboo	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeStick	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeFancyRainforest	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeShapeSwamp	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureBoneshaleTree	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureCherryTreeFancy	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeCherry	net/minecraft/core/world/generate/feature/tree/WorldFeatureTree	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeFancy	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeShrub	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeTaigaTall	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeTall	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeCaatinga	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTree	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreePalm	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/tree/WorldFeatureTreeThorn	net/minecraft/core/world/generate/feature/tree/spooner/WorldFeatureSpoonerTreeProcedural	
+S	net/minecraft/core/world/generate/feature/WorldFeatureThermalVent	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatterBoulderSulfuric	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatter	
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatterBonePile	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatter	
+S	net/minecraft/core/world/generate/feature/WorldFeatureBoulderMagma	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureCactus	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureSpinifexPatch	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureFire	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureSponge	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureMudPatch	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureFloorVent	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureOre	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureLake	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureTerrace	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureBoulder	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeaturePebbles	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureSpireVent	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureLabyrinth	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/weatherable/operation/FallOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/HoleOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/MossOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/CollapseOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/SinkOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/BlastOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/CrumbleOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/operation/RotOperation	java/lang/Object	net/minecraft/core/world/generate/feature/weatherable/Operation
+S	net/minecraft/core/world/generate/feature/weatherable/WorldFeatureWeatherable	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureDeadBush	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureRichScorchedDirt	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureGlowstone	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureWallClump	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureGrassPatch	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureSugarCaneTall	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeaturePerlinVein	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatterBoulderMagmatic	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatter	
+S	net/minecraft/core/world/generate/feature/WorldFeatureRoofSpire	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/MethodParametersAnnotation	java/lang/Object	java/lang/annotation/Annotation
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatterEmberAsh	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatter	
+S	net/minecraft/core/world/generate/feature/WorldFeatureNetherScatter	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/WorldFeatureTallGrass	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureMeadow	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeatureDungeon	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeaturePermaice	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/WorldFeaturePumpkin	net/minecraft/core/world/generate/feature/WorldFeature	
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeonBase	java/lang/Record	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeon$Netherrack	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeon$Basalt	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeon$Slate	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeon$Gloomstone	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/feature/hanging/WorldFeatureHangingDungeon$RandomType	java/lang/Object	net/minecraft/core/world/generate/feature/WorldFeatureInterface
+S	net/minecraft/core/world/generate/IceFloeLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/generate/voxelizer/ConvexShapeVoxelizer	java/lang/Object	net/minecraft/core/world/generate/voxelizer/Voxelizer
+S	net/minecraft/core/world/generate/RubyglassFloeLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/generate/LavaFloeLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/ChunkGeneratorOverworld	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/hell/ChunkGeneratorOverworldHell	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/hell/ChunkDecoratorOverworldHell	net/minecraft/core/world/generate/chunk/ChunkFeatureDecorator	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/ChunkDecoratorOverworld	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/woods/ChunkGeneratorOverworldWoods	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/woods/ChunkDecoratorOverworldWoods	net/minecraft/core/world/generate/chunk/perlin/overworld/ChunkDecoratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/TerrainGeneratorOverworld	net/minecraft/core/world/generate/chunk/perlin/TerrainGeneratorLerp	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/SurfaceGeneratorOverworld	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/SurfaceGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/DensityGeneratorOverworld	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/DensityGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/b173/DensityGeneratorOverworldB173	net/minecraft/core/world/generate/chunk/perlin/overworld/DensityGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/b173/ChunkGeneratorOverworldB173	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/b173/SurfaceGeneratorOverworldB173	net/minecraft/core/world/generate/chunk/perlin/overworld/SurfaceGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/b173/TerrainGeneratorOverworldB173	net/minecraft/core/world/generate/chunk/perlin/overworld/TerrainGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/b173/ChunkDecoratorOverworldB173	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/floating/ChunkGeneratorOverworldFloating	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/retro/ChunkGeneratorOverworldRetro	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/retro/TerrainGeneratorOverworldRetro	net/minecraft/core/world/generate/chunk/perlin/overworld/TerrainGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/retro/ChunkDecoratorOverworldRetro	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/retro/SurfaceGeneratorOverworldRetro	net/minecraft/core/world/generate/chunk/perlin/overworld/SurfaceGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/overworld/retro/DensityGeneratorOverworldRetro	net/minecraft/core/world/generate/chunk/perlin/overworld/DensityGeneratorOverworld	
+S	net/minecraft/core/world/generate/chunk/perlin/TerrainGeneratorLerp	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/TerrainGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/drift/DensityGeneratorDrift	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/DensityGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/drift/ChunkGeneratorDrift	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/drift/TerrainGeneratorDrift	net/minecraft/core/world/generate/chunk/perlin/TerrainGeneratorLerp	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/ChunkGeneratorNether	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/TerrainGeneratorNether	net/minecraft/core/world/generate/chunk/perlin/TerrainGeneratorLerp	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/SurfaceGeneratorNether	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/SurfaceGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/nether/ChunkDecoratorNether	net/minecraft/core/world/generate/chunk/ChunkFeatureDecorator	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/NetherCavesLargeFeatureB173	net/minecraft/core/world/generate/RetroCavesLargeFeature	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/DensityGeneratorNetherB173	net/minecraft/core/world/generate/chunk/perlin/nether/DensityGeneratorNether	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/TerrainGeneratorNetherB173	net/minecraft/core/world/generate/chunk/perlin/TerrainGeneratorLerp	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/ChunkDecoratorNetherB173	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/ChunkGeneratorNetherB173	net/minecraft/core/world/generate/chunk/perlin/ChunkGeneratorPerlin	
+S	net/minecraft/core/world/generate/chunk/perlin/nether/b173/SurfaceGeneratorNetherB173	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/SurfaceGenerator
+S	net/minecraft/core/world/generate/chunk/perlin/nether/DensityGeneratorNether	java/lang/Object	net/minecraft/core/world/generate/chunk/perlin/DensityGenerator
+S	net/minecraft/core/world/generate/chunk/flat/ChunkDecoratorFlat	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/flat/ChunkGeneratorFlat	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/debug/ChunkDecoratorDebug	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/debug/ChunkGeneratorDebug	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/PositionSelectors$HeightRangeUniform	java/lang/Object	net/minecraft/core/world/generate/chunk/PositionSelector
+S	net/minecraft/core/world/generate/chunk/empty/ChunkGeneratorEmpty	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/empty/ChunkDecoratorEmpty	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/classic/ChunkGeneratorClassic	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/PlacementMethod$TriesPerChunk	java/lang/Object	net/minecraft/core/world/generate/chunk/PlacementMethod
+S	net/minecraft/core/world/generate/chunk/PlacementMethod$ChanceToPlace	java/lang/Object	net/minecraft/core/world/generate/chunk/PlacementMethod
+S	net/minecraft/core/world/generate/chunk/indev/IndevWorldType	java/lang/Enum	
+S	net/minecraft/core/world/generate/chunk/indev/ChunkGeneratorIndev	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/indev/IndevWorldTheme	java/lang/Enum	
+S	net/minecraft/core/world/generate/chunk/ChunkDecorationBuilder	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecoration
+S	net/minecraft/core/world/generate/chunk/ChunkFeatureDecorator	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/skyblock/ChunkDecoratorSkyblock	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/skyblock/ChunkDecoratorSkyblockNether	java/lang/Object	net/minecraft/core/world/generate/chunk/ChunkDecorator
+S	net/minecraft/core/world/generate/chunk/skyblock/ChunkGeneratorSkyblockNether	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/chunk/skyblock/ChunkGeneratorSkyblock	net/minecraft/core/world/generate/chunk/ChunkGenerator	
+S	net/minecraft/core/world/generate/ShelfLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/generate/RetroCavesLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/generate/CavesLargeFeature	net/minecraft/core/world/generate/LargeFeature	
+S	net/minecraft/core/world/pos/ChunkPos	java/lang/Object	java/io/Externalizable,java/lang/Cloneable,net/minecraft/core/world/pos/ChunkPosc
+S	net/minecraft/core/world/pos/ChunkSectionTilePos	java/lang/Object	java/io/Externalizable,java/lang/Cloneable,net/minecraft/core/world/pos/ChunkSectionTilePosc
+S	net/minecraft/core/world/pos/TilePos	java/lang/Object	java/io/Externalizable,java/lang/Cloneable,net/minecraft/core/world/pos/TilePosc
+S	net/minecraft/core/world/pos/ChunkTilePos	java/lang/Object	java/io/Externalizable,java/lang/Cloneable,net/minecraft/core/world/pos/ChunkTilePosc
+S	net/minecraft/core/world/config/season/SeasonConfigSingle	net/minecraft/core/world/config/season/SeasonConfig	
+S	net/minecraft/core/world/config/season/SeasonConfigCycle	net/minecraft/core/world/config/season/SeasonConfig	
+S	net/minecraft/core/world/config/season/SeasonConfigBuilder$Type	java/lang/Enum	
+S	net/minecraft/core/world/settings/ContainerSettingNode	java/lang/Object	net/minecraft/core/world/settings/SettingNode
+S	net/minecraft/core/world/settings/ListValueSettingNode	java/lang/Object	net/minecraft/core/world/settings/ValueSettingNode
+S	net/minecraft/core/world/settings/WorldConfiguration	java/lang/Object	net/minecraft/core/world/save/WorldConfigurationReader
+S	net/minecraft/core/world/settings/SettingNodeChildrenProvider	java/lang/Object	java/lang/Iterable
+S	net/minecraft/core/world/settings/NamedSettingNode	java/lang/Object	net/minecraft/core/world/settings/SettingNode
+S	net/minecraft/core/world/settings/ListSettingNodeChildrenProvider	java/lang/Object	net/minecraft/core/world/settings/SettingNodeChildrenProvider
+S	net/minecraft/core/world/settings/GenericSettingNode	java/lang/Object	net/minecraft/core/world/settings/KeyedSettingNode
+S	net/minecraft/core/world/settings/impl/EnumSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/ListValueSettingNode
+S	net/minecraft/core/world/settings/impl/PercentageSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/RangeValueSettingNode
+S	net/minecraft/core/world/settings/impl/RangeIntegerSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/RangeValueSettingNode
+S	net/minecraft/core/world/settings/impl/WorldHeightSettingNode$ValueType	java/lang/Enum	
+S	net/minecraft/core/world/settings/impl/SeasonSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/ListValueSettingNode
+S	net/minecraft/core/world/settings/impl/BooleanSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	
+S	net/minecraft/core/world/settings/impl/BiomeSettingNode	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/ListValueSettingNode
+S	net/minecraft/core/world/settings/impl/WorldHeightSettingNode	net/minecraft/core/world/settings/impl/RangeIntegerSettingNode	
+S	net/minecraft/core/world/settings/RangeValueSettingNode	java/lang/Object	net/minecraft/core/world/settings/ValueSettingNode
+S	net/minecraft/core/world/settings/ValueSettingNode	java/lang/Object	net/minecraft/core/world/settings/SettingNode,net/minecraft/core/world/settings/NamedSettingNode,net/minecraft/core/world/settings/KeyedSettingNode
+S	net/minecraft/core/world/settings/ValueGenericSettingNode	net/minecraft/core/world/settings/GenericSettingNode	net/minecraft/core/world/settings/ValueSettingNode
+S	net/minecraft/core/world/settings/KeyedSettingNode	java/lang/Object	net/minecraft/core/world/settings/SettingNode
+S	net/minecraft/core/world/save/SaveFormatBase	java/lang/Object	net/minecraft/core/world/save/ISaveFormat
+S	net/minecraft/core/world/save/legacy/SaveFormatLegacy	net/minecraft/core/world/save/SaveFormatBase	
+S	net/minecraft/core/world/save/legacy/ChunkFile	java/lang/Object	java/lang/Comparable
+S	net/minecraft/core/world/save/legacy/ChunkFilePattern	java/lang/Object	java/io/FilenameFilter
+S	net/minecraft/core/world/save/legacy/ChunkFolderPattern	java/lang/Object	java/io/FileFilter
+S	net/minecraft/core/world/save/SaveFile	java/lang/Object	java/lang/Comparable
+S	net/minecraft/core/world/save/LevelStorageCore	net/minecraft/core/world/save/LevelStorageBase	
+S	net/minecraft/core/world/save/LevelStorage	java/lang/Object	net/minecraft/core/world/save/PlayerIO
+S	net/minecraft/core/world/save/conversion/ChunkConverter$MappingComplex	net/minecraft/core/world/save/conversion/ChunkConverter$MappingBase	
+S	net/minecraft/core/world/save/conversion/SaveConverter19134To19135	net/minecraft/core/world/save/conversion/SaveConverterMCRegionBase	
+S	net/minecraft/core/world/save/conversion/SaveConverter19133To19134	net/minecraft/core/world/save/conversion/SaveConverterMCRegionBase	
+S	net/minecraft/core/world/save/conversion/SaveConverter19132To19133	net/minecraft/core/world/save/conversion/SaveConverterMCRegionBase	
+S	net/minecraft/core/world/save/conversion/ChunkConverter$MappingMetaToId	net/minecraft/core/world/save/conversion/ChunkConverter$MappingBase	
+S	net/minecraft/core/world/save/conversion/ChunkConverter$MappingSimple	net/minecraft/core/world/save/conversion/ChunkConverter$MappingBase	
+S	net/minecraft/core/world/save/conversion/SaveConverterMCRegionBase	java/lang/Object	net/minecraft/core/world/save/ISaveConverter
+S	net/minecraft/core/world/save/conversion/ChunkConverter$MappingLeavesMetaToId	net/minecraft/core/world/save/conversion/ChunkConverter$MappingBase	
+S	net/minecraft/core/world/save/conversion/SaveConverterLegacyTo19132	java/lang/Object	net/minecraft/core/world/save/ISaveConverter
+S	net/minecraft/core/world/save/LevelStorageDummy	java/lang/Object	net/minecraft/core/world/save/LevelStorage
+S	net/minecraft/core/world/save/mcregion/SaveFormat19133	net/minecraft/core/world/save/SaveFormatBase	
+S	net/minecraft/core/world/save/mcregion/RegionFileChunkBuffer	java/io/ByteArrayOutputStream	
+S	net/minecraft/core/world/save/mcregion/SaveFormat19132	net/minecraft/core/world/save/SaveFormatBase	
+S	net/minecraft/core/world/save/mcregion/SaveFormat19134	net/minecraft/core/world/save/SaveFormatBase	
+S	net/minecraft/core/world/save/mcregion/SaveFormat19135	net/minecraft/core/world/save/SaveFormatBase	
+S	net/minecraft/core/world/save/LevelStorageServer	net/minecraft/core/world/save/LevelStorageBase	net/minecraft/core/world/save/PlayerIO
+S	net/minecraft/core/world/save/LevelStorageBase	java/lang/Object	net/minecraft/core/world/save/LevelStorage
+S	net/minecraft/core/world/BlocksContainer	java/lang/Object	net/minecraft/core/world/MutableWorldSource
+S	net/minecraft/core/world/season/SeasonSummer	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonDriftGold	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonWinter	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonManagerCycle	net/minecraft/core/world/season/SeasonManager	
+S	net/minecraft/core/world/season/SeasonSpring	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonDriftSilver	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonNull	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonFall	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonOverworldHell	net/minecraft/core/world/season/Season	
+S	net/minecraft/core/world/season/SeasonManagerSingle	net/minecraft/core/world/season/SeasonManager	
+S	net/minecraft/core/world/chunk/ChunkCache	java/lang/Object	net/minecraft/core/world/WorldSource
+S	net/minecraft/core/world/chunk/ChunkLoaderLegacy	java/lang/Object	net/minecraft/core/world/chunk/ChunkLoader
+S	net/minecraft/core/world/chunk/ChunkLoaderRegion	java/lang/Object	net/minecraft/core/world/chunk/ChunkLoader
+S	net/minecraft/core/world/chunk/DisplayChunk	net/minecraft/core/world/chunk/EmptyChunk	
+S	net/minecraft/core/world/chunk/ChunkLoaderRegionAsync$ChunkSaveThread	java/lang/Thread	
+S	net/minecraft/core/world/chunk/ChunkCoordinates	java/lang/Object	java/lang/Comparable
+S	net/minecraft/core/world/chunk/ChunkLoaderRegionAsync	java/lang/Object	net/minecraft/core/world/chunk/ChunkLoader
+S	net/minecraft/core/world/chunk/provider/ChunkProviderThreaded	java/lang/Object	net/minecraft/core/world/chunk/provider/ChunkProvider
+S	net/minecraft/core/world/chunk/provider/ChunkProviderThreaded$ChunkGenThread	java/lang/Thread	
+S	net/minecraft/core/world/chunk/EmptyChunk	net/minecraft/core/world/chunk/Chunk	
+S	net/minecraft/core/world/chunk/reader/ChunkReaderVersion3	net/minecraft/core/world/chunk/reader/ChunkReader	
+S	net/minecraft/core/world/chunk/reader/ChunkReaderLegacy	net/minecraft/core/world/chunk/reader/ChunkReader	
+S	net/minecraft/core/world/chunk/reader/ChunkReaderVersion2	net/minecraft/core/world/chunk/reader/ChunkReader	
+S	net/minecraft/core/world/chunk/reader/ChunkReaderVersion1	net/minecraft/core/world/chunk/reader/ChunkReader	
+S	net/minecraft/core/world/type/WorldTypeDebug	net/minecraft/core/world/type/WorldType	
+S	net/minecraft/core/world/type/WorldTypeEmpty	net/minecraft/core/world/type/WorldType	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldWoods	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldClassic	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldFloating	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldInland	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldB173	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldRetro	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldParadise	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldIndev	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeFlat	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworld	net/minecraft/core/world/type/WorldType	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldHell	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/overworld/WorldTypeOverworldSkyblock	net/minecraft/core/world/type/overworld/WorldTypeOverworld	
+S	net/minecraft/core/world/type/drift/WorldTypeDrift	net/minecraft/core/world/type/WorldType	
+S	net/minecraft/core/world/type/WorldType	java/lang/Object	net/minecraft/core/data/tag/ITaggable
+S	net/minecraft/core/world/type/nether/WorldTypeNether	net/minecraft/core/world/type/WorldType	
+S	net/minecraft/core/world/type/nether/WorldTypeNetherB173	net/minecraft/core/world/type/nether/WorldTypeNether	
+S	net/minecraft/core/world/type/nether/WorldTypeNetherSkyblock	net/minecraft/core/world/type/nether/WorldTypeNether	
+S	net/minecraft/core/world/weather/WeatherRain	net/minecraft/core/world/weather/Weather	net/minecraft/core/world/weather/IPrecipitation
+S	net/minecraft/core/world/weather/WeatherStorm	net/minecraft/core/world/weather/WeatherRain	
+S	net/minecraft/core/world/weather/WeatherRainBlood	net/minecraft/core/world/weather/WeatherStorm	
+S	net/minecraft/core/world/weather/WeatherClear	net/minecraft/core/world/weather/Weather	
+S	net/minecraft/core/world/weather/IPrecipitation$Type	java/lang/Enum	
+S	net/minecraft/core/world/weather/WeatherSnow	net/minecraft/core/world/weather/Weather	net/minecraft/core/world/weather/IPrecipitation
+S	net/minecraft/core/world/ExplosionCannonball	net/minecraft/core/world/Explosion	
+S	net/minecraft/core/world/wind/WindProviderGeneric	net/minecraft/core/world/wind/WindProvider	
+S	net/minecraft/core/world/LevelDimensionDataWrapper	java/lang/Object	net/minecraft/core/world/save/WorldConfigurationReader
+S	net/minecraft/core/world/MutableWorldSource	java/lang/Object	net/minecraft/core/world/WorldSource
+S	net/minecraft/core/world/biome/overworld/BiomeOutback	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/legacy/BiomeDesertLegacy	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/legacy/BiomeForestLegacy	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/legacy/BiomeSwampLegacy	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/legacy/BiomeRainforestLegacy	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/legacy/BiomeTaigaLegacy	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomePlains	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeCaatinga	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeBirchForest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeDesert	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeForest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeShrubland	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeRainforest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeSwamp	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeRetro	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeTaiga	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeSeasonalForest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/overworld/BiomeBorealForest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/Biome	java/lang/Object	net/minecraft/core/data/tag/ITaggable
+S	net/minecraft/core/world/biome/drift/BiomeDrift	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/provider/BiomeProviderNether	net/minecraft/core/world/biome/provider/BiomeProvider	
+S	net/minecraft/core/world/biome/provider/BiomeProviderOverworld	net/minecraft/core/world/biome/provider/BiomeProvider	
+S	net/minecraft/core/world/biome/provider/BiomeProviderSingleBiome	net/minecraft/core/world/biome/provider/BiomeProvider	
+S	net/minecraft/core/world/biome/provider/BiomeProviderB173	net/minecraft/core/world/biome/provider/BiomeProvider	
+S	net/minecraft/core/world/biome/provider/BiomeProviderNetherB173	net/minecraft/core/world/biome/provider/BiomeProvider	
+S	net/minecraft/core/world/biome/nether/BiomeSulfurPools	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/nether/BiomeCrystalForest	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/nether/BiomeNether	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/biome/nether/BiomeVolcanoIslands	net/minecraft/core/world/biome/Biome	
+S	net/minecraft/core/world/World	java/lang/Object	net/minecraft/core/world/MutableWorldSource
+S	net/minecraft/core/world/lighting/LightingEngineLegacy	java/lang/Object	net/minecraft/core/world/lighting/LightingEngine

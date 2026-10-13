@@ -939,6 +939,7 @@ F	net/minecraft/class_189	field_664	field_664	SIN_TABLE
 F	net/minecraft/class_191	field_666	field_666	title
 F	net/minecraft/class_191	field_669	field_669	offsetX
 F	net/minecraft/class_191	field_670	field_670	offsetY
+F	net/minecraft/class_191	field_677	field_677	Plant
 F	net/minecraft/class_191	field_695	field_695	Skeleton
 F	net/minecraft/class_197	field_716	field_716	rand
 F	net/minecraft/class_201	field_741	field_741	windowId
@@ -1277,6 +1278,8 @@ F	net/minecraft/class_428	field_1689	field_1689	STONE
 F	net/minecraft/class_428	field_1690	field_1690	IRON
 F	net/minecraft/class_428	field_1691	field_1691	EMERALD
 F	net/minecraft/class_428	field_1692	field_1692	GOLD
+F	net/minecraft/class_428	field_1695	field_1695	efficiencyOnProperMaterial
+F	net/minecraft/class_428	field_1696	field_1696	damageVsEntity
 F	net/minecraft/class_444	field_1699	field_1699	note
 F	net/minecraft/class_447	field_1704	field_1704	description
 F	net/minecraft/class_447	field_1705	field_1705	exception
@@ -1614,6 +1617,8 @@ F	net/minecraft/class_104	field_2681	field_2681	delay
 F	net/minecraft/class_104	field_2682	field_2682	yaw
 F	net/minecraft/class_61	field_2691	field_2691	points
 F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
+F	net/minecraft/class_632	field_2713	field_2713	efficiencyOnProperMaterial
+F	net/minecraft/class_632	field_2714	field_2714	damageVsEntity
 F	net/minecraft/class_71	field_2734	field_2734	slots
 F	net/minecraft/class_71	field_2735	field_2735	windowId
 F	net/minecraft/class_259	field_2739	field_2739	grassColor
@@ -1786,6 +1791,7 @@ M	net/minecraft/class_58	method_545	(Lnet/minecraft/class_8;)V	method_545	readFr
 M	net/minecraft/class_58	method_546	(Z)V	method_546	setDirty
 M	net/minecraft/class_58	method_547	()Z	method_547	isDirty
 M	net/minecraft/class_58	method_548	(Lnet/minecraft/class_8;)V	method_548	writeToNBT
+M	net/minecraft/class_187	method_626	()Ljava/lang/String;	method_626	getKey
 M	net/minecraft/class_188	method_633	()Z	method_633	hasPath
 M	net/minecraft/class_188	method_636	(Lnet/minecraft/class_57;)V	method_636	setTarget
 M	net/minecraft/class_188	method_637	(Lnet/minecraft/class_57;F)V	method_637	attackEntity
@@ -2031,6 +2037,7 @@ M	net/minecraft/class_17	method_1560	(Lnet/minecraft/class_18;IIILnet/minecraft/
 M	net/minecraft/class_17	method_1565	()I	method_1565	tickRate
 M	net/minecraft/class_17	method_1566	(Lnet/minecraft/class_18;III)Z	method_1566	canBlockStay
 M	net/minecraft/class_17	method_1567	(Lnet/minecraft/class_18;III)Z	method_1567	canPlaceBlockAt
+M	net/minecraft/class_17	method_1571	(IZ)Z	method_1571	canCollideCheck
 M	net/minecraft/class_17	method_1574	()I	method_1574	getMobilityFlag
 M	net/minecraft/class_17	method_1576	()Z	method_1576	isCollidable
 M	net/minecraft/class_17	method_1577	(F)Lnet/minecraft/class_17;	method_1577	setLightValue
@@ -2042,6 +2049,7 @@ M	net/minecraft/class_17	method_1585	(F)Lnet/minecraft/class_17;	method_1585	set
 M	net/minecraft/class_17	method_1587	(F)Lnet/minecraft/class_17;	method_1587	setHardness
 M	net/minecraft/class_17	method_1589	(I)I	method_1589	getRenderColor
 M	net/minecraft/class_17	method_1590	(I)Lnet/minecraft/class_17;	method_1590	setLightOpacity
+M	net/minecraft/class_17	method_1593	()V	method_1593	initializeBlock
 M	net/minecraft/class_17	method_1594	()Lnet/minecraft/class_17;	method_1594	setBlockUnbreakable
 M	net/minecraft/class_17	method_1595	()F	method_1595	getHardness
 M	net/minecraft/class_17	method_1596	()Ljava/lang/String;	method_1596	translateBlockName

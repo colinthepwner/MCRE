@@ -1705,7 +1705,6 @@ F	acu	w	field_76824_w	cactusGen
 F	acu	x	field_76834_x	waterlilyGen
 F	acu	y	field_76833_y	waterlilyPerChunk
 F	acu	z	field_76832_z	treesPerChunk
-F	acy	d	field_76947_d	biomeGenerator
 F	acy	e	field_76948_e	hellTemperature
 F	acy	f	field_76946_f	rainfall
 F	adp	a	field_76585_a	data
@@ -2520,6 +2519,7 @@ F	nu	b	field_75611_b	primaryColor
 F	nu	c	field_75612_c	secondaryColor
 F	of	aN	field_70761_aq	renderYawOffset
 F	of	aP	field_70759_as	rotationYawHead
+F	of	aU	field_70729_aU	dead
 F	of	aV	field_70708_bq	entityAge
 F	of	ay	field_70737_aN	hurtTime
 F	of	bf	field_70701_bs	moveForward
@@ -2569,6 +2569,7 @@ F	r	c	field_82373_c	directions
 F	r	d	field_71582_c	directionToFacing
 F	r	e	field_71579_d	facingToDirection
 F	r	f	field_71580_e	rotateOpposite
+F	r	g	field_71577_f	rotateRight
 F	r	h	field_71578_g	rotateLeft
 F	r	i	field_71584_h	bedDirection
 F	rf	b	field_75513_b	worldObj
@@ -2666,7 +2667,9 @@ F	ww	j	field_78037_j	tabCombat
 F	ww	k	field_78038_k	tabBrewing
 F	ww	l	field_78035_l	tabMaterials
 F	ww	m	field_78036_m	tabInventory
+F	xj	a	field_77864_a	efficiencyOnProperMaterial
 F	xj	b	field_77862_b	toolMaterial
+F	xj	d	field_77865_bY	damageVsEntity
 F	xl	c	field_77859_b	dyeColors
 F	xx	b	field_77853_b	healAmount
 F	xx	c	field_77854_c	saturationModifier
@@ -2807,7 +2810,6 @@ F	yc	c	field_77700_c	containerItem
 F	yc	cB	field_77774_bZ	unlocalizedName
 F	yc	ca	field_94584_bZ	netherrackBrick
 F	yc	cb	field_94583_ca	netherQuartz
-F	yc	cc	field_94582_cb	tntMinecart
 F	yc	cd	field_96600_cc	minecartHopper
 F	yc	ce	field_111215_ce	horseArmorIron
 F	yc	cf	field_111216_cf	horseArmorGold
@@ -2857,6 +2859,8 @@ F	yd	b	STONE	STONE
 F	yd	c	IRON	IRON
 F	yd	d	EMERALD	EMERALD
 F	yd	e	GOLD	GOLD
+F	yd	h	field_78010_h	efficiencyOnProperMaterial
+F	yd	i	field_78011_i	damageVsEntity
 F	yd	j	field_78008_j	enchantability
 F	ye	b	field_77994_a	stackSize
 F	ye	d	field_77993_c	itemID
@@ -2923,9 +2927,7 @@ M	abw	a	(IIILasp;)V	func_72837_a	setBlockTileEntity
 M	abw	a	(IIIZ)Z	func_94578_a	destroyBlock
 M	abw	a	(Lasx;Lakc;)Z	func_72875_a	isMaterialInBB
 M	abw	a	(Lasx;Lakc;Lnn;)Z	func_72918_a	handleMaterialAcceleration
-M	abw	a	(Latc;Latc;)Lata;	func_72933_a	rayTraceBlocks
-M	abw	a	(Latc;Latc;Z)Lata;	func_72901_a	rayTraceBlocks
-M	abw	a	(Latc;Latc;ZZ)Lata;	func_72831_a	rayTraceBlocks
+M	abw	a	(Latc;Latc;ZZ)Lata;	func_72831_a	rayTraceBlocks_do_do
 M	abw	a	(Ljava/lang/Class;Lasx;)Ljava/util/List;	func_72872_a	getEntitiesWithinAABB
 M	abw	a	(Ljava/lang/Class;Lasx;Lnw;)Ljava/util/List;	func_82733_a	selectEntitiesWithinAABB
 M	abw	a	(Ljava/lang/String;)Luf;	func_72924_a	getPlayerEntityByName
@@ -2938,7 +2940,7 @@ M	abw	a	(Luf;IIIII)V	func_72889_a	playAuxSFXAtEntity
 M	abw	b	()V	func_72835_b	tick
 M	abw	b	(DDDD)Luf;	func_72846_b	getClosestVulnerablePlayer
 M	abw	b	(IIII)Z	func_72873_a	doChunksNearChunkExist
-M	abw	b	(IIIII)Z	func_72921_c	setBlockMetadata
+M	abw	b	(IIIII)Z	func_72921_c	setBlockMetadataWithNotify
 M	abw	b	(J)V	func_72877_b	setWorldTime
 M	abw	b	(Lasx;Lakc;)Z	func_72830_b	isAABBInMaterial
 M	abw	b	(Ljava/lang/String;)I	func_72841_b	getUniqueDataId
@@ -3125,6 +3127,7 @@ M	akc	a	()Z	func_76220_a	isSolid
 M	akc	d	()Z	func_76224_d	isLiquid
 M	akc	f	()Lakc;	func_76221_f	setRequiresTool
 M	akc	h	()Z	func_76217_h	getCanBurn
+M	akc	j	()Z	func_76222_j	isReplaceable
 M	akc	k	()Z	func_76218_k	isOpaque
 M	akc	l	()Z	func_76229_l	isToolNotRequired
 M	ako	a	()V	func_76446_a	resetIntCache
@@ -3150,7 +3153,6 @@ M	als	d	()I	func_76075_d	getSpawnY
 M	als	e	()I	func_76074_e	getSpawnZ
 M	als	f	()J	func_82573_f	getWorldTotalTime
 M	als	g	()J	func_76073_f	getWorldTime
-M	als	j	()I	func_76076_i	getDimension
 M	als	k	()Ljava/lang/String;	func_76065_j	getWorldName
 M	als	n	()Z	func_76061_m	isThundering
 M	als	p	()Z	func_76059_o	isRaining
@@ -3209,6 +3211,7 @@ M	aqz	a	(II)Lms;	func_71858_a	getIcon
 M	aqz	a	(ILjava/util/Random;)I	func_71910_a	quantityDroppedWithBonus
 M	aqz	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	aqz	a	(ILww;Ljava/util/List;)V	func_71879_a	getSubBlocks
+M	aqz	a	(IZ)Z	func_71913_a	canCollideCheck
 M	aqz	a	(Labw;)I	func_71859_p_	tickRate
 M	aqz	a	(Labw;III)V	func_71861_g	onBlockAdded
 M	aqz	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
@@ -3252,6 +3255,7 @@ M	aqz	m	(I)Lms;	func_71851_a	getBlockTextureFromSide
 M	aqz	n	()I	func_71856_s_	getRenderBlockPass
 M	aqz	o	()I	func_71933_m	getBlockColor
 M	aqz	r	()Laqz;	func_71875_q	setBlockUnbreakable
+M	aqz	s_	()V	func_71928_r_	initializeBlock
 M	aqz	t	()Z	func_71887_s	hasTileEntity
 M	ard	a	()Ljava/lang/String;	func_72676_a	getBreakSound
 M	ard	c	()F	func_72677_b	getVolume
@@ -3351,6 +3355,7 @@ M	atv	B	()Z	func_71356_B	isSingleplayer
 M	atv	J	()Lbim;	func_110434_K	getTextureManager
 M	atv	O	()V	func_71384_a	startGame
 M	atv	a	(Lawe;)V	func_71373_a	displayGuiScreen
+M	atv	d	()V	func_99999_d	run
 M	atv	k	()V	func_71407_l	runTick
 M	atv	w	()Latv;	func_71410_x	getMinecraft
 M	aul	a	()V	func_74300_a	loadOptions
@@ -3875,6 +3880,7 @@ M	hn	a	(Ley;I)V	func_72396_a	sendPacketToAllPlayersInDimension
 M	hn	a	(Ljv;I)V	func_72356_a	transferPlayerToDimension
 M	hn	d	()[Ljava/lang/String;	func_72369_d	getAllUsernames
 M	hn	e	(Ljava/lang/String;)Z	func_72353_e	isPlayerOpped
+M	hn	f	(Ljava/lang/String;)Ljv;	func_72361_f	getPlayerForUsername
 M	hn	i	()Ljava/util/Set;	func_72376_i	getOps
 M	hn	k	()I	func_72394_k	getCurrentPlayerCount
 M	hn	l	()I	func_72352_l	getMaxPlayers
@@ -3891,6 +3897,7 @@ M	jv	a	(Lmo;)V	func_71007_a	displayGUIChest
 M	jv	a	(Lnb;F)Z	func_70097_a	attackEntityFrom
 M	jv	a	(Luy;II)V	func_71112_a	sendProgressBarUpdate
 M	jv	a	(Luy;ILye;)V	func_71111_a	sendSlotContents
+M	jv	a	(Luy;Ljava/util/List;)V	func_71110_a	sendContainerAndContentsToPlayer
 M	jv	b	(I)V	func_71027_c	travelToDimension
 M	jv	b	(Lby;)V	func_70014_b	writeEntityToNBT
 M	jv	f	()F	func_70047_e	getEyeHeight
@@ -4014,6 +4021,7 @@ M	net/minecraft/server/MinecraftServer	g	()Z	func_71225_e	canStructuresSpawn
 M	net/minecraft/server/MinecraftServer	h	()Lace;	func_71265_f	getGameType
 M	net/minecraft/server/MinecraftServer	h	(Ljava/lang/String;)V	func_71201_j	logSevere
 M	net/minecraft/server/MinecraftServer	i	()I	func_71232_g	getDifficulty
+M	net/minecraft/server/MinecraftServer	run	()V	run	run
 M	net/minecraft/server/MinecraftServer	s	()V	func_71217_p	tick
 M	net/minecraft/server/MinecraftServer	z	()Ljava/lang/String;	func_71249_w	getMinecraftVersion
 M	ni	a	()Ljava/lang/String;	func_76393_a	getName
@@ -4059,6 +4067,7 @@ M	nn	a	(Ljava/lang/String;FF)V	func_85030_a	playSound
 M	nn	a	(Lnb;F)Z	func_70097_a	attackEntityFrom
 M	nn	a	(Lye;F)Lss;	func_70099_a	entityDropItem
 M	nn	aa	()Latc;	func_70040_Z	getLookVec
+M	nn	ae	()[Lye;	func_70035_c	getLastActiveItems
 M	nn	af	()Z	func_70027_ad	isBurning
 M	nn	ah	()Z	func_70093_af	isSneaking
 M	nn	aj	()Z	func_82150_aj	isInvisible
@@ -4123,6 +4132,7 @@ M	of	aX	()Lov;	func_110140_aT	getAttributeMap
 M	of	aY	()Loj;	func_70668_bt	getCreatureAttribute
 M	of	aZ	()Lye;	func_70694_bm	getHeldItem
 M	of	aa	()Latc;	func_70040_Z	getLookVec
+M	of	ae	()[Lye;	func_70035_c	getLastActiveItems
 M	of	az	()V	func_110147_ax	applyEntityAttributes
 M	of	b	(Lby;)V	func_70014_b	writeEntityToNBT
 M	of	b	(Lni;)Lnj;	func_70660_b	getActivePotionEffect
@@ -4153,6 +4163,7 @@ M	of	l	(I)V	func_70600_l	dropRareDrop
 M	of	l_	()V	func_70071_h_	onUpdate
 M	of	m	(F)V	func_110149_m	setAbsorptionAmount
 M	of	m	(Lnn;)Z	func_70652_k	attackEntityAsMob
+M	of	n	(I)Lye;	func_71124_b	getCurrentItemOrArmor
 M	of	o	(Lnn;)Z	func_70685_l	canEntityBeSeen
 M	of	y	()V	func_70030_z	onEntityUpdate
 M	og	a	()V	func_70088_a	entityInit
@@ -4161,6 +4172,7 @@ M	og	a	(Lnn;FF)V	func_70625_a	faceEntity
 M	og	a	(Luf;)Z	func_70085_c	interact
 M	og	a	(ZI)V	func_82160_b	dropEquipment
 M	og	aZ	()Lye;	func_70694_bm	getHeldItem
+M	og	ae	()[Lye;	func_70035_c	getLastActiveItems
 M	og	an	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	og	az	()V	func_110147_ax	applyEntityAttributes
 M	og	b	(Lby;)V	func_70014_b	writeEntityToNBT
@@ -4179,6 +4191,7 @@ M	og	k	()Lrf;	func_70661_as	getNavigator
 M	og	l	()Lrg;	func_70635_at	getEntitySenses
 M	og	l_	()V	func_70071_h_	onUpdate
 M	og	m	()Lof;	func_70638_az	getAttackTarget
+M	og	n	(I)Lye;	func_71124_b	getCurrentItemOrArmor
 M	og	o	()I	func_70627_aG	getTalkInterval
 M	og	r	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	og	s	()I	func_70633_aT	getDropItemId
@@ -4275,6 +4288,7 @@ M	ps	b	()Z	func_75253_b	continueExecuting
 M	ps	c	()V	func_75249_e	startExecuting
 M	ps	d	()V	func_75251_c	resetTask
 M	ps	e	()V	func_75246_d	updateTask
+M	ps	i	()Z	func_75252_g	isInterruptible
 M	ps	j	()I	func_75247_h	getMutexBits
 M	pt	a	()V	func_75774_a	onUpdateTasks
 M	pt	a	(ILps;)V	func_75776_a	addTask
@@ -4375,6 +4389,7 @@ M	uf	a	(Lmo;)V	func_71007_a	displayGUIChest
 M	uf	a	(Lnb;F)Z	func_70097_a	attackEntityFrom
 M	uf	aQ	()I	func_70658_aO	getTotalArmorValue
 M	uf	aZ	()Lye;	func_70694_bm	getHeldItem
+M	uf	ae	()[Lye;	func_70035_c	getLastActiveItems
 M	uf	am	()V	func_70110_aj	setInWeb
 M	uf	an	()Ljava/lang/String;	func_70023_ak	getEntityName
 M	uf	az	()V	func_110147_ax	applyEntityAttributes
@@ -4398,6 +4413,7 @@ M	uf	f_	()Labw;	func_130014_f_	getEntityWorld
 M	uf	i	()V	func_71053_j	closeScreen
 M	uf	l_	()V	func_70071_h_	onUpdate
 M	uf	m	(F)V	func_110149_m	setAbsorptionAmount
+M	uf	n	(I)Lye;	func_71124_b	getCurrentItemOrArmor
 M	uf	o	(I)Lye;	func_82169_q	getCurrentArmor
 M	uf	s	(I)V	func_71023_q	addExperience
 M	uf	x	()V	func_70106_y	setDead
@@ -4461,16 +4477,20 @@ M	uy	a	(ILye;)V	func_75141_a	putStackInSlot
 M	uy	a	(Lmo;)V	func_75130_a	onCraftMatrixChanged
 M	uy	a	(Lmo;I)Lwe;	func_75147_a	getSlotFromInventory
 M	uy	a	(Luf;)Z	func_75145_c	canInteractWith
+M	uy	a	(Luf;Z)V	func_75128_a	setPlayerIsPresent
+M	uy	a	(Lvi;)V	func_75132_a	addCraftingToCrafters
 M	uy	a	(Lwe;)Lwe;	func_75146_a	addSlotToContainer
 M	uy	a	(Lye;IIZ)Z	func_75135_a	mergeItemStack
 M	uy	b	()V	func_75142_b	detectAndSendChanges
 M	uy	b	(II)V	func_75137_b	updateProgressBar
 M	uy	b	(Luf;I)Lye;	func_82846_b	transferStackInSlot
 M	uy	b	(Lvi;)V	func_82847_b	removeCraftingFromCrafters
+M	uy	c	(Luf;)Z	func_75129_b	isPlayerNotUsingContainer
 M	v	a	(C)Z	func_71566_a	isAllowedCharacter
 M	v	a	(Ljava/lang/String;)Ljava/lang/String;	func_71565_a	filerAllowedCharacters
 M	vi	a	(Luy;II)V	func_71112_a	sendProgressBarUpdate
 M	vi	a	(Luy;ILye;)V	func_71111_a	sendSlotContents
+M	vi	a	(Luy;Ljava/util/List;)V	func_71110_a	sendContainerAndContentsToPlayer
 M	vj	a	(Luf;)Z	func_75145_c	canInteractWith
 M	vj	b	(Luf;I)Lye;	func_82846_b	transferStackInSlot
 M	vj	e	()Lmo;	func_85151_d	getLowerChestInventory
@@ -4482,6 +4502,7 @@ M	wd	a	(Luf;Lye;)V	func_82870_a	onPickupFromSlot
 M	wd	a	(Lye;)Z	func_75214_a	isItemValid
 M	we	a	()I	func_75219_a	getSlotStackLimit
 M	we	a	(I)Lye;	func_75209_a	decrStackSize
+M	we	a	(Lmo;I)Z	func_75217_a	isSlotInInventory
 M	we	a	(Luf;)Z	func_82869_a	canTakeStack
 M	we	a	(Luf;Lye;)V	func_82870_a	onPickupFromSlot
 M	we	a	(Lye;)Z	func_75214_a	isItemValid
@@ -4604,7 +4625,14 @@ M	zl	a	(Lye;Laqz;)F	func_77638_a	getStrVsBlock
 M	zl	c	()I	func_77619_b	getItemEnchantability
 M	zl	d_	(Lye;)I	func_77626_a	getMaxItemUseDuration
 M	zl	n_	()Z	func_77662_d	isFull3D
+R	BLACK	BLACK
 R	GOLD	GOLD
+R	GRAY	GRAY
+R	BLUE	BLUE
+R	GREEN	GREEN
+R	RED	RED
+R	YELLOW	YELLOW
+R	WHITE	WHITE
 R	field_77606_a	smeltingBase
 R	field_77361_a	damageType
 R	field_77494_b	entityLiving
@@ -4622,6 +4650,7 @@ R	Sky	Sky
 R	Block	Block
 R	field_72818_a	chunkX
 R	field_72816_b	chunkZ
+R	field_72814_d	isEmpty
 R	field_72815_e	worldObj
 R	field_77183_a	xCoord
 R	field_77181_b	yCoord
@@ -4679,6 +4708,7 @@ R	everything	everything
 R	mobs	mobs
 R	players	players
 R	field_72218_a	blockType
+R	field_72178_a	glowing
 R	field_72166_a	powered
 R	field_82539_a	types
 R	field_82136_e	levels
@@ -4982,25 +5012,31 @@ R	field_74267_a	mcServer
 R	field_74274_a	mcServer
 R	field_74272_a	mcServer
 R	field_74270_a	mcServer
+R	field_73672_b	properties
 R	field_73674_a	logger
 R	field_71340_o	settings
 R	field_72428_a	server
 R	field_72795_a	theWorld
 R	field_72783_a	mcServer
 R	field_72699_b	players
-R	field_73263_b	players
 R	field_73251_h	worldObj
 R	field_73092_a	theWorld
 R	field_73098_k	posX
 R	field_73095_l	posY
 R	field_73096_m	posZ
+R	field_73137_j	motionX
+R	field_73138_k	motionY
 R	field_73135_l	motionZ
+R	field_73136_m	ticks
+R	field_73147_p	posX
+R	field_73146_q	posY
+R	field_73145_r	posZ
 R	field_72537_e	rand
 R	field_72534_f	mcServer
 R	field_72573_d	mcServer
+R	field_72583_k	randomGenerator
 R	field_71750_c	mcServer
 R	field_72673_b	output
-R	field_70010_a	instance
 R	field_72619_a	running
 R	field_72617_b	server
 R	field_72640_t	time
@@ -5023,6 +5059,7 @@ R	field_70521_d	zPosition
 R	field_75702_A	title
 R	field_75699_D	offsetX
 R	field_75700_E	offsetY
+R	Plant	Plant
 R	Skeleton	Skeleton
 R	field_75675_d	watched
 R	field_75385_b	thePlayer
@@ -5246,6 +5283,7 @@ R	func_75905_a	initWorldGenSeed
 R	func_75829_a	distanceTo
 R	func_75878_a	getPosition
 R	func_75763_a	getChunkLoader
+R	accept	accept
 R	func_76063_b	getSeed
 R	func_76079_c	getSpawnX
 R	func_76068_b	setWorldTime
@@ -5253,7 +5291,6 @@ R	func_76075_d	getSpawnY
 R	func_76074_e	getSpawnZ
 R	func_82573_f	getWorldTotalTime
 R	func_76073_f	getWorldTime
-R	func_76076_i	getDimension
 R	func_76065_j	getWorldName
 R	func_76061_m	isThundering
 R	func_76059_o	isRaining
@@ -5261,6 +5298,7 @@ R	func_76077_q	getGameType
 R	func_76093_s	isHardcoreModeEnabled
 R	func_76067_t	getTerrainType
 R	func_76086_u	areCommandsAllowed
+R	func_75756_e	getSaveHandler
 R	func_75803_c	getWorldInfo
 R	func_85129_h	getWorldTime
 R	func_85120_o	getGameType
@@ -5309,6 +5347,7 @@ R	func_82526_n	dispense
 R	func_71895_b	getBlockTexture
 R	func_71906_q_	canSilkHarvest
 R	func_71935_l	isCollidable
+R	func_71928_r_	initializeBlock
 R	func_71856_s_	getRenderBlockPass
 R	func_71910_a	quantityDroppedWithBonus
 R	func_71889_f_	getRenderColor
@@ -5317,6 +5356,7 @@ R	func_71933_m	getBlockColor
 R	func_111048_c	getSideIcon
 R	func_70307_a	readFromNBT
 R	func_70310_b	writeToNBT
+R	func_71913_a	canCollideCheck
 R	func_72216_n	isFlammable
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
@@ -5354,7 +5394,7 @@ R	func_70322_n	getBlockMetadata
 R	func_72445_d	squareDistanceTo
 R	func_96679_b	getName
 R	func_96678_d	getDisplayName
-R	func_99999_d	run
+R	func_71404_a	crashed
 R	func_74502_a	getType
 R	func_100015_a	isKeyDown
 R	func_74305_a	parseFloat
@@ -5394,6 +5434,7 @@ R	func_74149_a	drawGradientRect
 R	func_74185_a	drawGuiContainerBackgroundLayer
 R	func_71112_a	sendProgressBarUpdate
 R	func_71111_a	sendSlotContents
+R	func_71110_a	sendContainerAndContentsToPlayer
 R	func_74189_g	drawGuiContainerForegroundLayer
 R	func_74191_a	handleMouseClick
 R	func_73879_b	mouseMovedOrUp
@@ -5402,6 +5443,7 @@ R	func_75145_c	canInteractWith
 R	func_82846_b	transferStackInSlot
 R	func_75219_a	getSlotStackLimit
 R	func_75209_a	decrStackSize
+R	func_75217_a	isSlotInInventory
 R	func_82870_a	onPickupFromSlot
 R	func_75214_a	isItemValid
 R	func_75212_b	getBackgroundIconIndex
@@ -5540,7 +5582,6 @@ R	func_82485_a	playDispenseSound
 R	func_82498_a	func_82498_a
 R	func_82500_b	func_82500_b
 R	func_92062_k	sendChatMsg
-R	func_72374_b	onTick
 R	func_71233_x	getCurrentPlayerCount
 R	func_71275_y	getMaxPlayers
 R	func_71213_z	getAllUsernames
@@ -5551,14 +5592,14 @@ R	func_71236_h	logWarning
 R	func_71201_j	logSevere
 R	func_71249_w	getMinecraftVersion
 R	func_73667_a	setProperty
+R	func_73671_a	getProperty
 R	func_71203_ab	getConfigurationManager
 R	func_71742_a	getType
 R	func_73074_a	onBlockClicked
-R	func_72688_a	getMinecraftServer
 R	func_72687_a	markBlockForUpdate
-R	func_73254_a	onUpdate
 R	func_73043_a	onBlockEventReceived
 R	func_73081_b	getGameType
+R	func_72567_b	sendPacketToPlayer
 R	func_72669_b	reset
 R	func_72609_b	logInfo
 R	func_72606_c	logWarning
@@ -5590,7 +5631,6 @@ R	func_76455_a	onUpdate
 R	func_98055_j	setScale
 R	func_70076_C	kill
 R	func_70022_Q	getEntityString
-R	func_70035_c	getInventory
 R	func_70115_ae	isRiding
 R	func_70069_a	fall
 R	func_82704_a	isEntityApplicable
@@ -5682,6 +5722,7 @@ R	func_70227_a	onImpact
 R	func_75118_a	onUpdate
 R	func_75111_a	addStats
 R	func_75130_a	onCraftMatrixChanged
+R	func_75132_a	addCraftingToCrafters
 R	func_75137_b	updateProgressBar
 R	func_82869_a	canTakeStack
 R	func_75142_b	detectAndSendChanges
