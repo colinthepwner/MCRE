@@ -306,7 +306,7 @@ VM.prototype.defineFromBytes = function (expectName, bytes, source, parsed) {
 	for (var i = 0; i < cf.fields.length; i++) {
 		var f = cf.fields[i];
 		var st = (f.access & ACC_STATIC) !== 0;
-		c.fields[f.name] = { name: f.name, desc: f.desc, access: f.access, static: st, annotations: f.annotations || null };
+		c.fields[f.name] = { name: f.name, desc: f.desc, access: f.access, static: st, annotations: f.annotations || null, signature: f.signature || null };
 		if (st) c.statics[f.name] = f.constant !== undefined ? f.constant : defaultOf(f.desc);
 	}
 	for (var j = 0; j < cf.methods.length; j++) {
@@ -597,6 +597,7 @@ function parseClassFile(bytes) {
 				return true;
 			}
 			if (aname === 'RuntimeVisibleAnnotations') { fld.annotations = readAnnotations(r, cp); return true; }
+			if (aname === 'Signature') { fld.signature = utf(r.u2()); return true; }
 			return false;
 		});
 		cf.fields.push(fld);
@@ -2304,6 +2305,7 @@ function installLang(vm) {
 			'valueOf(Z)Ljava/lang/Boolean;': function (vm, n, a) { return box(vm, a[0], 'Z'); },
 			'valueOf(Ljava/lang/String;)Ljava/lang/Boolean;': function (vm, n, a) { return box(vm, a[0] !== null && a[0].toLowerCase() === 'true' ? 1 : 0, 'Z'); },
 			'parseBoolean(Ljava/lang/String;)Z': function (vm, n, a) { return a[0] !== null && a[0].toLowerCase() === 'true' ? 1 : 0; },
+			'getBoolean(Ljava/lang/String;)Z': function () { return 0; },
 			'toString(Z)Ljava/lang/String;': function (vm, n, a) { return a[0] ? 'true' : 'false'; },
 		},
 		clinit: function (vm, c) { c.statics.TRUE = box(vm, 1, 'Z'); c.statics.FALSE = box(vm, 0, 'Z'); },
@@ -2364,6 +2366,7 @@ function installLang(vm) {
 		'toRadians(D)D': M1(function (x) { return x / 180 * Math.PI; }), 'toDegrees(D)D': M1(function (x) { return x * 180 / Math.PI; }),
 		'floorDiv(II)I': M2(function (a, b) { return Math.floor(a / b) | 0; }),
 		'floorMod(II)I': M2(function (a, b) { return ((a % b) + b) % b; }),
+		'toIntExact(J)I': function (vm, n, a) { var v = a[0]; if (v > 2147483647n || v < -2147483648n) vm.throwNew('java/lang/ArithmeticException', 'integer overflow'); return Number(v); },
 		'log1p(D)D': M1(Math.log1p), 'expm1(D)D': M1(Math.expm1),
 		'ulp(D)D': M1(function (x) { return Math.abs(x) * 2.220446049250313e-16; }),
 		'clamp(DDD)D': function (vm, n, a) { return Math.min(Math.max(a[0], a[1]), a[2]); },
@@ -2970,10 +2973,48 @@ function installReflect(vm) {
 			'getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;': function (vm, self) { return annotationArray(vm, listOf(self)); },
 		};
 	};
+	def('java/lang/reflect/Type', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT, methods: {
+		'getTypeName()Ljava/lang/String;': function (vm, self) { return self.$cls ? self.$cls.name.replace(/[/]/g, '.') : String(self.$raw || ''); },
+	} });
+	def('java/lang/reflect/ParameterizedType', { access: JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT, interfaces: ['java/lang/reflect/Type'], methods: {} });
+	def('mcre/ParameterizedType', { interfaces: ['java/lang/reflect/ParameterizedType'], methods: {
+		'getRawType()Ljava/lang/reflect/Type;': function (vm, self) { return self.$raw; },
+		'getOwnerType()Ljava/lang/reflect/Type;': function () { return null; },
+		'getActualTypeArguments()[Ljava/lang/reflect/Type;': function (vm, self) { return JVM.javaArray(vm, 'Ljava/lang/reflect/Type;', self.$args.slice()); },
+		'getTypeName()Ljava/lang/String;': function (vm, self) { return String(self.$name); },
+		'toString()Ljava/lang/String;': function (vm, self) { return String(self.$name); },
+	} });
+	var sigType = function (vm, s) {
+		var c = s.t.charAt(s.i);
+		if (c === '*') { s.i++; return vm.classObject(vm.loadClass('java/lang/Object')); }
+		if (c === '+' || c === '-') { s.i++; var b = sigType(vm, s); return c === '+' ? b : vm.classObject(vm.loadClass('java/lang/Object')); }
+		if (c === 'T') { s.i = s.t.indexOf(';', s.i) + 1; return vm.classObject(vm.loadClass('java/lang/Object')); }
+		if (c === '[') { s.i++; var el = sigType(vm, s); var ec = el.$cls || (el.$raw && el.$raw.$cls); return vm.classObject(vm.classFor('[' + (ec ? descOf(ec) : 'Ljava/lang/Object;'))); }
+		if (c !== 'L') { s.i++; return vm.classObject(vm.loadClass(c)); }
+		var j = s.i + 1, name = '';
+		while (j < s.t.length && s.t.charAt(j) !== '<' && s.t.charAt(j) !== ';') name += s.t.charAt(j++);
+		var args = null;
+		if (s.t.charAt(j) === '<') {
+			s.i = j + 1; args = [];
+			while (s.t.charAt(s.i) !== '>') args.push(sigType(vm, s));
+			j = s.i + 1;
+			while (s.t.charAt(j) === '.') { j++; name += '$'; while (s.t.charAt(j) !== ';' && s.t.charAt(j) !== '<') name += s.t.charAt(j++); if (s.t.charAt(j) === '<') { var d = 1; j++; while (d) { var ch = s.t.charAt(j++); if (ch === '<') d++; else if (ch === '>') d--; } } }
+		}
+		s.i = j + 1;
+		var raw = vm.classObject(vm.classFor('L' + name + ';'));
+		if (!args) return raw;
+		var p = vm.newObject(vm.loadClass('mcre/ParameterizedType'));
+		p.$raw = raw; p.$args = args; p.$name = name.replace(/[/$]/g, '.') + '<' + args.map(function (x) { return x.$name || (x.$cls ? x.$cls.name.replace(/[/$]/g, '.') : '?'); }).join(', ') + '>';
+		return p;
+	};
+	var genericOf = function (vm, sig, desc) {
+		if (!sig) return vm.classObject(typeClass(vm, desc));
+		try { return sigType(vm, { t: sig, i: 0 }); } catch (e) { return vm.classObject(typeClass(vm, desc)); }
+	};
 	def('java/lang/reflect/Field', { super: 'java/lang/reflect/AccessibleObject', methods: Object.assign(annMethods(function (s) { return s.$f.annotations; }), {
 		'getName()Ljava/lang/String;': function (vm, self) { return self.$f.name; },
 		'getType()Ljava/lang/Class;': function (vm, self) { return vm.classObject(typeClass(vm, self.$f.desc)); },
-		'getGenericType()Ljava/lang/reflect/Type;': function (vm, self) { return vm.classObject(typeClass(vm, self.$f.desc)); },
+		'getGenericType()Ljava/lang/reflect/Type;': function (vm, self) { return genericOf(vm, self.$f.signature, self.$f.desc); },
 		'getModifiers()I': function (vm, self) { return self.$f.access | (self.$f.static ? JVM.ACC_STATIC : 0); },
 		'getDeclaringClass()Ljava/lang/Class;': function (vm, self) { return vm.classObject(self.$owner); },
 		'isEnumConstant()Z': function (vm, self) { return self.$f.access & 0x4000 ? 1 : 0; },
@@ -3747,6 +3788,91 @@ function installUtil(vm) {
 		staticMethods: { 'getDefault()Ljava/util/Locale;': function (vm) { var c = vm.loadClass('java/util/Locale'); vm.initClass(c); return c.statics.US; } },
 		methods: { 'toString()Ljava/lang/String;': function (vm, self) { return self.$tag || ''; }, 'getLanguage()Ljava/lang/String;': function () { return 'en'; } },
 	});
+	var grp = function (s) { return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+	var decFmt = function (pat, v) {
+		pat = String(pat || '#,##0.###');
+		var m = /^([^#0,.]*)([#0,]*)(?:\.([#0]*))?(.*)$/.exec(pat.split(';')[0]) || ['', '', '#,##0', '###', ''];
+		var pre = m[1], ip = m[2], fp = m[3] || '', suf = m[4];
+		if (/%/.test(suf + pre)) v *= 100;
+		var minF = (fp.match(/0/g) || []).length, maxF = fp.length;
+		var s = Math.abs(v).toFixed(maxF);
+		if (maxF > minF) s = s.replace(new RegExp('0{1,' + (maxF - minF) + '}$'), '').replace(/\.$/, '');
+		var parts = s.split('.'), minI = (ip.match(/0/g) || []).length;
+		while (parts[0].length < minI) parts[0] = '0' + parts[0];
+		if (!minI && parts[0] === '0' && parts[1]) parts[0] = '';
+		if (ip.indexOf(',') >= 0) parts[0] = grp(parts[0]);
+		return (v < 0 ? '-' : '') + pre.replace(/'/g, '') + parts.join('.') + suf.replace(/'/g, '');
+	};
+	var numOf = function (x) { var u = JVM.unbox(x); return typeof u === 'bigint' ? Number(u) : +u; };
+	var nfMethods = {
+		'format(J)Ljava/lang/String;': function (vm, self, a) { return decFmt(self.$pat, Number(a[0])); },
+		'format(D)Ljava/lang/String;': function (vm, self, a) { return decFmt(self.$pat, a[0]); },
+		'format(Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { return decFmt(self.$pat, numOf(a[0])); },
+		'setMaximumFractionDigits(I)V': function (vm, self, a) { var p = String(self.$pat || '#,##0.###').split('.'); self.$pat = p[0] + (a[0] > 0 ? '.' + '#'.repeat(a[0]) : ''); },
+		'setMinimumFractionDigits(I)V': function (vm, self, a) { var p = String(self.$pat || '#,##0').split('.'); var f = (p[1] || '').replace(/0/g, '#'); while (f.length < a[0]) f += '#'; self.$pat = p[0] + (f ? '.' + '0'.repeat(a[0]) + f.slice(a[0]) : ''); },
+		'setGroupingUsed(Z)V': function (vm, self, a) { var p = String(self.$pat || '#,##0.###'); self.$pat = a[0] ? (p.indexOf(',') < 0 ? '#,' + p : p) : p.replace(/,/g, ''); },
+		'setRoundingMode(Ljava/math/RoundingMode;)V': function () {},
+		'parse(Ljava/lang/String;)Ljava/lang/Number;': function (vm, self, a) { return JVM.box(vm, parseFloat(String(a[0]).replace(/,/g, '')) || 0, 'D'); },
+		'applyPattern(Ljava/lang/String;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+		'toPattern()Ljava/lang/String;': function (vm, self) { return self.$pat || '#,##0.###'; },
+	};
+	var nfNew = function (vm, pat) { var o = vm.newObject(vm.loadClass('java/text/DecimalFormat')); o.$pat = pat; return o; };
+	def('java/text/Format', { methods: {} });
+	def('java/text/NumberFormat', { super: 'java/text/Format', methods: nfMethods, staticMethods: {
+		'getInstance()Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0.###'); },
+		'getInstance(Ljava/util/Locale;)Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0.###'); },
+		'getNumberInstance()Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0.###'); },
+		'getNumberInstance(Ljava/util/Locale;)Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0.###'); },
+		'getIntegerInstance()Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0'); },
+		'getPercentInstance()Ljava/text/NumberFormat;': function (vm) { return nfNew(vm, '#,##0%'); },
+	} });
+	def('java/text/DecimalFormat', { super: 'java/text/NumberFormat', methods: {
+		'<init>()V': function (vm, self) { self.$pat = '#,##0.###'; },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+		'<init>(Ljava/lang/String;Ljava/text/DecimalFormatSymbols;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+	} });
+	def('java/text/DecimalFormatSymbols', { methods: { '<init>()V': function () {}, '<init>(Ljava/util/Locale;)V': function () {} }, staticMethods: {
+		'getInstance()Ljava/text/DecimalFormatSymbols;': function (vm) { return vm.newObject(vm.loadClass('java/text/DecimalFormatSymbols')); },
+		'getInstance(Ljava/util/Locale;)Ljava/text/DecimalFormatSymbols;': function (vm) { return vm.newObject(vm.loadClass('java/text/DecimalFormatSymbols')); },
+	} });
+	var MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+	var DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	var dateFmt = function (pat, t) {
+		var d = new Date(t), pad = function (n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; };
+		return String(pat).replace(/'([^']*)'|y+|M+|d+|H+|h+|m+|s+|S+|E+|a|z+|Z/g, function (k, lit) {
+			if (lit !== undefined) return lit || "'";
+			var c = k.charAt(0), n = k.length;
+			switch (c) {
+			case 'y': return n === 2 ? pad(d.getFullYear() % 100, 2) : pad(d.getFullYear(), n);
+			case 'M': return n >= 4 ? MON[d.getMonth()] : n === 3 ? MON[d.getMonth()].slice(0, 3) : pad(d.getMonth() + 1, n);
+			case 'd': return pad(d.getDate(), n);
+			case 'H': return pad(d.getHours(), n);
+			case 'h': return pad(d.getHours() % 12 || 12, n);
+			case 'm': return pad(d.getMinutes(), n);
+			case 's': return pad(d.getSeconds(), n);
+			case 'S': return pad(d.getMilliseconds(), n);
+			case 'E': return n >= 4 ? DAY[d.getDay()] : DAY[d.getDay()].slice(0, 3);
+			case 'a': return d.getHours() < 12 ? 'AM' : 'PM';
+			case 'z': return 'UTC';
+			case 'Z': return '+0000';
+			}
+			return k;
+		});
+	};
+	def('java/text/DateFormat', { super: 'java/text/Format', methods: {
+		'format(Ljava/util/Date;)Ljava/lang/String;': function (vm, self, a) { return dateFmt(self.$pat, a[0] ? a[0].$t : Date.now()); },
+		'format(Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { var x = a[0]; return dateFmt(self.$pat, x && x.$t !== undefined ? x.$t : numOf(x)); },
+		'parse(Ljava/lang/String;)Ljava/util/Date;': function (vm) { var o = vm.newObject(vm.loadClass('java/util/Date')); o.$t = Date.now(); return o; },
+		'setTimeZone(Ljava/util/TimeZone;)V': function () {},
+		'setLenient(Z)V': function () {},
+	} });
+	def('java/text/SimpleDateFormat', { super: 'java/text/DateFormat', methods: {
+		'<init>()V': function (vm, self) { self.$pat = 'M/d/yy, h:mm a'; },
+		'<init>(Ljava/lang/String;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+		'<init>(Ljava/lang/String;Ljava/util/Locale;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+		'applyPattern(Ljava/lang/String;)V': function (vm, self, a) { self.$pat = String(a[0]); },
+		'toPattern()Ljava/lang/String;': function (vm, self) { return self.$pat; },
+	} });
 	def('java/util/UUID', {
 		methods: {
 			'<init>(JJ)V': function (vm, self, a) { self.$hi = a[0]; self.$lo = a[1]; },
@@ -4360,10 +4486,94 @@ function installIo(vm) {
 			'hashCode()I': function (vm, self) { return JVM.stringHash(self.$path) ^ 1234321; },
 			'compareTo(Ljava/lang/Object;)I': function (vm, self, a) { return self.$path < a[0].$path ? -1 : self.$path > a[0].$path ? 1 : 0; },
 			'toURI()Ljava/net/URI;': function () { return null; },
+			'toPath()Ljava/nio/file/Path;': function (vm, self) { return JVM.pathObj(vm, self.$path); },
 		},
 	});
 	function fileObj(vm, path) { var f = vm.newObject(vm.loadClass('java/io/File')); f.$path = norm(path); return f; }
 	JVM.fileObj = fileObj;
+
+	def('java/nio/file/Path', { access: I, interfaces: ['java/lang/Comparable', 'java/lang/Iterable'], methods: {} });
+	var pathObj = function (vm, p) { var o = vm.newObject(vm.loadClass('mcre/Path')); o.$path = norm(p); return o; };
+	JVM.pathObj = pathObj;
+	var pjoin = function (a, b) { b = String(b); return b.charAt(0) === '/' ? b : (a ? a + '/' : '') + b; };
+	var pstr = function (x) { return x == null ? '' : x.$path !== undefined ? x.$path : String(x.$s !== undefined ? x.$s : x); };
+	def('mcre/Path', { interfaces: ['java/nio/file/Path'], methods: {
+		'toFile()Ljava/io/File;': function (vm, self) { return fileObj(vm, self.$path); },
+		'resolve(Ljava/lang/String;)Ljava/nio/file/Path;': function (vm, self, a) { return pathObj(vm, pjoin(self.$path, a[0])); },
+		'resolve(Ljava/nio/file/Path;)Ljava/nio/file/Path;': function (vm, self, a) { return pathObj(vm, pjoin(self.$path, pstr(a[0]))); },
+		'resolveSibling(Ljava/lang/String;)Ljava/nio/file/Path;': function (vm, self, a) { var i = self.$path.lastIndexOf('/'); return pathObj(vm, pjoin(i < 0 ? '' : self.$path.substring(0, i), a[0])); },
+		'getParent()Ljava/nio/file/Path;': function (vm, self) { var i = self.$path.lastIndexOf('/'); return i < 0 ? null : pathObj(vm, self.$path.substring(0, i)); },
+		'getFileName()Ljava/nio/file/Path;': function (vm, self) { return pathObj(vm, self.$path.substring(self.$path.lastIndexOf('/') + 1)); },
+		'toAbsolutePath()Ljava/nio/file/Path;': function (vm, self) { return self; },
+		'normalize()Ljava/nio/file/Path;': function (vm, self) { return self; },
+		'isAbsolute()Z': function () { return 1; },
+		'toString()Ljava/lang/String;': function (vm, self) { return self.$path; },
+		'startsWith(Ljava/lang/String;)Z': function (vm, self, a) { return self.$path.indexOf(norm(a[0])) === 0 ? 1 : 0; },
+		'endsWith(Ljava/lang/String;)Z': function (vm, self, a) { var s = String(a[0]); return self.$path.slice(-s.length) === s ? 1 : 0; },
+		'equals(Ljava/lang/Object;)Z': function (vm, self, a) { return a[0] && a[0].$path === self.$path ? 1 : 0; },
+		'hashCode()I': function (vm, self) { return JVM.stringHash(self.$path); },
+		'compareTo(Ljava/lang/Object;)I': function (vm, self, a) { return self.$path < a[0].$path ? -1 : self.$path > a[0].$path ? 1 : 0; },
+	} });
+	def('java/nio/file/Paths', { methods: {
+		'get(Ljava/lang/String;[Ljava/lang/String;)Ljava/nio/file/Path;': function (vm, self, a) { var p = String(a[0]); (a[1] && a[1].a || []).forEach(function (x) { p = pjoin(p, x); }); return pathObj(vm, p); },
+	} });
+	var pbytes = function (vm, p) { return p.$res != null ? vm.resources[p.$res] || null : fsOf(vm).read(p.$path); };
+	var bytesOf = function (vm, p) { var b = pbytes(vm, p); if (!b) vm.throwNew('java/nio/file/NoSuchFileException', p.$path); return b; };
+	JVM.resPath = function (vm, res) { var o = pathObj(vm, '/' + res); o.$res = String(res).replace(/^[/]+/, ''); return o; };
+	var utf8 = function (b) { return new TextDecoder().decode(b); };
+	def('java/nio/file/NoSuchFileException', { super: 'java/io/IOException', methods: {} });
+	var pngSize = function (b) { return b && b.length > 24 && b[1] === 80 && b[2] === 78 && b[3] === 71 ? [(b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0] : [16, 16]; };
+	var imgOf = function (vm, bytes, w, h) { var o = vm.newObject(vm.loadClass('java/awt/image/BufferedImage')); o.$png = bytes; var sz = bytes ? pngSize(bytes) : [w, h]; o.$w = sz[0]; o.$h = sz[1]; return o; };
+	JVM.imageOf = imgOf;
+	def('java/awt/Image', { methods: {} });
+	def('java/awt/image/RenderedImage', { access: I, methods: {} });
+	def('java/awt/image/BufferedImage', { super: 'java/awt/Image', interfaces: ['java/awt/image/RenderedImage'], statics: { TYPE_INT_RGB: 1, TYPE_INT_ARGB: 2 }, methods: {
+		'<init>(III)V': function (vm, self, a) { self.$w = a[0]; self.$h = a[1]; self.$png = null; },
+		'getWidth()I': function (vm, self) { return self.$w | 0; },
+		'getHeight()I': function (vm, self) { return self.$h | 0; },
+		'getWidth(Ljava/awt/image/ImageObserver;)I': function (vm, self) { return self.$w | 0; },
+		'getHeight(Ljava/awt/image/ImageObserver;)I': function (vm, self) { return self.$h | 0; },
+		'getType()I': function () { return 2; },
+		'getRGB(II)I': function (vm, self, a) { return self.$px ? self.$px[a[1] * self.$w + a[0]] | 0 : 0; },
+		'setRGB(III)V': function (vm, self, a) { (self.$px || (self.$px = new Int32Array(self.$w * self.$h)))[a[1] * self.$w + a[0]] = a[2]; },
+		'getRGB(IIII[III)[I': function (vm, self, a) { var out = a[4] || JVM.javaArray(vm, 'I', new Array(a[2] * a[3]).fill(0)); for (var y = 0; y < a[3]; y++) for (var x = 0; x < a[2]; x++) out.a[a[5] + y * a[6] + x] = self.$px ? self.$px[(a[1] + y) * self.$w + a[0] + x] | 0 : 0; return out; },
+		'getSubimage(IIII)Ljava/awt/image/BufferedImage;': function (vm, self, a) { var o = imgOf(vm, null, a[2], a[3]); o.$png = self.$png; o.$sub = [a[0], a[1], a[2], a[3]]; return o; },
+		'getGraphics()Ljava/awt/Graphics;': function () { return null; },
+		'flush()V': function () {},
+	} });
+	def('javax/imageio/ImageIO', { staticMethods: {
+		'read(Ljava/io/InputStream;)Ljava/awt/image/BufferedImage;': function (vm, n, a) { return a[0] ? imgOf(vm, readAllBytes(vm, a[0])) : null; },
+		'read(Ljava/io/File;)Ljava/awt/image/BufferedImage;': function (vm, n, a) { var b = a[0] && fsOf(vm).read(a[0].$path); if (!b) vm.throwNew('javax/imageio/IIOException', "Can't read input file!"); return imgOf(vm, b); },
+		'read(Ljava/net/URL;)Ljava/awt/image/BufferedImage;': function (vm, n, a) { var b = a[0] && a[0].$res ? vm.resources[a[0].$res] : null; return b ? imgOf(vm, b) : null; },
+		'write(Ljava/awt/image/RenderedImage;Ljava/lang/String;Ljava/io/File;)Z': function () { return 0; },
+	} });
+	def('javax/imageio/IIOException', { super: 'java/io/IOException', methods: {} });
+	def('java/nio/file/Files', { methods: {
+		'exists(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z': function (vm, self, a) { return a[0].$res != null ? (vm.resources[a[0].$res] ? 1 : 0) : fsOf(vm).exists(a[0].$path) ? 1 : 0; },
+		'notExists(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z': function (vm, self, a) { return a[0].$res != null ? (vm.resources[a[0].$res] ? 0 : 1) : fsOf(vm).exists(a[0].$path) ? 0 : 1; },
+		'newInputStream(Ljava/nio/file/Path;[Ljava/nio/file/OpenOption;)Ljava/io/InputStream;': function (vm, self, a) { return bytesStream(vm, bytesOf(vm, a[0])); },
+		'size(Ljava/nio/file/Path;)J': function (vm, self, a) { return BigInt(bytesOf(vm, a[0]).length); },
+		'isDirectory(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z': function (vm, self, a) { return fsOf(vm).isDir(a[0].$path) ? 1 : 0; },
+		'isRegularFile(Ljava/nio/file/Path;[Ljava/nio/file/LinkOption;)Z': function (vm, self, a) { return fsOf(vm).exists(a[0].$path) && !fsOf(vm).isDir(a[0].$path) ? 1 : 0; },
+		'createDirectories(Ljava/nio/file/Path;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path;': function (vm, self, a) { fsOf(vm).mkdirs(a[0].$path); return a[0]; },
+		'createDirectory(Ljava/nio/file/Path;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path;': function (vm, self, a) { fsOf(vm).mkdirs(a[0].$path); return a[0]; },
+		'createFile(Ljava/nio/file/Path;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path;': function (vm, self, a) { if (!fsOf(vm).exists(a[0].$path)) fsOf(vm).write(a[0].$path, new Uint8Array(0)); return a[0]; },
+		'delete(Ljava/nio/file/Path;)V': function (vm, self, a) { fsOf(vm).remove(a[0].$path); },
+		'deleteIfExists(Ljava/nio/file/Path;)Z': function (vm, self, a) { var e = fsOf(vm).exists(a[0].$path); fsOf(vm).remove(a[0].$path); return e ? 1 : 0; },
+		'readAllBytes(Ljava/nio/file/Path;)[B': function (vm, self, a) { return JVM.javaArray(vm, 'B', Array.prototype.map.call(bytesOf(vm, a[0]), function (x) { return x << 24 >> 24; })); },
+		'readString(Ljava/nio/file/Path;)Ljava/lang/String;': function (vm, self, a) { return utf8(bytesOf(vm, a[0])); },
+		'readAllLines(Ljava/nio/file/Path;)Ljava/util/List;': function (vm, self, a) { return JVM.newList(vm, utf8(bytesOf(vm, a[0])).split(/\r?\n/)); },
+		'write(Ljava/nio/file/Path;[B[Ljava/nio/file/OpenOption;)Ljava/nio/file/Path;': function (vm, self, a) { fsOf(vm).write(a[0].$path, Uint8Array.from(a[1].a, function (x) { return x & 255; })); return a[0]; },
+		'writeString(Ljava/nio/file/Path;Ljava/lang/CharSequence;[Ljava/nio/file/OpenOption;)Ljava/nio/file/Path;': function (vm, self, a) { fsOf(vm).write(a[0].$path, new TextEncoder().encode(JVM.stringOf ? JVM.stringOf(vm, a[1]) : String(a[1]))); return a[0]; },
+		'newBufferedReader(Ljava/nio/file/Path;)Ljava/io/BufferedReader;': function (vm, self, a) {
+			var fr = vm.newObject(vm.loadClass('java/io/FileReader')); vm.callVirtual(fr, '<init>', '(Ljava/io/File;)V', [fileObj(vm, a[0].$path)]);
+			var br = vm.newObject(vm.loadClass('java/io/BufferedReader')); vm.callVirtual(br, '<init>', '(Ljava/io/Reader;)V', [fr]); return br;
+		},
+		'newBufferedWriter(Ljava/nio/file/Path;[Ljava/nio/file/OpenOption;)Ljava/io/BufferedWriter;': function (vm, self, a) {
+			var fw = vm.newObject(vm.loadClass('java/io/FileWriter')); vm.callVirtual(fw, '<init>', '(Ljava/io/File;)V', [fileObj(vm, a[0].$path)]);
+			var bw = vm.newObject(vm.loadClass('java/io/BufferedWriter')); vm.callVirtual(bw, '<init>', '(Ljava/io/Writer;)V', [fw]); return bw;
+		},
+	} });
 }
 
 JVM.installIo = installIo;
@@ -4610,7 +4820,93 @@ function installLibs(vm) {
 	def(GU + 'collect/Sets', { staticMethods: {
 		'newHashSet()Ljava/util/HashSet;': newOf('java/util/HashSet'), 'newLinkedHashSet()Ljava/util/LinkedHashSet;': newOf('java/util/LinkedHashSet'),
 		'newHashSet([Ljava/lang/Object;)Ljava/util/HashSet;': function (vm, n, a) { var o = newOf('java/util/HashSet')(vm); toArr(vm, a[0]).forEach(function (x) { vm.callVirtual(o, 'add', '(' + OBJ + ')Z', [x]); }); return o; },
+		'newHashSet(Ljava/lang/Iterable;)Ljava/util/HashSet;': function (vm, n, a) { var o = newOf('java/util/HashSet')(vm); toArr(vm, a[0]).forEach(function (x) { vm.callVirtual(o, 'add', '(' + OBJ + ')Z', [x]); }); return o; },
+		'newLinkedHashSet(Ljava/lang/Iterable;)Ljava/util/LinkedHashSet;': function (vm, n, a) { var o = newOf('java/util/LinkedHashSet')(vm); toArr(vm, a[0]).forEach(function (x) { vm.callVirtual(o, 'add', '(' + OBJ + ')Z', [x]); }); return o; },
+		'newTreeSet()Ljava/util/TreeSet;': newOf('java/util/TreeSet'),
 	} });
+	var joinWith = function (vm, self, items) {
+		var out = [];
+		items.forEach(function (x) { if (x == null) { if (self.$skip) return; if (self.$nul == null) vm.throwNew('java/lang/NullPointerException', null); out.push(self.$nul); } else out.push(JVM.stringOf(vm, x)); });
+		return out.join(self.$sep);
+	};
+	var joiner = function (vm, sep, skip, nul) { var o = vm.newObject(vm.loadClass(GU + 'base/Joiner')); o.$sep = sep; o.$skip = skip; o.$nul = nul; return o; };
+	def(GU + 'base/Joiner', { methods: {
+		'join(Ljava/lang/Iterable;)Ljava/lang/String;': function (vm, self, a) { return joinWith(vm, self, toArr(vm, a[0])); },
+		'join([Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { return joinWith(vm, self, toArr(vm, a[0])); },
+		'join(Ljava/util/Iterator;)Ljava/lang/String;': function (vm, self, a) { var r = []; while (vm.callVirtual(a[0], 'hasNext', '()Z', [])) r.push(vm.callVirtual(a[0], 'next', '()' + OBJ, [])); return joinWith(vm, self, r); },
+		'join(Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/String;': function (vm, self, a) { return joinWith(vm, self, [a[0], a[1]].concat(toArr(vm, a[2]))); },
+		'skipNulls()Lcom/google/common/base/Joiner;': function (vm, self) { return joiner(vm, self.$sep, true, null); },
+		'useForNull(Ljava/lang/String;)Lcom/google/common/base/Joiner;': function (vm, self, a) { return joiner(vm, self.$sep, false, String(a[0])); },
+		'appendTo(Ljava/lang/StringBuilder;Ljava/lang/Iterable;)Ljava/lang/StringBuilder;': function (vm, self, a) { vm.callVirtual(a[0], 'append', '(Ljava/lang/String;)Ljava/lang/StringBuilder;', [joinWith(vm, self, toArr(vm, a[1]))]); return a[0]; },
+	}, staticMethods: {
+		'on(Ljava/lang/String;)Lcom/google/common/base/Joiner;': function (vm, n, a) { return joiner(vm, String(a[0]), false, null); },
+		'on(C)Lcom/google/common/base/Joiner;': function (vm, n, a) { return joiner(vm, String.fromCharCode(a[0]), false, null); },
+	} });
+
+	var MM = GU + 'collect/';
+	var mmFind = function (vm, self, k) { var e = self.$mm; for (var i = 0; i < e.length; i++) if (JVM.equalsOf(vm, e[i][0], k)) return e[i]; return null; };
+	var mmColl = function (vm, self, k, make) {
+		var e = mmFind(vm, self, k);
+		if (!e && make) {
+			var c = vm.newObject(vm.loadClass(self.$set ? 'java/util/LinkedHashSet' : 'java/util/ArrayList'));
+			vm.callVirtual(c, '<init>', '()V', []);
+			e = [k, c]; self.$mm.push(e);
+		}
+		return e ? e[1] : null;
+	};
+	var csize = function (vm, c) { return vm.callVirtual(c, 'size', '()I', []); };
+	var live = function (vm, self) { return self.$mm.filter(function (e) { return csize(vm, e[1]) > 0; }); };
+	var mmVals = function (vm, self) { var r = []; live(vm, self).forEach(function (e) { r = r.concat(toArr(vm, e[1])); }); return r; };
+	var entry = function (vm, k, v) { var o = vm.newObject(vm.loadClass('java/util/AbstractMap$SimpleEntry')); o.$e = { k: k, v: v }; return o; };
+	var newSetOf = function (vm, items) { var s = vm.newObject(vm.loadClass('java/util/LinkedHashSet')); vm.callVirtual(s, '<init>', '()V', []); items.forEach(function (x) { vm.callVirtual(s, 'add', '(' + OBJ + ')Z', [x]); }); return s; };
+	var mmMethods = {
+		'<init>()V': function (vm, self) { self.$mm = []; },
+		'put(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) { return vm.callVirtual(mmColl(vm, self, a[0], true), 'add', '(' + OBJ + ')Z', [a[1]]); },
+		'putAll(Ljava/lang/Object;Ljava/lang/Iterable;)Z': function (vm, self, a) { var c = mmColl(vm, self, a[0], true), ch = 0; toArr(vm, a[1]).forEach(function (v) { ch |= vm.callVirtual(c, 'add', '(' + OBJ + ')Z', [v]); }); return ch; },
+		'putAll(Lcom/google/common/collect/Multimap;)Z': function (vm, self, a) { var ch = 0; (a[0].$mm || []).forEach(function (e) { toArr(vm, e[1]).forEach(function (v) { ch |= vm.callVirtual(mmColl(vm, self, e[0], true), 'add', '(' + OBJ + ')Z', [v]); }); }); return ch; },
+		'remove(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) { var c = mmColl(vm, self, a[0], false); return c ? vm.callVirtual(c, 'remove', '(' + OBJ + ')Z', [a[1]]) : 0; },
+		'containsKey(Ljava/lang/Object;)Z': function (vm, self, a) { var c = mmColl(vm, self, a[0], false); return c && csize(vm, c) > 0 ? 1 : 0; },
+		'containsValue(Ljava/lang/Object;)Z': function (vm, self, a) { return mmVals(vm, self).some(function (v) { return JVM.equalsOf(vm, v, a[0]); }) ? 1 : 0; },
+		'containsEntry(Ljava/lang/Object;Ljava/lang/Object;)Z': function (vm, self, a) { var c = mmColl(vm, self, a[0], false); return c ? vm.callVirtual(c, 'contains', '(' + OBJ + ')Z', [a[1]]) : 0; },
+		'size()I': function (vm, self) { return mmVals(vm, self).length; },
+		'isEmpty()Z': function (vm, self) { return mmVals(vm, self).length ? 0 : 1; },
+		'clear()V': function (vm, self) { self.$mm = []; },
+		'keySet()Ljava/util/Set;': function (vm, self) { return newSetOf(vm, live(vm, self).map(function (e) { return e[0]; })); },
+		'keys()Lcom/google/common/collect/Multiset;': function (vm, self) { var r = []; live(vm, self).forEach(function (e) { for (var i = csize(vm, e[1]); i > 0; i--) r.push(e[0]); }); return list(vm, r); },
+		'entries()Ljava/util/Collection;': function (vm, self) { var r = []; live(vm, self).forEach(function (e) { toArr(vm, e[1]).forEach(function (v) { r.push(entry(vm, e[0], v)); }); }); return list(vm, r); },
+		'asMap()Ljava/util/Map;': function (vm, self) { return map(vm, live(vm, self).map(function (e) { return [e[0], e[1]]; })); },
+		'hashCode()I': function (vm, self) { return self.$mm.length; },
+		'toString()Ljava/lang/String;': function (vm, self) { return '{' + live(vm, self).map(function (e) { return JVM.stringOf(vm, e[0]) + '=' + JVM.stringOf(vm, e[1]); }).join(', ') + '}'; },
+	};
+	[['Ljava/util/Collection;'], ['Ljava/util/List;'], ['Ljava/util/Set;']].forEach(function (t) {
+		var R = t[0];
+		mmMethods['get(' + OBJ + ')' + R] = function (vm, self, a) { return mmColl(vm, self, a[0], true); };
+		mmMethods['removeAll(' + OBJ + ')' + R] = function (vm, self, a) {
+			var e = mmFind(vm, self, a[0]); if (!e) return self.$set ? newSetOf(vm, []) : list(vm, []);
+			self.$mm.splice(self.$mm.indexOf(e), 1); return e[1];
+		};
+		mmMethods['replaceValues(' + OBJ + 'Ljava/lang/Iterable;)' + R] = function (vm, self, a) {
+			var old = toArr(vm, mmColl(vm, self, a[0], true)), c = mmColl(vm, self, a[0], false);
+			vm.callVirtual(c, 'clear', '()V', []); toArr(vm, a[1]).forEach(function (v) { vm.callVirtual(c, 'add', '(' + OBJ + ')Z', [v]); });
+			return self.$set ? newSetOf(vm, old) : list(vm, old);
+		};
+		mmMethods['values()' + R] = function (vm, self) { return list(vm, mmVals(vm, self)); };
+		mmMethods['entries()' + R] = mmMethods['entries()Ljava/util/Collection;'];
+	});
+	def(MM + 'Multimap', { access: I, methods: {} });
+	def(MM + 'ListMultimap', { access: I, interfaces: [MM + 'Multimap'], methods: {} });
+	def(MM + 'SetMultimap', { access: I, interfaces: [MM + 'Multimap'], methods: {} });
+	def(MM + 'Multiset', { access: I, interfaces: ['java/util/Collection'], methods: {} });
+	def('mcre/Multimap', { interfaces: [MM + 'ListMultimap', MM + 'SetMultimap'], methods: mmMethods });
+	[['ArrayListMultimap', false], ['LinkedListMultimap', false], ['HashMultimap', true], ['LinkedHashMultimap', true]].forEach(function (k) {
+		var n = MM + k[0], isSet = k[1], st = {};
+		var mk = function (vm) { var o = vm.newObject(vm.loadClass(n)); o.$mm = []; o.$set = isSet; return o; };
+		st['create()L' + n + ';'] = mk;
+		st['create(II)L' + n + ';'] = mk;
+		st['create(I)L' + n + ';'] = mk;
+		st['create(Lcom/google/common/collect/Multimap;)L' + n + ';'] = function (vm, nm, a) { var o = mk(vm); vm.callVirtual(o, 'putAll', '(Lcom/google/common/collect/Multimap;)Z', [a[0]]); return o; };
+		def(n, { super: 'mcre/Multimap', methods: {}, staticMethods: st });
+	});
 
 	var el = function (vm, j) {
 		var cn = j === null || j === undefined ? 'JsonNull' : Array.isArray(j) ? 'JsonArray' : typeof j === 'object' ? 'JsonObject' : 'JsonPrimitive';
@@ -4706,8 +5002,13 @@ function installLibs(vm) {
 		'disableHtmlEscaping()Lcom/google/gson/GsonBuilder;': self_, 'serializeNulls()Lcom/google/gson/GsonBuilder;': self_,
 		'setLenient()Lcom/google/gson/GsonBuilder;': self_, 'excludeFieldsWithoutExposeAnnotation()Lcom/google/gson/GsonBuilder;': self_,
 		'registerTypeAdapter(Ljava/lang/reflect/Type;Ljava/lang/Object;)Lcom/google/gson/GsonBuilder;': function (vm, self) { vm.warnOnce('gson:adapter', 'Gson type adapters are not available here'); return self; },
-		'create()Lcom/google/gson/Gson;': function (vm, self) { var g = vm.newObject(vm.loadClass(G + 'Gson')); g.$pretty = !!self.$pretty; return g; },
+		'create()Lcom/google/gson/Gson;': function (vm, self) { var g = vm.newObject(vm.loadClass(G + 'Gson')); g.$pretty = !!self.$pretty; g.$naming = self.$naming || null; return g; },
+		'setFieldNamingPolicy(Lcom/google/gson/FieldNamingPolicy;)Lcom/google/gson/GsonBuilder;': function (vm, self, a) { self.$naming = a[0] ? a[0].$name : null; return self; },
 	} });
+	var FNP = ['IDENTITY', 'UPPER_CAMEL_CASE', 'UPPER_CAMEL_CASE_WITH_SPACES', 'UPPER_CASE_WITH_UNDERSCORES', 'LOWER_CASE_WITH_UNDERSCORES', 'LOWER_CASE_WITH_DASHES', 'LOWER_CASE_WITH_DOTS'];
+	def(G + 'FieldNamingPolicy', { super: 'java/lang/Enum', statics: FNP.reduce(function (o, n) { o[n] = null; return o; }, {}), clinit: function (vm, c) {
+		c.$values = FNP.map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+	}, staticMethods: { 'values()[Lcom/google/gson/FieldNamingPolicy;': function (vm) { var c = vm.loadClass(G + 'FieldNamingPolicy'); vm.initClass(c); return JVM.javaArray(vm, 'L' + G + 'FieldNamingPolicy;', c.$values.slice()); } } });
 	var dump = function (g, j) { return g.$pretty ? JSON.stringify(j, null, 2) : JSON.stringify(j); };
 	var clsArg = function (c) { return c && c.$cls ? c.$cls : null; };
 	def(G + 'Gson', { methods: {
@@ -4721,6 +5022,25 @@ function installLibs(vm) {
 		'fromJson(Ljava/io/Reader;Ljava/lang/Class;)Ljava/lang/Object;': function (vm, self, a) { return fromJs(vm, parse(vm, JVM.readAllText(vm, a[0])).$j, clsArg(a[1])); },
 		'fromJson(Lcom/google/gson/JsonElement;Ljava/lang/Class;)Ljava/lang/Object;': function (vm, self, a) { return fromJs(vm, a[0] ? a[0].$j : null, clsArg(a[1])); },
 	} });
+	var gm = vm.natives[G + 'Gson'].methods;
+	Object.keys(gm).forEach(function (k) {
+		var f = gm[k];
+		gm[k] = function (vm, self, a) { var prev = naming; naming = self.$naming || null; try { return f(vm, self, a); } finally { naming = prev; } };
+	});
+}
+var naming = null;
+function jsonName(fn) {
+	if (!naming || naming === 'IDENTITY') return fn;
+	var words = fn.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(' ');
+	switch (naming) {
+	case 'UPPER_CAMEL_CASE': return fn.charAt(0).toUpperCase() + fn.slice(1);
+	case 'UPPER_CAMEL_CASE_WITH_SPACES': return words.map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+	case 'UPPER_CASE_WITH_UNDERSCORES': return words.join('_').toUpperCase();
+	case 'LOWER_CASE_WITH_UNDERSCORES': return words.join('_').toLowerCase();
+	case 'LOWER_CASE_WITH_DASHES': return words.join('-').toLowerCase();
+	case 'LOWER_CASE_WITH_DOTS': return words.join('.').toLowerCase();
+	}
+	return fn;
 }
 
 function toJs(vm, o, depth) {
@@ -4737,9 +5057,9 @@ function toJs(vm, o, depth) {
 	for (var c = o.cls; c && c.name !== 'java/lang/Object'; c = c.superClass) {
 		Object.keys(c.fields).forEach(function (fn) {
 			var f = c.fields[fn];
-			if (f.static || (f.access & 0x0080) || fn in out) return;
+			if (f.static || (f.access & 0x0080) || jsonName(fn) in out) return;
 			var v = o[':' + fn];
-			out[fn] = f.desc === 'Z' ? !!v : typeof v === 'bigint' ? Number(v) : toJs(vm, v, depth + 1);
+			out[jsonName(fn)] = f.desc === 'Z' ? !!v : typeof v === 'bigint' ? Number(v) : toJs(vm, v, depth + 1);
 		});
 	}
 	return out;
@@ -4781,8 +5101,9 @@ function fromJs(vm, j, cls, desc) {
 	for (var cc = c; cc && cc.name !== 'java/lang/Object'; cc = cc.superClass) {
 		Object.keys(cc.fields).forEach(function (fn) {
 			var f = cc.fields[fn];
-			if (f.static || (f.access & 0x0080) || !Object.prototype.hasOwnProperty.call(j, fn)) return;
-			o[':' + fn] = fromJs(vm, j[fn], null, f.desc);
+			var jn = jsonName(fn);
+			if (f.static || (f.access & 0x0080) || !Object.prototype.hasOwnProperty.call(j, jn)) return;
+			o[':' + fn] = fromJs(vm, j[jn], null, f.desc);
 		});
 	}
 	return o;
@@ -5154,7 +5475,7 @@ function loadMap(vm, text, tag) {
 		return prevClass ? prevClass(n) : null;
 	};
 	var mapMemberFn = function (owner, name, desc, isMethod) {
-		if (!isMethod && srg[name] && !cls[owner] && declaresField(vm, owner, name)) return name;
+		if (!isMethod && srg[name] && !cls[owner] && !(vm.$mixinClasses && vm.$mixinClasses[owner]) && declaresField(vm, owner, name)) return name;
 		if (srg[name]) return srg[name];
 		var q = [owner], seen = Object.create(null);
 		while (q.length) {
@@ -5284,8 +5605,19 @@ var ARMOR_MATS = { CLOTH: [5, [1, 3, 2, 1], 15], CHAIN: [15, [2, 5, 4, 1], 12], 
 function langOf(vm, k) {
 	var v = reg(vm).lang[k];
 	if (v != null) return v;
-	return vm.gameLang ? vm.gameLang(k) : null;
+	v = vm.gameLang ? vm.gameLang(k) : null;
+	return v != null ? v : JAVA_LANG[k] != null ? JAVA_LANG[k] : null;
 }
+var JAVA_LANG = {
+	'gui.done': 'Done', 'gui.cancel': 'Cancel', 'gui.back': 'Back', 'gui.yes': 'Yes', 'gui.no': 'No', 'gui.toMenu': 'Back to title screen',
+	'gui.up': 'Up', 'gui.down': 'Down', 'gui.all': 'All', 'gui.none': 'None', 'gui.proceed': 'Proceed', 'gui.ok': 'OK', 'gui.close': 'Close',
+	'menu.options': 'Options...', 'menu.quit': 'Quit Game', 'menu.singleplayer': 'Singleplayer', 'menu.multiplayer': 'Multiplayer',
+	'menu.returnToMenu': 'Save and Quit to Title', 'menu.returnToGame': 'Back to Game', 'menu.game': 'Game menu', 'menu.mods': 'Mods',
+	'options.title': 'Options', 'options.on': 'ON', 'options.off': 'OFF', 'options.video': 'Video Settings...', 'options.controls': 'Controls...',
+	'selectWorld.title': 'Select World', 'selectWorld.create': 'Create New World', 'selectWorld.delete': 'Delete', 'selectWorld.rename': 'Rename',
+	'container.inventory': 'Inventory', 'container.chest': 'Chest', 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chestDouble': 'Large Chest',
+	'stat.generalButton': 'General', 'stat.itemsButton': 'Items', 'gui.achievements': 'Achievements', 'gui.stats': 'Statistics',
+};
 function reg(vm) { return vm.mcReg || (vm.mcReg = { blocks: {}, items: {}, recipes: [], smelting: [], names: {}, lang: {}, tickMods: [], mods: [], vanilla: true }); }
 function op(vm) { var g = vm.game; return g && (g.mode === 'run' || g.mode === 'gen') && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
 function F(o, n) { return o[':' + n]; }
@@ -5378,7 +5710,7 @@ function installMc152(vm) {
 		if (JVM.mc152.onMinecraft) JVM.mc152.onMinecraft(vm, mc);
 		return mc;
 	}
-	vm.defineNative('net/minecraft/client/Minecraft', { methods: { 'isSingleplayer()Z': function () { return 1; } } });
+	vm.defineNative('net/minecraft/client/Minecraft', { statics: { theMinecraft: null }, clinit: function (vm, c) { c.statics.theMinecraft = minecraftObj(vm); }, methods: { 'isSingleplayer()Z': function () { return 1; } } });
 	vm.defineNative('java/util/logging/Logger', { methods: (function () {
 		var m = {};
 		['info', 'warning', 'severe', 'fine', 'finer', 'finest', 'config'].forEach(function (k) {
@@ -5773,8 +6105,23 @@ function installMc152(vm) {
 		'getLanguageList()Ljava/util/TreeMap;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/TreeMap')); vm.callVirtual(m, '<init>', '()V', []); vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', ['en_US', 'English (US)']); return m; },
 		'setLanguage(Ljava/lang/String;Z)V': function () {},
 	}, staticMethods: {
-		'getInstance()Lnet/minecraft/src/StringTranslate;': function (vm) { return vm.mcTranslate || (vm.mcTranslate = vm.newObject(vm.loadClass(SRC + 'StringTranslate'))); },
+		'getInstance()Lnet/minecraft/src/StringTranslate;': function (vm) {
+			if (vm.mcTranslate) return vm.mcTranslate;
+			var t = vm.mcTranslate = vm.newObject(vm.loadClass(SRC + 'StringTranslate'));
+			var lt = vm.newObject(vm.loadClass('mcre/LangTable')); vm.callVirtual(lt, '<init>', '()V', []);
+			t[':translateTable'] = lt;
+			return t;
+		},
 		'isBidirectional(Ljava/lang/String;)Z': function () { return 0; },
+	} });
+	var lkey = function (k) { return k == null ? '' : String(k); };
+	vm.defineNative('mcre/LangTable', { super: 'java/util/Properties', methods: {
+		'get(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { var v = langOf(vm, lkey(a[0])); return v == null ? null : v; },
+		'getProperty(Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var v = langOf(vm, lkey(a[0])); return v == null ? null : v; },
+		'getProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;': function (vm, self, a) { var v = langOf(vm, lkey(a[0])); return v == null ? a[1] : v; },
+		'containsKey(Ljava/lang/Object;)Z': function (vm, self, a) { return langOf(vm, lkey(a[0])) != null ? 1 : 0; },
+		'put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) { var k = lkey(a[0]), o = reg(vm).lang[k]; reg(vm).lang[k] = a[1] == null ? null : String(a[1]); return o == null ? null : o; },
+		'setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;': function (vm, self, a) { var k = lkey(a[0]), o = reg(vm).lang[k]; reg(vm).lang[k] = a[1] == null ? null : String(a[1]); return o == null ? null : o; },
 	} });
 	def('StatCollector', { staticMethods: {
 		'translateToLocal(Ljava/lang/String;)Ljava/lang/String;': function (vm, n, a) { return tr(vm, a[0]); },
@@ -5842,6 +6189,7 @@ function installMc152(vm) {
 	if (JVM.installSettings) JVM.installSettings(vm);
 	if (JVM.installLegacy) JVM.installLegacy(vm);
 	if (JVM.installGui) JVM.installGui(vm);
+	if (JVM.installChestGui) JVM.installChestGui(vm);
 	if (JVM.installPotions) JVM.installPotions(vm);
 	if (JVM.installAchievements) JVM.installAchievements(vm);
 	installSounds(vm);
@@ -5860,6 +6208,7 @@ function installMc152(vm) {
 	if (JVM.installBrain) JVM.installBrain(vm);
 	if (JVM.installParticles) JVM.installParticles(vm);
 	if (JVM.installRecorder) JVM.installRecorder(vm);
+	if (JVM.installMenus) JVM.installMenus(vm);
 	if (JVM.installDims) JVM.installDims(vm);
 	if (JVM.installForgeDims) JVM.installForgeDims(vm);
 	if (JVM.installWorldServices) JVM.installWorldServices(vm);
@@ -12627,6 +12976,26 @@ function push(vm, o) {
 	if (o.x2 !== undefined) { o.x2 += r.t[0]; o.y2 += r.t[1]; }
 	r.ops.push(o);
 }
+JVM.guiQuad = function (vm, v) {
+	var r = R(vm);
+	if (!r.on || v.length < 4) return false;
+	var xs = v.map(function (p) { return p[0]; }), ys = v.map(function (p) { return p[1]; });
+	var x = Math.min.apply(null, xs), y = Math.min.apply(null, ys), x2 = Math.max.apply(null, xs), y2 = Math.max.apply(null, ys);
+	if (x2 - x <= 0 || y2 - y <= 0) return true;
+	var col = function (p) { return p[5] == null ? (r.color ? (((r.color[3] * 255) & 255) << 24 | ((r.color[0] * 255) & 255) << 16 | ((r.color[1] * 255) & 255) << 8 | ((r.color[2] * 255) & 255)) : -1) : p[5]; };
+	var top = v.filter(function (p) { return p[1] === y; }), bot = v.filter(function (p) { return p[1] === y2; });
+	var ct = col(top[0] || v[0]), cb = col(bot[0] || v[2]);
+	if (r.noTex) {
+		if (ct === cb) push(vm, { k: 'rect', x: x, y: y, x2: x2, y2: y2, c: ct | 0 });
+		else push(vm, { k: 'grad', x: x, y: y, x2: x2, y2: y2, c: ct | 0, c2: cb | 0 });
+		return true;
+	}
+	var us = v.map(function (p) { return p[3]; }), vs = v.map(function (p) { return p[4]; });
+	push(vm, { k: 'uvq', tex: r.tex, x: x, y: y, w: x2 - x, h: y2 - y, u0: Math.min.apply(null, us), v0: Math.min.apply(null, vs), u1: Math.max.apply(null, us), v1: Math.max.apply(null, vs), c: ct === -1 ? null : ct | 0 });
+	return true;
+};
+JVM.guiWheel = function (vm, d) { vm.mcWheel = (vm.mcWheel | 0) + (d > 0 ? 120 : d < 0 ? -120 : 0); };
+
 var CW = (function () {
 	var w = {};
 	for (var c = 32; c < 127; c++) w[c] = 6;
@@ -12657,9 +13026,14 @@ function installGui(vm) {
 		'glTranslatef(FFF)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; if (vm.$glY) vm.$glY.b += vm.$glY.a * a[1]; },
 		'glTranslated(DDD)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; if (vm.$glY) vm.$glY.b += vm.$glY.a * a[1]; },
 		'glBindTexture(II)V': function (vm, n, a) { R(vm).tex = texName(vm, a[1]); },
-		'glEnable(I)V': function () {}, 'glDisable(I)V': function () {}, 'glBlendFunc(II)V': function () {}, 'glScalef(FFF)V': function (vm, n, a) { if (vm.$glY) vm.$glY.a *= a[1]; },
+		'glEnable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = false; }, 'glDisable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = true; }, 'glBlendFunc(II)V': function () {}, 'glScalef(FFF)V': function (vm, n, a) { if (vm.$glY) vm.$glY.a *= a[1]; },
 		'glRotatef(FFFF)V': function () {}, 'glDepthMask(Z)V': function () {}, 'glColorMask(ZZZZ)V': function () {}, 'glPolygonOffset(FF)V': function () {},
 		'glNormal3f(FFF)V': function () {}, 'glShadeModel(I)V': function () {}, 'glAlphaFunc(IF)V': function () {}, 'glTexParameteri(III)V': function () {},
+		'glDepthFunc(I)V': function () {}, 'glLineWidth(F)V': function () {}, 'glPointSize(F)V': function () {}, 'glClear(I)V': function () {}, 'glClearColor(FFFF)V': function () {},
+		'glMatrixMode(I)V': function () {}, 'glLoadIdentity()V': function () {}, 'glOrtho(DDDDDD)V': function () {}, 'glViewport(IIII)V': function () {},
+		'glTexParameterf(IIF)V': function () {}, 'glColor4ub(BBBB)V': function (vm, n, a) { R(vm).color = [(a[0] & 255) / 255, (a[1] & 255) / 255, (a[2] & 255) / 255, (a[3] & 255) / 255]; },
+		'glScissor(IIII)V': function () {}, 'glIsEnabled(I)Z': function (vm, n, a) { return a[0] === 3553 ? (R(vm).noTex ? 0 : 1) : 0; },
+		'glGetInteger(I)I': function () { return 0; }, 'glPushAttrib(I)V': function () {}, 'glPopAttrib()V': function () {}, 'glCallList(I)V': function () {}, 'glGenLists(I)I': function () { return 1; },
 	} });
 	vm.defineNative('org/lwjgl/input/Keyboard', { staticMethods: {
 		'isKeyDown(I)Z': function (vm, n, a) { return vm.mcKeys && vm.mcKeys[a[0]] ? 1 : 0; },
@@ -12668,12 +13042,30 @@ function installGui(vm) {
 		'getKeyName(I)Ljava/lang/String;': function (vm, n, a) { return String(JVM.lwjglKey ? JVM.lwjglKey(a[0]) : a[0]).replace(/^Key|^Digit/, '').toUpperCase(); },
 		'enableRepeatEvents(Z)V': function () {},
 	} });
+	vm.defineNative('org/lwjgl/Sys', { staticMethods: {
+		'getTime()J': function () { return BigInt(Math.floor(Date.now())); },
+		'getTimerResolution()J': function () { return 1000n; },
+		'getVersion()Ljava/lang/String;': function () { return '2.9.0'; },
+		'openURL(Ljava/lang/String;)Z': function (vm, n, a) { try { if (typeof window !== 'undefined' && /^https?:/.test(String(a[0]))) window.open(String(a[0]), '_blank', 'noopener'); } catch (e) { } return 1; },
+		'alert(Ljava/lang/String;Ljava/lang/String;)V': function (vm, n, a) { vm.log('warn', String(a[0]) + ': ' + String(a[1])); },
+	} });
 	vm.defineNative('org/lwjgl/input/Mouse', { staticMethods: {
-		'getEventDWheel()I': function () { return 0; }, 'getDWheel()I': function () { return 0; },
+		'getEventDWheel()I': function (vm) { return vm.mcWheelEv | 0; },
+		'getDWheel()I': function (vm) { var w = vm.mcWheel | 0; vm.mcWheel = 0; return w; },
+		'next()Z': function (vm) { if (vm.mcWheel) { vm.mcWheelEv = vm.mcWheel; vm.mcWheel = 0; return 1; } vm.mcWheelEv = 0; return 0; },
+		'getEventButton()I': function () { return -1; },
+		'getEventButtonState()Z': function () { return 0; },
+		'getEventX()I': function (vm) { return vm.mcMouse ? vm.mcMouse[0] : 0; }, 'getEventY()I': function (vm) { return vm.mcMouse ? vm.mcMouse[1] : 0; },
 		'isButtonDown(I)Z': function (vm, n, a) { return vm.mcMouseDown === a[0] ? 1 : 0; },
 		'getX()I': function (vm) { return vm.mcMouse ? vm.mcMouse[0] : 0; }, 'getY()I': function (vm) { return vm.mcMouse ? vm.mcMouse[1] : 0; },
 	} });
 	function texName(vm, id) { var t = vm.mcTexIds || []; return t[id] || null; }
+	function imgName(vm, img) {
+		if (!img || !img.$png) return null;
+		if (!img.$texName) { var b = vm.$imgTex || (vm.$imgTex = []); img.$texName = '$img/' + b.length + '.png'; b.push(img.$png); }
+		return img.$texName;
+	}
+	function imgTex(vm, img) { var n = imgName(vm, img); return n ? texId(vm, n) : 0; }
 	function texId(vm, name) { var t = vm.mcTexIds || (vm.mcTexIds = [null]); var i = t.indexOf(name); if (i < 0) { i = t.length; t.push(name); } return i; }
 	def('RenderEngine', { methods: {
 		'getTexture(Ljava/lang/String;)I': function (vm, self, a) { return texId(vm, a[0]); },
@@ -12681,6 +13073,9 @@ function installGui(vm) {
 		'bindTexture(Ljava/lang/String;)V': function (vm, self, a) { R(vm).tex = a[0]; },
 		'resetBoundTexture()V': function () {},
 		'getTextureForDownloadableImage(Ljava/lang/String;Ljava/lang/String;)I': function (vm, self, a) { return texId(vm, a[1]); },
+		'allocateAndSetupTexture(Ljava/awt/image/BufferedImage;)I': function (vm, self, a) { return imgTex(vm, a[0]); },
+		'setupTexture(Ljava/awt/image/BufferedImage;I)V': function (vm, self, a) { var n = imgName(vm, a[0]); if (n) (vm.mcTexIds || (vm.mcTexIds = [null]))[a[1]] = n; },
+		'deleteTexture(I)V': function () {},
 	} });
 	var drawStr = function (vm, s, x, y, color, shadow) {
 		push(vm, { k: 'text', s: String(s == null ? 'null' : s), x: x, y: y, c: color | 0, shadow: !!shadow });
@@ -12690,6 +13085,8 @@ function installGui(vm) {
 		'drawString(Ljava/lang/String;III)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], false); },
 		'drawStringWithShadow(Ljava/lang/String;III)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], true); },
 		'drawString(Ljava/lang/String;IIIZ)I': function (vm, self, a) { return drawStr(vm, a[0], a[1], a[2], a[3], a[4]); },
+		'drawString(Ljava/lang/String;III)V': function (vm, self, a) { drawStr(vm, a[0], a[1], a[2], a[3], false); },
+		'drawStringWithShadow(Ljava/lang/String;III)V': function (vm, self, a) { drawStr(vm, a[0], a[1], a[2], a[3], true); },
 		'getStringWidth(Ljava/lang/String;)I': function (vm, self, a) { return strWidth(a[0]); },
 		'getCharWidth(C)I': function (vm, self, a) { return CW[a[0]] || 6; },
 		'trimStringToWidth(Ljava/lang/String;I)Ljava/lang/String;': function (vm, self, a) { var s = String(a[0] || ''), o = ''; for (var i = 0; i < s.length && strWidth(o + s[i]) <= a[1]; i++) o += s[i]; return o; },
@@ -12711,7 +13108,24 @@ function installGui(vm) {
 		});
 		return out;
 	}
-	var font = function (vm) { var f = vm.mcFont || (vm.mcFont = vm.newObject(vm.loadClass(SRC + 'FontRenderer'))); f[':FONT_HEIGHT'] = 9; return f; };
+	var font = function (vm) {
+		var f = vm.mcFont || (vm.mcFont = vm.newObject(vm.loadClass(SRC + 'FontRenderer')));
+		f[':FONT_HEIGHT'] = 9;
+		if (!f[':charWidth']) { var w = []; for (var i = 0; i < 256; i++) w.push(CW[i] || 6); f[':charWidth'] = JVM.javaArray(vm, 'I', w); }
+		return f;
+	};
+	def('ChatAllowedCharacters', { statics: { allowedCharacters: null, allowedCharactersArray: null }, clinit: function (vm, c) {
+		var t = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_\'abcdefghijklmnopqrstuvwxyz{|}~\u2302\u00c7\u00fc\u00e9\u00e2\u00e4\u00e0\u00e5\u00e7\u00ea\u00eb\u00e8\u00ef\u00ee\u00ec\u00c4\u00c5\u00c9\u00e6\u00c6\u00f4\u00f6\u00f2\u00fb\u00f9\u00ff\u00d6\u00dc\u00f8\u00a3\u00d8\u00d7\u0192\u00e1\u00ed\u00f3\u00fa\u00f1\u00d1\u00aa\u00ba\u00bf\u00ae\u00ac\u00bd\u00bc\u00a1\u00ab\u00bb';
+		c.statics.allowedCharacters = t;
+		c.statics.allowedCharactersArray = JVM.javaArray(vm, 'C', [47, 10, 13, 9, 0, 12, 96, 63, 42, 92, 60, 62, 124, 34, 58]);
+	}, staticMethods: {
+		'isAllowedCharacter(C)Z': function (vm, n, a) { return a[0] !== 167 && (a[0] >= 32 && a[0] !== 127) ? 1 : 0; },
+		'filerAllowedCharacters(Ljava/lang/String;)Ljava/lang/String;': function (vm, n, a) { return String(a[0] || '').replace(/[\u0000-\u001f\u007f\u00a7]/g, ''); },
+	} });
+	def('GameSettings', { fields: { guiScale: 'I', fancyGraphics: 'Z', language: 'Ljava/lang/String;', thirdPersonView: 'I', hideGUI: 'Z', showDebugInfo: 'Z', difficulty: 'I', renderDistance: 'I', mouseSensitivity: 'F', fovSetting: 'F', gammaSetting: 'F', anaglyph: 'Z', clouds: 'Z', particleSetting: 'I', viewBobbing: 'Z', advancedOpengl: 'Z', limitFramerate: 'I', ambientOcclusion: 'Z', soundVolume: 'F', musicVolume: 'F', invertMouse: 'Z' }, methods: {
+		'saveOptions()V': function () {}, 'loadOptions()V': function () {},
+		'getKeyBinding(Lnet/minecraft/src/EnumOptions;)Ljava/lang/String;': function () { return ''; },
+	} });
 	var engine = function (vm) { return vm.mcEngine || (vm.mcEngine = vm.newObject(vm.loadClass(SRC + 'RenderEngine'))); };
 
 	var tr = function (vm, x, y, u, v, w, h) { var r = R(vm), c = r.color; push(vm, { k: 'tex', tex: r.tex, x: x, y: y, u: u, v: v, w: w, h: h, col: c[0] !== 1 || c[1] !== 1 || c[2] !== 1 || c[3] !== 1 ? c.slice() : null }); };
@@ -12753,9 +13167,9 @@ function installGui(vm) {
 		'actionPerformed(Lnet/minecraft/src/GuiButton;)V': function () {},
 		'updateScreen()V': function () {},
 		'onGuiClosed()V': function () {},
-		'drawDefaultBackground()V': function (vm, self) { push(vm, { k: 'dim' }); },
-		'drawWorldBackground(I)V': function (vm, self) { push(vm, { k: 'dim' }); },
-		'drawBackground(I)V': function (vm, self) { push(vm, { k: 'dim' }); },
+		'drawDefaultBackground()V': function (vm, self) { menuBack(vm, self); },
+		'drawWorldBackground(I)V': function (vm, self) { menuBack(vm, self); },
+		'drawBackground(I)V': function (vm, self) { dirtBack(vm, self); },
 		'doesGuiPauseGame()Z': function () { return 1; },
 		'handleInput()V': function () {},
 		'confirmClicked(ZI)V': function () {},
@@ -12765,6 +13179,8 @@ function installGui(vm) {
 		'getClipboardString()Ljava/lang/String;': function () { return ''; },
 		'setClipboardString(Ljava/lang/String;)V': function () {},
 	}, anyInit: function (vm, self) { screenInit(vm, self); } });
+	var dirtBack = function (vm, self) { var w = self[':width'] || 427, h = self[':height'] || 240; push(vm, { k: 'uvq', tex: '/gui/background.png', x: 0, y: 0, w: w, h: h, u0: 0, v0: 0, u1: w / 32, v1: h / 32, c: 0xff404040 | 0 }); };
+	var menuBack = function (vm, self) { if (vm.game && vm.game.mode === 'run') push(vm, { k: 'dim' }); else dirtBack(vm, self); };
 	function screenInit(vm, self) {
 		if (!self[':buttonList']) self[':buttonList'] = JVM.newList(vm, []);
 		if (!self[':labelList']) self[':labelList'] = JVM.newList(vm, []);
@@ -12785,6 +13201,113 @@ function installGui(vm) {
 		'getHoverState(Z)I': function (vm, self, a) { return !self[':enabled'] ? 0 : a[0] ? 2 : 1; },
 		'func_82252_a()Z': function (vm, self) { return self[':field_82253_i']; },
 	} });
+	var SL = 'Lnet/minecraft/src/Tessellator;';
+	var slH = function (self) { return self[':slotHeight'] || self[':posZ'] || 1; };
+	var tess = function (vm) { var c = vm.loadClass(SRC + 'Tessellator'); vm.initClass(c); return c.statics.instance; };
+	var dirt = function (vm, x, y, x2, y2, grey, a1, a2) {
+		R(vm).tex = '/gui/background.png';
+		var c = function (al) { return (al & 255) << 24 | grey << 16 | grey << 8 | grey; };
+		if (a1 === a2) push(vm, { k: 'uvq', tex: '/gui/background.png', x: x, y: y, w: x2 - x, h: y2 - y, u0: x / 32, v0: y / 32, u1: x2 / 32, v1: y2 / 32, c: c(a1) });
+	};
+	var slotMethods = {
+		'<init>(Lnet/minecraft/client/Minecraft;IIIII)V': function (vm, self, a) {
+			self[':mc'] = a[0]; self[':width'] = a[1]; self[':height'] = a[2]; self[':top'] = a[3]; self[':bottom'] = a[4];
+			self[':posZ'] = a[5]; self[':slotHeight'] = a[5]; self[':left'] = 0; self[':right'] = a[1];
+			self[':initialClickY'] = -2; self[':selectedElement'] = -1; self[':field_25123_p'] = 1; self[':showSelectionBox'] = 1;
+		},
+		'getContentHeight()I': function (vm, self) { return vm.callVirtual(self, 'getSize', '()I', []) * slH(self) + (self[':field_27261_r'] | 0); },
+		'func_27258_a(Z)V': function (vm, self, a) { self[':field_25123_p'] = a[0]; self[':showSelectionBox'] = a[0]; },
+		'func_27259_a(ZI)V': function (vm, self, a) { self[':field_27262_q'] = a[0]; self[':field_27261_r'] = a[0] ? a[1] : 0; },
+		'func_27260_a(IILnet/minecraft/src/Tessellator;)V': function () {},
+		'func_27255_a(II)V': function () {},
+		'func_27257_b(II)V': function () {},
+		'func_27256_c(II)I': function (vm, self, a) {
+			var l = (self[':width'] >> 1) - 110, rr = (self[':width'] >> 1) + 110;
+			var yy = a[1] - self[':top'] - (self[':field_27261_r'] | 0) + (self[':amountScrolled'] | 0) - 4, i = Math.floor(yy / slH(self));
+			return a[0] >= l && a[0] <= rr && i >= 0 && yy >= 0 && i < vm.callVirtual(self, 'getSize', '()I', []) ? i : -1;
+		},
+		'registerScrollButtons(Ljava/util/List;II)V': function (vm, self, a) { self[':scrollUpButtonID'] = a[1]; self[':scrollDownButtonID'] = a[2]; },
+		'bindAmountScrolled()V': function (vm, self) {
+			var max = vm.callVirtual(self, 'getContentHeight', '()I', []) - (self[':bottom'] - self[':top'] - 4);
+			if (max < 0) max = Math.trunc(max / 2);
+			if (self[':amountScrolled'] < 0) self[':amountScrolled'] = 0;
+			if (self[':amountScrolled'] > max) self[':amountScrolled'] = Math.fround(max);
+		},
+		'actionPerformed(Lnet/minecraft/src/GuiButton;)V': function (vm, self, a) {
+			var b = a[0]; if (!b || !b[':enabled']) return;
+			var d = b[':id'] === self[':scrollUpButtonID'] ? -1 : b[':id'] === self[':scrollDownButtonID'] ? 1 : 0;
+			if (!d) return;
+			self[':amountScrolled'] = Math.fround(self[':amountScrolled'] + d * slH(self) * 2 / 3); self[':initialClickY'] = -2;
+			vm.callVirtual(self, 'bindAmountScrolled', '()V', []);
+		},
+		'overlayBackground(IIII)V': function (vm, self, a) { dirt(vm, 0, a[0], self[':width'], a[1], 0x40, a[2], a[3]); },
+		'drawScreen(IIF)V': function (vm, self, a) {
+			var mx = a[0], my = a[1], W = self[':width'], top = self[':top'], bottom = self[':bottom'], h = slH(self), pad = self[':field_27261_r'] | 0;
+			vm.callVirtual(self, 'drawBackground', '()V', []);
+			var size = vm.callVirtual(self, 'getSize', '()I', []);
+			var sbX = (W >> 1) + 124, sbX2 = sbX + 6;
+			var down = vm.mcMouseDown === 0, ch = vm.callVirtual(self, 'getContentHeight', '()I', []);
+			if (down) {
+				if (self[':initialClickY'] === -1) {
+					var ok = true;
+					if (my >= top && my <= bottom) {
+						var l = (W >> 1) - 110, rr = (W >> 1) + 110, yy = my - top - pad + (self[':amountScrolled'] | 0) - 4, i = Math.floor(yy / h);
+						if (mx >= l && mx <= rr && i >= 0 && yy >= 0 && i < size) {
+							var dbl = i === self[':selectedElement'] && Date.now() - Number(self[':lastClicked'] || 0n) < 250;
+							vm.callVirtual(self, 'elementClicked', '(IZ)V', [i, dbl ? 1 : 0]);
+							self[':selectedElement'] = i; self[':lastClicked'] = BigInt(Date.now());
+						} else if (mx >= l && mx <= rr && yy < 0) { vm.callVirtual(self, 'func_27255_a', '(II)V', [mx - l, my - top + (self[':amountScrolled'] | 0) - 4]); ok = false; }
+						if (mx >= sbX && mx <= sbX2) {
+							var max = Math.max(1, ch - (bottom - top - 4)), bar = Math.min(bottom - top - 8, Math.max(32, Math.trunc((bottom - top) * (bottom - top) / Math.max(1, ch))));
+							self[':scrollMultiplier'] = Math.fround(-1 / ((bottom - top - bar) / max));
+						} else self[':scrollMultiplier'] = 1;
+						self[':initialClickY'] = ok ? my : -2;
+					} else self[':initialClickY'] = -2;
+				} else if (self[':initialClickY'] >= 0) {
+					self[':amountScrolled'] = Math.fround(self[':amountScrolled'] - (my - self[':initialClickY']) * self[':scrollMultiplier']);
+					self[':initialClickY'] = my;
+				}
+			} else self[':initialClickY'] = -1;
+			if (vm.mcWheel) { self[':amountScrolled'] = Math.fround(self[':amountScrolled'] - (vm.mcWheel > 0 ? 1 : -1) * h / 2); vm.mcWheel = 0; }
+			vm.callVirtual(self, 'bindAmountScrolled', '()V', []);
+			var scr = self[':amountScrolled'] | 0, t = tess(vm);
+			dirt(vm, 0, top, W, bottom, 0x20, 255, 255);
+			var rowX = (W >> 1) - 92 - 16, y0 = top + 4 - scr;
+			if (self[':field_27262_q']) vm.callVirtual(self, 'func_27260_a', '(II' + SL + ')V', [rowX, y0, t]);
+			var sel = self[':field_25123_p'] || self[':showSelectionBox'];
+			for (var k = 0; k < size; k++) {
+				var y = y0 + k * h + pad, hh = h - 4;
+				if (y > bottom || y + hh < top) continue;
+				if (sel && vm.callVirtual(self, 'isSelected', '(I)Z', [k])) {
+					var l2 = (W >> 1) - 110, r2 = (W >> 1) + 110;
+					push(vm, { k: 'rect', x: l2, y: y - 2, x2: r2, y2: y + hh + 2, c: 0xff808080 | 0 });
+					push(vm, { k: 'rect', x: l2 + 1, y: y - 1, x2: r2 - 1, y2: y + hh + 1, c: 0xff000000 | 0 });
+				}
+				vm.callVirtual(self, 'drawSlot', '(IIII' + SL + ')V', [k, rowX, y, hh, t]);
+			}
+			dirt(vm, 0, 0, W, top, 0x40, 255, 255);
+			dirt(vm, 0, bottom, W, self[':height'], 0x40, 255, 255);
+			push(vm, { k: 'grad', x: 0, y: top, x2: W, y2: top + 4, c: 0xff000000 | 0, c2: 0 });
+			push(vm, { k: 'grad', x: 0, y: bottom - 4, x2: W, y2: bottom, c: 0, c2: 0xff000000 | 0 });
+			var over = ch - (bottom - top - 4);
+			if (over > 0) {
+				var bar2 = Math.min(bottom - top - 8, Math.max(32, Math.trunc((bottom - top) * (bottom - top) / ch)));
+				var by = Math.max(top, Math.trunc(scr * (bottom - top - bar2) / over) + top);
+				push(vm, { k: 'rect', x: sbX, y: top, x2: sbX2, y2: bottom, c: 0xff000000 | 0 });
+				push(vm, { k: 'rect', x: sbX, y: by, x2: sbX2, y2: by + bar2, c: 0xff808080 | 0 });
+				push(vm, { k: 'rect', x: sbX, y: by, x2: sbX2 - 1, y2: by + bar2 - 1, c: 0xffc0c0c0 | 0 });
+			}
+			vm.callVirtual(self, 'func_27257_b', '(II)V', [mx, my]);
+		},
+		'drawBackground()V': function () {},
+		'isSelected(I)Z': function () { return 0; },
+		'elementClicked(IZ)V': function () {},
+		'getSize()I': function () { return 0; },
+		'drawSlot(IIIILnet/minecraft/src/Tessellator;)V': function () {},
+	};
+	def('GuiSlot', { fields: { mc: 'Lnet/minecraft/client/Minecraft;', width: 'I', height: 'I', top: 'I', bottom: 'I', right: 'I', left: 'I', posZ: 'I', slotHeight: 'I',
+		scrollUpButtonID: 'I', scrollDownButtonID: 'I', initialClickY: 'F', scrollMultiplier: 'F', amountScrolled: 'F', selectedElement: 'I', lastClicked: 'J',
+		field_25123_p: 'Z', showSelectionBox: 'Z', field_27262_q: 'Z', field_27261_r: 'I' }, methods: slotMethods });
 	function btn(self, id, x, y, w, h, s) { self[':id'] = id; self[':xPosition'] = x; self[':yPosition'] = y; self[':width'] = w; self[':height'] = h; self[':displayString'] = s; self[':enabled'] = 1; self[':drawButton'] = 1; }
 	def('GuiTextField', { methods: {
 		'<init>(Lnet/minecraft/src/FontRenderer;IIII)V': function (vm, self, a) { self[':xPos'] = a[1]; self[':yPos'] = a[2]; self[':width'] = a[3]; self[':height'] = a[4]; self.$text = ''; self.$max = 32; self.$focus = false; },
@@ -12830,7 +13353,8 @@ function installGui(vm) {
 			gs[':keyBindInventory'] = kb('key.inventory', 18); gs[':keyBindJump'] = kb('key.jump', 57); gs[':keyBindSneak'] = kb('key.sneak', 42);
 			gs[':keyBindForward'] = kb('key.forward', 17); gs[':keyBindBack'] = kb('key.back', 31); gs[':keyBindLeft'] = kb('key.left', 30); gs[':keyBindRight'] = kb('key.right', 32);
 			gs[':keyBindDrop'] = kb('key.drop', 16); gs[':keyBindChat'] = kb('key.chat', 20); gs[':keyBindAttack'] = kb('key.attack', -100); gs[':keyBindUseItem'] = kb('key.use', -99);
-			gs[':fancyGraphics'] = 1; gs[':guiScale'] = 0; gs[':language'] = 'en_US';
+			gs[':fancyGraphics'] = 1; gs[':guiScale'] = 0; gs[':language'] = 'en_US'; gs[':renderDistance'] = 0; gs[':clouds'] = 1; gs[':viewBobbing'] = 1;
+			gs[':soundVolume'] = 1; gs[':musicVolume'] = 1; gs[':mouseSensitivity'] = 0.5; gs[':gammaSetting'] = 0.5; gs[':fovSetting'] = 0; gs[':ambientOcclusion'] = 1; gs[':particleSetting'] = 0;
 			mc[':gameSettings'] = gs;
 		}
 	};
@@ -12842,7 +13366,16 @@ function installGui(vm) {
 	EP.methods = Object.assign({}, EP.methods, {
 		'openGui(Ljava/lang/Object;ILnet/minecraft/src/World;III)V': function (vm, self, a) { openModGui(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); },
 		'closeScreen()V': function (vm) { closeScreen(vm); },
-		'displayGUIChest(Lnet/minecraft/src/IInventory;)V': function (vm, self, a) { vm.warnOnce('gui:chest', 'a mod chest screen (displayGUIChest) is not available here yet'); },
+		'displayGUIChest(Lnet/minecraft/src/IInventory;)V': function (vm, self, a) {
+			if (!a[0]) return;
+			var pinv = self[':inventory'];
+			var cc = vm.newObject(vm.loadClass(SRC + 'ContainerChest'));
+			vm.callVirtual(cc, '<init>', '(Lnet/minecraft/src/IInventory;Lnet/minecraft/src/IInventory;)V', [pinv, a[0]]);
+			var gc = vm.newObject(vm.loadClass(SRC + 'GuiChest'));
+			vm.callVirtual(gc, '<init>', '(Lnet/minecraft/src/IInventory;Lnet/minecraft/src/IInventory;)V', [pinv, a[0]]);
+			JVM.run(vm, function () { vm.callVirtual(a[0], 'openChest', '()V', []); });
+			openScreen(vm, gc, cc);
+		},
 	});
 	var NR = vm.natives['cpw/mods/fml/common/network/NetworkRegistry'];
 	if (NR) NR.methods['openRemoteGui(Lcpw/mods/fml/common/ModContainer;Lnet/minecraft/src/EntityPlayerMP;ILnet/minecraft/src/World;III)V'] = function (vm, self, a) { openModGui(vm, JVM.mc152.playerObj(vm, null), a[0] && a[0].$mod && a[0].$mod.instance, a[2], a[3], a[4], a[5], a[6]); };
@@ -12987,6 +13520,147 @@ function installGui(vm) {
 	} });
 }
 
+function installChestGui(vm) {
+	var def = function (n, sp) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, sp); };
+	var II = 'Lnet/minecraft/src/IInventory;';
+	def('ContainerChest', { super: SRC + 'Container', methods: {} });
+	var CC = vm.natives[SRC + 'ContainerChest'];
+	var slotIn = function (vm, c, inv, i, x, y) {
+		var sl = vm.newObject(vm.loadClass(SRC + 'Slot'));
+		vm.callVirtual(sl, '<init>', '(Lnet/minecraft/src/IInventory;III)V', [inv, i, x, y]);
+		vm.callVirtual(c, 'addSlotToContainer', '(Lnet/minecraft/src/Slot;)Lnet/minecraft/src/Slot;', [sl]);
+	};
+	CC.methods['<init>(Lnet/minecraft/src/IInventory;Lnet/minecraft/src/IInventory;)V'] = function (vm, self, a) {
+		var pinv = a[0], chest = a[1];
+		self.$chest = chest;
+		var n = vm.callVirtual(chest, 'getSizeInventory', '()I', []), rows = Math.max(1, Math.ceil(n / 9));
+		self.$rows = rows;
+		var off = (rows - 4) * 18;
+		for (var r = 0; r < rows; r++) for (var c = 0; c < 9 && r * 9 + c < n; c++) slotIn(vm, self, chest, c + r * 9, 8 + c * 18, 18 + r * 18);
+		for (var r2 = 0; r2 < 3; r2++) for (var c2 = 0; c2 < 9; c2++) slotIn(vm, self, pinv, c2 + r2 * 9 + 9, 8 + c2 * 18, 103 + r2 * 18 + off);
+		for (var h = 0; h < 9; h++) slotIn(vm, self, pinv, h, 8 + h * 18, 161 + off);
+	};
+	CC.methods['transferStackInSlot(Lnet/minecraft/src/EntityPlayer;I)Lnet/minecraft/src/ItemStack;'] = function (vm, self, a) {
+		var slots = listArr(vm, self[':inventorySlots']), s = slots[a[1]];
+		if (!s) return null;
+		var st = vm.callVirtual(s, 'getStack', '()Lnet/minecraft/src/ItemStack;', []);
+		if (!st) return null;
+		var copy = vm.callVirtual(st, 'copy', '()Lnet/minecraft/src/ItemStack;', []);
+		var nChest = self.$rows * 9 > slots.length - 36 ? slots.length - 36 : self.$rows * 9;
+		var moved = a[1] < nChest ? merge(vm, self, st, nChest, slots.length, true) : merge(vm, self, st, 0, nChest, false);
+		if (!moved) return null;
+		if (st[':stackSize'] <= 0) vm.callVirtual(s, 'putStack', '(Lnet/minecraft/src/ItemStack;)V', [null]);
+		else vm.callVirtual(s, 'onSlotChanged', '()V', []);
+		return copy;
+	};
+	CC.methods['getLowerChestInventory()Lnet/minecraft/src/IInventory;'] = function (vm, self) { return self.$chest; };
+	CC.methods['canInteractWith(Lnet/minecraft/src/EntityPlayer;)Z'] = function () { return 1; };
+	CC.methods['onCraftGuiClosed(Lnet/minecraft/src/EntityPlayer;)V'] = function (vm, self) {
+		putBack(vm);
+		if (self.$chest) JVM.run(vm, function () { vm.callVirtual(self.$chest, 'closeChest', '()V', []); });
+	};
+	def('GuiChest', { super: SRC + 'GuiContainer', methods: {} });
+	var GC = vm.natives[SRC + 'GuiChest'];
+	GC.methods['<init>(Lnet/minecraft/src/IInventory;Lnet/minecraft/src/IInventory;)V'] = function (vm, self, a) {
+		var cc = vm.newObject(vm.loadClass(SRC + 'ContainerChest'));
+		vm.callVirtual(cc, '<init>', '(Lnet/minecraft/src/IInventory;Lnet/minecraft/src/IInventory;)V', [a[0], a[1]]);
+		vm.invoke(vm.loadClass(SRC + 'GuiContainer').methods['<init>(Lnet/minecraft/src/Container;)V'], self, [cc]);
+		self.$upper = a[0]; self.$lower = a[1]; self.$rows = cc.$rows;
+		self[':ySize'] = 114 + self.$rows * 18;
+	};
+	GC.methods['drawGuiContainerBackgroundLayer(FII)V'] = function (vm, self) {
+		R(vm).tex = '/gui/container.png';
+		var x = (self[':width'] - self[':xSize']) >> 1, y = (self[':height'] - self[':ySize']) >> 1, rows = self.$rows;
+		vm.callVirtual(self, 'drawTexturedModalRect', '(IIIIII)V', [x, y, 0, 0, self[':xSize'], rows * 18 + 17]);
+		vm.callVirtual(self, 'drawTexturedModalRect', '(IIIIII)V', [x, y + rows * 18 + 17, 0, 126, self[':xSize'], 96]);
+	};
+	GC.methods['drawGuiContainerForegroundLayer(II)V'] = function (vm, self) {
+		var name = function (inv) {
+			var n = String(vm.callVirtual(inv, 'getInvName', '()Ljava/lang/String;', []) || '');
+			var loc = 0; try { loc = vm.callVirtual(inv, 'isInvNameLocalized', '()Z', []); } catch (e) { loc = 1; }
+			if (!loc && JVM.mc152.reg(vm).lang && JVM.mc152.reg(vm).lang[n]) n = JVM.mc152.reg(vm).lang[n];
+			return n === 'container.inventory' ? 'Inventory' : n;
+		};
+		var fr = self[':fontRenderer'];
+		if (!fr) return;
+		vm.callVirtual(fr, 'drawString', '(Ljava/lang/String;III)I', [name(self.$lower), 8, 6, 0x404040]);
+		vm.callVirtual(fr, 'drawString', '(Ljava/lang/String;III)I', [name(self.$upper), 8, self[':ySize'] - 96 + 2, 0x404040]);
+	};
+}
+JVM.installChestGui = installChestGui;
+
+var VANILLA_SCREENS = { GuiTexturePacks: 'mods', GuiScreenTexturePacks: 'mods', GuiOptions: 'options', GuiVideoSettings: 'options', GuiControls: 'options', GuiScreenResourcePacks: 'mods' };
+JVM.vanillaScreens = VANILLA_SCREENS;
+var MENU_VANILLA = { title: [0, 1, 2, 3, 4, 5, 6, 14, 20], pause: [0, 1, 4, 5, 6, 7, 12] };
+function installMenus(vm) {
+	var def = function (n, sp) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, sp); };
+	var B = 'Lnet/minecraft/src/GuiButton;';
+	var add = function (vm, self, id, x, y, w, h, label) {
+		var b = vm.newObject(vm.loadClass(SRC + 'GuiButton'));
+		vm.callVirtual(b, '<init>', '(IIIIILjava/lang/String;)V', [id, x, y, w, h, label]);
+		vm.callVirtual(self[':buttonList'], 'add', '(Ljava/lang/Object;)Z', [b]);
+	};
+	def('GuiMainMenu', { super: SRC + 'GuiScreen', methods: {
+		'initGui()V': function (vm, self) {
+			var w = self[':width'], i = (self[':height'] >> 2) + 48, x = (w >> 1) - 100;
+			add(vm, self, 1, x, i, 200, 20, 'Singleplayer');
+			add(vm, self, 2, x, i + 24, 200, 20, 'Multiplayer');
+			add(vm, self, 3, x, i + 48, 200, 20, 'Mods and Texture Packs');
+			add(vm, self, 0, x, i + 72, 98, 20, 'Options...');
+			add(vm, self, 4, (w >> 1) + 2, i + 72, 98, 20, 'Quit Game');
+		},
+		'actionPerformed(Lnet/minecraft/src/GuiButton;)V': function () {},
+		'doesGuiPauseGame()Z': function () { return 0; },
+	} });
+	def('GuiIngameMenu', { super: SRC + 'GuiScreen', methods: {
+		'initGui()V': function (vm, self) {
+			var w = self[':width'], i = (self[':height'] >> 2), x = (w >> 1) - 100;
+			add(vm, self, 4, x, i + 24, 200, 20, 'Back to game');
+			add(vm, self, 1, x, i + 48, 200, 20, 'Save and quit to title');
+			add(vm, self, 5, x, i + 72, 98, 20, 'Achievements');
+			add(vm, self, 6, (w >> 1) + 2, i + 72, 98, 20, 'Statistics');
+			add(vm, self, 0, x, i + 96, 200, 20, 'Options...');
+		},
+		'actionPerformed(Lnet/minecraft/src/GuiButton;)V': function () {},
+	} });
+	var GOE = 'net/minecraftforge/client/event/GuiOpenEvent';
+	if (vm.natives['net/minecraftforge/event/Event'] && !vm.natives[GOE]) vm.defineNative(GOE, { super: 'net/minecraftforge/event/Event', fields: { gui: 'Lnet/minecraft/src/GuiScreen;' }, methods: {} });
+	if (vm.natives[GOE]) {
+		vm.natives[GOE].methods['<init>(Lnet/minecraft/src/GuiScreen;)V'] = function (vm, self, a) { self[':gui'] = a[0]; };
+		vm.natives[GOE].methods['isCancelable()Z'] = function () { return 1; };
+	}
+}
+JVM.installMenus = installMenus;
+JVM.menuButtons = function (vm, which) {
+	var cn = SRC + (which === 'pause' ? 'GuiIngameMenu' : 'GuiMainMenu');
+	if (!vm.natives[cn]) return [];
+	var out = [];
+	JVM.run(vm, function () {
+		var sc = vm.newObject(vm.loadClass(cn));
+		vm.callVirtual(sc, '<init>', '()V', []);
+		sc.$vanillaMenu = which;
+		var mc = JVM.mc152.minecraftObj ? JVM.mc152.minecraftObj(vm) : null;
+		vm.callVirtual(sc, 'setWorldAndResolution', '(Lnet/minecraft/client/Minecraft;II)V', [mc, 427, 240]);
+		var ev = JVM.forgePost ? JVM.forgePost(vm, 'net/minecraftforge/client/event/GuiOpenEvent', function (e) { e[':gui'] = sc; }) : null;
+		if (ev && ev[':gui'] && ev[':gui'] !== sc) {
+			var own = ev[':gui'];
+			own.$vanillaMenu = which;
+			vm.callVirtual(own, 'setWorldAndResolution', '(Lnet/minecraft/client/Minecraft;II)V', [mc, 427, 240]);
+			sc = own;
+		}
+		var vanilla = MENU_VANILLA[which] || [];
+		var mine = listArr(vm, sc[':buttonList']).filter(function (b) { return vanilla.indexOf(b[':id']) < 0 && b[':drawButton'] !== 0; });
+		(vm.$menus || (vm.$menus = {}))[which] = { screen: sc, buttons: mine };
+		out = mine.map(function (b) { return String(b[':displayString'] || 'Mod'); });
+	});
+	return out;
+};
+JVM.menuClick = function (vm, which, i) {
+	var m = vm.$menus && vm.$menus[which], b = m && m.buttons[i];
+	if (!b) return;
+	JVM.run(vm, function () { vm.callVirtual(m.screen, 'actionPerformed', '(Lnet/minecraft/src/GuiButton;)V', [b]); });
+};
+
 function stackOf(vm, s) { return s ? vm.callVirtual(s, 'getStack', '()Lnet/minecraft/src/ItemStack;', []) : null; }
 function same(a, b) { return a && b && a[':itemID'] === b[':itemID'] && (!vm_hasSub(a) || a[':itemDamage'] === b[':itemDamage']); }
 function vm_hasSub(s) { return true; }
@@ -13106,6 +13780,13 @@ function openModGui(vm, player, modObj, id, world, x, y, z) {
 	openScreen(vm, client, server && vm.isInstance(server, vm.loadClass(SRC + 'Container')) ? server : null);
 }
 function openScreen(vm, screen, server) {
+	if (screen && screen.$vanillaMenu) { closeScreen(vm); return; }
+	if (screen && screen.cls && screen.cls.absent && screen.cls.name.indexOf(SRC) === 0) {
+		var vn = screen.cls.name.substring(SRC.length), to = VANILLA_SCREENS[vn];
+		if (to && JVM.onGameScreen) JVM.onGameScreen(vm, to);
+		else vm.warnOnce('gui:vanilla:' + vn, "the game's " + vn + ' is not available here');
+		return;
+	}
 	if (vm.mcActor) { vm.warnOnce('gui:joined', "mod screens for joined players aren't available yet"); return; }
 	if (vm.mcGui && vm.mcGui.screen !== screen) closeScreen(vm, true);
 	var g = vm.mcGui = { screen: screen, server: server, mod: screen.cls.source || vm.currentMod };
@@ -13156,6 +13837,7 @@ JVM.guiMouse = function (vm, mx, my, button, down) {
 	vm.steps = 0;
 	JVM.run(vm, function () { vm.callVirtual(g.screen, down ? 'mouseClicked' : 'mouseMovedOrUp', '(III)V', [mx, my, button]); });
 };
+JVM.guiDrag = function (vm, on) { vm.mcMouseDown = on ? 0 : -1; };
 JVM.guiKey = function (vm, ch, code, down) {
 	var g = vm.mcGui;
 	(vm.mcKeys || (vm.mcKeys = {}))[code] = !!down;
@@ -13172,6 +13854,8 @@ JVM.guiTick = function (vm) {
 };
 JVM.guiTexture = function (vm, path) {
 	var p = String(path || '').replace(/^[/]+/, '');
+	var m = /^[$]img[/](\d+)[.]png$/.exec(String(path || ''));
+	if (m) return vm.$imgTex && vm.$imgTex[+m[1]] || null;
 	return vm.resources[p] || null;
 };
 
@@ -13716,6 +14400,7 @@ var LIBS = [
 	[/^net[/]glasslauncher[/]mods[/]alwaysmoreitems|^net[/]glasslauncher[/]hmifabric/, null],
 	[/^com[/]terraformersmc[/]modmenu|^io[/]github[/]prospector[/]modmenu/, null],
 	[/^org[/]spongepowered[/]asm[/]/, null],
+	[/^com[/]llamalad7[/]mixinextras[/]/, null],
 ];
 var OWN = /^(java|javax|org[/]lwjgl|net[/]minecraft|cpw[/]mods[/]fml|net[/]minecraftforge|mcre|sun|com[/]google[/]common|argo|org[/]bouncycastle|net[/]fabricmc|net[/]modificationstation|net[/]mine_diver|org[/]apache[/]logging|org[/]slf4j|it[/]unimi|org[/]jetbrains|lombok)[/]/;
 
@@ -14091,16 +14776,23 @@ function install(vm) {
 		var o = T.off;
 		emit(vm, pts.map(function (p) { return [p[0] + o[0], p[1] + o[1], p[2] + o[2]]; }), uvs, pic);
 	};
+	var tcol = function (self, r, g, b, al) {
+		var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] });
+		var c = function (x) { x = Math.round(+x || 0); return x < 0 ? 0 : x > 255 ? 255 : x; };
+		T.col = (c(al) << 24 | c(r) << 16 | c(g) << 8 | c(b)) | 0;
+	};
 	def('Tessellator', { statics: { instance: null }, clinit: function (vm, c) { c.statics.instance = vm.newObject(c); }, methods: {
 		'<init>()V': function () {}, '<init>(I)V': function () {},
 		'startDrawingQuads()V': function (vm, self) { self.$T = { mode: 7, v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
 		'startDrawing(I)V': function (vm, self, a) { self.$T = { mode: a[0], v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
 		'draw()I': function (vm, self) { if (self.$T) self.$T.v = []; return 0; },
+		'draw()V': function (vm, self) { if (self.$T) self.$T.v = []; },
 		'setTextureUV(DD)V': function (vm, self, a) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).uv = [a[0], a[1]]; },
 		'addVertexWithUV(DDDDD)V': function (vm, self, a) {
 			var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] });
-			T.v.push([a[0], a[1], a[2], a[3], a[4]]);
+			T.v.push([a[0], a[1], a[2], a[3], a[4], T.noCol ? null : T.col == null ? null : T.col]);
 			if (rec(vm) && (T.mode === 7 ? T.v.length === 4 : T.v.length === 3)) { if (T.v.length === 3) T.v.push(T.v[2]); tessQuad(vm, T); T.v = []; }
+			else if (T.v.length === 4 && T.mode === 7 && JVM.guiQuad) { var o = T.off; JVM.guiQuad(vm, T.v.map(function (p) { return [p[0] + o[0], p[1] + o[1], p[2], p[3], p[4], p[5]]; })); T.v = []; }
 			else if (T.v.length >= 4) T.v = [];
 		},
 		'addVertex(DDD)V': function (vm, self, a) {
@@ -14109,9 +14801,14 @@ function install(vm) {
 		},
 		'setTranslation(DDD)V': function (vm, self, a) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).off = [a[0], a[1], a[2]]; },
 		'addTranslation(FFF)V': function (vm, self, a) { var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] }); T.off = [T.off[0] + a[0], T.off[1] + a[1], T.off[2] + a[2]]; },
-		'setNormal(FFF)V': function () {}, 'setBrightness(I)V': function () {}, 'setColorOpaque_F(FFF)V': function () {},
-		'setColorRGBA_F(FFFF)V': function () {}, 'setColorOpaque_I(I)V': function () {}, 'setColorOpaque(III)V': function () {},
-		'setColorRGBA(IIII)V': function () {}, 'setColorRGBA_I(II)V': function () {}, 'disableColor()V': function () {},
+		'setNormal(FFF)V': function () {}, 'setBrightness(I)V': function () {},
+		'setColorOpaque_F(FFF)V': function (vm, self, a) { tcol(self, a[0] * 255, a[1] * 255, a[2] * 255, 255); },
+		'setColorRGBA_F(FFFF)V': function (vm, self, a) { tcol(self, a[0] * 255, a[1] * 255, a[2] * 255, a[3] * 255); },
+		'setColorOpaque_I(I)V': function (vm, self, a) { tcol(self, a[0] >> 16 & 255, a[0] >> 8 & 255, a[0] & 255, 255); },
+		'setColorOpaque(III)V': function (vm, self, a) { tcol(self, a[0], a[1], a[2], 255); },
+		'setColorRGBA(IIII)V': function (vm, self, a) { tcol(self, a[0], a[1], a[2], a[3]); },
+		'setColorRGBA_I(II)V': function (vm, self, a) { tcol(self, a[0] >> 16 & 255, a[0] >> 8 & 255, a[0] & 255, a[1]); },
+		'disableColor()V': function (vm, self) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).noCol = true; },
 	} });
 
 	var FACES = {
@@ -14613,7 +15310,103 @@ function installStation(vm) {
 		'toString()Ljava/lang/String;': function (vm, self) { return String(self.$m.version || self.$m.id); },
 		'getDescription()Ljava/lang/String;': function (vm, self) { return String(self.$m.description || ''); },
 		'getType()Ljava/lang/String;': function () { return 'fabric'; },
+		'getAuthors()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, people(vm, mj(self).authors)); },
+		'getContributors()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, people(vm, mj(self).contributors)); },
+		'getContact()Lnet/fabricmc/loader/api/metadata/ContactInformation;': function (vm, self) { return contact(vm, mj(self).contact); },
+		'getLicense()Ljava/util/Collection;': function (vm, self) { var l = mj(self).license; return JVM.newList(vm, (Array.isArray(l) ? l : l ? [l] : []).map(String)); },
+		'getProvides()Ljava/util/Collection;': function (vm, self) { return JVM.newList(vm, (mj(self).provides || []).map(String)); },
+		'getDepends()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getRecommends()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getSuggests()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getConflicts()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getBreaks()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getDependencies()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'getEnvironment()Lnet/fabricmc/loader/api/metadata/ModEnvironment;': function (vm, self) {
+			var e = String(mj(self).environment || '*'), c = vm.loadClass('net/fabricmc/loader/api/metadata/ModEnvironment'); vm.initClass(c);
+			return c.statics[e === 'client' ? 'CLIENT' : e === 'server' ? 'SERVER' : 'UNIVERSAL'];
+		},
+		'getIconPath(I)Ljava/util/Optional;': function (vm, self) {
+			var ic = mj(self).icon; if (ic && typeof ic === 'object') { var ks = Object.keys(ic); ic = ic[ks[ks.length - 1]]; }
+			return vm.callStatic('java/util/Optional', 'ofNullable', '(Ljava/lang/Object;)Ljava/util/Optional;', [ic ? String(ic) : null]);
+		},
+		'containsCustomValue(Ljava/lang/String;)Z': function (vm, self, a) { var c = mj(self).custom; return c && Object.prototype.hasOwnProperty.call(c, String(a[0])) ? 1 : 0; },
+		'getCustomValue(Ljava/lang/String;)Lnet/fabricmc/loader/api/metadata/CustomValue;': function (vm, self, a) { var c = mj(self).custom; return c && Object.prototype.hasOwnProperty.call(c, String(a[0])) ? customValue(vm, c[String(a[0])]) : null; },
+		'getCustomValues()Ljava/util/Map;': function (vm, self) { var c = mj(self).custom || {}, m = JVM.newMap(vm); Object.keys(c).forEach(function (k) { vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [k, customValue(vm, c[k])]); }); return m; },
+		'findPath(Ljava/lang/String;)Ljava/util/Optional;': function (vm, self, a) { var r = String(a[0] || '').replace(/^[/]+/, ''); return vm.callStatic('java/util/Optional', 'ofNullable', '(Ljava/lang/Object;)Ljava/util/Optional;', [vm.resources[r] ? JVM.resPath(vm, r) : null]); },
+		'getPath(Ljava/lang/String;)Ljava/nio/file/Path;': function (vm, self, a) { return JVM.resPath(vm, String(a[0] || '')); },
+		'getRootPaths()Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getContainingMod()Ljava/util/Optional;': function (vm) { return vm.callStatic('java/util/Optional', 'empty', '()Ljava/util/Optional;', []); },
+		'getContainedMods()Ljava/util/Collection;': function (vm) { return JVM.newList(vm, []); },
+		'compareTo(Ljava/lang/Object;)I': function (vm, self, a) { var x = String(self.$m.version || ''), y = String(a[0] && a[0].$m ? a[0].$m.version : ''); return x < y ? -1 : x > y ? 1 : 0; },
 	} });
+	var mj = function (self) { return self.$m.json || {}; };
+	var people = function (vm, list) {
+		return (list || []).map(function (p) { var o = vm.newObject(vm.loadClass('mcre/FabricPerson')); o.$p = typeof p === 'string' ? { name: p } : p || {}; return o; });
+	};
+	var contact = function (vm, c) { var o = vm.newObject(vm.loadClass('mcre/FabricContact')); o.$c = c || {}; return o; };
+	def('net/fabricmc/loader/api/metadata/Person', { access: I });
+	def('net/fabricmc/loader/api/metadata/ContactInformation', { access: I });
+	def('mcre/FabricContact', { interfaces: ['net/fabricmc/loader/api/metadata/ContactInformation'], methods: {
+		'get(Ljava/lang/String;)Ljava/util/Optional;': function (vm, self, a) { var v = self.$c[String(a[0])]; return vm.callStatic('java/util/Optional', 'ofNullable', '(Ljava/lang/Object;)Ljava/util/Optional;', [v == null ? null : String(v)]); },
+		'asMap()Ljava/util/Map;': function (vm, self) { var m = JVM.newMap(vm); Object.keys(self.$c).forEach(function (k) { vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [k, String(self.$c[k])]); }); return m; },
+	} });
+	def('mcre/FabricPerson', { interfaces: ['net/fabricmc/loader/api/metadata/Person'], methods: {
+		'getName()Ljava/lang/String;': function (vm, self) { return String(self.$p.name || ''); },
+		'getContact()Lnet/fabricmc/loader/api/metadata/ContactInformation;': function (vm, self) { return contact(vm, self.$p.contact); },
+		'toString()Ljava/lang/String;': function (vm, self) { return String(self.$p.name || ''); },
+	} });
+	def('net/fabricmc/loader/api/metadata/ModEnvironment', { super: 'java/lang/Enum', statics: { CLIENT: null, SERVER: null, UNIVERSAL: null }, clinit: function (vm, c) {
+		c.$values = ['CLIENT', 'SERVER', 'UNIVERSAL'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+	}, methods: { 'matches(Lnet/fabricmc/api/EnvType;)Z': function () { return 1; } } });
+	var CV = 'net/fabricmc/loader/api/metadata/CustomValue';
+	var customValue = function (vm, j) { var o = vm.newObject(vm.loadClass('mcre/CustomValue')); o.$j = j; return o; };
+	def(CV, { access: I });
+	def(CV + '$CvObject', { access: I, interfaces: [CV, 'java/lang/Iterable'] });
+	def(CV + '$CvArray', { access: I, interfaces: [CV, 'java/lang/Iterable'] });
+	def(CV + '$CvType', { super: 'java/lang/Enum', statics: { OBJECT: null, ARRAY: null, STRING: null, NUMBER: null, BOOLEAN: null, NULL: null }, clinit: function (vm, c) {
+		c.$values = ['OBJECT', 'ARRAY', 'STRING', 'NUMBER', 'BOOLEAN', 'NULL'].map(function (n, i) { var o = vm.newObject(c); o.$name = n; o[':name'] = n; o[':ordinal'] = i; c.statics[n] = o; return o; });
+	} });
+	var cvType = function (j) { return j === null || j === undefined ? 'NULL' : Array.isArray(j) ? 'ARRAY' : typeof j === 'object' ? 'OBJECT' : typeof j === 'string' ? 'STRING' : typeof j === 'number' ? 'NUMBER' : 'BOOLEAN'; };
+	var cvWrong = function (vm, self, want) { if (cvType(self.$j) !== want) vm.throwNew('java/lang/ClassCastException', 'cannot convert ' + cvType(self.$j).toLowerCase() + ' to ' + want.toLowerCase()); };
+	def('mcre/CustomValue', { interfaces: [CV + '$CvObject', CV + '$CvArray'], methods: {
+		'getType()Lnet/fabricmc/loader/api/metadata/CustomValue$CvType;': function (vm, self) { var c = vm.loadClass(CV + '$CvType'); vm.initClass(c); return c.statics[cvType(self.$j)]; },
+		'getAsString()Ljava/lang/String;': function (vm, self) { cvWrong(vm, self, 'STRING'); return String(self.$j); },
+		'getAsNumber()Ljava/lang/Number;': function (vm, self) { cvWrong(vm, self, 'NUMBER'); return JVM.box(vm, +self.$j, 'D'); },
+		'getAsBoolean()Z': function (vm, self) { cvWrong(vm, self, 'BOOLEAN'); return self.$j ? 1 : 0; },
+		'getAsObject()Lnet/fabricmc/loader/api/metadata/CustomValue$CvObject;': function (vm, self) { cvWrong(vm, self, 'OBJECT'); return self; },
+		'getAsArray()Lnet/fabricmc/loader/api/metadata/CustomValue$CvArray;': function (vm, self) { cvWrong(vm, self, 'ARRAY'); return self; },
+		'size()I': function (vm, self) { return Array.isArray(self.$j) ? self.$j.length : Object.keys(self.$j || {}).length; },
+		'containsKey(Ljava/lang/String;)Z': function (vm, self, a) { return self.$j && Object.prototype.hasOwnProperty.call(self.$j, String(a[0])) ? 1 : 0; },
+		'get(Ljava/lang/String;)Lnet/fabricmc/loader/api/metadata/CustomValue;': function (vm, self, a) { var j = self.$j || {}; return Object.prototype.hasOwnProperty.call(j, String(a[0])) ? customValue(vm, j[String(a[0])]) : null; },
+		'get(I)Lnet/fabricmc/loader/api/metadata/CustomValue;': function (vm, self, a) { return customValue(vm, (self.$j || [])[a[0]]); },
+		'iterator()Ljava/util/Iterator;': function (vm, self) {
+			var j = self.$j || {}, items = Array.isArray(j) ? j.map(function (x) { return customValue(vm, x); }) : Object.keys(j).map(function (k) { var e = vm.newObject(vm.loadClass('java/util/AbstractMap$SimpleEntry')); e.$e = { k: k, v: customValue(vm, j[k]) }; return e; });
+			return vm.callVirtual(JVM.newList(vm, items), 'iterator', '()Ljava/util/Iterator;', []);
+		},
+		'toString()Ljava/lang/String;': function (vm, self) { return JSON.stringify(self.$j); },
+	} });
+	def('net/fabricmc/loader/api/entrypoint/EntrypointContainer', { access: I });
+	def('mcre/EntrypointContainer', { interfaces: ['net/fabricmc/loader/api/entrypoint/EntrypointContainer'], methods: {
+		'getEntrypoint()Ljava/lang/Object;': function (vm, self) { return self.$o; },
+		'getProvider()Lnet/fabricmc/loader/api/ModContainer;': function (vm, self) { return self.$mod; },
+		'getDefinition()Ljava/lang/String;': function (vm, self) { return self.$def; },
+	} });
+	var entrypointsFor = function (vm, key) {
+		var s = st(vm), out = [], cache = s.epCache || (s.epCache = {});
+		Object.keys(s.mods).forEach(function (id) {
+			var m = s.mods[id], list = m.json && m.json.entrypoints && m.json.entrypoints[key];
+			(list || []).forEach(function (v, i) {
+				var ck = id + '|' + key + '|' + i;
+				if (!(ck in cache)) {
+					var r = JVM.run(vm, function () { return entrypointObject(vm, v); });
+					if (!r.ok) vm.log('error', id + ': entrypoint ' + key + ' failed');
+					cache[ck] = r.ok && r.value && r.value.cls ? r.value : null;
+				}
+				if (cache[ck]) out.push({ o: cache[ck], mod: m, def: String(typeof v === 'string' ? v : v.value) });
+			});
+		});
+		return out;
+	};
 	var BUILTIN = { minecraft: '1.0.0-beta.7.3', java: '17', fabricloader: '0.16.0', stationapi: '2.0.0', 'station-api': '2.0.0', fabric: '1' };
 	var loaded = function (vm, id) {
 		if (BUILTIN[id]) return { id: id, name: id, version: BUILTIN[id] };
@@ -14632,16 +15425,21 @@ function installStation(vm) {
 		'getAllMods()Ljava/util/Collection;': function (vm) { var s = st(vm); return JVM.newList(vm, Object.keys(s.mods).map(function (k) { return modContainer(vm, s.mods[k]); })); },
 		'getEnvironmentType()Lnet/fabricmc/api/EnvType;': function (vm) { var c = vm.loadClass('net/fabricmc/api/EnvType'); vm.initClass(c); return c.statics.CLIENT; },
 		'isDevelopmentEnvironment()Z': function () { return 0; },
-		'getEntrypoints(Ljava/lang/String;Ljava/lang/Class;)Ljava/util/List;': function (vm) { return JVM.newList(vm, []); },
+		'getEntrypoints(Ljava/lang/String;Ljava/lang/Class;)Ljava/util/List;': function (vm, self, a) { return JVM.newList(vm, entrypointsFor(vm, String(a[0])).map(function (e) { return e.o; })); },
+		'getEntrypointContainers(Ljava/lang/String;Ljava/lang/Class;)Ljava/util/List;': function (vm, self, a) {
+			return JVM.newList(vm, entrypointsFor(vm, String(a[0])).map(function (e) { var c = vm.newObject(vm.loadClass('mcre/EntrypointContainer')); c.$o = e.o; c.$mod = modContainer(vm, e.mod); c.$def = e.def; return c; }));
+		},
 		'getConfigDirectory()Ljava/io/File;': function (vm) { var f = vm.newObject(vm.loadClass('java/io/File')); vm.callVirtual(f, '<init>', '(Ljava/lang/String;)V', ['config']); return f; },
 		'getGameDirectory()Ljava/io/File;': function (vm) { var f = vm.newObject(vm.loadClass('java/io/File')); vm.callVirtual(f, '<init>', '(Ljava/lang/String;)V', ['.']); return f; },
+		'getConfigDir()Ljava/nio/file/Path;': function (vm) { return JVM.pathObj(vm, 'config'); },
+		'getGameDir()Ljava/nio/file/Path;': function (vm) { return JVM.pathObj(vm, '.'); },
 		'getGameInstance()Ljava/lang/Object;': function (vm) { return vm.callStatic(SRC + 'ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []); },
 	} });
 
 	var logFn = function (level) { return function (vm, self, a) { var t = a[0] == null ? 'null' : String(a[0].$s || a[0]); var args = a[1] && a[1].a ? a[1].a : a.slice(1); args.forEach(function (x) { t = t.replace('{}', x == null ? 'null' : JVM.stringOf ? JVM.stringOf(vm, x) : String(x)); }); vm.log(level === 'error' ? 'warn' : 'out', '[' + (self.$name || 'mod') + '] ' + t); }; };
 	var logMethods = {};
 	['info', 'warn', 'error', 'debug', 'trace', 'fatal'].forEach(function (lv) {
-		['(' + STR + ')V', '(' + STR + OBJ + ')V', '(' + STR + OBJ + OBJ + ')V', '(' + STR + '[' + OBJ + ')V', '(' + OBJ + ')V', '(' + STR + 'Ljava/lang/Throwable;)V'].forEach(function (d) { logMethods[lv + d] = lv === 'debug' || lv === 'trace' ? function () {} : logFn(lv); });
+		['(' + STR + ')V', '(' + STR + OBJ + ')V', '(' + STR + OBJ + OBJ + ')V', '(' + STR + OBJ + OBJ + OBJ + ')V', '(' + STR + '[' + OBJ + ')V', '(' + OBJ + ')V', '(' + STR + 'Ljava/lang/Throwable;)V'].forEach(function (d) { logMethods[lv + d] = lv === 'debug' || lv === 'trace' ? function () {} : logFn(lv); });
 	});
 	logMethods['getName()Ljava/lang/String;'] = function (vm, self) { return self.$name || ''; };
 	def('org/apache/logging/log4j/Logger', { access: I });
@@ -15578,6 +16376,153 @@ function applyAccessorMixins(vm, modId, fj, files) {
 	return done;
 }
 
+var CI = MX + 'injection/callback/CallbackInfo', CIR = MX + 'injection/callback/CallbackInfoReturnable';
+function ensureCallbackInfo(vm) {
+	if (vm.natives[CI]) return;
+	vm.defineNative(CI, { methods: {
+		'<init>(Ljava/lang/String;Z)V': function (vm, self, a) { self.$id = a[0]; self.$cancellable = !!a[1]; },
+		'cancel()V': function (vm, self) { self.$cancelled = true; },
+		'isCancelled()Z': function (vm, self) { return self.$cancelled ? 1 : 0; },
+		'isCancellable()Z': function () { return 1; },
+		'getId()Ljava/lang/String;': function (vm, self) { return self.$id || ''; },
+	} });
+	var rv = function (vm, self) { return self.$ret; };
+	var rvm = { 'setReturnValue(Ljava/lang/Object;)V': function (vm, self, a) { self.$ret = a[0]; self.$retSet = true; self.$cancelled = true; },
+		'getReturnValue()Ljava/lang/Object;': rv };
+	['Z', 'B', 'C', 'S', 'I', 'J', 'F', 'D'].forEach(function (t) { rvm['getReturnValue' + t + '()' + t] = function (vm, self) { var v = self.$ret; return v && v.$box !== undefined ? JVM.unbox(v) : v; }; });
+	vm.defineNative(CIR, { super: CI, methods: rvm });
+}
+function injectTargets(vm, ann, refs) {
+	var out = [], items = ann.values.method && (ann.values.method.items || [ann.values.method]) || [];
+	var bmap = vm.$maps && vm.$maps.babric && vm.$maps.babric.map;
+	items.forEach(function (e) {
+		var str = String(e.v || ''), r = refs[str] || str;
+		var m = /^(?:L([^;]+);)?([^(:]+)(?::?(\(.*))?$/.exec(r);
+		if (!m) return;
+		var name = m[2], desc = m[3] || null;
+		var mcp = (bmap && bmap.srg[name]) || (vm.nameMap && vm.nameMap.srg[name]) || name;
+		if (desc) desc = desc.replace(/L([^;]+);/g, function (x, c) { return 'L' + (vm.mapClass(c) || c) + ';'; });
+		out.push({ name: mcp, desc: desc });
+	});
+	return out;
+}
+function markMixinClasses(vm, fj, files) {
+	var mxc = vm.$mixinClasses || (vm.$mixinClasses = Object.create(null));
+	(fj.mixins || []).forEach(function (mref) {
+		var cfg = json(files, typeof mref === 'string' ? mref : mref && mref.config);
+		if (!cfg) return;
+		var pkg = String(cfg.package || '').replace(/[.]/g, '/');
+		(cfg.mixins || []).concat(cfg.client || []).concat(cfg.server || []).forEach(function (n) { mxc[(pkg ? pkg + '/' : '') + String(n).replace(/[.]/g, '/')] = true; });
+	});
+}
+function applyInjectMixins(vm, modId, fj, files) {
+	ensureCallbackInfo(vm);
+	var applied = [], counted = 0;
+	(fj.mixins || []).forEach(function (mref) {
+		var cfgName = typeof mref === 'string' ? mref : mref && mref.config;
+		if (JVM.nativeMixins && JVM.nativeMixins[String(cfgName)]) return;
+		var cfg = json(files, cfgName);
+		if (!cfg) return;
+		var pkg = String(cfg.package || '').replace(/[.]/g, '/'), rm = cfg.refmap ? json(files, cfg.refmap) : null;
+		(cfg.mixins || []).concat(cfg.client || []).forEach(function (n) {
+			var cn = (pkg ? pkg + '/' : '') + String(n).replace(/[.]/g, '/');
+			if (!vm.sources[cn] && !vm.classes[cn]) return;
+			JVM.run(vm, function () {
+				var c = vm.loadClass(cn);
+				if (!c.cf || (c.access & JVM.ACC_INTERFACE)) return;
+				var mx = JVM.annotation(vm, c.cf.invisibleAnnotations, MX + 'Mixin');
+				var tcls = [];
+				(mx && mx.values.value && mx.values.value.items || []).forEach(function (e) { if (e.desc) tcls.push(e.desc.slice(1, -1)); });
+				(mx && mx.values.targets && mx.values.targets.items || []).forEach(function (e) { if (e.v) tcls.push(mapName(vm, String(e.v).replace(/[.]/g, '/'))); });
+				var refs = rm && rm.mappings && rm.mappings[cn] || {};
+				var ms = Object.keys(c.methods).map(function (k) { return c.methods[k]; });
+				var other = ms.some(function (m) { return (m.annotations || []).some(function (a) { return /injection[/](Redirect|ModifyArg|ModifyArgs|ModifyVariable|ModifyConstant);$|[/]Overwrite;$/.test(a.type); }); });
+				var inj = ms.map(function (m) { return { m: m, a: JVM.annotation(vm, m.annotations, MX + 'injection/Inject') }; }).filter(function (x) { return x.a; });
+				var merged = mergeMixin(vm, c, ms, tcls);
+				if (!inj.length && !merged) return;
+				var ok = 0;
+				inj.forEach(function (x) {
+					var at = x.a.values.at, atv = at && (at.items ? at.items[0] : at);
+					var where = atv && atv.ann && atv.ann.values.value ? String(atv.ann.values.value.v) : 'HEAD';
+					if (!/^(HEAD|TAIL|RETURN)$/.test(where)) return;
+					var hit = false;
+					injectTargets(vm, x.a, refs).forEach(function (t) {
+						tcls.forEach(function (tn) {
+							for (var k = vm.loadClass(tn); k && !hit; k = k.superClass) {
+								var sp = vm.natives[k.name];
+								if (!sp) continue;
+								var key = Object.keys(sp.methods || {}).filter(function (mk) { return mk.indexOf(t.name + '(') === 0 && (!t.desc || mk === t.name + t.desc); })[0];
+								if (!key) continue;
+								hookNative(vm, sp, key, vm.loadClass(tn).name, where, x.m);
+								hit = true;
+							}
+						});
+					});
+					if (hit) ok++;
+				});
+				if (ok === inj.length && !other) {
+					applied.push(cn);
+					var bytes = files[cn + '.class'];
+					if (!(bytes && (menuMixin(bytes) || logOnlyMixin(bytes)))) counted++;
+				}
+			});
+		});
+	});
+	(vm.$mixinsApplied || (vm.$mixinsApplied = {}))[modId] = counted;
+	return applied;
+}
+var MIXIN_ANN = /^Lorg\/spongepowered\/asm\/mixin\/(Shadow|Overwrite|Final|Mutable|gen\/|injection\/)/;
+function mergeMixin(vm, c, ms, tcls) {
+	var any = false;
+	tcls.forEach(function (tn) {
+		var T = vm.loadClass(tn);
+		if (!T || T === c) return;
+		(c.interfaces || []).forEach(function (i) { if (T.interfaces.indexOf(i) < 0) { T.interfaces.push(i); any = true; } });
+		ms.forEach(function (m) {
+			if (m.name === '<init>' || m.name === '<clinit>' || (m.access & JVM.ACC_ABSTRACT)) return;
+			if ((m.annotations || []).some(function (a) { return MIXIN_ANN.test(a.type); })) return;
+			var key = m.name + m.desc;
+			if (T.methods[key]) return;
+			T.methods[key] = m; any = true;
+		});
+		for (var fname in c.fields) {
+			var f = c.fields[fname];
+			if (f.static || T.fields[fname] || (f.annotations || []).some(function (a) { return /mixin[/]Shadow;$/.test(a.type); })) continue;
+			T.fields[fname] = f;
+		}
+	});
+	if (any) for (var n in vm.classes) { var k = vm.classes[n]; if (k && k.vcache) k.vcache = Object.create(null); }
+	return any;
+}
+function hookNative(vm, sp, key, target, where, m) {
+	var fn = sp.methods[key];
+	if (!fn.$hooks) {
+		var orig = fn, hooks = { head: [], tail: [] }, retType = key.slice(key.indexOf(')') + 1);
+		fn = function (vm, self, args) {
+			var cls = self && self.cls;
+			var mine = function (h) { if (!h.target) return true; for (var k = cls; k; k = k.superClass) if (k.name === h.target) return true; return false; };
+			var mk = function () { var ci = vm.newObject(vm.loadClass(retType === 'V' ? CI : CIR)); ci.$id = key; return ci; };
+			var call = function (h, ci) { vm.invoke(h.m, (h.m.access & JVM.ACC_STATIC) ? null : self, h.m.sig.args.length <= 1 ? [ci] : args.concat([ci])); };
+			for (var i = 0; i < hooks.head.length; i++) {
+				if (!mine(hooks.head[i])) continue;
+				var ci = mk(); call(hooks.head[i], ci);
+				if (ci.$cancelled) return ci.$retSet ? (ci.$ret && ci.$ret.$box !== undefined ? JVM.unbox(ci.$ret) : ci.$ret) : undefined;
+			}
+			var r = orig(vm, self, args);
+			for (var j = 0; j < hooks.tail.length; j++) {
+				if (!mine(hooks.tail[j])) continue;
+				var c2 = mk(); c2.$ret = r; call(hooks.tail[j], c2);
+				if (c2.$retSet) r = c2.$ret && c2.$ret.$box !== undefined ? JVM.unbox(c2.$ret) : c2.$ret;
+			}
+			return r;
+		};
+		fn.$hooks = hooks;
+		sp.methods[key] = fn;
+		for (var cn in vm.classes) { var jm = vm.classes[cn] && vm.classes[cn].native && vm.classes[cn].methods[key]; if (jm && jm.fn === orig) jm.fn = fn; }
+	}
+	(where === 'HEAD' ? fn.$hooks.head : fn.$hooks.tail).push({ m: m, target: target });
+}
+
 var EVENT_FEATURES = [
 	[/Biome/, 'new biomes'], [/Dimension/, 'new dimensions'], [/KeyBinding|KeyState/, 'its keys'],
 	[/Tooltip/, 'item tooltips'], [/Colors/, 'tinted blocks and items'], [/Renderer|ModelPredicate|Model/, 'custom-drawn blocks and items'],
@@ -15588,14 +16533,16 @@ var EVENT_FEATURES = [
 JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	var s = st(vm), id = String(fj.id || modId);
 	s.fabricIds[modId] = id;
-	s.mods[id] = { id: id, name: fj.name || id, version: fj.version || '1.0', description: fj.description || '', folder: modId };
+	s.mods[id] = { id: id, name: fj.name || id, version: fj.version || '1.0', description: fj.description || '', folder: modId, json: fj };
 	vm.currentMod = modId;
 	stationTags(vm, files);
+	markMixinClasses(vm, fj, files);
 	applyAccessorMixins(vm, modId, fj, files);
+	applyInjectMixins(vm, modId, fj, files);
 	var eps = {}, objs = [];
 	Object.keys(files).filter(function (k) { return /^META-INF[/]nested-mods[/]/.test(k); }).map(function (k) { return json(files, k); }).concat([fj]).forEach(function (m) {
 		if (!m) return;
-		if (m !== fj && m.id && !s.mods[m.id]) s.mods[m.id] = { id: String(m.id), name: m.name || m.id, version: m.version || '1.0', description: m.description || '', folder: modId };
+		if (m !== fj && m.id && !s.mods[m.id]) s.mods[m.id] = { id: String(m.id), name: m.name || m.id, version: m.version || '1.0', description: m.description || '', folder: modId, json: m };
 		var e = m.entrypoints || {};
 		Object.keys(e).forEach(function (k) { eps[k] = (eps[k] || []).concat(e[k]); });
 	});

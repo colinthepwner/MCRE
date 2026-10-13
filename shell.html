@@ -1619,6 +1619,7 @@
             }
             function variantRef(ref) { return /^mod:[^:]+:.+_\d+$/.test(ref || ''); }
             function gameData(id, data) { return (id | 0) === 38 ? 1 : data; }
+            function mixLeft(kind, modId) { return Math.max(0, (kind.mixins | 0) - ((vm && vm.$mixinsApplied && vm.$mixinsApplied[modId]) | 0)); }
             function javaOf(ref, data) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
                 if (/^id:38(\D|$)/.test(ref || '')) return { id: 38, data: 0 };
@@ -2251,6 +2252,24 @@
                         break;
                     }
                     case 'rect': ctx.fillStyle = argb(o.c); ctx.fillRect(o.x, o.y, o.x2 - o.x, o.y2 - o.y); break;
+                    case 'uvq': {
+                        var im = jgImage(o.tex);
+                        if (im === 'missing' || !im) { if (o.c != null) { ctx.fillStyle = argb(o.c); ctx.fillRect(o.x, o.y, o.w, o.h); } break; }
+                        var du = o.u1 - o.u0, dv = o.v1 - o.v0;
+                        ctx.save();
+                        if (o.c != null) {
+                            ctx.globalAlpha = ((o.c >>> 24) & 255) / 255;
+                            var cr = (o.c >> 16) & 255, cg = (o.c >> 8) & 255, cb = o.c & 255;
+                            if (cr < 255 || cg < 255 || cb < 255) ctx.filter = 'brightness(' + (Math.max(cr, cg, cb) / 255) + ')';
+                        }
+                        if (du > 1.001 || dv > 1.001 || o.u0 < 0 || o.v0 < 0 || o.u1 > 1.001 || o.v1 > 1.001) {
+                            var pat = ctx.createPattern(im, 'repeat'), sx = o.w / (du * im.width), sy = o.h / (dv * im.height);
+                            if (pat && pat.setTransform) pat.setTransform(new DOMMatrix([sx, 0, 0, sy, o.x - o.u0 * im.width * sx, o.y - o.v0 * im.height * sy]));
+                            ctx.fillStyle = pat; ctx.fillRect(o.x, o.y, o.w, o.h);
+                        } else if (du > 0 && dv > 0) ctx.drawImage(im, o.u0 * im.width, o.v0 * im.height, du * im.width, dv * im.height, o.x, o.y, o.w, o.h);
+                        ctx.restore();
+                        break;
+                    }
                     case 'grad': { var g2 = ctx.createLinearGradient(0, o.y, 0, o.y2); g2.addColorStop(0, argb(o.c)); g2.addColorStop(1, argb(o.c2)); ctx.fillStyle = g2; ctx.fillRect(o.x, o.y, o.x2 - o.x, o.y2 - o.y); break; }
                     case 'slot': if (standIn) jgSlot(ctx, o.x, o.y); break;
                     case 'text': jgText(ctx, o.s, o.x, o.y, o.c, o.shadow); break;
@@ -2308,8 +2327,19 @@
                 ov.addEventListener('mousedown', function (e) { var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, true); jgDraw(); });
                 ov.addEventListener('mouseup', function (e) { var p = jgPoint(e); JV.guiMouse(vm, p[0], p[1], e.button === 2 ? 1 : 0, false); });
                 var tStart = 0;
-                ov.addEventListener('touchstart', function (e) { e.preventDefault(); tStart = Date.now(); var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; });
-                ov.addEventListener('touchend', function (e) { e.preventDefault(); var p = jgPoint(e), b = Date.now() - tStart > 500 ? 1 : 0; JV.guiMouse(vm, p[0], p[1], b, true); JV.guiMouse(vm, p[0], p[1], b, false); jg.mx = -1; jgDraw(); });
+                var tFrom = null, tDrag = false;
+                ov.addEventListener('touchstart', function (e) { e.preventDefault(); tStart = Date.now(); var p = jgPoint(e); jg.mx = p[0]; jg.my = p[1]; tFrom = p; tDrag = false; });
+                ov.addEventListener('touchmove', function (e) {
+                    e.preventDefault(); var p = jgPoint(e);
+                    if (!tDrag && tFrom && Math.abs(p[0] - tFrom[0]) + Math.abs(p[1] - tFrom[1]) > 6) { tDrag = true; if (JV.guiDrag) JV.guiDrag(vm, true); }
+                    jg.mx = p[0]; jg.my = p[1];
+                });
+                ov.addEventListener('touchend', function (e) {
+                    e.preventDefault(); var p = jgPoint(e), b = Date.now() - tStart > 500 ? 1 : 0;
+                    if (tDrag) { if (JV.guiDrag) JV.guiDrag(vm, false); tDrag = false; jg.mx = -1; jgDraw(); return; }
+                    JV.guiMouse(vm, p[0], p[1], b, true); JV.guiMouse(vm, p[0], p[1], b, false); jg.mx = -1; jgDraw();
+                });
+                ov.addEventListener('wheel', function (e) { e.preventDefault(); if (JV.guiWheel) JV.guiWheel(vm, -e.deltaY); jgDraw(); }, { passive: false });
                 jg.onResize = function () { jgLayout(); };
                 window.addEventListener('resize', jg.onResize);
                 jg.timer = setInterval(jgDraw, 50);
@@ -2335,7 +2365,22 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); };
+            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); J.menusSoon(); };
+            J.menusSoon = function () {
+                clearTimeout(J.menuTimer);
+                J.menuTimer = setTimeout(function () {
+                    if (!Module._mcSetMenuButtons) return;
+                    ['title', 'pause'].forEach(function (which) {
+                        var labels = [];
+                        try { if (vm && window.JVM && window.JVM.menuButtons) labels = window.JVM.menuButtons(vm, which); } catch (e) { console.warn('mod menu buttons', e); }
+                        try { Module.ccall('mcSetMenuButtons', null, ['string', 'string'], [which, labels.join(String.fromCharCode(10))]); } catch (e) { }
+                    });
+                }, 50);
+            };
+            Module.mcMenuButton = function (which, i) {
+                if (!vm || !window.JVM || !window.JVM.menuClick) return;
+                window.JVM.menuClick(vm, which, i);
+            };
             J.pickTag = function (list) {
                 if (!list.length) return Promise.resolve({ tag: null, losers: [] });
                 return loadJvm().then(function (JVM) {
@@ -2412,6 +2457,7 @@
                         (vm.$modTag || (vm.$modTag = {}))[modId] = mtag;
                         if (!vm.fs || !vm.fs.$mods) { vm.fs = modFs(); vm.fs.$mods = true; }
                         JVM.onGuiOpen = function () { jgOpen(); };
+                        JVM.onGameScreen = function (v, which) { try { Module.ccall('mcOpenGameScreen', null, ['string'], [which]); } catch (e) { } };
                         JVM.onGuiClose = function () { jgClose(true); };
                         var classes = [];
                         Object.keys(files).forEach(function (k) {
@@ -2430,7 +2476,9 @@
                 });
             };
             J.define = function (modId, files, problem) {
+                J.menusSoon();
                 return J.preload(modId, files, problem).then(function (st) {
+                    setTimeout(J.menusSoon, 0);
                     if (!st || st.skip) return {};
                     files = st.files || files;
                     var JVM = window.JVM, ver = st.ver, classes = st.classes;
@@ -2478,7 +2526,7 @@
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes, menuMixins: kind.menus || 0,
                         errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
-                            .concat(kind.mixins ? ["changes to the game's own code (" + kind.mixins + (kind.mixins === 1 ? ' mixin)' : ' mixins)')] : []) });
+                            .concat(mixLeft(kind, modId) ? ["changes to the game's own code (" + mixLeft(kind, modId) + (mixLeft(kind, modId) === 1 ? ' mixin)' : ' mixins)')] : []) });
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });

@@ -1712,9 +1712,25 @@ F	ast	O	field_74313_G	keyBindUseItem
 F	ast	S	field_74324_K	keyBindings
 F	ast	T	field_74317_L	mc
 F	ast	U	field_74318_M	difficulty
+F	ast	V	field_74319_N	hideGUI
+F	ast	W	field_74320_O	thirdPersonView
+F	ast	X	field_74330_P	showDebugInfo
+F	ast	a	field_74342_a	musicVolume
+F	ast	af	field_74334_X	fovSetting
+F	ast	ag	field_74333_Y	gammaSetting
 F	ast	ah	field_74335_Z	guiScale
+F	ast	ai	field_74362_aa	particleSetting
 F	ast	aj	field_74363_ab	language
+F	ast	b	field_74340_b	soundVolume
+F	ast	c	field_74341_c	mouseSensitivity
+F	ast	d	field_74338_d	invertMouse
+F	ast	e	field_74339_e	renderDistance
+F	ast	f	field_74336_f	viewBobbing
+F	ast	g	field_74337_g	anaglyph
+F	ast	h	field_74349_h	advancedOpengl
+F	ast	i	field_74350_i	limitFramerate
 F	ast	j	field_74347_j	fancyGraphics
+F	ast	k	field_74348_k	ambientOcclusion
 F	ast	l	field_74345_l	clouds
 F	atb	a	field_73747_a	width
 F	atb	b	field_73745_b	height
@@ -1734,12 +1750,14 @@ F	atn	f	field_73809_f	text
 F	atn	l	field_73818_l	isFocused
 F	atn	s	field_73823_s	visible
 F	atq	b	field_78288_b	FONT_HEIGHT
+F	atq	d	field_78286_d	charWidth
 F	atq	i	field_78298_i	renderEngine
 F	atq	j	field_78295_j	posX
 F	atq	k	field_78296_k	posY
 F	atq	n	field_78291_n	red
 F	atq	o	field_78292_o	blue
 F	atq	p	field_78306_p	green
+F	atq	q	field_78305_q	alpha
 F	ats	j	field_73735_i	zLevel
 F	aul	f	field_73882_e	mc
 F	aul	g	field_73880_f	width
@@ -1972,10 +1990,12 @@ F	bev	f	field_77375_f	options
 F	bev	i	field_77376_g	loaded
 F	bev	j	field_77382_h	rand
 F	bex	c	field_77464_c	rand
+F	bey	a	field_73976_a	rand
 F	bh	a	field_82630_a	x
 F	bh	b	field_82628_b	y
 F	bh	c	field_82629_c	z
 F	bn	a	field_74817_a	instance
+F	bn	b	field_74815_b	translateTable
 F	bn	e	field_74814_e	isUnicode
 F	bp	a	field_74756_a	data
 F	bt	a	field_74755_a	data
@@ -1991,6 +2011,7 @@ F	gm	f	field_72400_f	mcServer
 F	gm	i	field_72414_i	ops
 F	in	a	field_73061_a	mcServer
 F	iq	b	field_71133_b	mcServer
+F	iq	cq	field_71142_cm	renderDistance
 F	jg	a	field_75993_a	displayColumn
 F	jg	b	field_75991_b	displayRow
 F	jg	c	field_75992_c	parentAchievement
@@ -2176,6 +2197,7 @@ F	nc	a	field_75254_a	mutexBits
 F	nd	c	field_75781_c	theProfiler
 F	net/minecraft/client/Minecraft	J	field_71425_J	running
 F	net/minecraft/client/Minecraft	K	field_71426_K	debug
+F	net/minecraft/client/Minecraft	P	field_71432_P	theMinecraft
 F	net/minecraft/client/Minecraft	T	field_71428_T	timer
 F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
 F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
@@ -2285,6 +2307,8 @@ F	tj	l	field_78035_l	tabMaterials
 F	tj	m	field_78036_m	tabInventory
 F	tw	b	field_77862_b	toolMaterial
 F	ty	b	field_77859_b	dyeColors
+F	u	a	field_71568_a	allowedCharacters
+F	u	b	field_71567_b	allowedCharactersArray
 F	uk	b	field_77853_b	healAmount
 F	uk	c	field_77854_c	saturationModifier
 F	uk	co	field_77856_bY	isWolfsFavoriteMeat
@@ -2890,6 +2914,9 @@ M	arv	d	()V	func_74505_d	unpressKey
 M	arw	a	()V	func_74518_a	disableStandardItemLighting
 M	arw	b	()V	func_74519_b	enableStandardItemLighting
 M	arw	c	()V	func_74520_c	enableGUIStandardItemLighting
+M	ast	a	()V	func_74300_a	loadOptions
+M	ast	b	()V	func_74303_b	saveOptions
+M	ast	c	(Lasv;)Ljava/lang/String;	func_74297_c	getKeyBinding
 M	atb	a	()Z	func_82252_a	func_82252_a
 M	atb	a	(II)V	func_73740_a	mouseReleased
 M	atb	a	(Lnet/minecraft/client/Minecraft;II)V	func_73737_a	drawButton
@@ -2926,6 +2953,10 @@ M	ats	a	(Latq;Ljava/lang/String;III)V	func_73732_a	drawCenteredString
 M	ats	b	(IIII)V	func_73728_b	drawVerticalLine
 M	ats	b	(IIIIII)V	func_73729_b	drawTexturedModalRect
 M	ats	b	(Latq;Ljava/lang/String;III)V	func_73731_b	drawString
+M	auf	A_	()V	func_73866_w_	initGui
+M	auf	a	(IIF)V	func_73863_a	drawScreen
+M	auf	a	(Latb;)V	func_73875_a	actionPerformed
+M	auf	c	()V	func_73876_c	updateScreen
 M	aul	A_	()V	func_73866_w_	initGui
 M	aul	a	(CI)V	func_73869_a	keyTyped
 M	aul	a	(IIF)V	func_73863_a	drawScreen
@@ -2956,6 +2987,8 @@ M	avf	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
 M	avf	b	(III)V	func_73879_b	mouseMovedOrUp
 M	avf	c	()V	func_73876_c	updateScreen
 M	avf	f	()Z	func_73868_f	doesGuiPauseGame
+M	avp	a	(FII)V	func_74185_a	drawGuiContainerBackgroundLayer
+M	avp	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
 M	awm	a	(Llq;FFFFFF)V	func_78088_a	render
 M	awn	a	(FFFFFFLlq;)V	func_78087_a	setRotationAngles
 M	awn	a	(Llq;FFFFFF)V	func_78088_a	render
@@ -3156,6 +3189,9 @@ M	baz	c	(FFF)V	func_78372_c	addTranslation
 M	baz	c	(I)V	func_78380_c	setBrightness
 M	baz	d	(I)V	func_78378_d	setColorOpaque_I
 M	bb	a	(Lax;Lur;)Lur;	func_82482_a	dispense
+M	bba	a	(I)V	func_78344_a	deleteTexture
+M	bba	a	(Ljava/awt/image/BufferedImage;)I	func_78353_a	allocateAndSetupTexture
+M	bba	a	(Ljava/awt/image/BufferedImage;I)V	func_78351_a	setupTexture
 M	bba	a	(Ljava/lang/String;Ljava/lang/String;)I	func_78350_a	getTextureForDownloadableImage
 M	bba	b	(I)V	func_78342_b	bindTexture
 M	bba	b	(Ljava/lang/String;)I	func_78341_b	getTexture
@@ -3234,6 +3270,14 @@ M	bev	b	(Ljava/lang/String;Ljava/io/File;)V	func_77374_b	addStreaming
 M	bev	c	(Ljava/lang/String;Ljava/io/File;)V	func_77365_c	addMusic
 M	bex	a	(Ljava/lang/String;)Lbeu;	func_77458_a	getRandomSoundFromSoundPool
 M	bex	a	(Ljava/lang/String;Ljava/io/File;)Lbeu;	func_77459_a	addSound
+M	bey	A_	()V	func_73866_w_	initGui
+M	bey	a	(CI)V	func_73869_a	keyTyped
+M	bey	a	(IIF)V	func_73863_a	drawScreen
+M	bey	a	(III)V	func_73864_a	mouseClicked
+M	bey	a	(Latb;)V	func_73875_a	actionPerformed
+M	bey	a	(ZI)V	func_73878_a	confirmClicked
+M	bey	c	()V	func_73876_c	updateScreen
+M	bey	f	()Z	func_73868_f	doesGuiPauseGame
 M	bf	k	()Lyc;	func_82618_k	getWorld
 M	bg	a	()D	func_82615_a	getX
 M	bg	b	()D	func_82617_b	getY
@@ -3825,6 +3869,10 @@ M	rq	b	(Lqx;I)Lur;	func_82846_b	transferStackInSlot
 M	rq	b	(Lrw;)V	func_82847_b	removeCraftingFromCrafters
 M	rw	a	(Lrq;II)V	func_71112_a	sendProgressBarUpdate
 M	rw	a	(Lrq;ILur;)V	func_71111_a	sendSlotContents
+M	rx	a	(Lqx;)Z	func_75145_c	canInteractWith
+M	rx	b	(Lqx;)V	func_75134_a	onCraftGuiClosed
+M	rx	b	(Lqx;I)Lur;	func_82846_b	transferStackInSlot
+M	rx	d	()Lla;	func_85151_d	getLowerChestInventory
 M	s	b	(III)V	func_71571_b	set
 M	s	compareTo	(Ljava/lang/Object;)I	compareTo	compareTo
 M	s	e	(III)F	func_71569_e	getDistanceSquared
@@ -3861,6 +3909,8 @@ M	ty	a	(ILtj;Ljava/util/List;)V	func_77633_a	getSubItems
 M	ty	a	(Lur;Lqx;Lyc;IIIIFFF)Z	func_77648_a	onItemUse
 M	ty	b	(I)I	func_77617_a	getIconFromDamage
 M	ty	d	(Lur;)Ljava/lang/String;	func_77667_c	getItemNameIS
+M	u	a	(C)Z	func_71566_a	isAllowedCharacter
+M	u	a	(Ljava/lang/String;)Ljava/lang/String;	func_71565_a	filerAllowedCharacters
 M	uk	a	(IIIF)Luk;	func_77844_a	setPotionEffect
 M	uk	a	(Lur;Lyc;Lqx;)Lur;	func_77659_a	onItemRightClick
 M	uk	c_	(Lur;)I	func_77626_a	getMaxItemUseDuration
@@ -4241,7 +4291,10 @@ R	field_74729_a	key
 R	field_74663_a	stack
 R	field_74662_b	root
 R	field_74636_a	index
+R	OBJECT	OBJECT
+R	ARRAY	ARRAY
 R	STRING	STRING
+R	NUMBER	NUMBER
 R	NULL	NULL
 R	field_74620_b	value
 R	field_74617_a	fields
@@ -4276,11 +4329,21 @@ R	field_77233_a	mc
 R	field_77228_g	width
 R	field_77231_b	top
 R	field_77232_c	bottom
+R	field_77229_d	slotHeight
 R	field_77230_e	mouseX
 R	field_77227_f	mouseY
 R	field_77240_h	height
 R	field_77241_i	right
 R	field_77238_j	left
+R	field_77239_k	scrollUpButtonID
+R	field_77236_l	scrollDownButtonID
+R	field_77237_m	initialClickY
+R	field_77234_n	scrollMultiplier
+R	field_77235_o	amountScrolled
+R	field_77246_p	selectedElement
+R	field_77245_q	lastClicked
+R	field_77244_r	showSelectionBox
+R	field_73752_k	dragging
 R	field_74113_c	mouseX
 R	field_74111_d	mouseY
 R	field_74152_c	renderItem
@@ -4295,6 +4358,7 @@ R	field_78059_b	rand
 R	field_74207_v	theItemStack
 R	field_74216_x	rand
 R	field_73749_j	mirrored
+R	field_73981_b	allowedCharacters
 R	field_78071_a	posX
 R	field_78069_b	posY
 R	field_78070_c	prevPosX
@@ -4326,6 +4390,7 @@ R	field_78941_z	tessellator
 R	field_78545_a	instance
 R	field_78462_a	image
 R	field_78455_a	mc
+R	field_72739_F	renderDistance
 R	field_72762_a	tileEntities
 R	field_72769_h	theWorld
 R	field_72770_i	renderEngine
@@ -4348,6 +4413,7 @@ R	field_76850_b	iconIndex
 R	field_76855_g	red
 R	field_76858_h	green
 R	field_76859_i	blue
+R	field_76856_j	alpha
 R	field_76963_a	instance
 R	field_76960_e	renderEngine
 R	field_76957_f	worldObj
@@ -4357,7 +4423,6 @@ R	field_77530_a	logger
 R	field_77312_b	mc
 R	field_77388_c	hash
 R	field_82476_c	thePlayer
-R	field_73976_a	rand
 R	field_73526_a	entityId
 R	field_73524_b	xPosition
 R	field_73525_c	yPosition
@@ -4402,6 +4467,7 @@ R	field_73452_a	xPosition
 R	field_73450_b	zPosition
 R	field_73448_d	size
 R	field_73468_a	language
+R	field_73466_b	renderDistance
 R	field_73456_b	username
 R	field_73438_a	itemID
 R	field_73435_a	windowId
@@ -4608,6 +4674,7 @@ R	field_70287_a	blockID
 R	field_70285_b	metadata
 R	field_70502_e	fuel
 R	field_70500_g	matrix
+R	OK	OK
 R	field_70224_b	targetX
 R	field_70225_c	targetY
 R	field_70222_d	targetZ
@@ -4677,6 +4744,8 @@ R	func_76686_a	get
 R	func_76691_a	load
 R	func_76706_a	write
 R	func_76712_a	write
+R	func_76708_c	close
+R	close	close
 R	func_76562_b	getFogColor
 R	func_76556_a	generateLightBrightnessTable
 R	func_76566_a	canCoordinateBeSpawn
@@ -4846,6 +4915,7 @@ R	func_74565_b	read
 R	func_74552_a	parse
 R	func_74502_a	getType
 R	func_74305_a	parseFloat
+R	func_73758_b	scroll
 R	func_73866_w_	initGui
 R	func_73863_a	drawScreen
 R	func_73875_a	actionPerformed
@@ -4855,13 +4925,23 @@ R	func_73878_a	confirmClicked
 R	func_73874_b	onGuiClosed
 R	func_73876_c	updateScreen
 R	func_73868_f	doesGuiPauseGame
+R	func_77217_a	getSize
+R	func_77218_a	isSelected
+R	func_77214_a	drawSlot
+R	func_77213_a	elementClicked
 R	func_77221_c	drawBackground
 R	func_73873_v_	drawDefaultBackground
 R	func_78262_a	trimStringToWidth
 R	func_73831_a	updateTick
+R	func_77212_b	getContentHeight
 R	func_73737_a	drawButton
 R	func_77211_a	drawScreen
 R	func_77219_a	actionPerformed
+R	func_77220_a	registerScrollButtons
+R	func_77206_b	overlayBackground
+R	func_77226_h	bindAmountScrolled
+R	func_74068_a	getSize
+R	func_74064_e	selectWorld
 R	func_73740_a	mouseReleased
 R	func_73738_a	getHoverState
 R	func_73739_b	mouseDragged
@@ -4917,7 +4997,6 @@ R	func_72708_a	spawnParticle
 R	func_72704_a	playSound
 R	func_72706_a	playAuxSFX
 R	func_78379_d	reset
-R	func_78344_a	deleteTexture
 R	func_82772_a	updateDynamicTexture
 R	func_82774_a	setOverrideBlockTexture
 R	func_78547_a	setPosition
@@ -4976,12 +5055,14 @@ R	func_82500_b	func_82500_b
 R	func_72374_b	onTick
 R	func_71213_z	getAllUsernames
 R	func_71270_I	getFolderName
+R	func_71328_a	setProperty
 R	func_71244_g	logInfo
 R	func_71236_h	logWarning
 R	func_71201_j	logSevere
 R	func_71249_w	getMinecraftVersion
 R	func_71233_x	getCurrentPlayerCount
 R	func_71275_y	getMaxPlayers
+R	func_73667_a	setProperty
 R	func_71203_ab	getConfigurationManager
 R	func_71742_a	getType
 R	func_73074_a	onBlockClicked
@@ -5109,8 +5190,8 @@ R	func_75118_a	onUpdate
 R	func_75111_a	addStats
 R	func_75142_b	detectAndSendChanges
 R	func_75137_b	updateProgressBar
-R	func_75134_a	onCraftGuiClosed
 R	func_75130_a	onCraftMatrixChanged
+R	func_75134_a	onCraftGuiClosed
 R	func_75210_a	onCrafting
 R	func_75208_c	onCrafting
 R	func_82869_a	canTakeStack
