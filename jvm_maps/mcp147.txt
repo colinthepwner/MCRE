@@ -5519,6 +5519,7 @@ M	yc	a	(Llq;)V	func_72923_a	obtainEntitySkin
 M	yc	a	(Llq;D)Lqx;	func_72890_a	getClosestPlayerToEntity
 M	yc	a	(Llq;DDDFZ)Lxx;	func_72876_a	createExplosion
 M	yc	a	(Llq;DDDFZZ)Lxx;	func_72885_a	newExplosion
+M	yc	a	(Llq;F)Laoj;	func_72833_a	getSkyColor
 M	yc	a	(Llq;Laoe;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	yc	a	(Llq;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
 M	yc	a	(Lqx;IIIII)V	func_72889_a	playAuxSFXAtEntity
@@ -5591,6 +5592,7 @@ M	yq	b	(Llq;DDDF)Z	func_77184_b	placeInExistingPortal
 M	yv	equals	(Ljava/lang/Object;)Z	equals	equals
 M	yv	hashCode	()I	hashCode	hashCode
 M	yy	a	()Lzc;	func_76729_a	createBiomeDecorator
+M	yy	a	(F)I	func_76731_a	getSkyColorByTemp
 M	yy	a	(FF)Lyy;	func_76732_a	setTemperatureRainfall
 M	yy	a	(I)Lyy;	func_76733_a	func_76733_a
 M	yy	a	(Ljava/lang/String;)Lyy;	func_76735_a	setBiomeName
@@ -6904,6 +6906,7 @@ R	func_76740_a	getRandomWorldGenForTrees
 R	func_76730_b	getRandomWorldGenForGrass
 R	func_76737_k	getBiomeGrassColor
 R	func_76726_l	getBiomeFoliageColor
+R	func_76731_a	getSkyColorByTemp
 R	func_76794_a	decorate
 R	func_76582_a	get
 R	func_76581_a	set

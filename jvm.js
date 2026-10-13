@@ -5458,6 +5458,7 @@ function hsbToRgb(h, s, v) {
 	}
 	return 0xff000000 | (r << 16) | (g << 8) | b;
 }
+JVM.hsbToRgb = hsbToRgb;
 function rgbToHsb(r, g, b) {
 	var cmax = Math.max(r, g, b), cmin = Math.min(r, g, b), h, s, v = Math.fround(cmax / 255);
 	s = cmax !== 0 ? Math.fround((cmax - cmin) / cmax) : 0;
@@ -7846,6 +7847,21 @@ JVM.collectContent = function (vm, modId) {
 		return extra;
 		}
 	}
+	function codeName(o) {
+		var words = function (n) {
+			n = String(n || '').replace(/^.*[.:/$]/, '');
+			var parts = n.split('_');
+			if (parts.length > 1 && /^[A-Z]?[a-z]+([A-Z][a-z]+)*$/.test(parts[0]) && parts[0].length > 3 && ((o.$mod || '') + ' ' + (o.cls ? o.cls.name : '')).toLowerCase().indexOf(parts[0].toLowerCase()) >= 0) parts.shift();
+			n = parts.join(' ').replace(/^(Block|Item|Tile)(?=[A-Z])/, '').replace(/^(block|item|tile) /i, '');
+			n = n.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/\s+/g, ' ').trim();
+			if (!/[a-z]/i.test(n) || n.length < 3) return null;
+			return n.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+		};
+		var r = o.$regName ? words(o.$regName) : null;
+		if (r) return r;
+		var cn = o.cls && !o.cls.native ? o.cls.name.split('/').pop() : '';
+		return cn && !/^(Block|Item)(Generic|Base|Basic|Simple|Mod|Custom)?$/.test(cn) ? words(cn) : null;
+	}
 	function keyName(o) {
 		var k = (o[':key'] ? String(o[':key']) : null) || o.$btaKey || null;
 		if (!k) return null;
@@ -7979,7 +7995,7 @@ JVM.collectContent = function (vm, modId) {
 		}
 		var uniq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
 		var given = langOf(b, (meta & 12) && JVM.logAxisOf(vm, b) ? meta & 3 : meta) || keyName(b);
-		var json = { name: given || ('Block ' + (b.$askId != null ? b.$askId : id) + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
+		var json = { name: given || codeName(b) || ('Block ' + (b.$askId != null ? b.$askId : id) + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
 		if (!given && !uniq.length) json.creative = false;
 		json.hardness = b[':blockHardness'];
 		var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
@@ -8164,7 +8180,7 @@ JVM.collectContent = function (vm, modId) {
 	function itemEntry(it, id, meta) {
 		var t = stationTex(it, -1, meta) || legacy(it, 0, meta) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [meta]); }, null));
 		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
-		var json = { name: langOf(it, meta) || keyName(it) || ('Item ' + id + (meta ? ':' + meta : '')), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
+		var json = { name: langOf(it, meta) || keyName(it) || codeName(it) || ('Item ' + id + (meta ? ':' + meta : '')), texture: t ? t.name : 'stick', stack: it[':maxStackSize'] };
 		var acc = JVM.accessoryTypesOf ? JVM.accessoryTypesOf(vm, it, meta) : null;
 		if (acc && acc.length) json.accessory = acc;
 		if (it.$food) json.food = { hunger: it.$food[0], saturation: it.$food[1] };
@@ -12527,6 +12543,11 @@ function install(vm) {
 			},
 			'getBiomeGrassColor()I': function (vm, self) { if (self.$grass != null) return self.$grass; self.$defaultColor = true; return 0x79c05a; },
 			'getBiomeFoliageColor()I': function (vm, self) { if (self.$leaves != null) return self.$leaves; self.$defaultColor = true; return 0x59ae30; },
+			'getSkyColorByTemp(F)I': function (vm, self, a) {
+				self.$defaultColor = true;
+				var t = Math.max(-1, Math.min(1, a[0] / 3));
+				return JVM.hsbToRgb(0.62222224 - t * 0.05, 0.5 + t * 0.1, 1);
+			},
 			'getIntTemperature()I': function (vm, self) { return (self[':temperature'] * 65536) | 0; },
 			'getIntRainfall()I': function (vm, self) { return (self[':rainfall'] * 65536) | 0; },
 			'getFloatTemperature()F': function (vm, self) { return self[':temperature'] != null ? self[':temperature'] : 0.5; },
@@ -28102,6 +28123,11 @@ JVM.collectBiomes = function (vm, modId, ref, safe) {
 		var hex = function (v) { return '#' + ('00000' + ((v >>> 0) & 0xffffff).toString(16)).slice(-6); };
 		if (typeof g === 'number') j.grass_color = hex(g);
 		if (typeof f === 'number') j.foliage_color = hex(f);
+		if (own('getSkyColorByTemp(F)I')) {
+			b.$defaultColor = false;
+			var sk = safe(function () { return vm.callVirtual(b, 'getSkyColorByTemp', '(F)I', [+b[':temperature'] || 0.5]); }, null);
+			if (!b.$defaultColor && typeof sk === 'number') j.sky_color = hex(sk);
+		}
 		var d = b[':theBiomeDecorator'];
 		if (JVM.javaDecorated && JVM.javaDecorated(vm, b)) { j.trees = 'none'; j.flowers_per_chunk = 0; j.grass_per_chunk = 0; }
 		else if (d) {
@@ -29875,10 +29901,17 @@ JVM.collectDims = function (vm, modId, safe) {
 			var a1 = safe(function () { return vm.callVirtual(dim, 'calculateCelestialAngle', '(JF)F', [18000n, 0]); }, 0.5);
 			if (Math.abs(a0 - a1) < 1e-4) j.time = Math.max(0, Math.min(1, a0));
 			var fog = safe(function () { return callNamed(vm, dim, ['func_4096_a', 'getFogColor'], [0, 0]); }, null);
-			if (fog && fog[':xCoord'] != null) {
-				var h = function (v) { return ('0' + Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)).slice(-2); };
-				j.fog_color = '#' + h(fog[':xCoord']) + h(fog[':yCoord']) + h(fog[':zCoord']);
-			}
+			var h = function (v) { return ('0' + Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)).slice(-2); };
+			if (fog && fog[':xCoord'] != null) j.fog_color = '#' + h(fog[':xCoord']) + h(fog[':yCoord']) + h(fog[':zCoord']);
+			var sky = safe(function () {
+				var names = ['getSkyColor(Lnet/minecraft/src/Entity;F)Lnet/minecraft/src/Vec3;', 'getSkyColor(Lnet/minecraft/src/Entity;F)Lnet/minecraft/src/Vec3D;'];
+				for (var i = 0; i < names.length; i++) {
+					var m = dim.cls.findMethod(names[i]);
+					if (m && !m.cls.native) { var r = JVM.run(vm, function () { return vm.invoke(m, dim, [null, 0]); }); return r.ok ? r.value : null; }
+				}
+				return null;
+			}, null);
+			if (sky && sky[':xCoord'] != null) j.sky_color = '#' + h(sky[':xCoord']) + h(sky[':yCoord']) + h(sky[':zCoord']);
 			var lang = reg(vm).lang || {};
 			var msg = function (m) {
 				var k = safe(function () { return dim.cls.findMethod(m + '()Ljava/lang/String;') ? vm.callVirtual(dim, m, '()Ljava/lang/String;', []) : null; }, null);

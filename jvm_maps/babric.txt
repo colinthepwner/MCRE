@@ -2044,6 +2044,7 @@ M	net/minecraft/class_153	method_792	(I)Lnet/minecraft/class_153;	method_792	set
 M	net/minecraft/class_153	method_793	()Z	method_793	getEnableSnow
 M	net/minecraft/class_153	method_794	()Z	method_794	canSpawnLightningBolt
 M	net/minecraft/class_153	method_795	()Lnet/minecraft/class_153;	method_795	setDisableRain
+M	net/minecraft/class_153	method_796	(F)I	method_796	getSkyColorByTemp
 M	net/minecraft/class_153	method_797	(Ljava/util/Random;)Lnet/minecraft/class_239;	method_797	getRandomWorldGenForTrees
 M	net/minecraft/class_169	method_798	()I	method_798	getPacketSize
 M	net/minecraft/class_169	method_802	(Ljava/io/DataInputStream;I)Ljava/lang/String;	method_802	readString

@@ -1878,6 +1878,7 @@ M	kd	e	()Lkd;	func_27076_e	setDisableRain
 M	kd	b	()Lkd;	func_4122_b	setEnableSnow
 M	kd	a	(Ljava/lang/String;)Lkd;	func_4125_a	setBiomeName
 M	kd	b	(I)Lkd;	func_4123_b	setColor
+M	kd	a	(F)I	func_4126_a	getSkyColorByTemp
 M	kd	a	(Llk;)Ljava/util/List;	func_25063_a	getSpawnableList
 M	kd	c	()Z	func_27078_c	getEnableSnow
 M	kd	d	()Z	func_27077_d	canSpawnLightningBolt

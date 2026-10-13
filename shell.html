@@ -1316,8 +1316,17 @@
             Module.mcGameRules.define('edgeAssistHoldSeconds', 1, 'How long a touch player backing or strafing off an edge is held before they go over (walking at it: a moment)', [0, 10]);
             Module.mcGameRules.define('jukeboxRange', 64, 'How far (blocks) a jukebox\'s record can be heard; it fades out linearly to there (Java: 64)', [8, 256]);
             Module.mcGameRules.define('jukeboxNowPlaying', true, 'A record starting shows "Now playing: <disc>" above the hotbar');
+            Module.mcGameRules.define('modSkyColors', true, "Mods' biomes show their own sky colour (off: the usual sky there)");
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
             function rule(n) { return Module.mcGameRules.get(n); }
+            Module.mcSky = Module.mcSky || {
+                script: -1,
+                apply: function () {
+                    var joined = net.state === 'in', c = joined ? pres.rules.sky : Module.mcSky.script;
+                    var on = joined ? pres.rules.modSky !== false : !!rule('modSkyColors');
+                    try { if (Module._mcSetSky) Module._mcSetSky(typeof c === 'number' && c >= 0 ? c & 0xffffff : -1, on ? 1 : 0); } catch (e) { }
+                }
+            };
             function afkRules() {
                 if (net.state === 'in') return pres.rules;
                 return { idle: rule('afkIdleSeconds') * 1000, kick: rule('afkKickSeconds') * 1000, fade: !!rule('afkFade'), mobs: !!rule('afkMobsIgnore'), lost: rule('hostLostSeconds') * 1000 };
@@ -1380,6 +1389,7 @@
             }
             function presenceTick(force) {
                 var now = Date.now();
+                Module.mcSky.apply();
                 if (net.state === 'in') {
                     if (document.hidden) pres.visibleSince = 0;
                     else if (!pres.visibleSince) pres.visibleSince = now;
@@ -1417,7 +1427,7 @@
                     }
                     list.push({ id: id, device: p.device, afk: ms });
                 });
-                var rules = { idle: R.idle, kick: R.kick, fade: R.fade, mobs: R.mobs, lost: R.lost };
+                var rules = { idle: R.idle, kick: R.kick, fade: R.fade, mobs: R.mobs, lost: R.lost, sky: Module.mcSky.script, modSky: !!rule('modSkyColors') };
                 conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list, rules: rules }); });
                 applyPresence(list, rules);
             }
@@ -1578,7 +1588,9 @@
                                 var hm = readCtl(b);
                                 if (hm && hm.json && hm.json.t === 'presence') {
                                     var hr = hm.json.rules;
-                                    if (hr) pres.rules = { idle: +hr.idle || 0, kick: +hr.kick || 0, fade: hr.fade !== false, mobs: hr.mobs !== false, lost: Math.max(10000, +hr.lost || HOST_LOST_MS) };
+                                    if (hr) pres.rules = { idle: +hr.idle || 0, kick: +hr.kick || 0, fade: hr.fade !== false, mobs: hr.mobs !== false, lost: Math.max(10000, +hr.lost || HOST_LOST_MS),
+                                                           sky: typeof hr.sky === 'number' ? hr.sky : -1, modSky: hr.modSky !== false };
+                                    if (hr) Module.mcSky.apply();
                                     applyPresence(hm.json.list, hr ? pres.rules : null);
                                     return;
                                 }
@@ -4726,7 +4738,29 @@
                     if (!Object.keys(parent).length) return;
                     var groups = {};
                     Object.keys(parent).forEach(function (v) { var g = find(v); (groups[g] = groups[g] || []).push(v); });
+                    var modOfRef = function (r) { return /^mod:/.test(r) ? r.split(':')[1] : 'vanilla'; };
+                    Object.keys(groups).forEach(function (g) {
+                        var per = {};
+                        if (groups[g].some(function (r) { var m = modOfRef(r); per[m] = (per[m] || 0) + 1; return per[m] > 1; })) {
+                            groups[g].forEach(function (r) { delete parent[r]; });
+                            delete groups[g];
+                        }
+                    });
+                    if (!Object.keys(groups).length) return;
                     var alts = function (r) { return parent[r] ? groups[find(r)] : [r]; };
+                    var inputsOf = function (f) {
+                        if (f[0] === 'shaped') {
+                            var km = {};
+                            (f[4] || '').split(';').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) km[kv.slice(0, i)] = kv.slice(i + 1); });
+                            return 'S' + String(f[3] || '').split('|').map(function (row) { return row.split('').map(function (ch) { return km[ch] || '.'; }).join(','); }).join('/');
+                        }
+                        if (f[0] === 'shapeless') return 'L' + String(f[3] || '').split(';').sort().join(';');
+                        if (f[0] === 'smelt') return 'F' + f[1];
+                        return null;
+                    };
+                    var taken = {};
+                    lines.forEach(function (l) { var k = inputsOf(l.split('\t')); if (k) taken[k] = true; });
+                    var fresh = function (line) { var k = inputsOf(line.split('\t')); if (!k || taken[k]) return false; taken[k] = true; return true; };
                     var combos = function (lists, cap) {
                         var out = [[]];
                         lists.forEach(function (l) {
@@ -4745,19 +4779,19 @@
                             if (!ks.some(function (k) { return parent[k[1]]; })) return;
                             combos(ks.map(function (k) { return alts(k[1]).map(function (r) { return k[0] + '=' + r; }); }), 16).forEach(function (c) {
                                 var nl = [f[0], f[1], f[2], f[3], c.join(';')].join('\t');
-                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                                if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         } else if (f[0] === 'shapeless' && f[3]) {
                             var ing = f[3].split(';');
                             if (!ing.some(function (r) { return parent[r]; })) return;
                             combos(ing.map(alts), 16).forEach(function (c) {
                                 var nl = [f[0], f[1], f[2], c.join(';')].join('\t');
-                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                                if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         } else if (f[0] === 'smelt' && parent[f[1]]) {
                             alts(f[1]).slice(0, 8).forEach(function (r) {
                                 var nl = [f[0], r, f[2], f[3]].join('\t');
-                                if (!seen[nl]) { seen[nl] = true; extra.push(nl); }
+                                if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         }
                     });
@@ -5311,7 +5345,7 @@
                                 hexColor(j.grass_color, b.mod, b.file, 'grass_color'), hexColor(j.foliage_color, b.mod, b.file, 'foliage_color'),
                                 trees, num(j.trees_per_chunk, trees === 'none' ? 0 : 3, 0, 64), Math.round(num(j.flowers_per_chunk, 2, 0, 64)),
                                 Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1, rules.join(';') || '-', terrain,
-                                wts.join(';') || 'default', tags.join(';') || '-'].join('\t'));
+                                wts.join(';') || 'default', tags.join(';') || '-', hexColor(j.sky_color, b.mod, b.file, 'sky_color')].join('\t'));
                 });
                 var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
                 function ore(o, blockRef, mod, file) {
@@ -5601,7 +5635,7 @@
                         if (kind === 'head') { headDone = true; return 1; }
                         if (kind === 'leg') { var l = legs++ % 4; return l === 0 || l === 3 ? 2 : 3; }
                         if (kind === 'arm') return arms++ % 2 ? 5 : 4;
-                        if (kind === 'wing') return /left|(^|_)l($|_)/.test(p.name) ? 6 : /right|(^|_)r($|_)/.test(p.name) ? 7 : (wings++ % 2 ? 7 : 6);
+                        if (kind === 'wing') return /left|(^|_)l($|_|\d)|(^|_)l_?wing|wing_?l($|_|\d)/.test(p.name) ? 6 : /right|(^|_)r($|_|\d)|(^|_)r_?wing|wing_?r($|_|\d)/.test(p.name) ? 7 : (wings++ % 2 ? 7 : 6);
                         return ANIM[kind];
                     };
                     var hiddenNames = Array.isArray(j.hidden_parts) ? j.hidden_parts.map(function (n) { return String(n).toLowerCase(); }) : [];
@@ -6980,6 +7014,8 @@
                             gameRule: function (name) { return ask(mod, ['gamerule', String(name)]).then(function (r) { return r.value; }); },
                             gameRules: function () { return ask(mod, ['gamerules']).then(function (r) { return r.rules || {}; }); },
                             setGameRule: function (name, value) { act(mod, ['setgamerule', String(name), value === undefined ? null : value]); },
+                            skyColor: function () { return ask(mod, ['skycolor']).then(function (r) { return r.color; }); },
+                            setSkyColor: function (c) { act(mod, ['setsky', c === undefined ? null : c]); },
                             setDifficulty: function (d) {
                                 var n = typeof d === 'string' ? ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()) : d | 0;
                                 if (n >= 0 && n <= 3) act(mod, ['setdifficulty', n]);
@@ -7345,6 +7381,22 @@
                 if (k === 'setgamerule') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) return;
                     if (!Module.mcGameRules.set(String(a[1]), a[2]) && W() && W().problem) W().problem(mod, 'scripts', 'world.setGameRule: no game rule "' + a[1] + '"', 'script');
+                    if (Module.mcSky) Module.mcSky.apply();
+                    return;
+                }
+                if (k === 'skycolor') {
+                    var sn = Module._mcSkyNow ? Module._mcSkyNow() : 0x3070ff;
+                    deliver(fromGuid, a[1], { color: '#' + ('00000' + (sn & 0xffffff).toString(16)).slice(-6) });
+                    return;
+                }
+                if (k === 'setsky') {
+                    if (fromGuid && !isOp(byGuid(fromGuid))) return;
+                    var sv = a[1], sc = -1;
+                    if (typeof sv === 'number' && isFinite(sv)) sc = sv & 0xffffff;
+                    else if (typeof sv === 'string' && /^#?[0-9a-f]{6}$/i.test(sv.trim())) sc = parseInt(sv.trim().replace('#', ''), 16);
+                    else if (sv !== null && W() && W().problem) { W().problem(mod, 'scripts', 'world.setSkyColor: a colour like "#7fb2ff" (or null)', 'script'); return; }
+                    if (Module.mcSky) { Module.mcSky.script = sc; Module.mcSky.apply(); }
+                    toWorker({ t: 'sky', color: sc < 0 ? null : '#' + ('00000' + sc.toString(16)).slice(-6), mod: mod });
                     return;
                 }
                 if (k === 'presence') {
@@ -7702,6 +7754,7 @@
                 if (worker) { try { worker.terminate(); } catch (x) { } }
                 worker = null; side = ''; actions = []; known = {}; wants = {}; swants = {}; remoteReq = {}; ops = null;
                 if (Module.mcGameRules) Module.mcGameRules.reset();
+                if (Module.mcSky) { Module.mcSky.script = -1; Module.mcSky.apply(); }
                 closeGui(true);
                 closePanels();
                 hud(null);
