@@ -2071,6 +2071,7 @@ F	apa	z	field_71979_v	dirt
 F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
+F	api	d	field_72131_c	graphicsLevel
 F	apk	d	field_94388_cO	tree_top
 F	apy	a	field_70425_a	adjacentChestChecked
 F	apy	b	field_70423_b	adjacentChestZNeg
@@ -2085,6 +2086,8 @@ F	aqc	a	field_94050_c	customName
 F	aqg	a	field_70407_a	furnaceBurnTime
 F	aqg	b	field_70405_b	currentItemBurnTime
 F	aqg	c	field_70406_c	furnaceCookTime
+F	aqj	a	field_98050_a	field_98050_a
+F	aqk	a	field_98295_a	mobSpawnerEntity
 F	aqp	a	field_70326_a	nameToClassMap
 F	aqp	b	field_70323_b	classToNameMap
 F	aqp	k	field_70331_k	worldObj
@@ -3078,6 +3081,14 @@ F	za	h	digger	digger
 F	za	i	bow	bow
 F	zg	b	field_76302_b	enchantmentobj
 F	zg	c	field_76303_c	enchantmentLevel
+F	zs	a	field_98288_a	mobID
+F	zs	b	field_98286_b	spawnDelay
+F	zs	g	field_98283_g	minSpawnDelay
+F	zs	h	field_98293_h	maxSpawnDelay
+F	zs	i	field_98294_i	spawnCount
+F	zs	k	field_98292_k	maxNearbyEntities
+F	zs	l	field_98289_l	activatingRangeFromPlayer
+F	zs	m	field_98290_m	spawnRange
 F	zu	a	field_77276_a	chunkXPos
 F	zw	a	field_77286_a	isFlaming
 F	zw	b	field_82755_b	isSmoking
@@ -3615,6 +3626,7 @@ M	amj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	amj	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
 M	amj	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
 M	amj	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amj	a	(Laak;IIII)Z	func_71877_c	shouldSideBeRendered
 M	amj	a	(Lly;)V	func_94332_a	registerIcons
 M	amj	b	()Z	func_71886_c	renderAsNormalBlock
 M	amj	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
@@ -3631,6 +3643,22 @@ M	amz	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
 M	amz	c	()Z	func_71926_d	isOpaqueCube
 M	amz	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	amz	d	()I	func_71857_b	getRenderType
+M	ana	a	(I)I	func_71899_b	damageDropped
+M	ana	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	ana	a	(ILve;Ljava/util/List;)V	func_71879_a	getSubBlocks
+M	ana	a	(Laab;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
+M	ana	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	ana	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ana	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
+M	ana	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	ana	a	(Lly;)V	func_94332_a	registerIcons
+M	ana	a	(Z)V	func_72133_a	setGraphicsLevel
+M	ana	b	(I)I	func_71889_f_	getRenderColor
+M	ana	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	ana	c	()Z	func_71926_d	isOpaqueCube
+M	ana	c	(Laak;III)I	func_71920_b	colorMultiplier
+M	ana	k	(Laab;III)V	func_72132_l	removeLeaves
+M	ana	o	()I	func_71933_m	getBlockColor
 M	anc	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	anc	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
 M	anc	a	(Laab;IIIII)V	func_71852_a	breakBlock
@@ -3701,6 +3729,7 @@ M	apa	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
 M	apa	a	(Laab;IIILzw;)V	func_71867_k	onBlockDestroyedByExplosion
 M	apa	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
 M	apa	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	apa	a	(Laak;IIII)Z	func_71877_c	shouldSideBeRendered
 M	apa	a	(Lape;)Lapa;	func_71884_a	setStepSound
 M	apa	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
 M	apa	a	(Lly;)V	func_94332_a	registerIcons
@@ -3753,6 +3782,8 @@ M	aph	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
 M	aph	c	()Z	func_71926_d	isOpaqueCube
 M	aph	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	aph	d	()I	func_71857_b	getRenderType
+M	api	a	(Laak;IIII)Z	func_71877_c	shouldSideBeRendered
+M	api	c	()Z	func_71926_d	isOpaqueCube
 M	apj	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	apj	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
 M	apj	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
@@ -3878,6 +3909,17 @@ M	aqi	g	()V	func_70305_f	closeChest
 M	aqi	h	()V	func_70316_g	updateEntity
 M	aqi	j_	()I	func_70302_i_	getSizeInventory
 M	aqi	k_	()V	func_70296_d	onInventoryChanged
+M	aqj	a	()Lzs;	func_98049_a	getSpawnerLogic
+M	aqj	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aqj	b	(II)Z	func_70315_b	receiveClientEvent
+M	aqj	b	(Lbs;)V	func_70310_b	writeToNBT
+M	aqj	h	()V	func_70316_g	updateEntity
+M	aqj	m	()Lei;	func_70319_e	getDescriptionPacket
+M	aqk	a	()Laab;	func_98271_a	getSpawnerWorld
+M	aqk	a	(I)V	func_98267_a	func_98267_a
+M	aqk	b	()I	func_98275_b	getSpawnerX
+M	aqk	c	()I	func_98274_c	getSpawnerY
+M	aqk	d	()I	func_98266_d	getSpawnerZ
 M	aqp	a	(DDD)D	func_70318_a	getDistanceFrom
 M	aqp	a	(Lbs;)V	func_70307_a	readFromNBT
 M	aqp	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
@@ -5700,6 +5742,13 @@ M	vt	a	(ILve;Ljava/util/List;)V	func_77633_a	getSubItems
 M	vt	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	vt	a_	(I)Llx;	func_77617_a	getIconFromDamage
 M	vt	d	(Lwm;)Ljava/lang/String;	func_77667_c	getUnlocalizedName
+M	vw	a	(Ljava/util/Random;)Lwm;	func_92109_a	func_92109_a
+M	vw	a	(Ljava/util/Random;III)Llp;	func_92112_a	func_92112_a
+M	vw	a	(Lwm;Lzg;)V	func_92115_a	addEnchantment
+M	vw	a	(Lzg;)Lwm;	func_92111_a	getEnchantedItemStack
+M	vw	b	(Ljava/util/Random;)Llp;	func_92114_b	func_92114_b
+M	vw	e	(Lwm;)Z	func_77636_d	hasEffect
+M	vw	g	(Lwm;)Lca;	func_92110_g	func_92110_g
 M	wf	a	(IIIF)Lwf;	func_77844_a	setPotionEffect
 M	wf	a	(Lwm;Laab;Lsq;)Lwm;	func_77659_a	onItemRightClick
 M	wf	b	(Lwm;Laab;Lsq;)Lwm;	func_77654_b	onEaten
@@ -5840,6 +5889,18 @@ M	zb	e	(Lng;)Z	func_77502_d	getSilkTouchModifier
 M	zb	f	(Lng;)I	func_77517_e	getFortuneModifier
 M	zb	g	(Lng;)I	func_77519_f	getLootingModifier
 M	zb	h	(Lng;)Z	func_77510_g	getAquaAffinityModifier
+M	zs	a	()Laab;	func_98271_a	getSpawnerWorld
+M	zs	a	(I)V	func_98267_a	func_98267_a
+M	zs	a	(Lbs;)V	func_98270_a	readFromNBT
+M	zs	a	(Ljava/lang/String;)V	func_98272_a	setMobID
+M	zs	b	()I	func_98275_b	getSpawnerX
+M	zs	b	(Lbs;)V	func_98280_b	writeToNBT
+M	zs	c	()I	func_98274_c	getSpawnerY
+M	zs	d	()I	func_98266_d	getSpawnerZ
+M	zs	e	()Ljava/lang/String;	func_98276_e	getEntityNameToSpawn
+M	zs	f	()Z	func_98279_f	canRun
+M	zs	g	()V	func_98278_g	updateSpawner
+M	zs	j	()V	func_98273_j	func_98273_j
 M	zu	a	()I	func_77273_a	getCenterXPos
 M	zu	b	()I	func_77274_b	getCenterZPosition
 M	zu	equals	(Ljava/lang/Object;)Z	equals	equals
@@ -5975,6 +6036,7 @@ R	field_74827_c	info
 R	field_74619_a	elements
 R	field_74730_a	elements
 R	field_74625_a	NULL
+R	field_74624_c	FALSE
 R	field_74729_a	key
 R	field_74663_a	stack
 R	field_74662_b	root
@@ -5983,6 +6045,7 @@ R	OBJECT	OBJECT
 R	ARRAY	ARRAY
 R	STRING	STRING
 R	NUMBER	NUMBER
+R	FALSE	FALSE
 R	NULL	NULL
 R	field_74620_b	value
 R	field_74617_a	fields
@@ -6672,6 +6735,7 @@ R	func_71879_a	getSubBlocks
 R	func_71860_a	onBlockPlacedBy
 R	func_71903_a	onBlockActivated
 R	func_71902_a	setBlockBoundsBasedOnState
+R	func_71877_c	shouldSideBeRendered
 R	func_94332_a	registerIcons
 R	func_71886_c	renderAsNormalBlock
 R	func_71926_d	isOpaqueCube
@@ -7104,6 +7168,11 @@ R	func_70690_d	addPotionEffect
 R	func_70492_c	setDamage
 R	func_71027_c	travelToDimension
 R	func_70106_y	setDead
+R	func_98271_a	getSpawnerWorld
+R	func_98267_a	func_98267_a
+R	func_98275_b	getSpawnerX
+R	func_98274_c	getSpawnerY
+R	func_98266_d	getSpawnerZ
 R	func_70515_d	explode
 R	func_70438_a	getStrVsBlock
 R	func_70442_a	writeToNBT
@@ -7141,10 +7210,6 @@ R	func_77667_c	getUnlocalizedName
 R	func_77633_a	getSubItems
 R	func_82790_a	getColorFromItemStack
 R	func_78012_e	getTabIconItemIndex
-R	func_92112_a	func_92112_a
-R	func_92115_a	addEnchantment
-R	func_92111_a	getEnchantedItemStack
-R	func_92114_b	func_92114_b
 R	func_77636_d	hasEffect
 R	func_77845_h	isWolfsFavoriteMeat
 R	func_77657_g	getLocalizedName
@@ -7182,8 +7247,7 @@ R	func_92089_a	canApply
 R	func_77326_a	canApplyTogether
 R	func_77505_b	mapEnchantmentData
 R	func_77318_a	calcModifierDamage
-R	func_98270_a	readFromNBT
-R	func_98280_b	writeToNBT
+R	func_98268_b	setDelayToMin
 R	func_77271_a	getChunkPosition
 R	func_82756_a	getGameRuleStringValue
 R	func_82758_b	getGameRuleBooleanValue

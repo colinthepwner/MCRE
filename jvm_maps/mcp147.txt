@@ -1606,6 +1606,7 @@ F	ahx	r	field_76114_p	thunderTime
 F	ajf	a	field_82537_a	sensible
 F	ajw	a	field_82527_a	dispenseBehaviorRegistry
 F	ajw	b	field_72284_a	random
+F	akt	cD	field_72134_cr	baseIndexInPNG
 F	amh	cD	field_72157_b	modelBlock
 F	amq	A	field_71988_x	planks
 F	amq	B	field_71987_y	sapling
@@ -1783,6 +1784,7 @@ F	amq	z	field_71978_w	cobblestone
 F	amu	a	field_72681_a	stepSoundName
 F	amu	b	field_72679_b	stepSoundVolume
 F	amu	c	field_72680_c	stepSoundPitch
+F	amy	c	field_72131_c	graphicsLevel
 F	anm	a	field_70425_a	adjacentChestChecked
 F	anm	b	field_70423_b	adjacentChestZNeg
 F	anm	c	field_70424_c	adjacentChestXPos
@@ -1794,6 +1796,14 @@ F	anm	h	field_70427_h	numUsingPlayers
 F	anr	a	field_70407_a	furnaceBurnTime
 F	anr	b	field_70405_b	currentItemBurnTime
 F	anr	c	field_70406_c	furnaceCookTime
+F	ans	a	field_70394_a	delay
+F	ans	b	field_70392_b	yaw
+F	ans	d	field_70390_d	mobID
+F	ans	g	field_70388_f	minSpawnDelay
+F	ans	h	field_70389_g	maxSpawnDelay
+F	ans	i	field_70395_h	spawnCount
+F	ans	r	field_82350_j	maxNearbyEntities
+F	ans	t	field_82348_s	spawnRange
 F	any	a	field_70326_a	nameToClassMap
 F	any	b	field_70323_b	classToNameMap
 F	any	k	field_70331_k	worldObj
@@ -3259,6 +3269,7 @@ M	akd	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
 M	akd	a	(Lyc;IIILmd;)V	func_71860_a	onBlockPlacedBy
 M	akd	a	(Lyc;IIILqx;IFFF)Z	func_71903_a	onBlockActivated
 M	akd	a	(Lym;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	akd	a	(Lym;IIII)Z	func_71877_c	shouldSideBeRendered
 M	akd	b	()Z	func_71886_c	renderAsNormalBlock
 M	akd	b	(Lyc;III)Z	func_71930_b	canPlaceBlockAt
 M	akd	c	()Z	func_71926_d	isOpaqueCube
@@ -3274,6 +3285,22 @@ M	aks	b	(Lyc;III)Z	func_71930_b	canPlaceBlockAt
 M	aks	c	()Z	func_71926_d	isOpaqueCube
 M	aks	d	()I	func_71857_b	getRenderType
 M	aks	e	(Lyc;III)Laoe;	func_71872_e	getCollisionBoundingBoxFromPool
+M	akt	a	(II)I	func_71858_a	getBlockTextureFromSideAndMetadata
+M	akt	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	akt	a	(ILtj;Ljava/util/List;)V	func_71879_a	getSubBlocks
+M	akt	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	akt	a	(Lyc;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
+M	akt	a	(Lyc;IIIII)V	func_71852_a	breakBlock
+M	akt	a	(Lyc;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	akt	a	(Lyc;Lqx;IIII)V	func_71893_a	harvestBlock
+M	akt	a	(Z)V	func_72133_a	setGraphicsLevel
+M	akt	b	(I)I	func_71899_b	damageDropped
+M	akt	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	akt	b	(Lym;III)I	func_71920_b	colorMultiplier
+M	akt	c	()Z	func_71926_d	isOpaqueCube
+M	akt	g_	(I)I	func_71889_f_	getRenderColor
+M	akt	l	(Lyc;III)V	func_72132_l	removeLeaves
+M	akt	o	()I	func_71933_m	getBlockColor
 M	akv	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
 M	akv	a	(Lyc;IIIIFFFI)I	func_85104_a	onBlockPlaced
 M	akv	a	(Lyc;IIIII)V	func_71852_a	breakBlock
@@ -3343,6 +3370,7 @@ M	amq	a	(Lyc;IIILqx;)V	func_71921_a	onBlockClicked
 M	amq	a	(Lyc;IIILqx;IFFF)Z	func_71903_a	onBlockActivated
 M	amq	a	(Lyc;Lqx;IIII)V	func_71893_a	harvestBlock
 M	amq	a	(Lym;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amq	a	(Lym;IIII)Z	func_71877_c	shouldSideBeRendered
 M	amq	b	()Z	func_71886_c	renderAsNormalBlock
 M	amq	b	(F)Lamq;	func_71894_b	setResistance
 M	amq	b	(I)I	func_71899_b	damageDropped
@@ -3391,6 +3419,8 @@ M	amx	c	()Z	func_71926_d	isOpaqueCube
 M	amx	d	()I	func_71857_b	getRenderType
 M	amx	e	(Lyc;III)Laoe;	func_71872_e	getCollisionBoundingBoxFromPool
 M	amx	g	(Lyc;III)V	func_71861_g	onBlockAdded
+M	amy	a	(Lym;IIII)Z	func_71877_c	shouldSideBeRendered
+M	amy	c	()Z	func_71926_d	isOpaqueCube
 M	amz	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
 M	amz	a	(Lyc;IIIIFFFI)I	func_85104_a	onBlockPlaced
 M	amz	a	(Lyc;IIILqx;)V	func_71921_a	onBlockClicked
@@ -3488,6 +3518,12 @@ M	anr	g	()V	func_70316_g	updateEntity
 M	anr	i	()Z	func_70400_i	isBurning
 M	anr	k_	()I	func_70302_i_	getSizeInventory
 M	anr	l_	()V	func_70295_k_	openChest
+M	ans	a	()Ljava/lang/String;	func_70384_a	getMobID
+M	ans	a	(Lbq;)V	func_70307_a	readFromNBT
+M	ans	a	(Ljava/lang/String;)V	func_70385_a	setMobID
+M	ans	b	(Lbq;)V	func_70310_b	writeToNBT
+M	ans	g	()V	func_70316_g	updateEntity
+M	ans	l	()Lef;	func_70319_e	getDescriptionPacket
 M	any	a	(DDD)D	func_70318_a	getDistanceFrom
 M	any	a	(Lbq;)V	func_70307_a	readFromNBT
 M	any	a	(Ljava/lang/Class;Ljava/lang/String;)V	func_70306_a	addMapping
@@ -5279,6 +5315,13 @@ M	ty	b	(I)I	func_77617_a	getIconFromDamage
 M	ty	d	(Lur;)Ljava/lang/String;	func_77667_c	getItemNameIS
 M	u	a	(C)Z	func_71566_a	isAllowedCharacter
 M	u	a	(Ljava/lang/String;)Ljava/lang/String;	func_71565_a	filerAllowedCharacters
+M	ub	a	(Ljava/util/Random;)Lur;	func_92109_a	func_92109_a
+M	ub	a	(Ljava/util/Random;III)Lkw;	func_92112_a	func_92112_a
+M	ub	a	(Lur;Lxj;)V	func_92115_a	addEnchantment
+M	ub	a	(Lxj;)Lur;	func_92111_a	getEnchantedItemStack
+M	ub	b	(Ljava/util/Random;)Lkw;	func_92114_b	func_92114_b
+M	ub	e	(Lur;)Z	func_77636_d	hasEffect
+M	ub	g	(Lur;)Lby;	func_92110_g	func_92110_g
 M	uk	a	(IIIF)Luk;	func_77844_a	setPotionEffect
 M	uk	a	(Lur;Lyc;Lqx;)Lur;	func_77659_a	onItemRightClick
 M	uk	c_	(Lur;)I	func_77626_a	getMaxItemUseDuration
@@ -5687,8 +5730,6 @@ R	field_70376_r	rand
 R	field_70370_a	lidAngle
 R	field_70368_b	prevLidAngle
 R	field_70369_c	numUsingPlayers
-R	field_70394_a	delay
-R	field_70392_b	yaw
 R	field_70416_a	note
 R	field_70344_d	extending
 R	field_70342_f	progress
@@ -5711,6 +5752,7 @@ R	field_74827_c	info
 R	field_74619_a	elements
 R	field_74730_a	elements
 R	field_74625_a	NULL
+R	field_74624_c	FALSE
 R	field_74729_a	key
 R	field_74663_a	stack
 R	field_74662_b	root
@@ -5719,6 +5761,7 @@ R	OBJECT	OBJECT
 R	ARRAY	ARRAY
 R	STRING	STRING
 R	NUMBER	NUMBER
+R	FALSE	FALSE
 R	NULL	NULL
 R	field_74620_b	value
 R	field_74617_a	fields
@@ -6358,6 +6401,7 @@ R	func_71879_a	getSubBlocks
 R	func_71860_a	onBlockPlacedBy
 R	func_71903_a	onBlockActivated
 R	func_71902_a	setBlockBoundsBasedOnState
+R	func_71877_c	shouldSideBeRendered
 R	func_71886_c	renderAsNormalBlock
 R	func_71899_b	damageDropped
 R	func_71926_d	isOpaqueCube
@@ -6784,10 +6828,6 @@ R	func_77667_c	getItemNameIS
 R	func_77633_a	getSubItems
 R	func_82790_a	getColorFromItemStack
 R	func_78012_e	getTabIconItemIndex
-R	func_92112_a	func_92112_a
-R	func_92115_a	addEnchantment
-R	func_92111_a	getEnchantedItemStack
-R	func_92114_b	func_92114_b
 R	func_77636_d	hasEffect
 R	func_77618_c	getIconFromDamageForRenderPass
 R	func_77845_h	isWolfsFavoriteMeat

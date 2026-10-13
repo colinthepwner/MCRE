@@ -1972,8 +1972,8 @@
                         var hp = player(); if (!hp || !hp.carried || hp.carried[0] === 'id:0') return null; var hj = javaOf(hp.carried[0], hp.carried[2]); return { id: hj.id, count: hp.carried[1], data: hj.data, ench: enchOf(hp.carried[3]) }; }
                     case 'give':
                         var gref = itemRef(a[0], a[2]), gd = variantRef(gref) ? 0 : a[2] | 0;
-                        if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : ''), n: a[1] | 0 }); return 1; }
-                        return mp(['give', gref, a[1] | 0, gd].join('\t'));
+                        if (actor) { toActor({ t: 'give', ref: gref + (gd ? ':' + gd : '') + enchSpec(a[3]), n: a[1] | 0 }); return 1; }
+                        return mp(['give', gref + enchSpec(a[3]), a[1] | 0, gd].join('\t'));
                     case 'achievement': {
                         var ai = a[0] || {}, ap = actor;
                         if (!ap) { try { ap = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (x) { ap = null; } }
@@ -1991,6 +1991,8 @@
                         var cref = a[4] && a[5] > 0 ? itemRef(a[4], a[6]) : 'id:0';
                         return mp(['setchest', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, cref === 'id:0' ? cref : cref + enchSpec(a[7]), a[5] | 0, variantRef(cref) ? 0 : a[6] | 0].join('	'));
                     }
+                    case 'spawnerset': return mp(['spawnerset', a[0] | 0, a[1] | 0, a[2] | 0, clean(a[3] || '')].concat(a[4] ? a[4].map(function (n) { return n | 0; }) : []).join('\t'));
+                    case 'spawner': return mp(['spawner', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'drop': { var dref = itemRef(a[3], a[5]); return mp(['drop', +a[0], +a[1], +a[2], dref + enchSpec(a[7]), a[4] | 0, variantRef(dref) ? 0 : gameData(a[3], a[5] | 0), a[6] == null ? '' : a[6] | 0].join('\t')); }
                     case 'msg':
                         if (actor) { toActor({ t: 'chat', text: clean(a[0]) }); return 1; }
@@ -2186,9 +2188,11 @@
                 return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {}, genBind = -1;
+            var genPT = null;
+            var genWT = null;
             function genFresh() {
                 var bv = Module._mcModBindVersion ? Module._mcModBindVersion() : 0;
-                if (bv !== genBind) { genBind = bv; genRefs = {}; genIds = {}; }
+                if (bv !== genBind) { genBind = bv; genRefs = {}; genIds = {}; genPT = null; genWT = null; }
             }
             function genJava(raw) {
                 genFresh();
@@ -2215,14 +2219,28 @@
             var genBridge = {
                 mode: 'gen',
                 blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava,
+                tileP: function (x, y, z) {
+                    var raw = Module._mcJavaGenTile(x, y, z), pt = genPT;
+                    if (pt !== null) { var pv = pt[raw]; if (pv >= 0) return pv; }
+                    var gt = genJava(raw), pk = gt.id * 65536 + (gt.data & 65535);
+                    if (genPT === null) { genPT = new Float64Array(65536); genPT.fill(-1); }
+                    if (raw >= 0 && raw < 65536) genPT[raw] = pk;
+                    return pk;
+                },
                 op: function (name, x, y, z, b, d) {
                     x |= 0; y |= 0; z |= 0;
                     switch (name) {
                     case 'tile': { var t = genJava(Module._mcJavaGenTile(x, y, z)); return { id: t.id, data: t.data }; }
                     case 'settile': {
                         if (!b) { Module._mcJavaGenSet(x, y, z, 0, 0); return 0; }
-                        var gg = genGame(b | 0, (b | 0) === 38 ? 1 : d | 0);
-                        if (gg) Module._mcJavaGenSet(x, y, z, gg.id, gg.mod ? gg.aux : d | 0);
+                        var jid = b | 0, jd = jid === 38 ? 1 : d | 0;
+                        var wk = jid >= 0 && jid < 4096 && jd >= 0 && jd < 16 ? jid * 16 + jd : -1, wv = wk >= 0 && genWT !== null ? genWT[wk] : 0;
+                        if (wv === 0) {
+                            var gg = genGame(jid, jd);
+                            wv = gg ? (gg.id & 255 | (gg.aux & 255) << 8 | (gg.mod ? 1 : 0) << 16) + 1 : -1;
+                            if (wk >= 0) { if (genWT === null) genWT = new Int32Array(65536); genWT[wk] = wv; }
+                        }
+                        if (wv > 0) { wv--; Module._mcJavaGenSet(x, y, z, wv & 255, wv >> 16 ? (wv >> 8) & 255 : d | 0); }
                         return 0;
                     }
                     case 'setdata': {
@@ -2253,7 +2271,7 @@
             }
             J.genCheck = function () {
                 var r = reg();
-                genRefs = {}; genIds = {};
+                genRefs = {}; genIds = {}; genPT = null; genWT = null;
                 var on = !!(vm && r && (genMods(r).length || (window.JVM && window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm)) ||
                     (window.JVM && window.JVM.hasJavaDims && window.JVM.hasJavaDims(vm)) ||
                     (window.JVM && window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm)) ||
@@ -2277,6 +2295,7 @@
                         dimSeeds[key] = seed | 0;
                     }
                     if (seed != null) vm.mcSeed = seed | 0;
+                    genFresh();
                     vm.game = genBridge; vm.steps = 0;
                     var mdk = (Module.mcModDims || {})[key];
                     if (mdk && mdk.id != null) vm.mcDim = mdk.id;
@@ -2313,6 +2332,7 @@
                     Object.keys(r.blocks).forEach(function (k) { javaMods[r.blocks[k].$mod] = true; });
                     Object.keys(r.items).forEach(function (k) { javaMods[r.items[k].$mod] = true; });
                 }
+                genFresh();
                 vm.game = genBridge; vm.mcSeed = seed | 0; vm.mcDim = dim; vm.steps = 0;
                 try {
                     JV.run(vm, function () {
@@ -2334,7 +2354,10 @@
                         if (fg) JV.forgeGenerate(vm, cx, cz);
                         if (sg) JV.stationGenerate(vm, world, cx, cz, rnd, dim);
                     });
-                } finally { vm.game = prev; vm.mcDim = prevDim; }
+                } finally {
+                    vm.game = prev; vm.mcDim = prevDim;
+                    if (JV.structPendingCount && JV.structPendingCount(vm)) { try { Module.ccall('mcModpeOp', 'string', ['string'], ['wanttick']); } catch (x) { } }
+                }
             };
             J.worldStop = function () {
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
@@ -4449,6 +4472,8 @@
                 if ((m = /^(\w+?)_log$/.exec(n))) return 'log_' + (W[m[1]] ? m[1] : 'oak');
                 if ((m = /^(\w+?)_sapling$/.exec(n))) return 'sapling_' + (W[m[1]] ? m[1] : 'oak');
                 if ((m = /^(\w+?)_leaves$/.exec(n))) return m[1] === 'spruce' ? 'leaves_spruce' : 'leaves_jungle';
+                if ((m = /^(\w+?)_leaves_fast$/.exec(n))) return m[1] === 'spruce' ? 'leaves_spruce_opaque' : 'leaves_jungle_opaque';
+                if ((m = /^fast_(\w+?)_leaves$/.exec(n))) return m[1] === 'spruce' ? 'leaves_spruce_opaque' : 'leaves_jungle_opaque';
                 if ((m = /^(\w+?)_wool$/.exec(n))) return 'wool_colored_' + (m[1] === 'light_gray' ? 'silver' : m[1]);
                 if ((m = /^(wheat|carrots|potatoes|beetroots|nether_wart)_stage(\d)$/.exec(n))) return m[1] + '_stage_' + m[2];
                 return '';
@@ -4798,6 +4823,15 @@
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
                     if (j.log_axis === 1 || j.log_axis === 2) lines.push(['logaxis', key, j.log_axis].join('\t'));
+                    if (j.leaves === true) {
+                        var lft = j.texture_fast, lff = tex;
+                        if (lft && typeof lft === 'object') {
+                            var lside = lft.side || lft.all, lall = lft.all || lft.side;
+                            lff = [lft.down || lft.bottom || lall, lft.up || lft.top || lall, lft.north || lside, lft.south || lside, lft.west || lside, lft.east || lside]
+                                .map(function (f, i) { return f ? cellOf('blocks', b.mod, f, b.file) : tex[i]; });
+                        } else if (typeof lft === 'string' && lft) lff = [0, 0, 0, 0, 0, 0].map(function () { return cellOf('blocks', b.mod, lft, b.file); });
+                        lines.push(['leaves', key, lff.join(',')].join('\t'));
+                    }
                     if (j.state_boxes && typeof j.state_boxes === 'object') Object.keys(j.state_boxes).forEach(function (sd) {
                         var bx = j.state_boxes[sd];
                         if (/^\d+$/.test(sd) && +sd <= 16 && Array.isArray(bx) && bx.length === 6 && bx.every(function (v) { return isFinite(+v); }))
@@ -7023,6 +7057,13 @@
                                 act(mod, ['particle', p[0], +x, +y, +z, Math.max(1, Math.min(200, o.count == null ? 1 : o.count | 0)),
                                           Math.abs(+s[0] || 0), Math.abs(+s[1] || 0), Math.abs(+s[2] || 0), Math.max(0, +o.speed || 0), extra]);
                             },
+                            spawner: function (x, y, z) { return ask(mod, ['spawnerinfo', x | 0, y | 0, z | 0]).then(function (r) { return r.spawner || null; }); },
+                            setSpawner: function (x, y, z, mob, o) {
+                                o = o || {};
+                                var n = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, v | 0) : 0; };
+                                act(mod, ['setspawner', x | 0, y | 0, z | 0, mob == null ? '' : String(mob).replace(/[\t\r\n]/g, ' '),
+                                          n(o.minDelay), n(o.maxDelay), n(o.count), n(o.maxNearby), n(o.playerRange), n(o.range)]);
+                            },
                             signText: function (x, y, z) { return ask(mod, ['signtext', x | 0, y | 0, z | 0]).then(function (r) { return r.lines || null; }); },
                             setSignText: function (x, y, z, lines) {
                                 var l = Array.isArray(lines) ? lines : String(lines == null ? '' : lines).split('\n');
@@ -7345,7 +7386,7 @@
                     eachJoiner(function (c) { net().sendCtlTo(c, { t: 'particle', a: pa }); });
                 }
                 if ((k === 'getblock' || k === 'players' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
-                     k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox') && fromGuid) {
+                     k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox' || k === 'spawnerinfo') && fromGuid) {
                     var id = nextRemoteReq++;
                     remoteReq[id] = { guid: fromGuid, req: a[1] };
                     a = a.slice(); a[1] = id;

@@ -676,6 +676,7 @@ C	net/minecraft/client/MinecraftApplet	net/minecraft/client/MinecraftApplet
 C	net/minecraft/client/MinecraftApplet$class_641	net/minecraft/src/MinecraftAppletImpl
 C	net/minecraft/client/MinecraftApplet$class_642	net/minecraft/src/CanvasMinecraftApplet
 F	argo/jdom/JsonNodeType	ARRAY	ARRAY	ARRAY
+F	argo/jdom/JsonNodeType	FALSE	FALSE	FALSE
 F	argo/jdom/JsonNodeType	NULL	NULL	NULL
 F	argo/jdom/JsonNodeType	NUMBER	NUMBER	NUMBER
 F	argo/jdom/JsonNodeType	OBJECT	OBJECT	OBJECT
@@ -1138,6 +1139,7 @@ F	net/minecraft/class_295	field_1162	field_1162	roll
 F	net/minecraft/class_295	field_1163	field_1163	itemID
 F	net/minecraft/class_295	field_1164	field_1164	count
 F	net/minecraft/class_295	field_1165	field_1165	itemDamage
+F	net/minecraft/class_299	field_1172	field_1172	baseIndexInPNG
 F	net/minecraft/class_300	field_1173	field_1173	instance
 F	net/minecraft/class_300	field_1174	field_1174	translateTable
 F	net/minecraft/class_303	field_1176	field_1176	availableTexturePacks
@@ -1149,6 +1151,7 @@ F	net/minecraft/class_304	field_1186	field_1186	leg2
 F	net/minecraft/class_304	field_1187	field_1187	leg3
 F	net/minecraft/class_304	field_1188	field_1188	leg4
 F	net/minecraft/class_305	field_1189	field_1189	entityId
+F	net/minecraft/class_307	field_1192	field_1192	graphicsLevel
 F	net/minecraft/class_308	field_1193	field_1193	entityId
 F	net/minecraft/class_309$class_310	field_1195	field_1195	buffer
 F	net/minecraft/class_309$class_310	field_1197	field_1197	hash
@@ -1754,6 +1757,7 @@ F	net/minecraft/class_579	field_2677	field_2677	renderManager
 F	net/minecraft/class_579	field_2678	field_2678	shadowSize
 F	net/minecraft/class_104	field_2681	field_2681	delay
 F	net/minecraft/class_104	field_2682	field_2682	yaw
+F	net/minecraft/class_104	field_2684	field_2684	mobID
 F	net/minecraft/class_61	field_2691	field_2691	points
 F	net/minecraft/class_613	field_2698	field_2698	fleeceColorTable
 F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
@@ -2111,6 +2115,8 @@ M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_26
 M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
 M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
 M	net/minecraft/class_290	method_983	(FF)Lnet/minecraft/class_290;	method_983	setTexturePosition
+M	net/minecraft/class_299	method_990	(Lnet/minecraft/class_18;III)V	method_990	removeLeaves
+M	net/minecraft/class_299	method_991	(Z)V	method_991	setGraphicsLevel
 M	net/minecraft/class_300	method_992	()Lnet/minecraft/class_300;	method_992	getInstance
 M	net/minecraft/class_300	method_993	(Ljava/lang/String;)Ljava/lang/String;	method_993	translateKey
 M	net/minecraft/class_300	method_994	(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;	method_994	translateKeyFormat
@@ -2327,6 +2333,7 @@ M	net/minecraft/class_17	method_1614	(Lnet/minecraft/class_18;IIILnet/minecraft/
 M	net/minecraft/class_17	method_1615	(Lnet/minecraft/class_18;IIILnet/minecraft/class_57;)V	method_1615	onEntityCollidedWithBlock
 M	net/minecraft/class_17	method_1616	(Lnet/minecraft/class_14;III)V	method_1616	setBlockBoundsBasedOnState
 M	net/minecraft/class_17	method_1617	(Lnet/minecraft/class_18;IIILjava/util/Random;)V	method_1617	randomDisplayTick
+M	net/minecraft/class_17	method_1618	(Lnet/minecraft/class_14;IIII)Z	method_1618	shouldSideBeRendered
 M	net/minecraft/class_17	method_1619	()I	method_1619	getRenderBlockPass
 M	net/minecraft/class_17	method_1620	()Z	method_1620	isOpaqueCube
 M	net/minecraft/class_17	method_1621	()I	method_1621	getRenderType
@@ -2451,6 +2458,8 @@ M	net/minecraft/class_579	method_2028	(Lnet/minecraft/class_57;DDDF)V	method_202
 M	net/minecraft/class_579	method_2029	(Lnet/minecraft/class_578;)V	method_2029	setRenderManager
 M	net/minecraft/class_579	method_2032	(Lnet/minecraft/class_57;DDDFF)V	method_2032	doRenderShadowAndFire
 M	net/minecraft/class_579	method_2033	(Lnet/minecraft/class_57;DDDFF)V	method_2033	renderShadow
+M	net/minecraft/class_104	method_2035	(Ljava/lang/String;)V	method_2035	setMobID
+M	net/minecraft/class_104	method_2037	()Ljava/lang/String;	method_2037	getMobID
 M	net/minecraft/class_61	method_2040	()V	method_2040	incrementPathIndex
 M	net/minecraft/class_61	method_2042	()Z	method_2042	isFinished
 M	net/minecraft/class_613	method_2044	(Ljava/util/Random;)I	method_2044	getRandomFleeceColor

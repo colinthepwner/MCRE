@@ -749,6 +749,7 @@ F	ln	F	field_28128_D	isOpaque
 F	wf	a	field_1111_a	x
 F	wf	b	field_1110_b	y
 F	wf	c	field_1112_c	z
+F	nr	b	field_6359_a	graphicsLevel
 F	qy	a	field_1361_a	xCoord
 F	qy	b	field_1360_b	yCoord
 F	qy	c	field_1366_c	zCoord
@@ -766,6 +767,7 @@ F	yg	a	field_204_f	scale
 F	tk	bN	field_797_bg	sendQueue
 F	qb	a	field_1371_a	keyDescription
 F	qb	b	field_1370_b	keyCode
+F	bk	c	field_463_b	baseIndexInPNG
 F	ju	a	field_799_a	blockID
 F	gj	a	field_6367_a	entityId
 F	gj	b	field_6366_b	motionX
@@ -839,6 +841,7 @@ F	ps	g	field_1404_g	mirror
 F	ps	h	field_1403_h	showModel
 F	ps	i	field_1402_i	isHidden
 F	cy	a	field_829_a	delay
+F	cy	i	field_828_b	mobID
 F	cy	b	field_831_c	yaw
 F	cv	c	field_1772_a	blockAccess
 F	cv	d	field_1771_b	overrideBlockTexture
@@ -1441,6 +1444,7 @@ F	at	a	OBJECT	OBJECT
 F	at	b	ARRAY	ARRAY
 F	at	c	STRING	STRING
 F	at	d	NUMBER	NUMBER
+F	at	f	FALSE	FALSE
 F	at	g	NULL	NULL
 F	vr	e	field_25071_d	statId
 F	vr	f	field_25070_e	statName
@@ -1841,6 +1845,8 @@ M	iz	b	(Luu;)Z	func_1099_b	canHarvestBlock
 M	iz	k	()Liz;	func_1102_e	copy
 M	iz	a	(Liz;)Z	func_21184_a	isItemEqual
 M	iz	l	()Ljava/lang/String;	func_20109_f	getItemName
+M	bk	h	(Lfd;III)V	func_6360_i	removeLeaves
+M	bk	a	(Z)V	func_310_a	setGraphicsLevel
 M	ju	k	()Lfd;	func_465_i	getWorld
 M	wt	a	(Lxa;)Lbf;	func_22149_a	getChunkLoader
 M	gv	a	(Lls;F)V	func_6330_a	preRenderCallback
@@ -1890,6 +1896,8 @@ M	ps	a	(FFF)V	func_925_a	setRotationPoint
 M	ps	a	(F)V	func_922_a	render
 M	ps	b	(F)V	func_25122_b	renderWithRotation
 M	ps	c	(F)V	func_926_b	postRender
+M	cy	a	()Ljava/lang/String;	func_21099_a	getMobID
+M	cy	a	(Ljava/lang/String;)V	func_21098_a	setMobID
 M	cv	a	(Luu;IIII)V	func_1223_a	renderBlockUsingTexture
 M	cv	b	(Luu;III)Z	func_1234_a	renderBlockByRenderType
 M	cv	c	(Luu;III)Z	func_1241_b	renderBlockTorch
@@ -2401,6 +2409,7 @@ M	uu	a	(Lfd;III)Z	func_243_a	canPlaceBlockAt
 M	uu	g	(Lfd;III)Z	func_223_g	canBlockStay
 M	uu	a	(Lfd;IIILjava/util/Random;)V	func_208_a	updateTick
 M	uu	a	(II)I	func_232_a	getBlockTextureFromSideAndMetadata
+M	uu	b	(Lxp;IIII)Z	func_260_c	shouldSideBeRendered
 M	uu	b	()I	func_210_f	getRenderType
 M	uu	a	(I)I	func_218_a	getBlockTextureFromSide
 M	uu	b	(Lfd;IIII)V	func_226_a	onNeighborBlockChange
