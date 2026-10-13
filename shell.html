@@ -5787,7 +5787,8 @@
                         return ab;
                     });
                 }).then(function (ab) {
-                    return install(new File([ab], e.id + '.zip', { type: 'application/zip' }));
+                    var jar = /[.]jar([?#].*)?$/i.test(String(e.zip || ''));
+                    return install(new File([ab], e.id + (jar ? '.jar' : '.zip'), { type: jar ? 'application/java-archive' : 'application/zip' }));
                 }).then(function (ok) {
                     if (ok === false) throw new Error(status || "isn't a mod this game can use");
                     var x = byContentId(e.id);
