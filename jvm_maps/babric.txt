@@ -767,6 +767,8 @@ F	net/minecraft/class_81	field_282	field_282	now
 F	net/minecraft/class_82	field_283	field_283	minableBlockId
 F	net/minecraft/class_82	field_284	field_284	numberOfBlocks
 F	net/minecraft/class_86	field_294	field_294	modelBipedMain
+F	net/minecraft/class_86	field_295	field_295	modelArmorChestplate
+F	net/minecraft/class_86	field_296	field_296	modelArmor
 F	net/minecraft/class_89	field_298	field_298	allowedCharacters
 F	net/minecraft/class_89	field_299	field_299	allowedCharactersArray
 F	net/minecraft/class_103	field_329	field_329	entityHashMap
@@ -1204,6 +1206,12 @@ F	net/minecraft/class_107	field_1386	field_1386	yPosition
 F	net/minecraft/class_107	field_1387	field_1387	zPosition
 F	net/minecraft/class_107	field_1388	field_1388	art
 F	net/minecraft/class_365	field_1390	field_1390	fuse
+F	net/minecraft/class_60	field_1391	field_1391	isFlaming
+F	net/minecraft/class_60	field_1392	field_1392	explosionX
+F	net/minecraft/class_60	field_1393	field_1393	explosionY
+F	net/minecraft/class_60	field_1394	field_1394	explosionZ
+F	net/minecraft/class_60	field_1395	field_1395	exploder
+F	net/minecraft/class_60	field_1396	field_1396	explosionSize
 F	net/minecraft/class_60	field_1397	field_1397	destroyedBlockPositions
 F	net/minecraft/class_60	field_1399	field_1399	worldObj
 F	net/minecraft/class_366	field_1400	field_1400	xCoord
@@ -1226,6 +1234,10 @@ F	net/minecraft/class_374	field_1425	field_1425	pitch
 F	net/minecraft/class_173	field_1427	field_1427	onGround
 F	net/minecraft/class_173	field_1428	field_1428	isRiding
 F	net/minecraft/class_379	field_1429	field_1429	cache
+F	net/minecraft/class_382	field_1432	field_1432	explosionX
+F	net/minecraft/class_382	field_1433	field_1433	explosionY
+F	net/minecraft/class_382	field_1434	field_1434	explosionZ
+F	net/minecraft/class_382	field_1435	field_1435	explosionSize
 F	net/minecraft/class_382	field_1436	field_1436	destroyedBlockPositions
 F	net/minecraft/class_384	field_1437	field_1437	mc
 F	net/minecraft/class_322	field_1442	field_1442	thirdPersonView
@@ -1722,6 +1734,9 @@ F	net/minecraft/class_77	field_2641	field_2641	particleGravity
 F	net/minecraft/class_77	field_2642	field_2642	particleRed
 F	net/minecraft/class_77	field_2643	field_2643	particleGreen
 F	net/minecraft/class_77	field_2644	field_2644	particleBlue
+F	net/minecraft/class_77	field_2645	field_2645	interpPosX
+F	net/minecraft/class_77	field_2646	field_2646	interpPosY
+F	net/minecraft/class_77	field_2647	field_2647	interpPosZ
 F	net/minecraft/class_615	field_2659	field_2659	allowedCharacters
 F	net/minecraft/class_141	field_2660	field_2660	OK
 F	net/minecraft/class_141	field_2661	field_2661	NOT_POSSIBLE_HERE
@@ -1760,6 +1775,7 @@ F	net/minecraft/client/Minecraft	field_2803	field_2803	displayHeight
 F	net/minecraft/client/Minecraft	field_2804	field_2804	theWorld
 F	net/minecraft/client/Minecraft	field_2805	field_2805	renderGlobal
 F	net/minecraft/client/Minecraft	field_2806	field_2806	thePlayer
+F	net/minecraft/client/Minecraft	field_2807	field_2807	renderViewEntity
 F	net/minecraft/client/Minecraft	field_2808	field_2808	effectRenderer
 F	net/minecraft/client/Minecraft	field_2809	field_2809	session
 F	net/minecraft/client/Minecraft	field_2814	field_2814	renderEngine
@@ -2025,6 +2041,12 @@ M	net/minecraft/class_153	method_793	()Z	method_793	getEnableSnow
 M	net/minecraft/class_153	method_794	()Z	method_794	canSpawnLightningBolt
 M	net/minecraft/class_153	method_795	()Lnet/minecraft/class_153;	method_795	setDisableRain
 M	net/minecraft/class_153	method_797	(Ljava/util/Random;)Lnet/minecraft/class_239;	method_797	getRandomWorldGenForTrees
+M	net/minecraft/class_169	method_798	()I	method_798	getPacketSize
+M	net/minecraft/class_169	method_802	(Ljava/io/DataInputStream;I)Ljava/lang/String;	method_802	readString
+M	net/minecraft/class_169	method_804	(Ljava/lang/String;Ljava/io/DataOutputStream;)V	method_804	writeString
+M	net/minecraft/class_169	method_806	(Ljava/io/DataInputStream;)V	method_806	readPacketData
+M	net/minecraft/class_169	method_807	(Ljava/io/DataOutputStream;)V	method_807	writePacketData
+M	net/minecraft/class_169	method_808	(Lnet/minecraft/class_240;)V	method_808	processPacket
 M	net/minecraft/class_245	method_815	(Lnet/minecraft/class_173;)V	method_815	setRenderPassModel
 M	net/minecraft/class_245	method_816	(Lnet/minecraft/class_127;)F	method_816	getDeathMaxRotation
 M	net/minecraft/class_245	method_817	(Lnet/minecraft/class_127;FF)I	method_817	getColorMultiplier
@@ -2061,6 +2083,7 @@ M	net/minecraft/class_127	method_913	()Ljava/lang/String;	method_913	getDeathSou
 M	net/minecraft/class_127	method_914	()I	method_914	getDropItemId
 M	net/minecraft/class_127	method_915	()F	method_915	getSoundVolume
 M	net/minecraft/class_127	method_918	()V	method_918	playLivingSound
+M	net/minecraft/class_127	method_919	()V	method_919	spawnExplosionParticle
 M	net/minecraft/class_127	method_924	(Lnet/minecraft/class_57;FF)V	method_924	faceEntity
 M	net/minecraft/class_127	method_928	(Lnet/minecraft/class_57;)Z	method_928	canEntityBeSeen
 M	net/minecraft/class_127	method_932	()Z	method_932	isOnLadder
@@ -2157,6 +2180,8 @@ M	net/minecraft/class_33	method_1187	(Z)I	method_1187	getHoverState
 M	net/minecraft/class_33	method_1188	(Lnet/minecraft/client/Minecraft;II)V	method_1188	mouseDragged
 M	net/minecraft/class_33	method_1189	(Lnet/minecraft/client/Minecraft;II)Z	method_1189	mousePressed
 M	net/minecraft/class_364	method_1190	(DDDD)Z	method_1190	isCourseTraversable
+M	net/minecraft/class_60	method_1195	()V	method_1195	doExplosionA
+M	net/minecraft/class_60	method_1196	(Z)V	method_1196	doExplosionB
 M	net/minecraft/class_369	method_1199	(DDD)D	method_1199	generateNoise
 M	net/minecraft/class_369	method_1204	(DD)D	method_1204	func_801_a
 M	net/minecraft/class_173	method_1209	(Lnet/minecraft/class_127;FFF)V	method_1209	setLivingAnimations

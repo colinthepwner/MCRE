@@ -685,6 +685,9 @@ F	xw	h	field_664_h	particleGravity
 F	xw	i	field_663_i	particleRed
 F	xw	j	field_662_j	particleGreen
 F	xw	k	field_661_k	particleBlue
+F	xw	l	field_660_l	interpPosX
+F	xw	m	field_659_m	interpPosY
+F	xw	n	field_658_n	interpPosZ
 F	vw	e	field_21038_e	pitch
 F	th	a	field_1233_a	instance
 F	th	p	field_1218_p	fontRenderer
@@ -1005,7 +1008,13 @@ F	yv	e	field_25015_e	thePlayer
 F	np	c	field_1516_c	hash
 F	np	a	field_1514_a	buffer
 F	ys	b	field_20922_a	blockType
+F	qx	a	field_12257_a	isFlaming
 F	qx	i	field_12249_i	worldObj
+F	qx	b	field_12256_b	explosionX
+F	qx	c	field_12255_c	explosionY
+F	qx	d	field_12254_d	explosionZ
+F	qx	e	field_12253_e	exploder
+F	qx	f	field_12252_f	explosionSize
 F	qx	g	field_12251_g	destroyedBlockPositions
 F	yc	m	field_20083_l	allowedCharacters
 F	da	b	field_945_b	mc
@@ -1721,6 +1730,10 @@ F	kv	I	field_25148_H	guiScale
 F	sr	b	field_592_b	xPosition
 F	sr	c	field_595_c	yPosition
 F	sr	d	field_594_d	zPosition
+F	rm	a	field_12236_a	explosionX
+F	rm	b	field_12235_b	explosionY
+F	rm	c	field_12239_c	explosionZ
+F	rm	d	field_12238_d	explosionSize
 F	rm	e	field_12237_e	destroyedBlockPositions
 F	xu	a	field_1009_a	x
 F	xu	b	field_1008_b	y
@@ -1751,7 +1764,29 @@ F	yf	p	field_907_p	worldObj
 F	ms	a	field_867_a	clayBlockId
 F	ms	b	field_866_b	numberOfBlocks
 F	ds	a	field_209_f	modelBipedMain
+F	ds	g	field_208_g	modelArmorChestplate
+F	ds	h	field_207_h	modelArmor
 F	vx	i	field_953_h	cancelled
+F	net/minecraft/client/Minecraft	a	field_21900_a	theMinecraft
+F	net/minecraft/client/Minecraft	d	field_6326_c	displayWidth
+F	net/minecraft/client/Minecraft	e	field_6325_d	displayHeight
+F	net/minecraft/client/Minecraft	T	field_9237_P	timer
+F	net/minecraft/client/Minecraft	f	field_6324_e	theWorld
+F	net/minecraft/client/Minecraft	g	field_6323_f	renderGlobal
+F	net/minecraft/client/Minecraft	h	field_6322_g	thePlayer
+F	net/minecraft/client/Minecraft	i	field_22009_h	renderViewEntity
+F	net/minecraft/client/Minecraft	j	field_6321_h	effectRenderer
+F	net/minecraft/client/Minecraft	k	field_6320_i	session
+F	net/minecraft/client/Minecraft	p	field_6315_n	renderEngine
+F	net/minecraft/client/Minecraft	q	field_6314_o	fontRenderer
+F	net/minecraft/client/Minecraft	r	field_6313_p	currentScreen
+F	net/minecraft/client/Minecraft	t	field_9243_r	entityRenderer
+F	net/minecraft/client/Minecraft	v	field_6308_u	ingameGUI
+F	net/minecraft/client/Minecraft	y	field_6305_x	objectMouseOver
+F	net/minecraft/client/Minecraft	z	field_6304_y	gameSettings
+F	net/minecraft/client/Minecraft	J	field_6293_H	running
+F	net/minecraft/client/Minecraft	K	field_6292_I	debug
+F	net/minecraft/client/Minecraft	O	field_6288_M	isRaining
 M	xw	a	(Lnw;FFFFFF)V	func_406_a	renderParticle
 M	xw	c_	()I	func_404_c	getFXLayer
 M	xp	a	(III)I	func_600_a	getBlockId
@@ -1902,6 +1937,12 @@ M	ei	e	(I)V	func_27399_e	setThunderTime
 M	ei	b	(Z)V	func_27394_b	setRaining
 M	ei	p	()I	func_27393_p	getRainTime
 M	ei	f	(I)V	func_27395_f	setRainTime
+M	ki	a	(Ljava/io/DataInputStream;)V	func_327_a	readPacketData
+M	ki	a	(Ljava/io/DataOutputStream;)V	func_322_a	writePacketData
+M	ki	a	(Lti;)V	func_323_a	processPacket
+M	ki	a	()I	func_329_a	getPacketSize
+M	ki	a	(Ljava/lang/String;Ljava/io/DataOutputStream;)V	func_27049_a	writeString
+M	ki	a	(Ljava/io/DataInputStream;I)Ljava/lang/String;	func_27048_a	readString
 M	sn	n	()Z	func_25021_m	canTriggerWalking
 M	sn	b	()V	func_21057_b	entityInit
 M	sn	w_	()V	func_370_e_	onUpdate
@@ -1912,6 +1953,7 @@ M	sn	a	(Lsn;I)Z	func_396_a	attackEntityFrom
 M	sn	h_	()Z	func_401_c_	canBeCollidedWith
 M	sn	x_	()F	func_392_h_	getShadowSize
 M	sn	w	()F	func_373_s	getEyeHeight
+M	sn	K	()V	func_395_F	setDead
 M	sn	q_	()Ljava/lang/String;	func_6376_z	getTexture
 M	sn	a	(Lgs;)Z	func_353_a	interact
 M	sn	a	(D)Z	func_384_a	isInRangeToRenderDist
@@ -1992,6 +2034,8 @@ M	qq	a	()I	func_903_a	getScaledWidth
 M	qq	b	()I	func_902_b	getScaledHeight
 M	hc	a	()V	func_28188_a	saveAllData
 M	hc	a	(Ljava/lang/String;)I	func_28186_a	getUniqueDataId
+M	qx	a	()V	func_12248_a	doExplosionA
+M	qx	a	(Z)V	func_12247_b	doExplosionB
 M	da	a	(CI)V	func_580_a	keyTyped
 M	da	b	()V	func_6448_a	initGui
 M	da	a	()V	func_570_g	updateScreen
@@ -2049,6 +2093,7 @@ M	ls	j	()I	func_422_g	getDropItemId
 M	ls	r_	()Liz;	func_4045_l	getHeldItem
 M	ls	c	(I)V	func_432_b	heal
 M	ls	y	()Z	func_22049_v	isMovementBlocked
+M	ls	f_	()V	func_418_b_	updateEntityActionState
 M	ls	b	(Lsn;)V	func_419_b	onDeath
 M	ls	N	()Z	func_22051_K	isPlayerSleeping
 M	ls	u	()Z	func_25023_u	canDespawn
@@ -2057,6 +2102,7 @@ M	ls	q	()V	func_21066_o	dropFewItems
 M	ls	e	()I	func_421_b	getTalkInterval
 M	ls	e	(Lsn;)Z	func_420_c	canEntityBeSeen
 M	ls	T	()V	func_22050_O	playLivingSound
+M	ls	V	()V	func_415_z	spawnExplosionParticle
 M	ls	d_	()Z	func_21067_c_	canBreatheUnderwater
 M	ls	a	(Lsn;FF)V	func_426_b	faceEntity
 M	ib	a	(FF)Lib;	func_1115_a	setTexturePosition
@@ -2422,6 +2468,13 @@ M	jc	a	(Ljava/lang/String;Lfd;)Lsn;	func_1079_a	createEntityInWorld
 M	jc	a	(ILfd;)Lsn;	func_1084_a	createEntity
 M	jc	a	(Lsn;)I	func_1082_a	getEntityID
 M	jc	b	(Lsn;)Ljava/lang/String;	func_1083_b	getEntityString
+M	net/minecraft/client/Minecraft	a	()V	func_6271_a	startGame
+M	net/minecraft/client/Minecraft	b	()Ljava/io/File;	func_6240_b	getMinecraftDir
+M	net/minecraft/client/Minecraft	a	(Lda;)V	func_6272_a	displayGuiScreen
+M	net/minecraft/client/Minecraft	k	()V	func_6246_i	runTick
+M	net/minecraft/client/Minecraft	a	(Ljava/lang/String;Ljava/lang/String;J)V	func_6247_b	startWorld
+M	net/minecraft/client/Minecraft	a	(Lfd;Ljava/lang/String;Lgs;)V	func_6256_a	changeWorld
+M	net/minecraft/client/Minecraft	u	()Z	func_22001_u	isFancyGraphicsEnabled
 S	ny	vr	
 S	fs	kd	
 S	rb	kd	

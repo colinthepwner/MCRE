@@ -3482,6 +3482,8 @@ function installUtil(vm) {
 	def('java/util/Vector', { super: 'java/util/AbstractList', interfaces: listIfaces, methods: listMethods });
 	def('java/util/Stack', { super: 'java/util/Vector', methods: { '<init>()V': function (vm, self) { self.$list = []; } } });
 	def('java/util/concurrent/CopyOnWriteArrayList', { super: 'java/util/ArrayList', methods: {} });
+	def('java/util/concurrent/ConcurrentLinkedQueue', { super: 'java/util/ArrayDeque', methods: {} });
+	def('java/util/concurrent/ConcurrentLinkedDeque', { super: 'java/util/ArrayDeque', methods: {} });
 
 	var calStatics = { ERA: 0, YEAR: 1, MONTH: 2, WEEK_OF_YEAR: 3, WEEK_OF_MONTH: 4, DATE: 5, DAY_OF_MONTH: 5, DAY_OF_YEAR: 6, DAY_OF_WEEK: 7,
 		DAY_OF_WEEK_IN_MONTH: 8, AM_PM: 9, HOUR: 10, HOUR_OF_DAY: 11, MINUTE: 12, SECOND: 13, MILLISECOND: 14,
@@ -6290,6 +6292,11 @@ function loadMap(vm, text, tag) {
 	};
 	var mapMemberFn = function (owner, name, desc, isMethod) {
 		if (!isMethod && srg[name] && !cls[owner] && !(vm.$mixinClasses && vm.$mixinClasses[owner]) && declaresField(vm, owner, name)) return name;
+		if (!isMethod && srg[name] && !cls[owner] && !(vm.$mixinClasses && vm.$mixinClasses[owner])) {
+			for (var mc = parentsOf(vm, owner)[0], guard = 0; mc && !cls[mc] && guard < 64; mc = parentsOf(vm, mc)[0], guard++) {
+				if (declaresField(vm, mc, name)) return name;
+			}
+		}
 		if (srg[name]) return srg[name];
 		var q = [owner], seen = Object.create(null);
 		while (q.length) {
@@ -6559,6 +6566,8 @@ function installMc152(vm) {
 			'<init>(Lnet/minecraft/src/MapColor;)V': function (vm, self) { self.$name = self.$name || 'custom'; },
 			'isSolid()Z': function (vm, self) { return ['air', 'water', 'lava', 'plants', 'vine', 'fire', 'circuits', 'snow', 'portal', 'web'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'isLiquid()Z': function (vm, self) { return self.$name === 'water' || self.$name === 'lava' ? 1 : 0; },
+			'isReplaceable()Z': function (vm, self) { return self.$replaceable || ['air', 'water', 'lava', 'vine', 'snow', 'fire'].indexOf(self.$name) >= 0 ? 1 : 0; },
+			'setReplaceable()Lnet/minecraft/src/Material;': function (vm, self) { self.$replaceable = true; return self; },
 			'blocksMovement()Z': function (vm, self) { return ['air', 'water', 'lava', 'plants', 'vine', 'fire', 'circuits', 'snow', 'portal', 'web'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'isOpaque()Z': function (vm, self) { return ['glass', 'leaves', 'ice', 'air'].indexOf(self.$name) < 0 ? 1 : 0; },
 			'getCanBurn()Z': function (vm, self) { return ['wood', 'leaves', 'cloth', 'tnt', 'plants', 'vine'].indexOf(self.$name) >= 0 ? 1 : 0; },
@@ -6670,7 +6679,14 @@ function installMc152(vm) {
 		'onEntityCollidedWithBlock(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V': function () {},
 		'onBlockPlacedBy(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityLiving;Lnet/minecraft/src/ItemStack;)V': function () {},
 		'onBlockClicked(Lnet/minecraft/src/World;IIILnet/minecraft/src/EntityPlayer;)V': function () {},
-		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function () { return 1; },
+		'canPlaceBlockAt(Lnet/minecraft/src/World;III)Z': function (vm, self, a) {
+			var id = vm.callVirtual(a[0], 'getBlockId', '(III)I', [a[1], a[2], a[3]]) | 0;
+			if (!id || REPLACEABLE[id]) return 1;
+			var bc = vm.loadClass(SRC + 'Block'), b = bc.statics.blocksList && bc.statics.blocksList.a[id];
+			if (!b || b.$vanilla) return 0;
+			var m = b[':blockMaterial'];
+			return m ? vm.callVirtual(m, 'isReplaceable', '()Z', []) : 0;
+		},
 		'canBlockStay(Lnet/minecraft/src/World;III)Z': function () { return 1; },
 		'dropBlockAsItem_do(Lnet/minecraft/src/World;IIILnet/minecraft/src/ItemStack;)V': function (vm, self, a) { dropStack(vm, a[1] + 0.5, a[2] + 0.5, a[3] + 0.5, a[4]); },
 		'dropBlockAsItem(Lnet/minecraft/src/World;IIIII)V': function (vm, self, a) {
@@ -6737,6 +6753,8 @@ function installMc152(vm) {
 				c.statics[p[0]] = b;
 			});
 			r.vanilla = false;
+			var LV = { 10: 15, 11: 15, 39: 1, 50: 14, 51: 15, 62: 13, 74: 9, 76: 7, 89: 15, 90: 11, 91: 15, 94: 9, 95: 15, 117: 1, 119: 15, 120: 1, 122: 1, 124: 15, 138: 15, 150: 9 };
+			Object.keys(LV).forEach(function (k) { c.statics.lightValue.a[k] = LV[k]; });
 		},
 	});
 	function initBlock(vm, self, id, material) {
@@ -7234,6 +7252,7 @@ function setBlock(vm, world, x, y, z, id, meta) {
 	return 1;
 }
 
+var REPLACEABLE = { 8: 1, 9: 1, 10: 1, 11: 1, 31: 1, 32: 1, 51: 1, 78: 1, 106: 1 };
 var LIGHT0 = Object.create(null), NOMOVE = Object.create(null);
 [0, 6, 20, 26, 27, 28, 30, 31, 32, 37, 38, 39, 40, 50, 51, 55, 59, 63, 64, 65, 66, 68, 69, 70, 71, 72, 75, 76, 77, 78, 83, 85, 90, 92, 93,
  94, 96, 101, 102, 104, 105, 106, 107, 111, 113, 115, 117, 118, 119, 120, 122, 127, 131, 132, 140, 141, 142, 143, 144, 145, 147, 148,
@@ -7284,7 +7303,7 @@ function installWorld(vm, def) {
 			vm.warnOnce('spawn:' + (e && e.cls.name), 'spawning ' + (e ? e.cls.name.replace(/[/]/g, '.') : 'null') + ' is not available here (left unplugged)');
 			return 0;
 		},
-		'createExplosion(Lnet/minecraft/src/Entity;DDDFZ)Lnet/minecraft/src/Explosion;': function (vm, self, a) { op(vm, 'explode', a[1], a[2], a[3], a[4], a[5] ? 1 : 0); return null; },
+		'createExplosion(Lnet/minecraft/src/Entity;DDDFZ)Lnet/minecraft/src/Explosion;': function (vm, self, a) { op(vm, 'explode', a[1], a[2], a[3], a[4], 0); return null; },
 		'getSeed()J': function (vm) { return BigInt(vm.mcSeed | 0); },
 		'getWorldTime()J': function (vm) { return BigInt(op(vm, 'time') || 0); },
 		'getTotalWorldTime()J': function (vm) { return BigInt(op(vm, 'time') || 0); },
@@ -7437,6 +7456,7 @@ function installWorld(vm, def) {
 	def('EntityItem', { super: SRC + 'Entity', methods: {
 		'<init>(Lnet/minecraft/src/World;DDDLnet/minecraft/src/ItemStack;)V': function (vm, self, a) { self[':worldObj'] = a[0]; self[':posX'] = a[1]; self[':posY'] = a[2]; self[':posZ'] = a[3]; self.$stack = a[4]; },
 		'getEntityItem()Lnet/minecraft/src/ItemStack;': function (vm, self) { return self.$stack; },
+		'setDead()V': function (vm, self) { self[':isDead'] = 1; if (self.$entityId != null && vm.game && vm.game.mode === 'run') op(vm, 'remove', self.$entityId | 0); },
 	} });
 }
 
@@ -7596,6 +7616,15 @@ JVM.collectContent = function (vm, modId) {
 		if (!t0 && meta === 0) for (var m2 = 1; m2 <= 3 && !t0; m2++) t0 = ask(m2);
 		return t0;
 	}
+	function logFaces(b, meta) {
+		var fs = {}, FN = ['down', 'up', 'north', 'south', 'west', 'east'];
+		for (var s = 0; s < 6; s++) {
+			var sx = stationTex(b, s, meta), lt = sx ? null : legacy(b, s, meta);
+			var t = sx || lt || tex(safe(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [s, meta]); }, null));
+			if (t) fs[FN[s]] = t.name;
+		}
+		return fs;
+	}
 	function blockEntry(b, id, meta) {
 		var faces = {}, FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
 		for (var s = 0; s < 6; s++) {
@@ -7618,7 +7647,7 @@ JVM.collectContent = function (vm, modId) {
 			});
 		}
 		var uniq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-		var given = langOf(b, meta) || keyName(b);
+		var given = langOf(b, (meta & 12) && JVM.logAxisOf(vm, b) ? meta & 3 : meta) || keyName(b);
 		var json = { name: given || ('Block ' + (b.$askId != null ? b.$askId : id) + (meta ? ':' + meta : '')), texture: uniq.length === 1 ? uniq[0] : faces };
 		if (!given && !uniq.length) json.creative = false;
 		json.hardness = b[':blockHardness'];
@@ -7746,6 +7775,35 @@ JVM.collectContent = function (vm, modId) {
 				var cb = [cbb[':minX'], cbb[':minY'] - 64, cbb[':minZ'], cbb[':maxX'], cbb[':maxY'] - 64, cbb[':maxZ']].map(function (v) { return Math.round(v * 16 * 100) / 100; });
 				if (cb.join() !== (json.shape || [0, 0, 0, 16, 16, 16]).join() && cb.every(function (v) { return isFinite(v); })) json.collision_box = cb;
 			}
+		}
+		if (sshape === 'wallbutton' && overrides(b, ['setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V'])) {
+			var sbx = {}, bnd = function () { return ['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].map(function (k) { return Math.round(b[':' + k] * 16 * 100) / 100; }); };
+			var keep = bnd();
+			for (var sd = 0; sd < 16; sd++) {
+				vm.$defTile = { x: 0, y: 65, z: 0, id: id, data: sd };
+				var okb = safe(function () { vm.callVirtual(b, 'setBlockBoundsBasedOnState', '(Lnet/minecraft/src/IBlockAccess;III)V', [JVM.mc152.worldObj(vm), 0, 65, 0]); return true; }, false);
+				vm.$defTile = null;
+				var bx = bnd();
+				if (okb && bx.every(function (v) { return isFinite(v); }) && bx.join() !== '0,0,0,16,16,16') sbx[sd] = bx;
+			}
+			if (overrides(b, ['setBlockBoundsForItemRender()V']) && safe(function () { vm.callVirtual(b, 'setBlockBoundsForItemRender', '()V', []); return true; }, false)) sbx[16] = bnd();
+			['minX', 'minY', 'minZ', 'maxX', 'maxY', 'maxZ'].forEach(function (k, i) { b[':' + k] = keep[i] / 16; });
+			if (Object.keys(sbx).length) json.state_boxes = sbx;
+		}
+		if (sshape === 'door' && JVM.betaTag(modTag)) json.beta_door = true;
+		if ((meta & 12) && JVM.logAxisOf(vm, b)) {
+			var ax = (meta >> 2) & 3, up0 = logFaces(b, meta & 3), fm = typeof json.texture === 'string' ? null : json.texture;
+			var same = FACE.every(function (f) { return (fm ? fm[f] : json.texture) === up0[f]; });
+			if (same && up0.up && up0.north) {
+				var endT = up0.up, sideT = up0.north, lf = {};
+				FACE.forEach(function (f, s) {
+					var end = ax === 1 ? s === 4 || s === 5 : ax === 2 ? s === 2 || s === 3 : false;
+					lf[f] = end ? endT : sideT;
+				});
+				json.texture = lf;
+			}
+			json.log_axis = ax;
+			json.creative = false;
 		}
 		out.blocks[JVM.contentName(vm, id, meta)] = json;
 	}
@@ -8042,6 +8100,13 @@ JVM.variantsOf = function (vm, o) {
 		if (metas[0] !== 0) metas.unshift(0);
 		o.$variants = metas.slice(0, isBlock ? 16 : 64);
 	}
+	if (isBlock && JVM.logAxisOf(vm, o)) {
+		var types = o.$variants.filter(function (d) { return d < 4; });
+		if (types.length < 2 && (!m || m.cls.native) && vm.natives[SRC + 'BlockLog'] && vm.isInstance(o, vm.loadClass(SRC + 'BlockLog'))) types = [0, 1, 2, 3];
+		var withAxes = types.slice();
+		[4, 8, 12].forEach(function (ax) { types.forEach(function (t) { withAxes.push(t | ax); }); });
+		o.$variants = withAxes;
+	}
 	return o.$variants;
 };
 var STATE_KINDS = [['BlockLadder', 'ladder', 8], ['BlockTorch', 'torch', 2], ['BlockLever', 'lever', 12], ['BlockButton', 'wallbutton', 0],
@@ -8083,6 +8148,15 @@ JVM.stateShapeOf = function (vm, o) {
 		o.$stateShape = STATE_RTYPES[rt];
 	return o.$stateShape;
 };
+JVM.logAxisOf = function (vm, o) {
+	if (!o || o.$logAxis !== undefined) return o ? o.$logAxis : false;
+	o.$logAxis = false;
+	if (!o.cls || o.$stStates || o.$stConnected || o.$override || typeof o[':blockID'] !== 'number' || !vm.isInstance(o, vm.loadClass(SRC + 'Block'))) return false;
+	if (JVM.stateShapeOf(vm, o)) return false;
+	var rt = 0;
+	try { JVM.run(vm, function () { rt = vm.callVirtual(o, 'getRenderType', '()I', []); }); } catch (e) { return false; }
+	return (o.$logAxis = rt === 31);
+};
 JVM.stateBlockOf = function (vm, mod, name) {
 	var r = reg(vm), id = JVM.contentId(vm, mod, name), o = id != null && r ? r.blocks[id] : null;
 	if (!o || o.$mod !== mod || !JVM.stateShapeOf(vm, o)) return null;
@@ -8090,6 +8164,15 @@ JVM.stateBlockOf = function (vm, mod, name) {
 };
 JVM.statePlaced = function (vm, blk, world, x, y, z, face) {
 	var shape = JVM.stateShapeOf(vm, blk);
+	if (!shape && JVM.logAxisOf(vm, blk)) {
+		JVM.run(vm, function () {
+			var cur = vm.callVirtual(world, 'getBlockMetadata', '(III)I', [x, y, z]) | 0;
+			var pm = blk.cls.findMethod('onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I');
+			var m = pm ? vm.invoke(pm, blk, [world, x, y, z, face == null ? 1 : face | 0, 0.5, 0.5, 0.5, cur & 3]) : cur;
+			if (typeof m === 'number' && (m & 15) !== cur) vm.callVirtual(world, 'setBlockMetadataWithNotify', '(IIIII)Z', [x, y, z, m & 15, 3]);
+		});
+		return true;
+	}
 	if (!shape) return false;
 	var side = face == null ? 1 : face | 0;
 	JVM.run(vm, function () {
@@ -8125,6 +8208,34 @@ function flag(vm, self, i, bit) { return (dwGet(vm, self, i, 0) & bit) ? 1 : 0; 
 function setFlag(vm, self, i, bit, on) { var b = dwGet(vm, self, i, 0) | 0; dwSet(vm, self, i, on ? (b | bit) : (b & ~bit), 'B'); }
 var ret = function (v) { return function () { return v; }; };
 var noop = function () {};
+function creeperTick(vm, self) {
+	if (!(vm.$brainTick && self.$brain) || self[':isDead'] || !(+self[':health'] > 0)) return;
+	var call = function (n, d, a) { return vm.callVirtual(self, n, d, a || []); };
+	var st = call('getCreeperState', '()I') | 0;
+	var was = self.$cIgnited | 0;
+	if (st > 0 && was === 0) { try { call('playSound', '(Ljava/lang/String;FF)V', ['random.fuse', 1, 0.5]); } catch (e) { } }
+	var now = Math.max(0, was + st);
+	self.$cIgnited = now;
+	if (now >= 30) {
+		self.$cIgnited = 30;
+		var w = self[':worldObj'];
+		if (!w) return;
+		var grief = 1;
+		try { var gr = vm.callVirtual(w, 'getGameRules', '()Lnet/minecraft/src/GameRules;', []); if (gr) grief = vm.callVirtual(gr, 'getGameRuleBooleanValue', '(Ljava/lang/String;)Z', ['mobGriefing']) ? 1 : 0; } catch (e2) { grief = 1; }
+		var r = call('getPowered', '()Z') ? 6 : 3;
+		vm.callVirtual(w, 'createExplosion', '(Lnet/minecraft/src/Entity;DDDFZ)Lnet/minecraft/src/Explosion;', [self, +self[':posX'], +self[':posY'], +self[':posZ'], Math.fround(r), grief]);
+		call('setDead', '()V');
+		return;
+	}
+	var t = self[':attackTarget'] || self[':entityToAttack'] || null;
+	if (t && !t[':isDead']) {
+		var dx = t[':posX'] - self[':posX'], dy = t[':posY'] - self[':posY'], dz = t[':posZ'] - self[':posZ'], d2 = dx * dx + dy * dy + dz * dz;
+		if (st > 0 || d2 < 9) {
+			var ns = d2 > 49 ? -1 : call('canEntityBeSeen', '(Lnet/minecraft/src/Entity;)Z', [t]) ? 1 : -1;
+			if (ns !== st) call('setCreeperState', '(I)V', [ns]);
+		}
+	}
+}
 
 function install(vm) {
 	var def = function (n, spec) { if (!vm.natives[SRC + n]) vm.defineNative(SRC + n, spec); };
@@ -8166,8 +8277,13 @@ function install(vm) {
 		'getCreeperState()I': function (vm, self) { return dwGet(vm, self, 16, -1); },
 		'setCreeperState(I)V': function (vm, self, a) { dwSet(vm, self, 16, a[0], 'B'); },
 		'getPowered()Z': function (vm, self) { return dwGet(vm, self, 17, 0) === 1 ? 1 : 0; },
-		'getCreeperFlashIntensity(F)F': function (vm, self) { return Math.max(0, Math.min(1, (self[':timeSinceIgnited'] | 0) / 28)); },
-		'setCreeperFlashTime(F)F': function (vm, self) { return Math.max(0, Math.min(1, (self[':timeSinceIgnited'] | 0) / 28)); },
+		'getCreeperFlashIntensity(F)F': function (vm, self) { return Math.max(0, Math.min(1, Math.max(self[':timeSinceIgnited'] | 0, self.$cIgnited | 0) / 28)); },
+		'setCreeperFlashTime(F)F': function (vm, self) { return Math.max(0, Math.min(1, Math.max(self[':timeSinceIgnited'] | 0, self.$cIgnited | 0) / 28)); },
+		'onUpdate()V': function (vm, self) {
+			creeperTick(vm, self);
+			var up = vm.loadClass(SRC + 'EntityMob').findMethod('onUpdate()V');
+			if (up) vm.invoke(up, self, []);
+		},
 		'getDropItemId()I': ret(289),
 		'getMaxHealth()I': ret(20),
 	});
@@ -9280,6 +9396,12 @@ function busPost(vm, bus, ev) {
 	});
 	return ev.$canceled ? 1 : 0;
 }
+JVM.forgeHasListener = function (vm, cname, busName) {
+	var f = vm.mcReg && vm.mcReg.forge, bus = f && f.buses[busName || 'EVENT_BUS'];
+	if (!bus || !bus.$listeners.length || !vm.natives[cname]) return false;
+	var c = vm.loadClass(cname);
+	return bus.$listeners.some(function (l) { return l.type && !l.type.absent && c.isSubclassOf(l.type); });
+};
 JVM.forgePost = function (vm, cname, fill, busName) {
 	var f = vm.mcReg && vm.mcReg.forge;
 	if (!f || !f.buses[busName || 'EVENT_BUS'] || !f.buses[busName || 'EVENT_BUS'].$listeners.length) return null;
@@ -9333,6 +9455,8 @@ function installEvents(vm, def) {
 	ev('event/entity/EntityEvent$EntityConstructing', 'event/entity/EntityEvent', {}, { desc: '<init>(Lnet/minecraft/src/Entity;)V', set: function (s, a) { s[':entity'] = a[0]; } });
 	ev('event/entity/living/LivingEvent', 'event/entity/EntityEvent', { entityLiving: L(EL) }, { desc: '<init>(Lnet/minecraft/src/EntityLiving;)V', set: function (s, a) { s[':entity'] = a[0]; s[':entityLiving'] = a[0]; } });
 	ev('event/entity/player/PlayerEvent', 'event/entity/living/LivingEvent', { entityPlayer: L(EP) }, { desc: '<init>(Lnet/minecraft/src/EntityPlayer;)V', set: function (s, a) { s[':entity'] = s[':entityLiving'] = s[':entityPlayer'] = a[0]; } });
+	ev('event/entity/living/LivingDeathEvent', 'event/entity/living/LivingEvent', { source: L(SRC + 'DamageSource') },
+		{ desc: '<init>(Lnet/minecraft/src/EntityLiving;Lnet/minecraft/src/DamageSource;)V', set: function (s, a) { s[':entity'] = s[':entityLiving'] = a[0]; s[':source'] = a[1]; } }, true);
 	var pl = function (s, a) { s[':entity'] = s[':entityLiving'] = s[':entityPlayer'] = a[0]; };
 	ev('event/entity/player/PlayerEvent$BreakSpeed', 'event/entity/player/PlayerEvent', { block: L(SRC + 'Block'), metadata: 'I', originalSpeed: 'F', newSpeed: 'F' },
 		{ desc: '<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/Block;IF)V', set: function (s, a) { pl(s, a); s[':block'] = a[1]; s[':metadata'] = a[2]; s[':originalSpeed'] = a[3]; s[':newSpeed'] = a[3]; } }, true);
@@ -9855,16 +9979,17 @@ JVM.forgeWorldStop = function (vm) {
 };
 JVM.forgeWantsTick = function (vm) { var f = vm.mcReg && vm.mcReg.forge; return !!(f && f.tickHandlers.length); };
 var TICK_ORDER = { SERVER: ['SERVER', 'WORLD', 'PLAYER'], CLIENT: ['CLIENT', 'WORLD', 'PLAYER'] };
-JVM.forgeTick = function (vm) {
+JVM.forgeTick = function (vm, opts) {
 	var f = vm.mcReg && vm.mcReg.forge;
 	if (!f || !f.tickHandlers.length) return;
-	var TT = FML + 'common/TickType';
+	var TT = FML + 'common/TickType', joiner = !!(opts && opts.joiner);
 	f.tickHandlers.forEach(function (t) {
-		if (t.scheduled) { if (t.wait-- > 0) return; }
+		if (t.scheduled) { if (joiner || t.wait-- > 0) return; }
 		vm.currentMod = t.mod || vm.currentMod;
 		JVM.run(vm, function () {
 			var types = listOf(vm, vm.callVirtual(t.h, 'ticks', '()Ljava/util/EnumSet;', []));
 			var order = TICK_ORDER[t.side] || TICK_ORDER.SERVER;
+			if (joiner) order = t.side === 'CLIENT' ? ['CLIENT', 'PLAYER'] : ['PLAYER'];
 			if (vm.mcHud && t.side === 'CLIENT') order = order.concat(['RENDER']);
 			order.forEach(function (name) {
 				var ty = enumOf(vm, TT, name);
@@ -10571,6 +10696,40 @@ function install(vm) {
 		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
 			var side = a[4], m = a[8] & 3;
 			return m | (side === 2 || side === 3 ? 8 : side === 4 || side === 5 ? 4 : 0);
+		},
+	} });
+	var LOG_SIDES = ['log_oak', 'log_spruce', 'log_birch', 'log_jungle'];
+	var ownLogPicture = function (vm, self) {
+		var ic = self[':blockIcon'], n = ic && !ic.$vanilla && ic.$name ? String(ic.$name) : null;
+		if (!n) return null;
+		var p = n.indexOf(':'), res = vm.resources || {};
+		var path = p >= 0 ? 'mods/' + n.substring(0, p) + '/textures/blocks/' + n.substring(p + 1) + '.png' : 'textures/blocks/' + n + '.png';
+		return res[path] || res['/' + path] ? ic : null;
+	};
+	def('BlockLog', { super: SRC + 'BlockRotatedPillar', methods: {
+		'<init>(I)V': function (vm, self, a) {
+			var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc);
+			vm.invoke(vm.loadClass(SRC + 'BlockRotatedPillar').findMethod('<init>(ILnet/minecraft/src/Material;)V'), self, [a[0], mc.statics.wood]);
+		},
+		'getRenderType()I': function (vm, self) { return JVM.betaTag(JVM.tagOf ? JVM.tagOf(vm, self.$mod) : vm.$tag) ? 0 : 31; },
+		'quantityDropped(Ljava/util/Random;)I': function () { return 1; },
+		'idDropped(ILjava/util/Random;I)I': function (vm, self) { return self[':blockID']; },
+		'getSideIcon(I)Lnet/minecraft/src/Icon;': function (vm, self, a) { return ownLogPicture(vm, self) || vIcon(LOG_SIDES[a[0] & 3]); },
+		'getEndIcon(I)Lnet/minecraft/src/Icon;': function (vm, self) { return ownLogPicture(vm, self) || vIcon('log_oak_top'); },
+		'getSubBlocks(ILnet/minecraft/src/CreativeTabs;Ljava/util/List;)V': function (vm, self, a) {
+			for (var t = 0; t < 4; t++) vm.callVirtual(a[2], 'add', '(Ljava/lang/Object;)Z', [JVM.mc152.newStack(vm, a[0], 1, t)]);
+		},
+		'breakBlock(Lnet/minecraft/src/World;IIIII)V': function (vm, self, a) {
+			var w = a[0], x = a[1], y = a[2], z = a[3], bc = vm.loadClass(SRC + 'Block');
+			vm.initClass(bc);
+			var list = bc.statics.blocksList && bc.statics.blocksList.a;
+			if (list) for (var i = -4; i <= 4; i++) for (var j = -4; j <= 4; j++) for (var k = -4; k <= 4; k++) {
+				var bid = vm.callVirtual(w, 'getBlockId', '(III)I', [x + i, y + j, z + k]);
+				var lb = bid > 0 ? list[bid] : null;
+				if (lb) vm.callVirtual(lb, 'beginLeavesDecay', '(Lnet/minecraft/src/World;III)V', [w, x + i, y + j, z + k]);
+			}
+			var sup = bc.findMethod('breakBlock(Lnet/minecraft/src/World;IIIII)V');
+			if (sup) vm.invoke(sup, self, a);
 		},
 	} });
 	var plantsMat = function () { var mc = vm.loadClass(SRC + 'Material'); vm.initClass(mc); return mc.statics.plants; };
@@ -16086,17 +16245,18 @@ function readSlot(vm, slot) {
 	return st;
 }
 function writeSlot(vm, slot, st) { op(vm, 'setslot', slot, st && st[':stackSize'] > 0 ? st[':itemID'] : 0, st ? st[':stackSize'] : 0, st ? st[':itemDamage'] : 0, st && st.$ench || null); }
-function liveArray(vm, n, armor) {
+function liveArray(vm, n, armor, inv) {
 	var cls = vm.loadClass('[L' + SRC + 'ItemStack;');
 	var backing = new Array(n);
+	var as = function (fn) { return JVM.mpAs && inv && inv.$player ? JVM.mpAs(vm, inv.$player, fn) : fn(); };
 	var proxy = new Proxy(backing, {
 		get: function (t, k) {
 			if (k === 'length') return n;
-			if (typeof k === 'string' && /^\d+$/.test(k)) { var i = +k; return i < n && running(vm) ? readSlot(vm, gameSlot(i, armor)) : null; }
+			if (typeof k === 'string' && /^\d+$/.test(k)) { var i = +k; return i < n && running(vm) ? as(function () { return readSlot(vm, gameSlot(i, armor)); }) : null; }
 			return t[k];
 		},
 		set: function (t, k, v) {
-			if (typeof k === 'string' && /^\d+$/.test(k)) { if (+k < n && running(vm)) writeSlot(vm, gameSlot(+k, armor), v); return true; }
+			if (typeof k === 'string' && /^\d+$/.test(k)) { if (+k < n && running(vm)) as(function () { writeSlot(vm, gameSlot(+k, armor), v); }); return true; }
 			t[k] = v; return true;
 		},
 	});
@@ -16159,7 +16319,7 @@ function installServer(vm) {
 	function vec(vm, x, y, z) { var v = vm.newObject(vm.loadClass(SRC + 'Vec3')); v[':xCoord'] = x; v[':yCoord'] = y; v[':zCoord'] = z; return v; }
 	def('Vec3Pool', { methods: { 'getVecFromPool(DDD)Lnet/minecraft/src/Vec3;': function (vm, self, a) { return vec(vm, a[0], a[1], a[2]); } } });
 
-	var players = function (vm) { return running(vm) ? [JVM.mc152.playerObj(vm, null)] : []; };
+	var players = function (vm) { return running(vm) ? (JVM.mpPlayerList ? JVM.mpPlayerList(vm) : [JVM.mc152.playerObj(vm, null)]) : []; };
 	var within = function (vm, cls, box, except) {
 		var b = bb(box);
 		var found = running(vm) && JVM.entityFor ? op(vm, 'entsin', b[0], b[1], b[2], b[3], b[4], b[5], except ? gameId(except) : 0) : null;
@@ -16352,8 +16512,24 @@ function installServer(vm) {
 		var inv = p[':inventory'];
 		if (inv && !inv.$live) {
 			inv.$live = true;
-			inv[':mainInventory'] = liveArray(vm, 36, false);
-			inv[':armorInventory'] = liveArray(vm, 4, true);
+			inv[':mainInventory'] = liveArray(vm, 36, false, inv);
+			inv[':armorInventory'] = liveArray(vm, 4, true, inv);
+		}
+		if (JVM.mpRegister) JVM.mpRegister(vm, p);
+		if (!p.$xpLive) {
+			p.$xpLive = true;
+			var xpProp = function (name, key, opName) {
+				Object.defineProperty(p, ':' + name, { configurable: true, enumerable: true,
+					get: function () { var i = p.$info || {}; return key === 'xpProgress' ? Math.fround(+i[key] || 0) : i[key] | 0; },
+					set: function (v) {
+						var i = p.$info || {}, d = (v | 0) - (i[key] | 0);
+						if (!opName) { vm.warnOnce('xp:progress', 'a mod setting the experience bar directly is left out (levels / points work)'); return; }
+						if (d && running(vm)) { JVM.mpAs ? JVM.mpAs(vm, p, function () { op(vm, opName, d); }) : op(vm, opName, d); i[key] = v | 0; }
+					} });
+			};
+			xpProp('experienceLevel', 'xpLevel', 'xplevel');
+			xpProp('experienceTotal', 'xpTotal', 'xp');
+			xpProp('experience', 'xpProgress', null);
 		}
 		if (inv) inv[':currentItem'] = p.$info && p.$info.slot != null ? p.$info.slot : 0;
 		p[':inventorySlots'] = p[':inventorySlots'] || null;
@@ -16492,13 +16668,79 @@ function installServer(vm) {
 		Wd.methods['spawnEntityInWorld(Lnet/minecraft/src/Entity;)Z'] = function (vm, self, a) {
 			var e = a[0];
 			if (e && e.cls === vm.loadClass(SRC + 'EntityXPOrb')) { op(vm, 'xporb', +e[':posX'] || 0, +e[':posY'] || 0, +e[':posZ'] || 0, e[':xpValue'] | 0); return 1; }
+			if (e && vm.isInstance(e, LBc())) { op(vm, 'lightning', +e[':posX'] || 0, +e[':posY'] || 0, +e[':posZ'] || 0); return 1; }
 			return prevSp ? prevSp(vm, self, a) : 0;
 		};
 	}
+	var LBc = function () { return vm.loadClass(SRC + 'EntityLightningBolt'); };
+	var EXPL = SRC + 'Explosion';
+	var harmless = function (vm, ex) {
+		var w = ex[':worldObj'] || JVM.mc152.worldObj(vm), s = +ex[':explosionSize'] || 0, x = +ex[':explosionX'], y = +ex[':explosionY'], z = +ex[':explosionZ'];
+		op(vm, 'sound', x, y, z, JVM.javaSoundName('random.explode'), 4, 0.7 + Math.random() * 0.2);
+		op(vm, 'particle', s >= 2 ? 'hugeexplosion' : 'largeexplode', x, y, z, 1, 0, 0);
+		if (!w || s <= 0) return;
+		var r2 = s * 2, box = aabb(vm, [x - r2 - 1, y - r2 - 1, z - r2 - 1, x + r2 + 1, y + r2 + 1, z + r2 + 1]);
+		var l = vm.callVirtual(w, 'getEntitiesWithinAABBExcludingEntity', '(Lnet/minecraft/src/Entity;Lnet/minecraft/src/AxisAlignedBB;)Ljava/util/List;', [ex[':exploder'] || null, box]);
+		var arr = l ? Array.prototype.slice.call(vm.callVirtual(l, 'toArray', '()[Ljava/lang/Object;', []).a) : [];
+		var src = null;
+		try { src = vm.callStatic(SRC + 'DamageSource', 'setExplosionSource', '(L' + EXPL + ';)Lnet/minecraft/src/DamageSource;', [ex]); } catch (e0) { src = null; }
+		arr.forEach(function (e) {
+			var dx = e[':posX'] - x, dy = (+e[':posY'] + (e.$info ? 0 : (+e[':height'] || 0) * 0.85)) - y, dz = e[':posZ'] - z, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			var i = 1 - d / r2;
+			if (i <= 0 || d === 0) return;
+			var dmg = Math.floor((i * i + i) / 2 * 8 * s + 1);
+			try { if (src) vm.callVirtual(e, 'attackEntityFrom', '(Lnet/minecraft/src/DamageSource;F)Z', [src, Math.fround(dmg)]); } catch (e1) { }
+			var id = e.$info && e.$info.id != null ? e.$info.id : e[':entityId'];
+			var v = e.$info || {};
+			if (id) { op(vm, 'setvel', id, 'x', (+v.vx || 0) + dx / d * i); op(vm, 'setvel', id, 'y', (+v.vy || 0) + dy / d * i); op(vm, 'setvel', id, 'z', (+v.vz || 0) + dz / d * i); }
+		});
+	};
+	var boom = function (vm, ex) {
+		if (!running(vm)) return;
+		if (ex[':isSmoking']) op(vm, 'explode', +ex[':explosionX'], +ex[':explosionY'], +ex[':explosionZ'], +ex[':explosionSize'] || 0.1, ex[':isFlaming'] ? 1 : 0);
+		else harmless(vm, ex);
+	};
+	var mkExpl = function (vm, w, e, x, y, z, s) {
+		var ex = vm.newObject(vm.loadClass(EXPL));
+		vm.callVirtual(ex, '<init>', '(Lnet/minecraft/src/World;Lnet/minecraft/src/Entity;DDDF)V', [w, e, x, y, z, s]);
+		return ex;
+	};
+	if (!vm.natives[EXPL]) vm.defineNative(EXPL, { fields: { isFlaming: 'Z', isSmoking: 'Z', explosionX: 'D', explosionY: 'D', explosionZ: 'D', exploder: 'Lnet/minecraft/src/Entity;', explosionSize: 'F', affectedBlockPositions: 'Ljava/util/List;', worldObj: 'Lnet/minecraft/src/World;' }, methods: {
+		'<init>(Lnet/minecraft/src/World;Lnet/minecraft/src/Entity;DDDF)V': function (vm, self, a) {
+			self[':worldObj'] = a[0]; self[':exploder'] = a[1]; self[':explosionX'] = a[2]; self[':explosionY'] = a[3]; self[':explosionZ'] = a[4]; self[':explosionSize'] = a[5];
+			self[':isFlaming'] = 0; self[':isSmoking'] = 1;
+			self[':affectedBlockPositions'] = JVM.newList(vm, []);
+		},
+		'doExplosionA()V': function () {},
+		'doExplosionB(Z)V': function (vm, self) { boom(vm, self); },
+		'getAffectedBlockPositions()Ljava/util/List;': function (vm, self) { return self[':affectedBlockPositions'] || (self[':affectedBlockPositions'] = JVM.newList(vm, [])); },
+		'func_77277_b()Ljava/util/Map;': function (vm) { var m = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); return m; },
+		'getExplosivePlacedBy()Lnet/minecraft/src/EntityLiving;': function (vm, self) { var e = self[':exploder']; return e && vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving')) ? e : null; },
+		'getExplosivePlacedBy()Lnet/minecraft/src/EntityLivingBase;': function (vm, self) { var e = self[':exploder']; return e && vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving')) ? e : null; },
+	} });
+	if (Bk) Bk.methods['onBlockDestroyedByExplosion(Lnet/minecraft/src/World;IIILnet/minecraft/src/Explosion;)V'] = function () {};
+	var ELs = vm.natives[SRC + 'EntityLiving'];
+	if (ELs) ELs.methods['spawnExplosionParticle()V'] = function (vm, self) {
+		var w = +self[':width'] || 0.6, h = +self[':height'] || 1.8, g = function () { return (Math.random() + Math.random() + Math.random() - 1.5) * 0.04; };
+		for (var i = 0; i < 20; i++) op(vm, 'particle', 'explode', +self[':posX'] + (Math.random() * 2 - 1) * w, +self[':posY'] + Math.random() * h, +self[':posZ'] + (Math.random() * 2 - 1) * w, g(), g(), g());
+	};
+	if (Wd) Wd.methods = Object.assign({}, Wd.methods, {
+		'createExplosion(Lnet/minecraft/src/Entity;DDDFZ)Lnet/minecraft/src/Explosion;': function (vm, self, a) {
+			return vm.callVirtual(self, 'newExplosion', '(Lnet/minecraft/src/Entity;DDDFZZ)Lnet/minecraft/src/Explosion;', [a[0], a[1], a[2], a[3], a[4], 0, a[5]]);
+		},
+		'newExplosion(Lnet/minecraft/src/Entity;DDDFZZ)Lnet/minecraft/src/Explosion;': function (vm, self, a) {
+			var ex = mkExpl(vm, self, a[0], a[1], a[2], a[3], a[4]);
+			ex[':isFlaming'] = a[5] ? 1 : 0; ex[':isSmoking'] = a[6] ? 1 : 0;
+			vm.callVirtual(ex, 'doExplosionA', '()V', []);
+			vm.callVirtual(ex, 'doExplosionB', '(Z)V', [1]);
+			return ex;
+		},
+	});
 	['EntityPlayer', 'EntityPlayerMP'].forEach(function (n) {
 		var P = vm.natives[SRC + n];
 		if (!P) return;
 		P.methods['addExperience(I)V'] = function (vm, self, a) { op(vm, 'xp', a[0] | 0); };
+		P.methods['addExperienceLevel(I)V'] = function (vm, self, a) { op(vm, 'xplevel', a[0] | 0); };
 		P.methods['setLocationAndAngles(DDDFF)V'] = function (vm, self, a) {
 			self[':posX'] = a[0]; self[':posY'] = a[1]; self[':posZ'] = a[2]; self[':rotationYaw'] = a[3]; self[':rotationPitch'] = a[4];
 			if (self.$info) op(vm, 'setpos', a[0], a[1] + (self.$eyeUp || 0), a[2]);
@@ -17310,6 +17552,14 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (!e.cls || (e.mod || '') !== modId) return;
 		if (shotClasses.some(function (c) { return e.cls.isSubclassOf(c); })) return;
 		var key = String(e.name || e.cls.name.split('/').pop()).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+		var owners = mb.keyOwner || (mb.keyOwner = {}), prevOwner = owners[modId + ':' + key];
+		if (prevOwner && prevOwner !== e.cls) {
+			var moved = key + '_' + prevOwner.name.split('/').pop().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+			if (out.mobs[key]) { out.mobs[moved] = out.mobs[key]; delete out.mobs[key]; }
+			if (mb.keys && mb.keys.get(prevOwner)) mb.keys.set(prevOwner, modId + ':' + moved);
+			owners[modId + ':' + moved] = prevOwner;
+		}
+		owners[modId + ':' + key] = e.cls;
 		var world = JVM.mc152.worldObj(vm);
 		if (!e.cls.isSubclassStrict(living) || e.cls === living) { objectOf(e, key, world); return; }
 		var ent = safe(function () {
@@ -17390,6 +17640,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			safe(function () {
 				var ks = vm.callVirtual(vm.callVirtual(el.statics.IDtoClassMapping, 'keySet', '()Ljava/util/Set;', []), 'toArray', '()[Ljava/lang/Object;', []).a;
 				Array.prototype.forEach.call(ks, function (k) { var v = vm.callVirtual(el.statics.IDtoClassMapping, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', [k]); if (v && v.$cls === e.cls) idOf = k; });
+				if (!idOf && typeof e.id === 'number' && e.id > 0) idOf = JVM.box(vm, e.id, 'I');
 				if (idOf) { var info = vm.callVirtual(el.statics.entityEggs, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', [idOf]); if (info) e.egg = [info[':primaryColor'], info[':secondaryColor']]; }
 			});
 		}
@@ -17467,6 +17718,9 @@ function gameOp(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.
 function entInfo(vm, typeName) {
 	var mb = mobs(vm), f = vm.mcReg && vm.mcReg.forge;
 	var key = String(typeName || '').split(':').pop();
+	if (mb.keys) for (var it = mb.keys.entries(), kv = it.next(); !kv.done; kv = it.next()) {
+		if (String(kv.value[1]).split(':').pop() === key) return { cls: kv.value[0], name: key };
+	}
 	var ents = mb.entities.slice();
 	if (f) f.entities.forEach(function (e) { var a = e.args; ents.push({ cls: a[0] && a[0].$cls, name: a[1] }); });
 	for (var i = 0; i < ents.length; i++) {
@@ -18016,6 +18270,7 @@ function entityFor(vm, info) {
 	if (!info) return null;
 	var me = vm.game && vm.game.op ? vm.game.op('player') : null;
 	if (info.type === 63 || (me && me.id === info.id)) return JVM.mc152.playerObj(vm, null);
+	if (info.type === 'minecraft:player' && JVM.mpPlayerById) { var po = JVM.mpPlayerById(vm, info.id | 0); if (po) return po; }
 	var o = JVM.liveMob ? JVM.liveMob(vm, info) : null;
 	if (!o) {
 		var cache = vm.$hitEnts || (vm.$hitEnts = {});
@@ -18031,6 +18286,7 @@ function entityFor(vm, info) {
 		o[':entityId'] = info.id;
 		o[':worldObj'] = JVM.mc152.worldObj(vm);
 		if (info.item && info.item.id) o.$stack = JVM.mc152.newStack(vm, info.item.id, info.item.count, info.item.data || 0);
+		if (o.$stack) o[':item'] = o.$stack;
 	}
 	if (info.w != null) { o[':width'] = +info.w; o[':height'] = +info.h; }
 	if (info.vx != null) { o[':motionX'] = +info.vx; o[':motionY'] = +info.vy; o[':motionZ'] = +info.vz; }
@@ -18282,11 +18538,18 @@ function install(vm) {
 	};
 	['Entity', 'EntityLivingBase', 'EntityLiving'].forEach(function (n) { add(n, looks); });
 	var W = spec('World');
+	var riddenMove = function (vm, self, a) {
+		if (!vm.$brainTick || !self[':riddenByEntity']) return;
+		var ai = self.cls.findMethod('isAIEnabled()Z') ? vm.callVirtual(self, 'isAIEnabled', '()Z', []) : 0, sp = null;
+		if (ai) { sp = JVM.attrValue ? JVM.attrValue(self, 'generic.movementSpeed') : null; if (sp == null) sp = +self[':moveSpeed'] || 0.25; }
+		else sp = +self[':landMovementFactor'] || 0.1;
+		vm.callVirtual(self, 'moveFlying', '(FFF)V', [+a[0] || 0, +a[1] || 0, self[':onGround'] ? sp : 0.02]);
+	};
 	add('EntityLivingBase', {
 		'isMovementBlocked()Z': function (vm, self) { return +self[':health'] <= 0 ? 1 : 0; },
 		'func_70610_aX()Z': function (vm, self) { return +self[':health'] <= 0 ? 1 : 0; },
 		'isClientWorld()Z': function () { return 1; }, 'func_70613_aW()Z': function () { return 1; },
-		'moveEntityWithHeading(FF)V': function () {}, 'func_70612_e(FF)V': function () {},
+		'moveEntityWithHeading(FF)V': riddenMove, 'func_70612_e(FF)V': riddenMove,
 		'onEntityUpdate()V': function () {}, 'func_70030_z()V': function () {},
 		'despawnEntity()V': function () {}, 'func_70623_bb()V': function () {},
 	});
@@ -18582,6 +18845,7 @@ function brainOf(vm, o) {
 	var c = o.cls;
 	if (c.$brain === undefined) {
 		var own = ACTIVE.some(function (k) { var m = c.findMethod(k); return m && !m.cls.native; });
+		if (!own && vm.natives[SRC + 'EntityCreeper'] && vm.isInstance(o, vm.loadClass(SRC + 'EntityCreeper'))) own = true;
 		c.$brain = own;
 	}
 	if (c.$brain) return true;
@@ -18602,6 +18866,19 @@ JVM.despawnVerdict = function (vm, o) {
 	if (o[':persistenceRequired'] || (o[':customName'] != null && String(o[':customName']).length)) return 1;
 	var tm = o.cls.findMethod('isTamed()Z');
 	if (tm && JVM.run(vm, function () { return vm.invoke(tm, o, []); }).value) return 1;
+	if (JVM.betaTag && JVM.betaTag(JVM.tagOf ? JVM.tagOf(vm, o.cls.source) : vm.$tag) && +o[':health'] > 0) {
+		var sdm = o.cls.findMethod('setDead()V');
+		if (sdm && !sdm.cls.native) {
+			var snap = {}, g0 = vm.game;
+			Object.keys(o).forEach(function (k) { if (k.charAt(0) === ':') snap[k] = o[k]; });
+			o[':isDead'] = 0;
+			if (g0 && g0.op) vm.game = Object.assign({}, g0, { op: function (n) { return /^(player|tile|time|world|held|biome|sky|entsin|inmat|cubes|raytrace|bright|fullbright)$/.test(n) ? g0.op.apply(g0, arguments) : 0; } });
+			var refused = false;
+			try { var pr = JVM.run(vm, function () { vm.invoke(sdm, o, []); }); refused = pr.ok && !o[':isDead']; }
+			finally { vm.game = g0; Object.keys(snap).forEach(function (k) { o[k] = snap[k]; }); }
+			if (refused) return 1;
+		}
+	}
 	var cd = o.cls.findMethod('canDespawn()Z');
 	if (cd && !cd.cls.native) {
 		var r = JVM.run(vm, function () { return vm.invoke(cd, o, []); });
@@ -18648,6 +18925,15 @@ JVM.mobTick = function (vm) {
 	var t0 = Date.now(), budgetMs = 6, n = list.length, start = (B.next | 0) % n, done = 0;
 	var order = list.slice(start).concat(list.slice(0, start));
 	order.forEach(function (info) {
+		var rg = info.rider && !(me && info.rider === me.id) && JVM.mpGuidOfEntity ? JVM.mpGuidOfEntity(vm, info.rider) : 0;
+		if (rg && vm.mcMp && vm.mcMp.withActor) {
+			var ran = false;
+			vm.mcMp.withActor(rg, function () { ran = true; tickOne(info, op(vm, 'player')); });
+			if (ran) return;
+		}
+		tickOne(info, me);
+	});
+	function tickOne(info, me) {
 		if (done < 0) return;
 		if (Date.now() - t0 > budgetMs) { B.next = start + done; done = -1; return; }
 		done++;
@@ -18734,7 +19020,7 @@ JVM.mobTick = function (vm) {
 		var nt = o[':attackTarget'] || o[':entityToAttack'] || null;
 		if (nt !== before.t) op(vm, 'mobtarget', id, nt ? idOf(nt) : 0);
 		if ((B.tick + id) % 40 === 0) { if (JVM.mobLook) JVM.mobLook(vm, o, id); if (JVM.mobSaveState) JVM.mobSaveState(vm, o, id); }
-	});
+	}
 };
 
 JVM.mobHit = function (vm, ev) {
@@ -18796,7 +19082,6 @@ function install(vm) {
 	var PD = vm.natives[NET + 'PacketDispatcher'];
 	if (PD) {
 		var P = 'Lnet/minecraft/src/Packet;';
-		var everyone = function (vm) { return [0].concat(joiners(vm).map(function (j) { return j.guid; })); };
 		PD.staticMethods['sendPacketToPlayer(' + P + 'Lcpw/mods/fml/common/network/Player;)V'] = function (vm, n, a) { send(vm, 'client', a[0], guidOf(a[1])); };
 		PD.staticMethods['sendPacketToAllAround(DDDDI' + P + ')V'] = function (vm, n, a) {
 			send(vm, 'client', a[5], 0);
@@ -18815,13 +19100,35 @@ function install(vm) {
 			return p;
 		};
 	}
-	def(SRC + 'NetClientHandler', { methods: {
+	def(SRC + 'NetClientHandler', { super: SRC + 'NetHandler', methods: {
 		'addToSendQueue(Lnet/minecraft/src/Packet;)V': function (vm, self, a) { send(vm, 'server', a[0], fromNow(vm)); },
 	} });
 	var MC = vm.natives['net/minecraft/client/Minecraft'];
 	if (MC && !MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;']) MC.methods['getNetHandler()Lnet/minecraft/src/NetClientHandler;'] = function (vm) { return JVM.netClient(vm); };
 	var W = vm.natives[SRC + 'World'];
 	if (W) W.methods['getEntityByID(I)Lnet/minecraft/src/Entity;'] = function (vm, self, a) { return entityById(vm, a[0] | 0); };
+	def(SRC + 'NetHandler', { methods: {} });
+	var PK = vm.natives[SRC + 'Packet'];
+	if (PK) ['readPacketData(Ljava/io/DataInputStream;)V', 'writePacketData(Ljava/io/DataOutputStream;)V', 'processPacket(Lnet/minecraft/src/NetHandler;)V', 'getPacketSize()I'].forEach(function (k) {
+		if (!PK.methods[k]) PK.methods[k] = /I$/.test(k) ? function () { return 0; } : function () {};
+	});
+	if (PK) {
+		PK.staticMethods = PK.staticMethods || {};
+		if (!PK.staticMethods['writeString(Ljava/lang/String;Ljava/io/DataOutputStream;)V']) PK.staticMethods['writeString(Ljava/lang/String;Ljava/io/DataOutputStream;)V'] = function (vm, n, a) {
+			var s = String(a[0] == null ? '' : a[0]), out = a[1];
+			vm.callVirtual(out, 'writeShort', '(I)V', [s.length]);
+			for (var i = 0; i < s.length; i++) vm.callVirtual(out, 'writeChar', '(I)V', [s.charCodeAt(i)]);
+		};
+		if (!PK.staticMethods['readString(Ljava/io/DataInputStream;I)Ljava/lang/String;']) PK.staticMethods['readString(Ljava/io/DataInputStream;I)Ljava/lang/String;'] = function (vm, n, a) {
+			var inp = a[0], len = vm.callVirtual(inp, 'readShort', '()S', []), s = '';
+			if (len > (a[1] | 0) || len < 0) throw vm.throwNew ? vm.throwNew('java/io/IOException', 'Received string length longer than maximum allowed (' + len + ' > ' + a[1] + ')') : new Error('string too long');
+			for (var i = 0; i < len; i++) s += String.fromCharCode(vm.callVirtual(inp, 'readChar', '()C', []));
+			return s;
+		};
+	}
+	installClosest(vm);
+	installModLoaderNet(vm);
+	installStationNet(vm);
 }
 
 function entityById(vm, id) {
@@ -18829,6 +19136,8 @@ function entityById(vm, id) {
 	if (live && live.get(id)) return live.get(id);
 	var me = op(vm, 'player');
 	if (me && me.id === id) return JVM.mc152.playerObj(vm, null);
+	var other = JVM.mpPlayerById(vm, id);
+	if (other) return other;
 	var info = op(vm, 'ent', id);
 	return info && JVM.entityFor ? JVM.entityFor(vm, info) : null;
 }
@@ -18867,7 +19176,11 @@ function scanSpecs(vm) {
 
 function send(vm, side, packet, who) {
 	if (!packet || packet[':channel'] == null) return;
-	net(vm).queue.push({ side: side, packet: packet, who: who || 0 });
+	queue(vm, { side: side, packet: packet, who: who || 0 });
+}
+function queue(vm, item) {
+	item.who = item.who || 0;
+	net(vm).queue.push(item);
 	if (!vm.$netPending && typeof Promise !== 'undefined') {
 		vm.$netPending = true;
 		Promise.resolve().then(function () { vm.$netPending = false; JVM.netDeliver(vm); });
@@ -18896,9 +19209,11 @@ JVM.netDeliver = function (vm) {
 	fill(null);
 	var M = mp(vm), acted = false;
 	q.forEach(function (it) {
-		var ch = String(it.packet[':channel']), hs = N[it.side][ch] || [];
 		if (it.side === 'server') server = true;
-		if (!hs.length) return;
+		var ch = it.kind ? '' : String(it.packet[':channel']), hs = it.kind ? [] : N[it.side][ch] || [];
+		var mls = it.kind ? [] : (N.ml && N.ml[ch]) || [];
+		var mp230 = it.kind === 'mlmp' && it.mod ? mlmpTarget(vm, it) : null;
+		if (!hs.length && !mls.length && !mp230) return;
 		var run = function () {
 			var who = it.who ? JVM.mc152.playerObj(vm, null) : pl;
 			if (it.who) {
@@ -18911,6 +19226,20 @@ JVM.netDeliver = function (vm) {
 				n++;
 				JVM.run(vm, function () { vm.callVirtual(h, 'onPacketData', '(Lnet/minecraft/src/INetworkManager;Lnet/minecraft/src/Packet250CustomPayload;Lcpw/mods/fml/common/network/Player;)V', [null, it.packet, who]); });
 			});
+			mls.forEach(function (m) {
+				n++;
+				vm.currentMod = m.cls.source || vm.currentMod;
+				if (it.side === 'server') {
+					var sh = who[':playerNetServerHandler'] || null;
+					if (sh) sh.$player = who;
+					JVM.run(vm, function () { vm.callVirtual(m, 'serverCustomPayload', '(Lnet/minecraft/src/NetServerHandler;Lnet/minecraft/src/Packet250CustomPayload;)V', [sh, it.packet]); });
+				} else JVM.run(vm, function () { vm.callVirtual(m, 'clientCustomPayload', '(Lnet/minecraft/src/NetClientHandler;Lnet/minecraft/src/Packet250CustomPayload;)V', [JVM.netClient(vm), it.packet]); });
+			});
+			if (mp230) {
+				n++;
+				vm.currentMod = it.mod.cls.source || vm.currentMod;
+				JVM.run(vm, function () { if (it.side === 'server') vm.callVirtual(it.mod, 'handlePacket', mp230, [it.packet, who]); else vm.callVirtual(it.mod, 'handlePacket', mp230, [it.packet]); });
+			}
 		};
 		if (!it.who) run();
 		else if (M) M.withActor(it.who, run);
@@ -18921,6 +19250,351 @@ JVM.netDeliver = function (vm) {
 	return n;
 };
 JVM.netClient = function (vm) { return vm.$netClient || (vm.$netClient = vm.newObject(vm.loadClass(SRC + 'NetClientHandler'))); };
+function mlmpTarget(vm, it) {
+	var d = it.side === 'server' ? '(Lnet/minecraft/src/Packet230ModLoader;Lnet/minecraft/src/EntityPlayerMP;)V' : '(Lnet/minecraft/src/Packet230ModLoader;)V';
+	var m = it.mod.cls && it.mod.cls.findMethod('handlePacket' + d);
+	return m && !m.cls.native ? d : null;
+}
+
+function standIns(vm) { return vm.$mpPlayers || (vm.$mpPlayers = new Map()); }
+JVM.mpRegister = function (vm, p) {
+	var i = p.$info || {};
+	if (i.remote && i.guid) {
+		if (!p.$mpHost) { p.$mpGuid = i.guid; standIns(vm).set(i.guid, p); }
+	} else if (!p.$mpGuid) { p.$mpHost = true; vm.$hostPlayer = p; }
+	if (!p[':playerNetServerHandler'] && vm.natives[SRC + 'NetServerHandler']) {
+		var h = vm.newObject(vm.loadClass(SRC + 'NetServerHandler'));
+		h[':playerEntity'] = p; h.$player = p;
+		p[':playerNetServerHandler'] = h;
+	}
+	if (!vm.$mpWrapped) wrapPlayers(vm, p);
+};
+function foreign(vm, o) {
+	if (!o) return false;
+	if (o.$mpGuid) return !vm.mcActor || vm.mcActor.guid !== o.$mpGuid;
+	return !!(o.$mpHost && vm.mcActor);
+}
+JVM.mpAs = function (vm, o, fn) {
+	var M = mp(vm);
+	if (!M || !foreign(vm, o)) return fn();
+	if (o.$mpGuid && M.has && !M.has(o.$mpGuid)) return fn();
+	var r, ran = false;
+	M.withActor(o.$mpGuid || 0, function () { ran = true; r = fn(); });
+	return ran ? r : fn();
+};
+function wrapPlayers(vm, p) {
+	vm.$mpWrapped = true;
+	var wrap = function (c, ownerOf) {
+		for (var k = c; k && k.name !== 'java/lang/Object'; k = k.superClass) {
+			if (!k.native) continue;
+			Object.keys(k.methods).forEach(function (key) {
+				var m = k.methods[key];
+				if (!m || !m.fn || m.fn.$mpOrig || m.isStatic || key.charAt(0) === '<') return;
+				var w = function (vm, self, a) {
+					var o = ownerOf(self), f = w.$mpOrig;
+					return o && foreign(vm, o) ? JVM.mpAs(vm, o, function () { return f(vm, self, a); }) : f(vm, self, a);
+				};
+				w.$mpOrig = m.fn;
+				m.fn = w;
+			});
+		}
+	};
+	wrap(p.cls, function (o) { return o && (o.$mpGuid || o.$mpHost) ? o : null; });
+	var inv = p[':inventory'];
+	if (inv && inv.cls) wrap(inv.cls, function (o) { return o && o.$player; });
+}
+function hostObj(vm) {
+	var M = mp(vm);
+	if (!vm.mcActor || !M) return JVM.mc152.playerObj(vm, null);
+	var o = null;
+	M.withActor(0, function () { o = JVM.mc152.playerObj(vm, null); });
+	return o || vm.$hostPlayer || null;
+}
+function joinerObj(vm, guid) {
+	var M = mp(vm);
+	if (!M) return null;
+	if (vm.mcActor && vm.mcActor.guid === guid) return JVM.mc152.playerObj(vm, null);
+	var o = null;
+	M.withActor(guid, function () { o = JVM.mc152.playerObj(vm, null); });
+	return o;
+}
+JVM.mpPlayerList = function (vm) {
+	var h = hostObj(vm), out = h ? [h] : [];
+	joiners(vm).forEach(function (j) { var o = joinerObj(vm, j.guid); if (o && out.indexOf(o) < 0) out.push(o); });
+	return out;
+};
+JVM.mpPlayerById = function (vm, id) {
+	if (!mp(vm)) return null;
+	var js = joiners(vm);
+	for (var i = 0; i < js.length; i++) if ((js[i].id | 0) === (id | 0)) return joinerObj(vm, js[i].guid);
+	if (vm.mcActor && (vm.mcActor.id | 0) !== (id | 0)) {
+		var h = hostObj(vm);
+		if (h && h.$info && (h.$info.id | 0) === (id | 0)) return h;
+	}
+	return null;
+};
+JVM.mpGuidOfEntity = function (vm, id) {
+	var js = joiners(vm);
+	for (var i = 0; i < js.length; i++) if ((js[i].id | 0) === (id | 0)) return js[i].guid;
+	return 0;
+};
+function installClosest(vm) {
+	var W = vm.natives[SRC + 'World'];
+	if (!W) return;
+	var E = 'Lnet/minecraft/src/Entity;', P = 'Lnet/minecraft/src/EntityPlayer;';
+	var find = function (vm, x, y, z, d, vulnerable) {
+		var best = null, bd = Infinity;
+		var consider = function (who, px, py, pz) {
+			var dx = px - x, dy = py - y, dz = pz - z, dd = dx * dx + dy * dy + dz * dz;
+			if ((d < 0 || dd < d * d) && dd < bd) { bd = dd; best = who; }
+		};
+		var M = mp(vm), hi = null;
+		if (vm.mcActor && M) M.withActor(0, function () { hi = op(vm, 'player'); }); else hi = op(vm, 'player');
+		if (hi && !(vulnerable && hi.creative)) consider(0, +hi.x, +hi.y - 1.62, +hi.z);
+		joiners(vm).forEach(function (j) { consider(j.guid, +j.x, +j.y, +j.z); });
+		if (best === null) return null;
+		return best ? joinerObj(vm, best) : hostObj(vm);
+	};
+	var at = function (vulnerable, prev) {
+		return function (vm, self, a) { return joiners(vm).length || !prev ? find(vm, +a[0], +a[1], +a[2], +a[3], vulnerable) : prev(vm, self, a); };
+	};
+	var toEnt = function (vulnerable, prev) {
+		return function (vm, self, a) {
+			var e = a[0];
+			if (!e) return null;
+			return joiners(vm).length || !prev ? find(vm, +e[':posX'] || 0, +e[':posY'] || 0, +e[':posZ'] || 0, +a[1], vulnerable) : prev(vm, self, a);
+		};
+	};
+	[['getClosestPlayer(DDDD)' + P, at, false], ['getClosestVulnerablePlayer(DDDD)' + P, at, true],
+	 ['getClosestPlayerToEntity(' + E + 'D)' + P, toEnt, false], ['getClosestVulnerablePlayerToEntity(' + E + 'D)' + P, toEnt, true]].forEach(function (k) {
+		W.methods[k[0]] = k[1](k[2], W.methods[k[0]] || null);
+	});
+}
+
+JVM.joinerClientTick = function (vm) {
+	var M = mp(vm);
+	if (!M || !M.send || !JVM.hudBegin || !JVM.hudEnd) return 0;
+	var js = joiners(vm), H = vm.$joinerHud || (vm.$joinerHud = new Map());
+	H.forEach(function (st, g) { if (!js.some(function (j) { return j.guid === g; })) H.delete(g); });
+	if (!js.length) return 0;
+	var tick = vm.mcTicks | 0, r = JVM.mc152.reg(vm), savedHud = vm.mcHud;
+	var mcObj = JVM.mc152.minecraftObj(vm), dw = mcObj && mcObj[':displayWidth'], dh = mcObj && mcObj[':displayHeight'];
+	var sent = 0;
+	js.forEach(function (j) {
+		var st = H.get(j.guid);
+		if (!st) H.set(j.guid, st = { last: '', at: -99 });
+		var sz = (vm.$remoteSizes || {})[j.guid] || [DEF_W, DEF_H, 2], ops = null;
+		var rg = remotes(vm).get(j.guid), saved = {};
+		STATE.forEach(function (k) { saved[k] = vm[k]; vm[k] = rg ? rg.st[k] : undefined; });
+		try {
+			M.withActor(j.guid, function () {
+				vm.steps = 0;
+				JVM.hudBegin(vm, sz[0], sz[1], sz[2] || 2);
+				try {
+					var mc = JVM.mc152.minecraftObj(vm);
+					r.tickMods.forEach(function (m) {
+						vm.currentMod = m.cls.source || vm.currentMod;
+						JVM.run(vm, function () { vm.callVirtual(m, 'onTickInGame', '(FLnet/minecraft/client/Minecraft;)Z', [0, mc]); });
+					});
+					if (JVM.forgeTick) JVM.forgeTick(vm, { joiner: true });
+				} finally { ops = JVM.hudEnd(vm); }
+			});
+		} finally {
+			STATE.forEach(function (k) { if (rg) rg.st[k] = vm[k]; vm[k] = saved[k]; });
+		}
+		if (!ops) return;
+		var s = '';
+		try { s = JSON.stringify(ops); } catch (x) { return; }
+		if (s === st.last || (tick - st.at < 2 && s !== '[]')) return;
+		st.last = s; st.at = tick; sent++;
+		M.send(j.guid, { t: 'jhud', ops: ops, w: sz[0], h: sz[1], s: sz[2] || 2 });
+	});
+	vm.mcHud = savedHud;
+	if (mcObj) { mcObj[':displayWidth'] = dw; mcObj[':displayHeight'] = dh; }
+	JVM.mc152.minecraftObj(vm);
+	return sent;
+};
+
+function installModLoaderNet(vm) {
+	var N = net(vm);
+	N.ml = N.ml || {};
+	var BM = vm.natives[SRC + 'BaseMod'];
+	if (BM) {
+		var nop = function () {};
+		['clientCustomPayload(Lnet/minecraft/src/NetClientHandler;Lnet/minecraft/src/Packet250CustomPayload;)V',
+		 'serverCustomPayload(Lnet/minecraft/src/NetServerHandler;Lnet/minecraft/src/Packet250CustomPayload;)V',
+		 'clientConnect(Lnet/minecraft/src/NetClientHandler;)V', 'clientDisconnect(Lnet/minecraft/src/NetClientHandler;)V',
+		 'onClientLogin(Lnet/minecraft/src/EntityPlayer;)V', 'onClientLogout(Lnet/minecraft/src/INetworkManager;)V'].forEach(function (k) { if (!BM.methods[k]) BM.methods[k] = nop; });
+	}
+	var ML = vm.natives[SRC + 'ModLoader'];
+	if (ML) {
+		ML.staticMethods = ML.staticMethods || {};
+		var P = 'Lnet/minecraft/src/Packet;';
+		ML.staticMethods['registerPacketChannel(Lnet/minecraft/src/BaseMod;Ljava/lang/String;)V'] = function (vm, n, a) {
+			if (!a[0] || a[1] == null) return;
+			var t = net(vm).ml, ch = String(a[1]);
+			(t[ch] || (t[ch] = [])).indexOf(a[0]) < 0 && t[ch].push(a[0]);
+		};
+		ML.staticMethods['clientSendPacket(' + P + ')V'] = function (vm, n, a) { send(vm, 'server', a[0], fromNow(vm)); };
+		ML.staticMethods['sendPacket(' + P + ')V'] = function (vm, n, a) { send(vm, 'server', a[0], fromNow(vm)); };
+		ML.staticMethods['serverSendPacket(Lnet/minecraft/src/NetServerHandler;' + P + ')V'] = function (vm, n, a) { var h = a[0]; send(vm, 'client', a[1], guidOf(h && (h[':playerEntity'] || h.$player))); };
+	}
+	var MP = vm.natives[SRC + 'ModLoaderMp'];
+	var P230 = 'Lnet/minecraft/src/Packet230ModLoader;';
+	if (!vm.natives[SRC + 'Packet230ModLoader']) vm.defineNative(SRC + 'Packet230ModLoader', { super: SRC + 'Packet', fields: { modId: 'I', packetType: 'I', dataInt: '[I', dataFloat: '[F', dataString: '[Ljava/lang/String;' }, methods: { '<init>()V': function () {} } });
+	if (MP) {
+		MP.staticMethods = MP.staticMethods || {};
+		MP.staticMethods['sendPacket(Lnet/minecraft/src/BaseModMp;' + P230 + ')V'] = function (vm, n, a) { queue(vm, { kind: 'mlmp', side: 'server', mod: a[0], packet: a[1], who: fromNow(vm) }); };
+		MP.staticMethods['sendPacketTo(Lnet/minecraft/src/BaseModMp;Lnet/minecraft/src/EntityPlayerMP;' + P230 + ')V'] = function (vm, n, a) { queue(vm, { kind: 'mlmp', side: 'client', mod: a[0], packet: a[2], who: guidOf(a[1]) }); };
+		MP.staticMethods['sendPacketToAll(Lnet/minecraft/src/BaseModMp;' + P230 + ')V'] = function (vm, n, a) { everyone(vm).forEach(function (g) { queue(vm, { kind: 'mlmp', side: 'client', mod: a[0], packet: a[1], who: g }); }); };
+		var none = function () {};
+		['registerNetClientHandlerEntity(Ljava/lang/Class;I)V', 'registerNetClientHandlerEntity(Ljava/lang/Class;ZI)V'].forEach(function (k) { if (!MP.staticMethods[k]) MP.staticMethods[k] = none; });
+	}
+	if (!vm.natives[SRC + 'NetServerHandler']) vm.defineNative(SRC + 'NetServerHandler', { super: SRC + 'NetHandler', fields: { playerEntity: 'Lnet/minecraft/src/EntityPlayerMP;' }, methods: {
+		'sendPacketToPlayer(Lnet/minecraft/src/Packet;)V': function (vm, self, a) { send(vm, 'client', a[0], guidOf(self[':playerEntity'] || self.$player)); },
+		'getPlayer()Lnet/minecraft/src/EntityPlayerMP;': function (vm, self) { return self[':playerEntity'] || null; },
+		'kickPlayerFromServer(Ljava/lang/String;)V': function (vm) { vm.warnOnce('net:kick', 'a mod kicking a player is left out'); },
+	} });
+	var SCM = vm.natives[SRC + 'ServerConfigurationManager'];
+	if (SCM) {
+		SCM.methods['sendPacketToAllPlayers(Lnet/minecraft/src/Packet;)V'] = function (vm, self, a) { everyone(vm).forEach(function (g) { send(vm, 'client', a[0], g); }); };
+		SCM.methods['sendPacketToAllPlayersInDimension(Lnet/minecraft/src/Packet;I)V'] = function (vm, self, a) { everyone(vm).forEach(function (g) { send(vm, 'client', a[0], g); }); };
+		SCM.methods['sendToAllNear(DDDDILnet/minecraft/src/Packet;)V'] = function (vm, self, a) { near(vm, a[0], a[1], a[2], a[3]).forEach(function (g) { send(vm, 'client', a[5], g); }); };
+	}
+}
+function everyone(vm) { return [0].concat(joiners(vm).map(function (j) { return j.guid; })); }
+function near(vm, x, y, z, r) {
+	var out = [0], r2 = (+r || 0) * (+r || 0);
+	joiners(vm).forEach(function (j) { var dx = j.x - x, dy = j.y - y, dz = j.z - z; if (dx * dx + dy * dy + dz * dz <= r2) out.push(j.guid); });
+	return out;
+}
+
+var STN = 'net/modificationstation/stationapi/api/';
+function installStationNet(vm) {
+	var I = JVM.ACC_PUBLIC | JVM.ACC_INTERFACE | JVM.ACC_ABSTRACT;
+	var def = function (n, s) { if (!vm.natives[n]) vm.defineNative(n, s); };
+	var PT = STN + 'network/packet/PacketType', MP = STN + 'network/packet/ManagedPacket', LPT = 'L' + PT + ';';
+	def(MP, { access: I, statics: { PACKET_ID: 254 } });
+	def(MP + '$Factory', { access: I });
+	def(STN + 'network/packet/IdentifiablePacket', { access: I, staticMethods: {
+		'register(Lnet/modificationstation/stationapi/api/util/Identifier;ZZLnet/modificationstation/stationapi/api/network/packet/IdentifiablePacket$Factory;)V': function () {},
+	} });
+	def(STN + 'network/packet/IdentifiablePacket$Factory', { access: I });
+	def(PT, { fields: { clientBound: 'Z', serverBound: 'Z', factory: 'L' + MP + '$Factory;', blocking: 'Z' }, methods: {
+		'getHandler()Ljava/util/Optional;': function (vm) { return vm.callStatic('java/util/Optional', 'empty', '()Ljava/util/Optional;', []); },
+		'setHandler(Lnet/minecraft/src/NetHandler;)V': function () {},
+	}, staticMethods: {
+		'builder(ZZLnet/modificationstation/stationapi/api/network/packet/ManagedPacket$Factory;)Lnet/modificationstation/stationapi/api/network/packet/PacketType$Builder;': function (vm, n, a) { var b = vm.newObject(vm.loadClass(PT + '$Builder')); b.$c = a[0] ? 1 : 0; b.$s = a[1] ? 1 : 0; b.$f = a[2]; return b; },
+	} });
+	def(PT + '$Builder', { methods: {
+		'rawId(I)Lnet/modificationstation/stationapi/api/network/packet/PacketType$Builder;': function (vm, self) { return self; },
+		'blocking()Lnet/modificationstation/stationapi/api/network/packet/PacketType$Builder;': function (vm, self) { self.$blocking = 1; return self; },
+		'build()Lnet/modificationstation/stationapi/api/network/packet/PacketType;': function (vm, self) {
+			var t = vm.newObject(vm.loadClass(PT));
+			t[':clientBound'] = self.$c; t[':serverBound'] = self.$s; t[':factory'] = self.$f || null; t[':blocking'] = self.$blocking | 0;
+			return t;
+		},
+	} });
+	var reg = function (name, key) {
+		def(STN + 'registry/' + name, { super: STN + 'registry/SimpleRegistry', statics: { INSTANCE: null, KEY: null, AUTO_ID: -1 }, clinit: function (vm, c) {
+			var o = vm.newObject(c); o.$s = key; c.statics.INSTANCE = o;
+			if (vm.natives[STN + 'registry/RegistryKey']) { var k = vm.newObject(vm.loadClass(STN + 'registry/RegistryKey')); k.$s = key; c.statics.KEY = k; }
+		} });
+	};
+	reg('PacketTypeRegistry', 'stationapi:packet_types');
+	reg('MessageListenerRegistry', 'stationapi:message_listeners');
+	def(STN + 'event/network/packet/PacketRegister', { access: I });
+	def(STN + 'event/network/packet/PacketRegisterEvent', { super: 'net/mine_diver/unsafeevents/Event', interfaces: [STN + 'event/network/packet/PacketRegister'], fields: { register: 'L' + STN + 'event/network/packet/PacketRegister;' }, methods: {
+		'register(IZZLjava/lang/Class;)V': function () {},
+		'register(Lnet/modificationstation/stationapi/api/util/Identifier;Lnet/modificationstation/stationapi/api/network/packet/PacketType;)V': function (vm, self, a) {
+			var c = vm.loadClass(STN + 'registry/PacketTypeRegistry'); vm.initClass(c);
+			vm.callStatic(STN + 'registry/Registry', 'register', '(L' + STN + 'registry/Registry;Lnet/modificationstation/stationapi/api/util/Identifier;Ljava/lang/Object;)Ljava/lang/Object;', [c.statics.INSTANCE, a[0], a[1]]);
+		},
+	} });
+	var MSG = STN + 'network/packet/MessagePacket';
+	def(MSG, { super: SRC + 'Packet', interfaces: [MP], statics: { TYPE: null }, clinit: function (vm, c) {
+		var t = vm.newObject(vm.loadClass(PT)); t[':clientBound'] = 1; t[':serverBound'] = 1; c.statics.TYPE = t;
+	}, fields: { identifier: 'Lnet/modificationstation/stationapi/api/util/Identifier;', booleans: '[Z', bytes: '[B', shorts: '[S', chars: '[C', ints: '[I',
+		longs: '[J', floats: '[F', doubles: '[D', strings: '[Ljava/lang/String;', objects: '[Ljava/lang/Object;' }, methods: {
+		'<init>(Lnet/modificationstation/stationapi/api/util/Identifier;)V': function (vm, self, a) { self[':identifier'] = a[0]; },
+		'<init>()V': function () {},
+		'getType()Lnet/modificationstation/stationapi/api/network/packet/PacketType;': function (vm) { var c = vm.loadClass(MSG); vm.initClass(c); return c.statics.TYPE; },
+		'processPacket(Lnet/minecraft/src/NetHandler;)V': function (vm, self, a) {
+			var id = self[':identifier'];
+			var rc = vm.loadClass(STN + 'registry/MessageListenerRegistry'); vm.initClass(rc);
+			var l = id ? vm.callVirtual(rc.statics.INSTANCE, 'get', '(Lnet/modificationstation/stationapi/api/util/Identifier;)Ljava/lang/Object;', [id]) : null;
+			if (!l) { vm.warnOnce('st:msg:' + (id && id.$s), 'a StationAPI message nobody listens for: ' + (id && id.$s)); return; }
+			var h = a[0], p = h && (h.$player || h[':playerEntity']) || JVM.mc152.playerObj(vm, null);
+			vm.callVirtual(l, 'accept', '(Ljava/lang/Object;Ljava/lang/Object;)V', [p, self]);
+		},
+		'writePacketData(Ljava/io/DataOutputStream;)V': function () {},
+		'readPacketData(Ljava/io/DataInputStream;)V': function () {},
+		'getPacketSize()I': function () { return 0; },
+	} });
+	def(STN + 'entity/player/PlayerHelper', { staticMethods: {
+		'getPlayerFromPacketHandler(Lnet/minecraft/src/NetHandler;)Lnet/minecraft/src/EntityPlayer;': function (vm, n, a) { var h = a[0]; return h && (h.$player || h[':playerEntity']) || JVM.mc152.playerObj(vm, null); },
+		'getPlayerFromGame()Lnet/minecraft/src/EntityPlayer;': function (vm) { return JVM.mc152.playerObj(vm, null); },
+	} });
+	var EP = 'Lnet/minecraft/src/EntityPlayer;', EN = 'Lnet/minecraft/src/Entity;', PK = 'Lnet/minecraft/src/Packet;';
+	def(STN + 'network/packet/PacketHelper', { staticMethods: (function () {
+		var s = {};
+		s['send(' + PK + ')V'] = function (vm, n, a) { stApply(vm, a[0], fromNow(vm), 'server'); };
+		s['sendTo(' + EP + PK + ')V'] = function (vm, n, a) { stApply(vm, a[1], guidOf(a[0]), 'client'); };
+		s['dispatchLocallyAndSendTo(' + EP + PK + ')V'] = s['sendTo(' + EP + PK + ')V'];
+		s['sendToAllTracking(' + EN + PK + ')V'] = function (vm, n, a) {
+			var e = a[0];
+			if (!e) return;
+			near(vm, +e[':posX'] || 0, +e[':posY'] || 0, +e[':posZ'] || 0, 80).forEach(function (g) { stApply(vm, a[1], g, 'client'); });
+		};
+		s['dispatchLocallyAndToAllTracking(' + EN + PK + ')V'] = s['sendToAllTracking(' + EN + PK + ')V'];
+		s['register(IZZLjava/lang/Class;)V'] = function () {};
+		return s;
+	})() });
+}
+function stApply(vm, pkt, who, side) {
+	if (!pkt) return;
+	var depth = vm.$stNetDepth | 0;
+	if (depth > 8) { vm.warnOnce('st:netloop', 'StationAPI packets answering each other without end were cut short'); return; }
+	var M = mp(vm);
+	var run = function () {
+		var p = JVM.mc152.playerObj(vm, null);
+		var h = side === 'server' ? p[':playerNetServerHandler'] || null : JVM.netClient(vm);
+		if (h) h.$player = p;
+		if (side !== 'server' && vm.$minecraftObj) vm.$minecraftObj(vm);
+		var fresh = copyPacket(vm, pkt);
+		vm.$stNetDepth = depth + 1;
+		try { vm.callVirtual(fresh, 'processPacket', '(Lnet/minecraft/src/NetHandler;)V', [h]); }
+		finally { vm.$stNetDepth = depth; }
+	};
+	if (!who) { if (vm.mcActor && M) M.withActor(0, run); else run(); }
+	else if (M) M.withActor(who, run);
+	if (side !== 'server' && who && vm.$minecraftObj && !vm.mcActor) vm.$minecraftObj(vm);
+}
+function copyPacket(vm, pkt) {
+	if (!pkt || !pkt.cls || pkt.cls.native) return pkt;
+	try {
+		var bo = vm.newObject(vm.loadClass('java/io/ByteArrayOutputStream')); vm.callVirtual(bo, '<init>', '()V', []);
+		var dout = vm.newObject(vm.loadClass('java/io/DataOutputStream')); vm.callVirtual(dout, '<init>', '(Ljava/io/OutputStream;)V', [bo]);
+		vm.callVirtual(pkt, 'writePacketData', '(Ljava/io/DataOutputStream;)V', [dout]);
+		var bytes = vm.callVirtual(bo, 'toByteArray', '()[B', []);
+		var fresh = null;
+		var tm = pkt.cls.findMethod('getType()L' + STN + 'network/packet/PacketType;');
+		var type = tm ? vm.callVirtual(pkt, 'getType', '()L' + STN + 'network/packet/PacketType;', []) : null;
+		var f = type && type[':factory'];
+		if (f) fresh = vm.callVirtual(f, 'create', '()Lnet/minecraft/src/Packet;', []);
+		if (!fresh && pkt.cls.findMethod('<init>()V')) { fresh = vm.newObject(pkt.cls); vm.callVirtual(fresh, '<init>', '()V', []); }
+		if (!fresh || fresh.cls !== pkt.cls) return pkt;
+		var bi = vm.newObject(vm.loadClass('java/io/ByteArrayInputStream')); vm.callVirtual(bi, '<init>', '([B)V', [bytes]);
+		var din = vm.newObject(vm.loadClass('java/io/DataInputStream')); vm.callVirtual(din, '<init>', '(Ljava/io/InputStream;)V', [bi]);
+		vm.callVirtual(fresh, 'readPacketData', '(Ljava/io/DataInputStream;)V', [din]);
+		return fresh;
+	} catch (x) {
+		vm.warnOnce('st:pktcopy:' + pkt.cls.name, 'a StationAPI packet (' + pkt.cls.name.split('/').pop() + ') could not be written and read back - used as it was');
+		return pkt;
+	}
+}
+JVM.stationPacketApply = stApply;
+
 JVM.installNet = install;
 
 var STATE = ['mcGui', 'mcHeld', 'mcMouse', 'mcMouseDown', 'mcKeys', 'mcLastKey', 'mcWheel', 'mcDraw'];
@@ -18985,7 +19659,7 @@ JVM.remoteGuiInput = function (vm, guid, m) {
 	var int = function (v, lo, hi) { v = Math.floor(+v || 0); return v < lo ? lo : v > hi ? hi : v; };
 	if (m.k === 'layout') {
 		var w = int(m.w, 160, 2000), h = int(m.h, 120, 2000);
-		(vm.$remoteSizes || (vm.$remoteSizes = {}))[guid] = [w, h];
+		(vm.$remoteSizes || (vm.$remoteSizes = {}))[guid] = [w, h, int(m.s, 1, 8) || 2];
 		if (rg) { rg.w = w; rg.h = h; if (rg.st.mcGui) inRemote(vm, rg, function () { JVM.guiLayout(vm, w, h); }); }
 	}
 	if (!rg) { if (M && m.k !== 'layout' && m.k !== 'move') M.send(guid, { t: 'jgui', close: 1 }); return; }
@@ -21661,6 +22335,7 @@ function apply(m, p) {
 	        m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
 	        m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]];
 }
+JVM.recMath = { ident: ident, mul: mul, translate: translate, scale: scale, rotate: rotate, apply: apply };
 
 function indexPic(vm, idx, blk) {
 	idx = idx | 0;
@@ -21690,6 +22365,7 @@ JVM.recStop = function (vm) { var r = vm.$rec; vm.$rec = null; return r ? r.quad
 function rec(vm) { return vm.$rec; }
 function emit(vm, pts, uvs, pic) {
 	var R = rec(vm);
+	if (R && R.world) { if (JVM.worldModelQuad) JVM.worldModelQuad(vm, pts, uvs, pic); return; }
 	if (!R || R.quads.length > 4000) return;
 	R.quads.push({ p: pts.map(function (p) { return apply(R.m, p); }), uv: uvs, icon: pic && pic.icon || null, img: pic && pic.img || null, iw: pic && pic.iw || 0, ih: pic && pic.ih || 0 });
 }
@@ -21910,11 +22586,13 @@ function install(vm) {
 		'<init>()V': function () {}, '<init>(I)V': function () {},
 		'startDrawingQuads()V': function (vm, self) { self.$T = { mode: 7, v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
 		'startDrawing(I)V': function (vm, self, a) { self.$T = { mode: a[0], v: [], uv: [0, 0], off: (self.$T && self.$T.off) || [0, 0, 0] }; },
-		'draw()I': function (vm, self) { if (self.$T) self.$T.v = []; return 0; },
-		'draw()V': function (vm, self) { if (self.$T) self.$T.v = []; },
+		'draw()I': function (vm, self) { var R = rec(vm); if (R && R.world && self.$T) JVM.worldTessDraw(vm, self.$T); if (self.$T) self.$T.v = []; return 0; },
+		'draw()V': function (vm, self) { var R = rec(vm); if (R && R.world && self.$T) JVM.worldTessDraw(vm, self.$T); if (self.$T) self.$T.v = []; },
 		'setTextureUV(DD)V': function (vm, self, a) { (self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] })).uv = [a[0], a[1]]; },
 		'addVertexWithUV(DDDDD)V': function (vm, self, a) {
 			var T = self.$T || (self.$T = { mode: 7, v: [], off: [0, 0, 0] });
+			var RW = rec(vm);
+			if (RW && RW.world) { (T.wv || (T.wv = [])).push([a[0] + T.off[0], a[1] + T.off[1], a[2] + T.off[2], a[3], a[4], T.noCol || T.col == null ? null : T.col]); return; }
 			T.v.push([a[0], a[1], a[2], a[3], a[4], T.noCol ? null : T.col == null ? null : T.col]);
 			if (rec(vm) && (T.mode === 7 ? T.v.length === 4 : T.v.length === 3)) { if (T.v.length === 3) T.v.push(T.v[2]); tessQuad(vm, T); T.v = []; }
 			else if (T.v.length === 4 && T.mode === 7 && JVM.guiQuad) { var o = T.off; JVM.guiQuad(vm, T.v.map(function (p) { return [p[0] + o[0], p[1] + o[1], p[2], p[3], p[4], p[5]]; })); T.v = []; }
@@ -22211,10 +22889,10 @@ function install(vm) {
 			'renderEntityWithPosYaw(Lnet/minecraft/src/Entity;DDDFF)V': function () {},
 			'getDistanceToCamera(DDD)D': function () { return 64; },
 			'func_851_a(DDD)D': function () { return 64; },
-			'getFontRenderer()Lnet/minecraft/src/FontRenderer;': function () { return null; },
+			'getFontRenderer()Lnet/minecraft/src/FontRenderer;': function (vm) { var m = JVM.mc152 && JVM.mc152.minecraftObj ? JVM.mc152.minecraftObj(vm) : null; return m && m[':fontRenderer'] || null; },
 			'set(Lnet/minecraft/src/World;)V': function (vm, self, a) { self[':worldObj'] = a[0]; },
 		} });
-	def('RenderGlobal', { fields: { worldObj: 'L' + SRC + 'World;', renderEngine: 'L' + SRC + 'RenderEngine;', renderDistance: 'I' }, methods: {
+	def('RenderGlobal', { fields: { worldObj: 'L' + SRC + 'World;', renderEngine: 'L' + SRC + 'RenderEngine;', renderDistance: 'I', mc: 'Lnet/minecraft/client/Minecraft;' }, methods: {
 		'loadRenderers()V': function () {},
 		'obtainEntitySkin(Lnet/minecraft/src/Entity;)V': function () {},
 		'releaseEntitySkin(Lnet/minecraft/src/Entity;)V': function () {},
@@ -22232,7 +22910,7 @@ function install(vm) {
 		var prevOnMc = JVM.mc152.onMinecraft;
 		JVM.mc152.onMinecraft = function (vm, mc) {
 			prevOnMc(vm, mc);
-			if (!mc[':renderGlobal'] && vm.natives[SRC + 'RenderGlobal']) { var rg = vm.newObject(vm.loadClass(SRC + 'RenderGlobal')); rg[':worldObj'] = mc[':theWorld'] || null; mc[':renderGlobal'] = rg; }
+			if (!mc[':renderGlobal'] && vm.natives[SRC + 'RenderGlobal']) { var rg = vm.newObject(vm.loadClass(SRC + 'RenderGlobal')); rg[':worldObj'] = mc[':theWorld'] || null; rg[':mc'] = mc; mc[':renderGlobal'] = rg; }
 		};
 		JVM.mc152.onMinecraft.$rg = true;
 	}
@@ -22323,6 +23001,7 @@ function install(vm) {
 			return id;
 		};
 	}
+	if (JVM.installWorldRec) JVM.installWorldRec(vm);
 }
 
 JVM.recordBlock = function (vm, b, id, meta, modId) {
@@ -22574,6 +23253,350 @@ JVM.quadsJson = function (vm, quads, texOf, out, keyBase, resources) {
 };
 
 JVM.installRecorder = install;
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/', FORGE = 'net/minecraftforge/', CE = FORGE + 'client/event/';
+var GL11 = 'org/lwjgl/opengl/GL11';
+var MAX_VERTS = 16384;
+var F_TEX = 1, F_DEPTH = 2, F_MASK = 4, F_BLEND = 8, F_ADD = 16, F_CULL = 32, F_PLAYER = 64;
+var WANT = /^net[/]minecraftforge[/]client[/]event[/](RenderWorldLastEvent|DrawBlockHighlightEvent|RenderPlayerEvent)/;
+var FONT_TEX = '#game:font/default8.png';
+
+function M() { return JVM.recMath; }
+function rec(vm) { var R = vm.$rec; return R && R.world ? R : null; }
+
+function newWorld() {
+	return { batches: [], verts: 0, dropped: 0, skipped: 0, player: false, imm: null, attr: [],
+		gl: { tex: true, depth: true, mask: true, blend: false, add: false, cull: true, color: [1, 1, 1, 1] } };
+}
+function argb(c) {
+	var k = function (x) { x = Math.round((+x || 0) * 255); return x < 0 ? 0 : x > 255 ? 255 : x; };
+	return ((k(c[3]) << 24) | (k(c[0]) << 16) | (k(c[1]) << 8) | k(c[2])) >>> 0;
+}
+function flush(vm, R, mode, vs) {
+	var W = R.world;
+	if (!vs || !vs.length) return;
+	if (mode === 8) mode = 5;
+	else if (mode === 9) mode = 6;
+	if (mode < 1 || mode > 7) { W.skipped += vs.length; return; }
+	var per = mode === 7 ? 4 : mode === 1 ? 2 : mode === 4 ? 3 : 1;
+	var n = vs.length - vs.length % per;
+	if (!n || (mode === 5 || mode === 6) && n < 3 || (mode === 2 || mode === 3) && n < 2) return;
+	if (W.verts + n > MAX_VERTS) { W.dropped += n; return; }
+	var gl = W.gl, flags = (gl.tex ? F_TEX : 0) | (gl.depth ? F_DEPTH : 0) | (gl.mask ? F_MASK : 0) | (gl.blend ? F_BLEND : 0) | (gl.add ? F_ADD : 0) | (gl.cull ? F_CULL : 0) | (W.player ? F_PLAYER : 0);
+	var tex = null;
+	if (gl.tex) {
+		var cu = 0, cv = 0;
+		for (var i = 0; i < n; i++) { cu += +vs[i][3] || 0; cv += +vs[i][4] || 0; }
+		cu /= n; cv /= n;
+		if (cu >= 2 && Math.floor(cu) === Math.floor(cv) && R.icons && R.icons[Math.floor(cu)]) tex = null;
+		else tex = R.worldTex || R.tex || null;
+		if (!tex && !vs.slice(0, n).some(function (v) { return +v[3] || +v[4]; })) flags &= ~F_TEX;
+		else if (!tex) { W.skipped += n; return; }
+	}
+	var m = R.m, ap = M().apply, col = argb(gl.color), out = new Array(n);
+	for (var j = 0; j < n; j++) {
+		var v = vs[j], p = ap(m, [+v[0] || 0, +v[1] || 0, +v[2] || 0]);
+		out[j] = [p[0], p[1], p[2], +v[3] || 0, +v[4] || 0, v[5] == null ? col : (v[5] >>> 0)];
+	}
+	W.batches.push({ mode: mode, flags: flags, tex: tex, v: out });
+	W.verts += n;
+}
+JVM.worldTessDraw = function (vm, T) {
+	var R = rec(vm);
+	if (!R || !T.wv) return;
+	var vs = T.wv; T.wv = null;
+	flush(vm, R, T.mode == null ? 7 : T.mode | 0, vs);
+};
+
+JVM.worldModelQuad = function (vm, pts, uvs, pic) {
+	var R = rec(vm);
+	if (!R || !pic || !pic.img) { if (R) R.world.skipped += 4; return; }
+	var iw = pic.iw || 64, ih = pic.ih || 32;
+	var vs = pts.map(function (p, i) { return [p[0], p[1], p[2], uvs[i][0] / iw, uvs[i][1] / ih, null]; });
+	var keep = R.worldTex;
+	R.worldTex = pic.img;
+	try { flush(vm, R, 7, vs); } finally { R.worldTex = keep; }
+};
+
+var CODES = [0x000000, 0x0000aa, 0x00aa00, 0x00aaaa, 0xaa0000, 0xaa00aa, 0xffaa00, 0xaaaaaa, 0x555555, 0x5555ff, 0x55ff55, 0x55ffff, 0xff5555, 0xff55ff, 0xffff55, 0xffffff];
+function worldText(vm, R, s, x, y, color, shadow) {
+	s = String(s == null ? '' : s);
+	var W = R.world;
+	if (!(color & 0xfc000000)) color |= 0xff000000;
+	var pass = function (dx, dy, c0) {
+		var vs = [], c = c0 >>> 0, px = x + dx;
+		for (var i = 0; i < s.length; i++) {
+			var ch = s.charCodeAt(i);
+			if (ch === 167 && i + 1 < s.length) {
+				var k = '0123456789abcdef'.indexOf(s.charAt(i + 1).toLowerCase());
+				if (k >= 0) { var rgb = CODES[k]; if (shadow && c0 !== color) rgb = (rgb & 0xfcfcfc) >> 2; c = ((c0 & 0xff000000) | rgb) >>> 0; }
+				else if (s.charAt(i + 1).toLowerCase() === 'r') c = c0 >>> 0;
+				i++; continue;
+			}
+			var w = JVM.mcStrWidth ? JVM.mcStrWidth(String.fromCharCode(ch)) : 6;
+			if (ch > 32 && ch < 256) {
+				var u = (ch % 16) / 16, v = Math.floor(ch / 16) / 16, f = (w - 1.01) / 128, h = 7.99 / 128;
+				var x1 = px + w - 1.01, y1 = y + dy + 7.99;
+				vs.push([px, y + dy, 0, u, v, c], [px, y1, 0, u, v + h, c], [x1, y1, 0, u + f, v + h, c], [x1, y + dy, 0, u + f, v, c]);
+			}
+			px += w;
+		}
+		var keep = R.worldTex, tex = W.gl.tex;
+		R.worldTex = FONT_TEX; W.gl.tex = true;
+		try { flush(vm, R, 7, vs); } finally { R.worldTex = keep; W.gl.tex = tex; }
+	};
+	if (shadow) pass(1, 1, ((color & 0xfcfcfc) >> 2 | (color & 0xff000000)) >>> 0);
+	pass(0, 0, color >>> 0);
+	return x + (JVM.mcStrWidth ? JVM.mcStrWidth(s) : s.length * 6) + (shadow ? 1 : 0);
+}
+
+function install(vm) {
+	var GL = vm.natives[GL11];
+	if (GL) {
+		GL.staticMethods = GL.staticMethods || {};
+		var wrap = function (k, fn) {
+			var prev = GL.staticMethods[k];
+			GL.staticMethods[k] = function (vm, n, a) { var r = prev ? prev(vm, n, a) : undefined; var R = rec(vm); if (R) { var x = fn(R.world, a, R); if (x !== undefined) return x; } return r; };
+		};
+		var cap = function (W, c, on) {
+			if (c === 3553) W.gl.tex = on; else if (c === 2929) W.gl.depth = on; else if (c === 3042) W.gl.blend = on; else if (c === 2884) W.gl.cull = on;
+		};
+		wrap('glEnable(I)V', function (W, a) { cap(W, a[0], true); });
+		wrap('glDisable(I)V', function (W, a) { cap(W, a[0], false); });
+		wrap('glIsEnabled(I)Z', function (W, a) { var c = a[0]; return c === 3553 ? +W.gl.tex : c === 2929 ? +W.gl.depth : c === 3042 ? +W.gl.blend : c === 2884 ? +W.gl.cull : undefined; });
+		wrap('glDepthMask(Z)V', function (W, a) { W.gl.mask = !!a[0]; });
+		wrap('glBlendFunc(II)V', function (W, a) { W.gl.add = a[1] === 1; });
+		wrap('glColor4f(FFFF)V', function (W, a) { W.gl.color = [a[0], a[1], a[2], a[3]]; });
+		wrap('glColor3f(FFF)V', function (W, a) { W.gl.color = [a[0], a[1], a[2], 1]; });
+		wrap('glColor4ub(BBBB)V', function (W, a) { W.gl.color = [(a[0] & 255) / 255, (a[1] & 255) / 255, (a[2] & 255) / 255, (a[3] & 255) / 255]; });
+		wrap('glColor3ub(BBB)V', function (W, a) { W.gl.color = [(a[0] & 255) / 255, (a[1] & 255) / 255, (a[2] & 255) / 255, 1]; });
+		wrap('glColor4d(DDDD)V', function (W, a) { W.gl.color = [a[0], a[1], a[2], a[3]]; });
+		wrap('glColor3d(DDD)V', function (W, a) { W.gl.color = [a[0], a[1], a[2], 1]; });
+		wrap('glPushAttrib(I)V', function (W) { W.attr.push(JSON.parse(JSON.stringify(W.gl))); });
+		wrap('glPopAttrib()V', function (W) { if (W.attr.length) W.gl = W.attr.pop(); });
+		var vtx = function (W, x, y, z) {
+			var I = W.imm;
+			if (I) I.v.push([x, y, z, I.uv[0], I.uv[1], argb(W.gl.color)]);
+		};
+		wrap('glBegin(I)V', function (W, a) { W.imm = { mode: a[0] | 0, v: [], uv: [0, 0] }; });
+		wrap('glEnd()V', function (W, a, R) { var I = W.imm; W.imm = null; if (I) flush(vm, R, I.mode, I.v); });
+		wrap('glVertex3d(DDD)V', function (W, a) { vtx(W, a[0], a[1], a[2]); });
+		wrap('glVertex3f(FFF)V', function (W, a) { vtx(W, a[0], a[1], a[2]); });
+		wrap('glVertex2f(FF)V', function (W, a) { vtx(W, a[0], a[1], 0); });
+		wrap('glVertex2d(DD)V', function (W, a) { vtx(W, a[0], a[1], 0); });
+		wrap('glTexCoord2f(FF)V', function (W, a) { if (W.imm) W.imm.uv = [a[0], a[1]]; });
+		wrap('glTexCoord2d(DD)V', function (W, a) { if (W.imm) W.imm.uv = [a[0], a[1]]; });
+		wrap('glNormal3f(FFF)V', function () {});
+		wrap('glLineWidth(F)V', function () {});
+	}
+	var idName = function (id) { var t = vm.mcTexIds || []; return t[id] || null; };
+	if (GL) wrap('glBindTexture(II)V', function (W, a, R) { R.tex = idName(a[1]); });
+	var RE = vm.natives[SRC + 'RenderEngine'];
+	if (RE && RE.methods) {
+		var prevBindI = RE.methods['bindTexture(I)V'];
+		RE.methods['bindTexture(I)V'] = function (vm, self, a) { var R = rec(vm); if (R) R.tex = idName(a[0]); return prevBindI ? prevBindI(vm, self, a) : undefined; };
+	}
+
+	var FR = vm.natives[SRC + 'FontRenderer'];
+	if (FR && FR.methods) {
+		var fw = function (k, fn) {
+			var prev = FR.methods[k];
+			FR.methods[k] = function (vm, self, a) { var R = rec(vm); if (R) return fn(R, a); return prev ? prev(vm, self, a) : undefined; };
+		};
+		fw('drawString(Ljava/lang/String;III)I', function (R, a) { return worldText(vm, R, a[0], a[1], a[2], a[3], false); });
+		fw('drawStringWithShadow(Ljava/lang/String;III)I', function (R, a) { return worldText(vm, R, a[0], a[1], a[2], a[3], true); });
+		fw('drawString(Ljava/lang/String;IIIZ)I', function (R, a) { return worldText(vm, R, a[0], a[1], a[2], a[3], !!a[4]); });
+		fw('drawString(Ljava/lang/String;III)V', function (R, a) { worldText(vm, R, a[0], a[1], a[2], a[3], false); });
+		fw('drawStringWithShadow(Ljava/lang/String;III)V', function (R, a) { worldText(vm, R, a[0], a[1], a[2], a[3], true); });
+	}
+
+	if (!vm.natives[FORGE + 'event/Event']) return;
+	var CANCEL = [FORGE + 'event/Cancelable'];
+	var def = function (n, sup, fields, cancelable, ctor) {
+		if (vm.natives[CE + n]) return;
+		var methods = {};
+		if (ctor) methods[ctor[0]] = ctor[1];
+		vm.defineNative(CE + n, { super: sup, fields: fields, methods: methods, annotations: cancelable ? CANCEL : [] });
+	};
+	var L = function (c) { return 'L' + (c.indexOf('/') >= 0 ? c : SRC + c) + ';'; };
+	def('RenderWorldLastEvent', FORGE + 'event/Event', { context: L('RenderGlobal'), partialTicks: 'F' }, false,
+		['<init>(Lnet/minecraft/src/RenderGlobal;F)V', function (vm, self, a) { self[':context'] = a[0]; self[':partialTicks'] = a[1]; }]);
+	def('DrawBlockHighlightEvent', FORGE + 'event/Event', { context: L('RenderGlobal'), player: L('EntityPlayer'), target: L('MovingObjectPosition'), subID: 'I', currentItem: L('ItemStack'), partialTicks: 'F' }, true,
+		['<init>(Lnet/minecraft/src/RenderGlobal;Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/MovingObjectPosition;ILnet/minecraft/src/ItemStack;F)V', function (vm, self, a) {
+			self[':context'] = a[0]; self[':player'] = a[1]; self[':target'] = a[2]; self[':subID'] = a[3]; self[':currentItem'] = a[4]; self[':partialTicks'] = a[5];
+		}]);
+	var PE = FORGE + 'event/entity/player/PlayerEvent';
+	if (vm.natives[PE]) {
+		var rpSet = function (vm, self, a) { self[':entity'] = self[':entityLiving'] = self[':entityPlayer'] = a[0]; self[':renderer'] = a[1]; self[':partialRenderTick'] = a[2]; };
+		var RPD = '(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/RenderPlayer;F)V';
+		def('RenderPlayerEvent', PE, { renderer: L('RenderPlayer'), partialRenderTick: 'F' }, false, ['<init>' + RPD, rpSet]);
+		def('RenderPlayerEvent$Pre', CE + 'RenderPlayerEvent', {}, true, ['<init>' + RPD, rpSet]);
+		def('RenderPlayerEvent$Post', CE + 'RenderPlayerEvent', {}, false, ['<init>' + RPD, rpSet]);
+		def('RenderPlayerEvent$Specials', CE + 'RenderPlayerEvent', {}, false, ['<init>' + RPD, rpSet]);
+		def('RenderPlayerEvent$Specials$Pre', CE + 'RenderPlayerEvent$Specials', { renderHelmet: 'Z', renderCape: 'Z', renderItem: 'Z' }, true,
+			['<init>' + RPD, function (vm, self, a) { rpSet(vm, self, a); self[':renderHelmet'] = self[':renderCape'] = self[':renderItem'] = 1; }]);
+		def('RenderPlayerEvent$Specials$Post', CE + 'RenderPlayerEvent$Specials', {}, false, ['<init>' + RPD, rpSet]);
+		def('RenderPlayerEvent$SetArmorModel', CE + 'RenderPlayerEvent', { stack: L('ItemStack'), slot: 'I', result: 'I' }, false,
+			['<init>(Lnet/minecraft/src/EntityPlayer;Lnet/minecraft/src/RenderPlayer;ILnet/minecraft/src/ItemStack;)V', function (vm, self, a) {
+				self[':entity'] = self[':entityLiving'] = self[':entityPlayer'] = a[0]; self[':renderer'] = a[1]; self[':slot'] = a[2]; self[':stack'] = a[3]; self[':result'] = -1;
+			}]);
+	}
+	if (!vm.natives[SRC + 'RenderPlayer'] && vm.natives[SRC + 'RenderLiving']) {
+		var MB = 'Lnet/minecraft/src/ModelBiped;';
+		vm.defineNative(SRC + 'RenderPlayer', { super: SRC + 'RenderLiving', fields: { modelBipedMain: MB, modelArmorChestplate: MB, modelArmor: MB }, methods: { '<init>()V': function () {} } });
+	}
+	var RM = vm.natives[SRC + 'RenderManager'];
+	if (RM && RM.methods) {
+		var isPlayer = function (vm, cls) { return !!(cls && vm.natives[SRC + 'EntityPlayer'] && cls.isSubclassOf(vm.loadClass(SRC + 'EntityPlayer'))); };
+		[['getEntityRenderObject(Lnet/minecraft/src/Entity;)Lnet/minecraft/src/Render;', function (a) { return a[0] && a[0].cls; }],
+		 ['getEntityClassRenderObject(Ljava/lang/Class;)Lnet/minecraft/src/Render;', function (a) { return a[0] && a[0].$cls; }]].forEach(function (e) {
+			var prev = RM.methods[e[0]];
+			RM.methods[e[0]] = function (vm, self, a) {
+				var r = prev ? prev(vm, self, a) : null;
+				return r || (isPlayer(vm, e[1](a)) ? playerRenderer(vm) : null);
+			};
+		});
+	}
+}
+function playerRenderer(vm) {
+	if (vm.$ovlRenderPlayer !== undefined) return vm.$ovlRenderPlayer;
+	var rp = null;
+	JVM.run(vm, function () {
+		rp = vm.newObject(vm.loadClass(SRC + 'RenderPlayer'));
+		[['modelBipedMain', '(F)V', [0]], ['modelArmorChestplate', '(F)V', [1]], ['modelArmor', '(F)V', [0.5]]].forEach(function (f) {
+			var m = vm.newObject(vm.loadClass(SRC + 'ModelBiped'));
+			vm.callVirtual(m, '<init>', f[1], f[2]);
+			rp[':' + f[0]] = m;
+		});
+	});
+	return (vm.$ovlRenderPlayer = rp);
+}
+JVM.installWorldRec = install;
+
+function bus(vm) { var f = vm.mcReg && vm.mcReg.forge; return f && f.buses && f.buses.EVENT_BUS || null; }
+function listens(vm, re) { var b = bus(vm); return !!(b && b.$listeners.some(function (l) { return l.type && !l.type.absent && re.test(l.type.name || ''); })); }
+JVM.worldOverlayWanted = function (vm) { return listens(vm, WANT); };
+
+function fresh(R) {
+	R.m = M().ident(); R.stack = []; R.tex = null;
+	var W = R.world;
+	W.gl = { tex: true, depth: true, mask: true, blend: false, add: false, cull: true, color: [1, 1, 1, 1] };
+	W.attr = []; W.imm = null;
+}
+function modelFrame(R, feet, yaw) {
+	var m = M(), t = m.translate(R.m, feet[0], feet[1], feet[2]);
+	t = m.rotate(t, 180 - yaw, 0, 1, 0);
+	t = m.scale(t, -1, -1, 1);
+	t = m.scale(t, 0.9375, 0.9375, 0.9375);
+	return m.translate(t, 0, -24 * 0.0625 - 0.0078125, 0);
+}
+
+JVM.worldOverlay = function (vm, opts) {
+	opts = opts || {};
+	if (!JVM.worldOverlayWanted(vm)) return null;
+	var mc = JVM.mc152.minecraftObj(vm), w = JVM.mc152.worldObj(vm);
+	if (!mc || !w) return null;
+	var p = null;
+	JVM.run(vm, function () { p = JVM.mc152.playerObj(vm, null); });
+	if (!p || !p.$info) return null;
+	var O = [+p[':posX'] || 0, +p[':posY'] || 0, +p[':posZ'] || 0];
+	['X', 'Y', 'Z'].forEach(function (k, i) { p[':lastTickPos' + k] = p[':prevPos' + k] = O[i]; });
+	mc[':renderViewEntity'] = p;
+	if (!mc[':thePlayer']) mc[':thePlayer'] = p;
+	var gs = mc[':gameSettings'], view = -1;
+	if (gs) {
+		var cur = gs[':thirdPersonView'] | 0;
+		if (vm.$ovlView != null && cur !== vm.$ovlView) { view = cur; opts.third = cur ? 1 : 0; }
+		else gs[':thirdPersonView'] = opts.third ? 1 : 0;
+		vm.$ovlView = gs[':thirdPersonView'] | 0;
+	}
+	var setStatics = function (cn, kv) { var c = vm.natives[SRC + cn] ? vm.loadClass(SRC + cn) : null; if (!c) return; vm.initClass(c); Object.keys(kv).forEach(function (k) { if (k in c.statics) c.statics[k] = kv[k]; }); return c; };
+	JVM.run(vm, function () {
+		var rm = setStatics('RenderManager', { renderPosX: O[0], renderPosY: O[1], renderPosZ: O[2] });
+		var ri = rm && rm.statics.instance;
+		if (ri) { ri[':viewerPosX'] = O[0]; ri[':viewerPosY'] = O[1]; ri[':viewerPosZ'] = O[2]; ri[':playerViewY'] = +p[':rotationYaw'] || 0; ri[':playerViewX'] = +p[':rotationPitch'] || 0; ri[':livingPlayer'] = p; ri[':worldObj'] = w; }
+		setStatics('TileEntityRenderer', { staticPlayerX: O[0], staticPlayerY: O[1], staticPlayerZ: O[2] });
+		setStatics('EntityFX', { interpPosX: O[0], interpPosY: O[1], interpPosZ: O[2] });
+	});
+	var rg = mc[':renderGlobal'] || null;
+	if (rg && !rg[':mc']) rg[':mc'] = mc;
+	var R = JVM.recStart(vm), W = R.world = newWorld();
+	var hideOutline = false, hidePlayer = false;
+	try {
+		if (opts.third && listens(vm, /RenderPlayerEvent/)) {
+			var rp = vm.natives[SRC + 'RenderPlayer'] ? playerRenderer(vm) : null;
+			var fill = function (e) { e[':entity'] = e[':entityLiving'] = e[':entityPlayer'] = p; e[':renderer'] = rp; e[':partialRenderTick'] = 1; };
+			W.player = true;
+			fresh(R);
+			var pre = JVM.forgePost(vm, CE + 'RenderPlayerEvent$Pre', fill);
+			hidePlayer = !!(pre && pre.$canceled);
+			if (!hidePlayer) {
+				var base = R.m;
+				R.m = modelFrame(R, [0, -(p.$eyeUp === 0 ? 1.62 : 0), 0], +p[':rotationYaw'] || 0); R.stack = [];
+				var sp = JVM.forgePost(vm, CE + 'RenderPlayerEvent$Specials$Pre', function (e) { fill(e); e[':renderHelmet'] = e[':renderCape'] = e[':renderItem'] = 1; });
+				if (!(sp && sp.$canceled)) JVM.forgePost(vm, CE + 'RenderPlayerEvent$Specials$Post', fill);
+				R.m = base; R.stack = [];
+				JVM.forgePost(vm, CE + 'RenderPlayerEvent$Post', fill);
+			}
+			W.player = false;
+		}
+		if (listens(vm, /DrawBlockHighlightEvent$/)) {
+			var mop = mc[':objectMouseOver'] || null;
+			if (mop) {
+				var held = null;
+				JVM.run(vm, function () { held = vm.callVirtual(p, 'getCurrentEquippedItem', '()Lnet/minecraft/src/ItemStack;', []); });
+				fresh(R);
+				var e = JVM.forgePost(vm, CE + 'DrawBlockHighlightEvent', function (e) { e[':context'] = rg; e[':player'] = p; e[':target'] = mop; e[':subID'] = 0; e[':currentItem'] = held; e[':partialTicks'] = 1; });
+				hideOutline = !!(e && e.$canceled);
+			}
+		}
+		fresh(R);
+		if (listens(vm, /RenderWorldLastEvent$/)) JVM.forgePost(vm, CE + 'RenderWorldLastEvent', function (e) { e[':context'] = rg; e[':partialTicks'] = 1; });
+	} finally { JVM.recStop(vm); }
+	var o = pack(vm, W, O, hideOutline, hidePlayer);
+	o.view = view;
+	return o;
+};
+
+function pack(vm, W, O, hideOutline, hidePlayer) {
+	var bs = [];
+	W.batches.forEach(function (b) {
+		var l = bs[bs.length - 1];
+		if (l && l.mode === b.mode && l.flags === b.flags && l.tex === b.tex && (b.mode === 1 || b.mode === 4 || b.mode === 7)) l.v = l.v.concat(b.v);
+		else bs.push({ mode: b.mode, flags: b.flags, tex: b.tex, v: b.v });
+	});
+	var texs = [], ti = {}, texRes = {};
+	var words = 0;
+	bs.forEach(function (b) {
+		words += 4 + b.v.length * 6;
+		if (b.tex != null && !(b.tex in ti)) { ti[b.tex] = texs.length + 1; texs.push(b.tex); texRes[b.tex] = texSource(vm, b.tex); }
+	});
+	var buf = new ArrayBuffer(words * 4), f = new Float32Array(buf), u = new Uint32Array(buf), k = 0;
+	bs.forEach(function (b) {
+		u[k++] = b.mode; u[k++] = b.flags; u[k++] = b.tex != null ? ti[b.tex] : 0; u[k++] = b.v.length;
+		b.v.forEach(function (v) { f[k++] = v[0]; f[k++] = v[1]; f[k++] = v[2]; f[k++] = v[3]; f[k++] = v[4]; u[k++] = v[5] >>> 0; });
+	});
+	return { buf: buf, words: words, origin: O, texs: texs, texRes: texRes, hideOutline: hideOutline, hidePlayer: hidePlayer,
+		verts: W.verts, batches: bs.length, dropped: W.dropped, skipped: W.skipped };
+}
+
+function texSource(vm, name) {
+	var g = /^#game:(.+)$/.exec(name);
+	if (g) return { game: g[1] };
+	var im = /^[$]img[/](\d+)[.]png$/.exec(name);
+	if (im) return vm.$imgTex && vm.$imgTex[+im[1]] ? { res: vm.$imgTex[+im[1]] } : {};
+	var t =String(name).replace(/^[/]+/, ''), res = vm.resources || {};
+	var ns = /^([a-z0-9_.-]+):(.+)$/.exec(t), cands = ns ? ['assets/' + ns[1] + '/' + ns[2], 'assets/' + ns[1] + '/stationapi/' + ns[2], ns[2]] : [t];
+	for (var i = 0; i < cands.length; i++) if (res[cands[i]]) return { res: res[cands[i]] };
+	var v = (ns ? (ns[1] === 'minecraft' ? ns[2] : null) : t);
+	if (v) return { game: v.replace(/^textures[/]/, '') };
+	return {};
+}
+JVM.worldTexSource = texSource;
 })();
 
 (function () {
@@ -24227,7 +25250,7 @@ function hookNative(vm, sp, key, slot, e) {
 		fn.$hooks = hooks;
 		if (orig.$sites) fn.$sites = orig.$sites;
 		sp.methods[key] = fn;
-		for (var cn in vm.classes) { var jm = vm.classes[cn] && vm.classes[cn].native && vm.classes[cn].methods[key]; if (jm && jm.fn === orig) jm.fn = fn; }
+		for (var cn in vm.classes) { var jm = vm.classes[cn] && vm.classes[cn].native && vm.classes[cn].methods[key]; if (jm && jm.fn === orig) jm.fn = fn; else if (jm && jm.fn && jm.fn.$mpOrig === orig) jm.fn.$mpOrig = fn; }
 	}
 	if (slot === 'site') (fn.$hooks.sites[e.site] || (fn.$hooks.sites[e.site] = [])).push(e);
 	else fn.$hooks[slot].push(e);
@@ -24497,6 +25520,8 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/worldgen/biome/BiomeProviderRegisterEvent'));
 	fireNew(E('event/registry/AfterBlockAndItemRegisterEvent'));
+	fireNew(E('event/network/packet/PacketRegisterEvent'));
+	fireNew(E('event/registry/MessageListenerRegistryEvent'), { registry: regObj('MessageListenerRegistry') });
 	JVM.run(vm, function () { fire(vm, newEvent(vm, E('event/achievement/AchievementRegisterEvent'), { achievements: JVM.newList(vm, []) }), modId); });
 	fireNew(E('event/registry/StatRegistryEvent'), { registry: regObj('StatRegistry') });
 	var rv = vm.loadClass(ST + 'event/recipe/RecipeRegisterEvent$Vanilla'); vm.initClass(rv);
@@ -24519,7 +25544,7 @@ JVM.babricLoad = function (vm, modId, fj, files, classes) {
 	});
 	fireNew(E('event/init/InitFinishedEvent'));
 	stationAssets(vm, modId, id, files);
-	var SENT = /(DimensionRegistry|BiomeRegister|BiomeProviderRegister|StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|ItemModelPredicateProviderRegistry|BlockModelPredicateProviderRegistry|EntityRendererRegister|BlockEntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
+	var SENT = /(PacketRegister|MessageListenerRegistry|DimensionRegistry|BiomeRegister|BiomeProviderRegister|StatRegistry|KeyBindingRegister|KeyStateChanged|AchievementRegister|BlockColorsRegister|ItemColorsRegister|ItemModelPredicateProviderRegistry|BlockModelPredicateProviderRegistry|EntityRendererRegister|BlockEntityRendererRegister|BiomeModification|PreInit|Init|PostInit|InitFinished|BlockRegistry|BlockItemRegistry|ItemRegistry|EntityRegister|BlockEntityRegister|AfterBlockAndItemRegister|RecipeRegister|TextureRegister|WorldGenEvent\$ChunkDecoration|WorldGenEvent|GameTickEvent\$End|GameTickEvent)(?:Event)?;$/;
 	s.listeners.forEach(function (l) {
 		if (l.mod !== modId || SENT.test(l.type)) return;
 		var n = l.type.replace(/^L|;$/g, '').split('/').pop();
@@ -25577,11 +26602,34 @@ JVM.hookAskWanted = function (vm, kind) {
 	if (!k) return false;
 	for (var i = 1; i < k.length; i++) if (hooked(vm, k[0], k[i])) return true;
 	if (kind === 'death') { var V = JVM.VANILLA_ENTITY_CLS || {}; for (var c in V) if (!OWN_DROPS[V[c]] && hooked(vm, SRC + V[c], DROP_ID)) return true; }
+	if (kind === 'death' && JVM.forgeHasListener && JVM.forgeHasListener(vm, LDE)) return true;
 	return false;
 };
+var LDE = 'net/minecraftforge/event/entity/living/LivingDeathEvent';
+function deathEvent(vm, e) {
+	if (!JVM.forgeHasListener || !JVM.forgeHasListener(vm, LDE) || !e.entity) return false;
+	var self = (JVM.liveMob && JVM.liveMob(vm, e.entity)) || (JVM.entityFor && JVM.entityFor(vm, e.entity));
+	if (!self) return false;
+	var w = JVM.mc152.worldObj(vm);
+	self[':worldObj'] = w;
+	if (e.entity.x != null) { self[':posX'] = +e.entity.x; self[':posY'] = +e.entity.y; self[':posZ'] = +e.entity.z; }
+	self[':health'] = 0;
+	var other = e.other && JVM.entityFor ? JVM.entityFor(vm, e.other) : null, DS = SRC + 'DamageSource', src = null;
+	var cancelled = false;
+	JVM.run(vm, function () {
+		var EP = vm.loadClass(SRC + 'EntityPlayer'), EL = vm.loadClass(SRC + 'EntityLiving');
+		if (other && vm.isInstance(other, EP)) src = vm.callStatic(DS, 'causePlayerDamage', '(Lnet/minecraft/src/EntityPlayer;)L' + DS + ';', [other]);
+		else if (other && vm.isInstance(other, EL)) src = vm.callStatic(DS, 'causeMobDamage', '(Lnet/minecraft/src/EntityLiving;)L' + DS + ';', [other]);
+		else { var dc = vm.loadClass(DS); vm.initClass(dc); src = dc.statics.generic || null; }
+		var ev = JVM.forgePost(vm, LDE, function (ev) { ev[':entity'] = ev[':entityLiving'] = self; ev[':source'] = src; });
+		cancelled = !!(ev && ev.$canceled);
+	});
+	return cancelled;
+}
 JVM.hookAsk = function (vm, kind, e) {
 	var dflt = kind === 'hurt' ? e.damage | 0 : 0;
 	if (!JVM.hookAskWanted(vm, kind) || !JVM.entityFor) return dflt;
+	if (kind === 'death' && deathEvent(vm, e)) return 1;
 	if (JVM.liveMob && e.entity && JVM.liveMob(vm, e.entity) && kind !== 'attack' && kind !== 'interact') return dflt;
 	var self = JVM.entityFor(vm, e.entity), other = e.other ? JVM.entityFor(vm, e.other) : null;
 	if (!self) return dflt;

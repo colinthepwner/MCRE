@@ -478,6 +478,9 @@
                         beta[name] = 1;
                     } else if (/^(music|newmusic)\/[^\/]+\.ogg$/.test(k)) {
                         tracks.push(url(k));
+                    } else {
+                        var rm = /^records[/]([^/]+)[.]ogg$/.exec(k);
+                        if (rm) add('records.' + rm[1], k);
                     }
                 });
                 files.forEach(function (k) {
@@ -1247,7 +1250,7 @@
                 return null;
             }
             function hostCtl(c, msg, id) {
-                if (msg && msg.json && msg.json.t === 'presence') { presenceReport(id, msg.json); return; }
+                if (msg && msg.json && msg.json.t === 'presence') { presenceReport(id, msg.json); if (Module.mcJava && Module.mcJava.seen) Module.mcJava.seen(id); return; }
                 if (msg && msg.json && msg.json.t === 'bye') {
                     if (conns.get(id) === c) { conns.delete(id); ev({ t: 'close', p: id }); }
                     setTimeout(function () { try { c.close(); } catch (e) { } }, 200);
@@ -1257,7 +1260,7 @@
                     if (Module.mcScripts) Module.mcScripts.fromJoiner(id, msg.json);
                     return;
                 }
-                if (msg && msg.json && (msg.json.t === 'jinv' || msg.json.t === 'jgin')) {
+                if (msg && msg.json && (msg.json.t === 'jinv' || msg.json.t === 'jgin' || msg.json.t === 'jev')) {
                     if (Module.mcJava && Module.mcJava.fromJoiner) Module.mcJava.fromJoiner(id, msg.json);
                     return;
                 }
@@ -1581,7 +1584,7 @@
                                 }
                                 if (hm && hm.json && hm.json.t === 'setafk') { setMyAfk(!!hm.json.on); return; }
                                 if (hm && hm.json && hm.json.t === 'kick') { net.kickReason = String(hm.json.why || 'Disconnected').slice(0, 150); return; }
-                                if (hm && hm.json && { jinvwatch: 1, jinvop: 1, jgui: 1, jop: 1 }[hm.json.t]) { if (Module.mcJava && Module.mcJava.fromHost) Module.mcJava.fromHost(hm.json); return; }
+                                if (hm && hm.json && { jinvwatch: 1, jinvop: 1, jgui: 1, jop: 1, jhud: 1 }[hm.json.t]) { if (Module.mcJava && Module.mcJava.fromHost) Module.mcJava.fromHost(hm.json); return; }
                                 if (hm && hm.json && Module.mcScripts) Module.mcScripts.fromHost(hm.json);
                                 return;
                             }
@@ -1818,7 +1821,7 @@
             function jmirror(guid) { return jinv[guid] || (jinv[guid] = { slots: [], armor: [], sel: 0, sent: 0, got: false, watch: false }); }
             function jwatch(guid) {
                 var m = jmirror(guid);
-                if (!m.watch && Module.mcNet && Module.mcNet.sendCtlTo) { m.watch = true; Module.mcNet.sendCtlTo(guid, { t: 'jinvwatch' }); }
+                if (!m.watch && Module.mcNet && Module.mcNet.sendCtlTo) { m.watch = true; Module.mcNet.sendCtlTo(guid, { t: 'jinvwatch', wants: Object.keys(JOINED_EVENTS).filter(function (k) { return WANTS[k]; }) }); }
                 return m;
             }
             function jstack(st) {
@@ -1863,12 +1866,21 @@
                     Module.mcNet.sendCtlTo(p.guid, msg);
                 });
             }
+            function standIn(guid) { var m = vm && vm.$mpPlayers; return m && m.get ? m.get(guid) || null : null; }
             function withActor(guid, fn) {
-                var who = joinerByGuid(guid);
-                if (!who || !vm) return undefined;
+                if (!vm) return undefined;
                 var pa = actor, pva = vm.mcActor, pm = vm.mcPlayer, pt = tiles;
+                if (!guid) {
+                    if (!pa) return fn();
+                    actor = null; vm.mcActor = null; vm.mcPlayer = vm.$hostPlayer || null;
+                    if (!tiles) tiles = {};
+                    try { return fn(); }
+                    finally { actor = pa; vm.mcActor = pva; vm.mcPlayer = pm; tiles = pt; }
+                }
+                var who = joinerByGuid(guid);
+                if (!who) return undefined;
                 if (pa && pa.guid === guid) { who.held = pa.held; }
-                else vm.mcPlayer = null;
+                else vm.mcPlayer = standIn(guid);
                 actor = who; vm.mcActor = who;
                 if (!tiles) tiles = {};
                 jwatch(guid);
@@ -1935,16 +1947,19 @@
                     }
                     case 'destroy': forget(a[0], a[1], a[2]); return mp(['destroy', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
                     case 'player': {
-                        if (actor) return { x: +actor.x, y: +actor.y + 1.62, z: +actor.z, yaw: 0, pitch: 0, name: actor.name, health: actor.health | 0, food: 20,
-                                            creative: 0, flying: 0, sneaking: 0, onGround: 1, id: actor.id, slot: jsel(), guid: actor.guid, remote: 1 };
+                        if (actor) return { x: +actor.x, y: +actor.y + 1.62, z: +actor.z, yaw: +actor.yaw || 0, pitch: +actor.pitch || 0, name: actor.name, health: actor.health | 0, food: 20,
+                                            creative: 0, flying: 0, sneaking: actor.sneak | 0, sneak: actor.sneak | 0, onGround: actor.onGround == null ? 1 : actor.onGround | 0,
+                                            id: actor.id, slot: jsel(), guid: actor.guid, remote: 1,
+                                            fwd: +actor.fwd || 0, strafe: +actor.strafe || 0, jump: actor.jump | 0, riding: actor.riding | 0,
+                                            xpLevel: actor.xpLevel | 0, xpTotal: actor.xpTotal | 0, xpProgress: +actor.xpProgress || 0 };
                         var p = player();
                         if (!p) return null;
                         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, name: p.name, health: p.health, food: p.food,
                                  creative: p.creative, flying: p.flying, sneaking: p.sneak, onGround: p.onGround, id: p.id, slot: p.slot,
-                                 fwd: +p.fwd || 0, strafe: +p.strafe || 0, jump: p.jump | 0, riding: p.riding | 0 };
+                                 fwd: +p.fwd || 0, strafe: +p.strafe || 0, jump: p.jump | 0, riding: p.riding | 0,
+                                 xpLevel: p.xpLevel | 0, xpTotal: p.xpTotal | 0, xpProgress: +p.xpProgress || 0 };
                     }
                     case 'ride':
-                        if (actor && (a[0] | 0) === (actor.id | 0)) { actorOnly('riding'); return 0; }
                         return mp(['ride', a[0] | 0, a[1] == null ? -1 : a[1] | 0].join('\t'));
                     case 'held': {
                         if (actor) {
@@ -2031,9 +2046,8 @@
                     case 'setweather': return mp(['setweather', a[0] == null ? -1 : a[0] | 0, a[1] == null ? -1 : a[1] | 0, a[2] | 0].join('\t'));
                     case 'lightning': return mp(['lightning', +a[0], +a[1], +a[2]].join('\t'));
                     case 'xporb': return mp(['xporb', +a[0], +a[1], +a[2], a[3] | 0].join('\t'));
-                    case 'xp':
-                        if (actor) { actorOnly('experience'); return 0; }
-                        return mp(['xp', a[0] | 0].join('\t'));
+                    case 'xp': case 'xplevel':
+                        return mp([name, a[0] | 0, actor ? actor.id | 0 : ''].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
                     case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
                     case 'remove': return mp(['remove', a[0] | 0].join('\t'));
@@ -2335,6 +2349,7 @@
                 if (vm && window.JVM.guiClose) window.JVM.guiClose(vm);
                 jgClose(true);
                 hudShow(null);
+                ovlShow(null);
                 running = false;
                 if (vm) vm.game = { mode: 'define', blockToGame: bridge.blockToGame, blockToJava: bridge.blockToJava, itemToGame: bridge.itemToGame, itemToJava: bridge.itemToJava };
             };
@@ -2360,14 +2375,17 @@
                 tiles = {};
                 var me0 = e.player ? player() : null;
                 actor = e.player && me0 && e.player.id !== me0.id ? e.player : null;
+                var hostObj = vm.mcPlayer;
                 if (actor) {
+                    var full = actor.guid ? joinerByGuid(actor.guid) : null;
+                    if (full) Object.keys(full).forEach(function (k) { if (!(k in actor)) actor[k] = full[k]; });
                     actor.held = e.item ? { id: refToJava(e.item), count: e.count != null ? e.count | 0 : 1, data: e.data | 0 } : Object.prototype.hasOwnProperty.call(e, 'item') ? null : undefined;
-                    vm.mcPlayer = null;
+                    vm.mcPlayer = standIn(actor.guid);
                     if (actor.guid) jwatch(actor.guid);
                 }
                 else if (Module.mcNet && Module.mcNet.state === 'open') joinersNow().forEach(function (p) { if (!jinv[p.guid] || !jinv[p.guid].watch) jwatch(p.guid); });
                 vm.mcActor = actor;
-                try { handle(e); } finally { tiles = null; if (actor) vm.mcPlayer = null; actor = null; vm.mcActor = null; }
+                try { handle(e); } finally { tiles = null; if (actor) vm.mcPlayer = hostObj; actor = null; vm.mcActor = null; }
             };
             function handle(e) {
                 var JV = window.JVM, M = JV.mc152, r = reg();
@@ -2385,6 +2403,13 @@
                     if (JV.forgeTick) JV.forgeTick(vm);
                     if (JV.hookTick) JV.hookTick(vm);
                     } finally { if (hudOn) hudShow(JV.hudEnd(vm)); }
+                    if (hudOn && JV.joinerClientTick && Module.mcNet && Module.mcNet.state === 'open') {
+                        try { JV.joinerClientTick(vm); } catch (x) { console.warn('[java] joined HUD', x); }
+                    }
+                    try {
+                        if (JV.worldOverlayWanted && JV.worldOverlayWanted(vm)) ovlShow(JV.worldOverlay(vm, { third: Module._mcJavaOverlayView ? Module._mcJavaOverlayView(-1) : 0 }));
+                        else if (ovlOn) ovlShow(null);
+                    } catch (e) { console.warn('[java] world overlay', e); }
                     if (JV.shotTick) JV.shotTick(vm);
                     if (JV.mobTick) JV.mobTick(vm);
                     if (JV.accessoryTick) JV.accessoryTick(vm);
@@ -2470,8 +2495,14 @@
                     m.got = true;
                 } else if (msg.t === 'jgin' && window.JVM.remoteGuiInput) {
                     try { window.JVM.remoteGuiInput(vm, guid, msg.m || {}); } catch (x) { console.warn('[java] joined screen', x); }
+                } else if (msg.t === 'jev' && msg.e && JOINED_EVENTS[msg.e.t] && WANTS[msg.e.t]) {
+                    var jp = joinerByGuid(guid), je = msg.e;
+                    if (!jp || typeof je.item !== 'string') return;
+                    J.handle({ t: je.t, item: je.item.slice(0, 200), data: je.data | 0, count: je.count == null ? 1 : Math.max(0, Math.min(64, je.count | 0)), player: jp });
                 }
             };
+            var JOINED_EVENTS = { craft: 1 };
+            J.seen = function (guid) { if (running && vm && guid && (!jinv[guid] || !jinv[guid].watch)) jwatch(guid); };
             var jw = null;
             function jwPush(force) {
                 var N = Module.mcNet;
@@ -2484,9 +2515,33 @@
                 try { inv = JSON.parse(t); } catch (x) { return; }
                 N.sendCtlHost({ t: 'jinv', inv: inv, seq: jw.seq });
             }
+            var joinedWants = {};
+            J.joinedWants = function (type) { return !!(joinedWants[type] && Module.mcNet && Module.mcNet.state === 'in'); };
+            J.joinedAny = function () { return Object.keys(joinedWants).length > 0 && !!(Module.mcNet && Module.mcNet.state === 'in'); };
+            J.joinedEvent = function (e) {
+                if (!e || !e.fwd || !J.joinedWants(e.t) || !Module.mcNet.sendCtlHost) return;
+                Module.mcNet.sendCtlHost({ t: 'jev', e: { t: e.t, item: e.item, data: e.data, count: e.count } });
+            };
+            var jhudWatch = 0, jhudSized = 0;
+            function jhud(msg) {
+                if (!Array.isArray(msg.ops)) return;
+                hudShow(msg.ops.length ? msg.ops : null);
+                var s = jgScale(), w = Math.ceil(window.innerWidth / s), h = Math.ceil(window.innerHeight / s), now = Date.now();
+                if ((msg.w !== w || msg.h !== h || msg.s !== s) && now - jhudSized > 2000 && Module.mcNet && Module.mcNet.sendCtlHost) {
+                    jhudSized = now;
+                    Module.mcNet.sendCtlHost({ t: 'jgin', m: { k: 'layout', w: w, h: h, s: s } });
+                }
+                if (!jhudWatch) jhudWatch = setInterval(function () {
+                    if (Module.mcNet && Module.mcNet.state === 'in') return;
+                    clearInterval(jhudWatch); jhudWatch = 0; joinedWants = {}; hudShow(null);
+                }, 1000);
+            }
             J.fromHost = function (msg) {
                 if (!msg) return;
+                if (msg.t === 'jhud') { jhud(msg); return; }
                 if (msg.t === 'jinvwatch') {
+                    joinedWants = {};
+                    if (Array.isArray(msg.wants)) msg.wants.forEach(function (k) { joinedWants[String(k)] = 1; });
                     if (!jw) jw = { timer: setInterval(function () { jwPush(false); }, 250), last: '', seq: 0 };
                     jwPush(true);
                 } else if (msg.t === 'jinvop') {
@@ -2724,6 +2779,30 @@
                     }
                 });
             }
+            var ovlOn = false, ovlTex = {};
+            function ovlTexPath(k, r) {
+                if (r && r.res) {
+                    var p = 'web_mods/ovl_' + k.replace(/[^a-z0-9_.-]+/gi, '_').slice(-80) + '.png';
+                    try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + p, r.res); return p; } catch (e) { return ''; }
+                }
+                if (r && r.game && r.game.indexOf('..') < 0) { try { return FS.analyzePath('/data/images/' + r.game).exists ? r.game : ''; } catch (e) { return ''; } }
+                return '';
+            }
+            function ovlShow(o) {
+                if (!Module._mcJavaOverlaySet) return;
+                if (!o) { if (ovlOn) Module._mcJavaOverlaySet(0, 0, 0, 0, 0, 0, 0); ovlOn = false; return; }
+                if (o.view >= 0 && Module._mcJavaOverlayView) Module._mcJavaOverlayView(o.view);
+                if (!o.words && !o.hideOutline && !o.hidePlayer && !ovlOn) return;
+                var names = o.texs.map(function (k) { if (ovlTex[k] === undefined) ovlTex[k] = ovlTexPath(k, o.texRes[k]); return ovlTex[k]; }).join(String.fromCharCode(10));
+                var bytes = o.words * 4, ptr = bytes ? Module._malloc(bytes) : 0;
+                var tl = (Module.lengthBytesUTF8 || lengthBytesUTF8)(names) + 1, tp = Module._malloc(tl);
+                try {
+                    if (ptr) HEAPU8.set(new Uint8Array(o.buf, 0, bytes), ptr);
+                    (Module.stringToUTF8 || stringToUTF8)(names, tp, tl);
+                    Module._mcJavaOverlaySet(ptr, o.words, o.origin[0], o.origin[1], o.origin[2], (o.hideOutline ? 1 : 0) | (o.hidePlayer ? 2 : 0), tp);
+                } finally { if (ptr) Module._free(ptr); Module._free(tp); }
+                ovlOn = !!(o.words || o.hideOutline || o.hidePlayer);
+            }
             var hud = null;
             function hudShow(ops) {
                 if (!ops || !ops.length) { if (hud) { hud.cv.remove(); hud = null; } return; }
@@ -2772,7 +2851,7 @@
                 return {
                     remote: true,
                     frame: function () { return Module.mcNet && Module.mcNet.state === 'in' ? jg.ops || [] : null; },
-                    layout: function (w, h) { send({ k: 'layout', w: w, h: h }); },
+                    layout: function (w, h) { send({ k: 'layout', w: w, h: h, s: jg ? jg.scale : jgScale() }); },
                     move: function (x, y) { var t = Date.now(); if (t - lastMove < 80) return; lastMove = t; send({ k: 'move', x: x, y: y }); },
                     mouse: function (x, y, b, down) { send({ k: 'mouse', x: x, y: y, b: b, down: !!down }); },
                     drag: function (on) { send({ k: 'drag', on: !!on }); },
@@ -4718,6 +4797,13 @@
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : j.java_drops === true ? '*java' : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
+                    if (j.log_axis === 1 || j.log_axis === 2) lines.push(['logaxis', key, j.log_axis].join('\t'));
+                    if (j.state_boxes && typeof j.state_boxes === 'object') Object.keys(j.state_boxes).forEach(function (sd) {
+                        var bx = j.state_boxes[sd];
+                        if (/^\d+$/.test(sd) && +sd <= 16 && Array.isArray(bx) && bx.length === 6 && bx.every(function (v) { return isFinite(+v); }))
+                            lines.push(['statebox', key, +sd].concat(bx.map(function (v) { return Math.max(-16, Math.min(32, +v)); })).join('\t'));
+                    });
+                    if (j.beta_door === true) lines.push(['betadoor', key].join('\t'));
                     if (j.portal_to != null) {
                         var pdim = dimRef(j.portal_to, b.mod);
                         if (pdim) lines.push(['portalto', key, pdim].join('\t'));
@@ -5799,11 +5885,34 @@
             var LIB_KNOWN = {
                 'fabric-language-kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true, name: 'Fabric Language Kotlin' },
                 'Fabric Language Kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true },
+                'LomLib': { slug: 'LomLib', name: 'LomLib', cf: {
+                    '1.6': { url: 'https://mediafilez.forgecdn.net/files/759/466/LomLib-universal-1.0.9.jar', sha1: '88dafcbe8817533cbc6120131cadde14e8a22dc1' },
+                } },
             };
+            function libCf(k, mcVersion) {
+                if (!k || !k.cf) return null;
+                var v = String(mcVersion || '');
+                return k.cf[v] || k.cf[v.split('.').slice(0, 2).join('.')] || null;
+            }
+            function libSha1Ok(ab, want) {
+                var sub = typeof crypto !== 'undefined' && crypto.subtle;
+                if (!sub) return Promise.resolve(false);
+                return sub.digest('SHA-1', ab).then(function (h) {
+                    return Array.prototype.map.call(new Uint8Array(h), function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('') === want;
+                }, function () { return false; });
+            }
             var LIB_BUILTIN = /^(minecraft|java|fabricloader|fabric|fabric-api|fabric-.*-v\d+|stationapi|station-.*|gcapi\d*|glass.*config.*|modmenu|mixinextras|babric|apron|forge|fml|mcp|optifabric)$/;
             var libTried = {};
             function libFetch(key, mcVersion) {
                 var k = LIB_KNOWN[key], slug = k ? k.slug : String(key).toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+                if (k && k.cf) {
+                    var cf = libCf(k, mcVersion);
+                    if (!cf) return Promise.resolve(null);
+                    return fetch(cf.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (ab) {
+                        if (!ab) return null;
+                        return libSha1Ok(ab, cf.sha1).then(function (ok) { return ok ? new File([ab], cf.url.split('/').pop()) : null; });
+                    });
+                }
                 var gv = /^Beta /.test(mcVersion || '') ? 'b' + mcVersion.slice(5) : mcVersion;
                 var tries = k ? [{ loaders: k.loaders, gv: k.any ? null : gv }]
                     : /Better Than Adventure/i.test(mcVersion || '') ? [{ loaders: ['bta-babric'], gv: null }, { loaders: ['babric'], gv: 'b1.7.3' }]
@@ -5881,7 +5990,7 @@
                         bump('Getting ' + nice + ' (needed by ' + want[k].by + ')...');
                         return libFetch(k, want[k].ver).then(function (file) {
                             if (file) return install(file);
-                            bump(want[k].by + ' needs ' + k + ' - it couldn\'t be found to add by itself');
+                            bump(want[k].by + ' needs ' + nice + (LIB_KNOWN[k] && LIB_KNOWN[k].cf ? ' - get it from CurseForge and drop it in' : ' - it couldn\'t be found to add by itself'));
                         }, function () { bump(want[k].by + ' needs ' + k + ' - it couldn\'t be downloaded (offline?)'); });
                     });
                 }, Promise.resolve());
@@ -7453,9 +7562,9 @@
             }
 
             var javaOn = function () { return !!(Module.mcJava && Module.mcJava.running()); };
-            api.running = function () { return !!worker || javaOn(); };
+            api.running = function () { return !!worker || javaOn() || !!(Module.mcJava && Module.mcJava.joinedAny && Module.mcJava.joinedAny()); };
             api.wantsTick = function () { return worker && wants.tick ? 1 : 0; };
-            api.wants = function (type) { return !!(worker && swants[type]) || (javaOn() && Module.mcJava.wants(type)); };
+            api.wants = function (type) { return !!(worker && swants[type]) || (javaOn() && Module.mcJava.wants(type)) || !!(Module.mcJava && Module.mcJava.joinedWants && Module.mcJava.joinedWants(type)); };
             api.peekLen = function () {
                 if (wants.screen) { var nowP = performance.now(); if (nowP - lastPoll > 12) { lastPoll = nowP; pollScreen(true); } }
                 return actions.length ? lengthBytesUTF8(actions[0]) + 1 : 0;
@@ -7470,6 +7579,7 @@
                 var e;
                 try { e = JSON.parse(json); } catch (x) { return; }
                 if ((e.t === 'start' || e.t === 'stop') && Module.mcModpe) Module.mcModpe.worldEvent(e);
+                if (e.fwd && Module.mcJava && Module.mcJava.joinedEvent) Module.mcJava.joinedEvent(e);
                 if (e.t === 'stop' && Module.mcJava) Module.mcJava.worldStop();
                 if (javaOn() && Module.mcJava.wants(e.t)) Module.mcJava.handle(e);
                 if (e.t === 'start') {

@@ -2071,6 +2071,7 @@ F	apa	z	field_71979_v	dirt
 F	ape	a	field_72681_a	stepSoundName
 F	ape	b	field_72679_b	stepSoundVolume
 F	ape	c	field_72680_c	stepSoundPitch
+F	apk	d	field_94388_cO	tree_top
 F	apy	a	field_70425_a	adjacentChestChecked
 F	apy	b	field_70423_b	adjacentChestZNeg
 F	apy	c	field_70424_c	adjacentChestXPos
@@ -2375,9 +2376,12 @@ F	bdl	b	field_72558_b	mapStorage
 F	bdl	e	field_72557_e	rand
 F	bdl	h	field_72563_h	mc
 F	bdw	a	field_71174_a	sendQueue
+F	beu	aA	field_70555_ap	interpPosZ
 F	beu	au	field_70553_i	particleGreen
 F	beu	av	field_70551_j	particleBlue
 F	beu	aw	field_82339_as	particleAlpha
+F	beu	ay	field_70556_an	interpPosX
+F	beu	az	field_70554_ao	interpPosY
 F	beu	b	field_94054_b	particleTextureIndexX
 F	beu	c	field_94055_c	particleTextureIndexY
 F	beu	d	field_70548_b	particleTextureJitterX
@@ -2450,6 +2454,9 @@ F	bhj	f	field_77023_b	zLevel
 F	bhj	i	field_77025_h	random
 F	bhp	i	field_77045_g	mainModel
 F	bhp	j	field_77046_h	renderPassModel
+F	bhu	a	field_77109_a	modelBipedMain
+F	bhu	f	field_77108_b	modelArmorChestplate
+F	bhu	g	field_77111_i	modelArmor
 F	bir	a	field_94271_a	instance
 F	bj	a	field_82630_a	x
 F	bj	b	field_82628_b	y
@@ -2496,9 +2503,13 @@ F	gu	a	field_72404_b	playerEntityList
 F	gu	e	field_72400_f	mcServer
 F	gu	h	field_72414_i	ops
 F	iz	a	field_73061_a	mcServer
+F	jc	a	field_71135_a	playerNetServerHandler
 F	jc	b	field_71133_b	mcServer
 F	jc	cr	field_71142_cm	renderDistance
 F	jc	f	field_71129_f	loadedChunks
+F	jh	c	field_72574_e	playerEntity
+F	jh	d	field_72573_d	mcServer
+F	jh	j	field_72583_k	randomGenerator
 F	ju	a	field_75993_a	displayColumn
 F	ju	b	field_75991_b	displayRow
 F	ju	c	field_75992_c	parentAchievement
@@ -2656,6 +2667,7 @@ F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
 F	net/minecraft/client/Minecraft	e	field_71441_e	theWorld
 F	net/minecraft/client/Minecraft	f	field_71438_f	renderGlobal
 F	net/minecraft/client/Minecraft	g	field_71439_g	thePlayer
+F	net/minecraft/client/Minecraft	h	field_71451_h	renderViewEntity
 F	net/minecraft/client/Minecraft	j	field_71452_i	effectRenderer
 F	net/minecraft/client/Minecraft	k	field_71449_j	session
 F	net/minecraft/client/Minecraft	p	field_71446_o	renderEngine
@@ -2746,6 +2758,8 @@ F	ri	d	field_70500_g	matrix
 F	rr	a	field_70516_a	fuse
 F	ru	d	field_70834_e	lastActiveTime
 F	ru	e	field_70833_d	timeSinceIgnited
+F	ru	f	field_82225_f	fuseTime
+F	ru	g	field_82226_g	explosionRadius
 F	s	b	field_71586_b	offsetsXForSide
 F	s	c	field_71587_c	offsetsYForSide
 F	s	d	field_71585_d	offsetsZForSide
@@ -2765,6 +2779,8 @@ F	sq	bK	field_71071_by	inventory
 F	sq	bM	field_71070_bA	openContainer
 F	sq	bS	field_71092_bJ	username
 F	sq	ce	field_71075_bZ	capabilities
+F	sq	cf	field_71068_ca	experienceLevel
+F	sq	cg	field_71067_cb	experienceTotal
 F	sq	ch	field_71106_cc	experience
 F	sq	ck	field_71104_cf	fishEntity
 F	ss	a	field_70251_a	canBePickedUp
@@ -3063,6 +3079,15 @@ F	za	i	bow	bow
 F	zg	b	field_76302_b	enchantmentobj
 F	zg	c	field_76303_c	enchantmentLevel
 F	zu	a	field_77276_a	chunkXPos
+F	zw	a	field_77286_a	isFlaming
+F	zw	b	field_82755_b	isSmoking
+F	zw	c	field_77284_b	explosionX
+F	zw	d	field_77285_c	explosionY
+F	zw	e	field_77282_d	explosionZ
+F	zw	f	field_77283_e	exploder
+F	zw	g	field_77280_f	explosionSize
+F	zw	h	field_77281_g	affectedBlockPositions
+F	zw	k	field_77287_j	worldObj
 M	aaa	a	(DD)I	func_77480_a	getGrassColor
 M	aab	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
 M	aab	E	()V	func_72906_B	checkSessionLock
@@ -3102,6 +3127,7 @@ M	aab	a	(Ljava/lang/String;DDDDDD)V	func_72869_a	spawnParticle
 M	aab	a	(Lmp;)V	func_72923_a	obtainEntitySkin
 M	aab	a	(Lmp;D)Lsq;	func_72890_a	getClosestPlayerToEntity
 M	aab	a	(Lmp;DDDFZ)Lzw;	func_72876_a	createExplosion
+M	aab	a	(Lmp;DDDFZZ)Lzw;	func_72885_a	newExplosion
 M	aab	a	(Lmp;Laqx;)Ljava/util/List;	func_72945_a	getCollidingBoundingBoxes
 M	aab	a	(Lmp;Ljava/lang/String;FF)V	func_72956_a	playSoundAtEntity
 M	aab	a	(Lsq;IIIII)V	func_72889_a	playAuxSFXAtEntity
@@ -3452,6 +3478,7 @@ M	aif	c	()Z	func_76230_c	blocksMovement
 M	aif	d	()Z	func_76224_d	isLiquid
 M	aif	f	()Laif;	func_76221_f	setRequiresTool
 M	aif	h	()Z	func_76217_h	getCanBurn
+M	aif	i	()Laif;	func_76231_i	setReplaceable
 M	aif	j	()Z	func_76222_j	isReplaceable
 M	aif	k	()Z	func_76218_k	isOpaque
 M	aif	l	()Z	func_76229_l	isToolNotRequired
@@ -3637,6 +3664,7 @@ M	aoq	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	aoq	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
 M	aoq	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
 M	aoq	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aoq	a	(Laab;IIILzw;)V	func_71867_k	onBlockDestroyedByExplosion
 M	aoq	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
 M	aoq	a	(Lly;)V	func_94332_a	registerIcons
 M	aoq	b	()Z	func_71886_c	renderAsNormalBlock
@@ -3670,6 +3698,7 @@ M	apa	a	(Laab;IIILmp;)V	func_71869_a	onEntityCollidedWithBlock
 M	apa	a	(Laab;IIILng;Lwm;)V	func_71860_a	onBlockPlacedBy
 M	apa	a	(Laab;IIILsq;)V	func_71921_a	onBlockClicked
 M	apa	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	apa	a	(Laab;IIILzw;)V	func_71867_k	onBlockDestroyedByExplosion
 M	apa	a	(Laab;Lsq;IIII)V	func_71893_a	harvestBlock
 M	apa	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
 M	apa	a	(Lape;)Lapa;	func_71884_a	setStepSound
@@ -3737,6 +3766,14 @@ M	apj	d	()I	func_71857_b	getRenderType
 M	apj	d	(I)V	func_72139_e	setBlockBoundsForBlockRender
 M	apj	f	(I)Z	func_72137_g	isTrapdoorOpen
 M	apj	g	()V	func_71919_f	setBlockBoundsForItemRender
+M	apk	a	(I)I	func_71899_b	damageDropped
+M	apk	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
+M	apk	a	(ILve;Ljava/util/List;)V	func_71879_a	getSubBlocks
+M	apk	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	apk	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	apk	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	apk	a	(Lly;)V	func_94332_a	registerIcons
+M	apk	d	()I	func_71857_b	getRenderType
 M	apn	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	apn	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	apn	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
@@ -4348,6 +4385,13 @@ M	bhr	a	(Lng;F)V	func_77041_b	preRenderCallback
 M	bht	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bht	a	(Lng;DDDFF)V	func_77031_a	doRenderLiving
 M	bht	a	(Lng;IF)I	func_77032_a	shouldRenderPass
+M	bhu	a	(Lmp;DDDFF)V	func_76986_a	doRender
+M	bhu	a	(Lng;DDD)V	func_77039_a	renderLivingAt
+M	bhu	a	(Lng;DDDFF)V	func_77031_a	doRenderLiving
+M	bhu	a	(Lng;F)V	func_77041_b	preRenderCallback
+M	bhu	a	(Lng;FFF)V	func_77043_a	rotateCorpse
+M	bhu	a	(Lng;IF)I	func_77032_a	shouldRenderPass
+M	bhu	c	(Lng;F)V	func_77029_c	renderEquippedItems
 M	bhv	a	(Lng;IF)I	func_77032_a	shouldRenderPass
 M	bhw	a	(Lmp;DDDFF)V	func_76986_a	doRender
 M	bhw	a	(Lng;DDDFF)V	func_77031_a	doRenderLiving
@@ -4529,12 +4573,23 @@ M	cf	equals	(Ljava/lang/Object;)Z	equals	equals
 M	cf	hashCode	()I	hashCode	hashCode
 M	cf	p	(Ljava/lang/String;)Lcf;	func_74738_o	setName
 M	cg	a	(Lei;)V	func_74429_a	addToSendQueue
+M	dk	a	()I	func_73284_a	getPacketSize
+M	dk	a	(Lej;)V	func_73279_a	processPacket
+M	dk	a	(Ljava/io/DataInputStream;)V	func_73267_a	readPacketData
+M	dk	a	(Ljava/io/DataOutputStream;)V	func_73273_a	writePacketData
+M	ei	a	()I	func_73284_a	getPacketSize
+M	ei	a	(Lej;)V	func_73279_a	processPacket
+M	ei	a	(Ljava/io/DataInputStream;)V	func_73267_a	readPacketData
+M	ei	a	(Ljava/io/DataInputStream;I)Ljava/lang/String;	func_73282_a	readString
+M	ei	a	(Ljava/io/DataOutputStream;)V	func_73273_a	writePacketData
+M	ei	a	(Ljava/lang/String;Ljava/io/DataOutputStream;)V	func_73271_a	writeString
 M	ei	toString	()Ljava/lang/String;	toString	toString
 M	fs	a	()F	func_82498_a	func_82498_a
 M	fs	a	(Laab;Lbi;)Lsy;	func_82499_a	getProjectileEntity
 M	fs	a	(Laz;)V	func_82485_a	playDispenseSound
 M	fs	b	()F	func_82500_b	func_82500_b
 M	fs	b	(Laz;Lwm;)Lwm;	func_82487_b	dispenseStack
+M	gu	a	(DDDDILei;)V	func_72393_a	sendToAllNear
 M	gu	a	(Lei;)V	func_72384_a	sendPacketToAllPlayers
 M	gu	a	(Lei;I)V	func_72396_a	sendPacketToAllPlayersInDimension
 M	gu	a	(Ljc;I)V	func_72356_a	transferPlayerToDimension
@@ -4548,6 +4603,7 @@ M	gu	l	()I	func_72352_l	getMaxPlayers
 M	iz	a	(I)Lmp;	func_73045_a	getEntityByID
 M	iz	a	(IIIII)V	func_72836_a	scheduleBlockUpdate
 M	iz	a	(Lmp;)V	func_72923_a	obtainEntitySkin
+M	iz	a	(Lmp;DDDFZZ)Lzw;	func_72885_a	newExplosion
 M	iz	b	()V	func_72835_b	tick
 M	iz	b	(Lmp;)V	func_72847_b	releaseEntitySkin
 M	iz	c	(Lmp;)Z	func_72942_c	addWeatherEffect
@@ -4555,6 +4611,7 @@ M	iz	d	(IIIIII)V	func_72965_b	addBlockEvent
 M	iz	o	()Lnet/minecraft/server/MinecraftServer;	func_73046_m	getMinecraftServer
 M	jc	a	(DDD)V	func_70634_a	setPositionAndUpdate
 M	jc	a	(DZ)V	func_70064_a	updateFallState
+M	jc	a	(I)V	func_82242_a	addExperienceLevel
 M	jc	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	jc	a	(Ljava/lang/String;)V	func_70006_a	sendChatToPlayer
 M	jc	a	(Lka;I)V	func_71064_a	addStat
@@ -4572,6 +4629,8 @@ M	jc	c	(I)V	func_71027_c	travelToDimension
 M	jc	e	()F	func_70047_e	getEyeHeight
 M	jc	h	()V	func_71053_j	closeScreen
 M	jc	l_	()V	func_70071_h_	onUpdate
+M	jh	b	(Lei;)V	func_72567_b	sendPacketToPlayer
+M	jh	c	(Ljava/lang/String;)V	func_72565_c	kickPlayerFromServer
 M	ju	a	()Lju;	func_75986_a	setIndependent
 M	ju	a	(Ljw;)Lju;	func_75988_a	setStatStringFormatter
 M	ju	b	()Lju;	func_75987_b	setSpecial
@@ -4844,6 +4903,7 @@ M	ng	aO	()V	func_70677_aE	detachHome
 M	ng	aP	()Z	func_70622_aF	hasHome
 M	ng	aQ	()I	func_70627_aG	getTalkInterval
 M	ng	aR	()V	func_70642_aH	playLivingSound
+M	ng	aU	()V	func_70656_aK	spawnExplosionParticle
 M	ng	aW	()I	func_70667_aM	getMaxHealth
 M	ng	aX	()I	func_70630_aN	getHealth
 M	ng	aZ	()I	func_70658_aO	getTotalArmorValue
@@ -5471,6 +5531,7 @@ M	so	l	()I	func_70430_l	getTotalArmorValue
 M	so	o	()Lwm;	func_70445_o	getItemStack
 M	sq	a	()V	func_70088_a	entityInit
 M	sq	a	(F)V	func_70069_a	fall
+M	sq	a	(I)V	func_82242_a	addExperienceLevel
 M	sq	a	(IIIILwm;)Z	func_82247_a	canPlayerEdit
 M	sq	a	(Lapa;)Z	func_71062_b	canHarvestBlock
 M	sq	a	(Lbs;)V	func_70037_a	readEntityFromNBT
@@ -5784,6 +5845,10 @@ M	zu	b	()I	func_77274_b	getCenterZPosition
 M	zu	equals	(Ljava/lang/Object;)Z	equals	equals
 M	zu	hashCode	()I	hashCode	hashCode
 M	zu	toString	()Ljava/lang/String;	toString	toString
+M	zw	a	()V	func_77278_a	doExplosionA
+M	zw	a	(Z)V	func_77279_a	doExplosionB
+M	zw	b	()Ljava/util/Map;	func_77277_b	func_77277_b
+M	zw	c	()Lng;	func_94613_c	getExplosivePlacedBy
 M	zx	a	()I	func_77466_a	getFoliageColorPine
 M	zx	a	(DD)I	func_77470_a	getFoliageColor
 M	zx	b	()I	func_77469_b	getFoliageColorBirch
@@ -5895,11 +5960,14 @@ R	field_71611_a	identifier
 R	field_71610_b	cache
 R	field_71595_a	bc
 R	field_71621_M	data
+R	field_71801_a	buf
 R	field_71788_a	random
 R	field_71787_b	strength
 R	field_71845_a	random
 R	field_71844_b	strength
 R	field_71830_a	S
+R	field_74858_c	buf
+R	field_74846_d	buf
 R	field_71784_a	key
 R	field_71781_b	parameters
 R	field_74843_a	actions
@@ -6031,7 +6099,6 @@ R	field_78550_b	xPosition
 R	field_78551_c	yPosition
 R	field_78549_d	zPosition
 R	field_77073_a	scale
-R	field_77109_a	modelBipedMain
 R	field_94191_c	width
 R	field_94188_d	height
 R	field_94187_f	holder
@@ -6114,6 +6181,10 @@ R	field_73634_a	windowId
 R	field_73637_a	windowId
 R	field_73631_a	reason
 R	field_73627_a	entityId
+R	field_73616_a	explosionX
+R	field_73614_b	explosionY
+R	field_73615_c	explosionZ
+R	field_73612_d	explosionSize
 R	field_73566_c	posX
 R	field_73563_d	posY
 R	field_73564_e	posZ
@@ -6172,6 +6243,8 @@ R	field_73389_c	motionY
 R	field_73387_d	motionZ
 R	field_73398_b	slot
 R	field_73396_a	experience
+R	field_73394_b	experienceTotal
+R	field_73395_c	experienceLevel
 R	field_73638_b	food
 R	field_96483_c	change
 R	field_96489_f	mode
@@ -6243,8 +6316,6 @@ R	field_73145_r	posZ
 R	field_73141_v	ridingEntity
 R	field_72537_e	rand
 R	field_72534_f	mcServer
-R	field_72573_d	mcServer
-R	field_72583_k	randomGenerator
 R	field_71750_c	mcServer
 R	field_72673_b	output
 R	field_72619_a	running
@@ -6392,7 +6463,6 @@ R	field_77606_a	smeltingBase
 R	field_77361_a	damageType
 R	field_77494_b	entityLiving
 R	field_77496_b	source
-R	field_77287_j	worldObj
 R	toString	toString
 R	values	values
 R	func_72903_x	setActivePlayerChunksAndCheckLight
@@ -6558,6 +6628,7 @@ R	func_75915_a	magnify
 R	func_75829_a	distanceTo
 R	func_76184_a	readFromNBT
 R	func_76187_b	writeToNBT
+R	func_75759_a	flush
 R	func_75763_a	getChunkLoader
 R	accept	accept
 R	func_76069_a	setThundering
@@ -6654,6 +6725,7 @@ R	func_72265_d	getState
 R	func_94331_a	canPlaceBlockOnSide
 R	func_71932_i	isNormalCube
 R	func_72676_a	getBreakSound
+R	func_71867_k	onBlockDestroyedByExplosion
 R	func_72125_l	canPlaceTorchOn
 R	func_72140_j	isValidSupportBlock
 R	func_72145_a	playSoundEffect
@@ -6699,6 +6771,7 @@ R	func_71819_a	shift
 R	available	available
 R	read	read
 R	skip	skip
+R	flush	flush
 R	write	write
 R	func_71783_a	getKey
 R	func_74818_a	setup
@@ -6819,6 +6892,7 @@ R	func_78611_c	renderEastFace
 R	func_78622_d	renderWestFace
 R	func_78573_e	renderNorthFace
 R	func_78605_f	renderSouthFace
+R	func_78581_r	renderBlockLog
 R	func_78547_a	setPosition
 R	func_78558_a	getInstance
 R	func_78559_a	normalize
@@ -6829,7 +6903,6 @@ R	func_77043_a	rotateCorpse
 R	func_77032_a	shouldRenderPass
 R	func_77029_c	renderEquippedItems
 R	func_77041_b	preRenderCallback
-R	func_77039_a	renderLivingAt
 R	func_77121_a	handleRotationFloat
 R	func_77035_b	inheritRenderPass
 R	func_77057_a	getTailRotation
@@ -6882,6 +6955,10 @@ R	func_74797_a	read
 R	func_74795_b	write
 R	func_74429_a	addToSendQueue
 R	func_74459_h	sendPacket
+R	func_73284_a	getPacketSize
+R	func_73279_a	processPacket
+R	func_73267_a	readPacketData
+R	func_73273_a	writePacketData
 R	func_73489_c	getMetadata
 R	func_73473_d	getText
 R	func_73462_i	getDifficulty
@@ -6918,10 +6995,13 @@ R	func_71203_ab	getConfigurationManager
 R	func_71742_a	getType
 R	func_73074_a	onBlockClicked
 R	func_73043_a	onBlockEventReceived
+R	func_73041_k	flush
 R	func_70645_a	onDeath
 R	func_73080_a	setWorld
 R	func_73081_b	getGameType
-R	func_72567_b	sendPacketToPlayer
+R	func_72672_a	toByteArray
+R	func_72671_a	writeString
+R	func_72668_a	writeShort
 R	func_72669_b	reset
 R	func_72609_b	logInfo
 R	func_72606_c	logWarning
