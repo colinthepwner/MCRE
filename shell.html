@@ -497,7 +497,7 @@
                     }
                 });
                 Module.mcPlaySound = play;
-                Module.mcHasSound = function (name) { return !!((groups[name] && groups[name].length) || (overrides[name] && overrides[name].length)); };
+                Module.mcHasSound = function (name) { var l = String(name || '').toLowerCase(); return !!((groups[name] && groups[name].length) || (overrides[name] && overrides[name].length) || (groups[l] && groups[l].length) || (overrides[l] && overrides[l].length)); };
             }).catch(function (e) { console.warn('[sound] classic sounds unavailable:', e); });
 
             var AC = window.AudioContext || window.webkitAudioContext;
@@ -588,7 +588,7 @@
                 a.playbackRate = Math.max(0.25, Math.min(4, pitch || 1));
             }
             function play(name, volume, pitch) {
-                var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name];
+                var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name]; if ((!list || !list.length) && name) { var lname = String(name).toLowerCase(); list = (overrides[lname] && overrides[lname].length) ? overrides[lname] : groups[lname]; }
                 if (!list || !list.length) return false;
                 if (playing.size > 24) {
                     playing.forEach(function (el) { if (el.paused || el.ended || el.error) playing.delete(el); });
@@ -670,7 +670,7 @@
                     play: function (x, y, z, name) {
                         var k = key(x, y, z);
                         stop(k);
-                        var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name];
+                        var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name]; if ((!list || !list.length) && name) { var lname = String(name).toLowerCase(); list = (overrides[lname] && overrides[lname].length) ? overrides[lname] : groups[lname]; }
                         if (!list || !list.length) { console.warn('[jukebox] no sound "' + name + '" (the disc\'s music is missing)'); return; }
                         var a = new Audio();
                         a.preload = 'auto';
@@ -2602,6 +2602,7 @@
                     if (JV.runDeferred) JV.runDeferred(vm);
                     if (JV.guiTick) JV.guiTick(vm);
                     if (JV.remoteGuiTick) JV.remoteGuiTick(vm);
+                    if (JV.displayTick) { try { JV.displayTick(vm); } catch (x) { console.warn('[java] display tick', x); } }
                     if (JV.tileTick) {
                         JV.tileTick(vm);
                         if (vm.mcTicks % 600 === 0 && JV.tileSave) JV.tileSave(vm);
@@ -4211,7 +4212,7 @@
                                     });
                                 }).catch(function () { unknown++; problem(id, path, "isn't a picture this browser can read (use PNG)"); });
                             } else if ((m = /^sounds\/(.+?)\d*\.(ogg|mp3|wav)$/i.exec(path))) {
-                                var sn = m[1].split('/').join('.');
+                                var sn = m[1].split('/').join('.').toLowerCase();
                                 var u = URL.createObjectURL(new Blob([data], { type: 'audio/' + (m[2].toLowerCase() === 'mp3' ? 'mpeg' : m[2].toLowerCase()) }));
                                 soundUrls.push(u);
                                 if (!sounds[sn] || sounds[sn].from !== id) { sounds[sn] = []; sounds[sn].from = id; }
@@ -5089,6 +5090,7 @@
                             if (!q || !Array.isArray(q.p) || q.p.length !== 4) return '';
                             var parts = [cellOf('blocks', b.mod, q.t, b.file), (q.f | 0) % 6, -1, q.shade === false ? 0 : 1];
                             q.p.forEach(function (c) { parts.push(qn(c[0]), qn(c[1]), qn(c[2]), qn(c[3]), qn(c[4])); });
+                            if (q.live) parts.push(0, 0, 1);
                             return parts.join(',');
                         }).filter(Boolean);
                         if (qs.length) lines.push(['model', key, rot === 'horizontal' ? 4 : 1, qs.join(';')].join('\t'));
@@ -5107,7 +5109,7 @@
                         if (im && im.textures && im.textures.layer0) itex = texName(im.textures.layer0, im.textures);
                     }
                     lines.push(['item', key, desc, cellOf('items', it.mod, itex || it.name, it.file),
-                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || (j.record ? 1 : 64))), Math.max(0, Math.min(20, food | 0)), sat, j.scripted ? 1 : 0, '']
+                                Math.max(1, Math.min(64, parseInt(j.stack, 10) || (j.record ? 1 : 64))), Math.max(0, Math.min(20, food | 0)), sat, j.scripted === 'air' ? 2 : j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
                     if (j.display_block) {

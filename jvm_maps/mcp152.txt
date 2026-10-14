@@ -8385,6 +8385,7 @@ R	func_74257_b	isCancelled
 R	func_78746_a	setGameType
 R	func_78764_a	attackEntity
 R	func_78757_d	getBlockReachDistance
+R	func_73029_E	doVoidFogParticles
 R	func_72980_b	playSound
 R	func_73045_a	getEntityByID
 R	func_72923_a	obtainEntitySkin
