@@ -10558,11 +10558,12 @@ function heldStack(vm) {
 	return (function () { var s = vm.newObject(vm.loadClass(SRC + 'ItemStack')); s[':itemID'] = vm.game.itemToJava(h.id); s[':stackSize'] = h.count; s[':itemDamage'] = h.data || 0; if (h.ench) s.$ench = h.ench; return s; })();
 }
 
-function setBlock(vm, world, x, y, z, id, meta) {
+function setBlock(vm, world, x, y, z, id, meta, flags) {
 	var gm = vm.game, oid, odata;
 	if (gm && gm.tileP && gm.mode === 'gen') { var p = gm.tileP(x | 0, y | 0, z | 0); oid = p >>> 16; odata = p & 65535; }
 	else { var old = op(vm, 'tile', x, y, z) || { id: 0, data: 0 }; oid = old.id; odata = old.data; }
-	op(vm, 'settile', x, y, z, id, meta, world && world[':editingBlocks'] ? 1 : 0);
+	var silent = (world && world[':editingBlocks']) || (flags != null && !(flags & 1));
+	op(vm, 'settile', x, y, z, id, meta, silent ? 1 : 0);
 	var r = reg(vm);
 	if (oid !== id) {
 		var ob = r.blocks[oid];
@@ -10603,7 +10604,7 @@ function installWorld(vm, def) {
 		'getBlockMetadata(III)I': function (vm, self, a) { return tileP(vm, a[0], a[1], a[2]) & 65535; },
 		'isAirBlock(III)Z': function (vm, self, a) { return tileP(vm, a[0], a[1], a[2]) < 65536 ? 1 : 0; },
 		'setBlock(IIII)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], a[3], 0); },
-		'setBlock(IIIIII)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], a[3], a[4]); },
+		'setBlock(IIIIII)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], a[3], a[4], a[5]); },
 		'setBlock(IIIII)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], a[3], a[4]); },
 		'setBlockToAir(III)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], 0, 0); },
 		'setBlockWithNotify(IIII)Z': function (vm, self, a) { return setBlock(vm, self, a[0], a[1], a[2], a[3], 0); },
