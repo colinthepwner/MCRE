@@ -912,7 +912,7 @@ F	sn	bC	field_9304_bm	isImmuneToFire
 F	sn	bD	field_21064_bx	dataWatcher
 F	sn	bM	field_28016_bK	ignoreFrustumCheck
 F	v	a	field_4013_a	modelBipedMain
-F	sz	a	field_1089_a	doubleValue
+F	sz	a	field_1089_a	data
 F	hj	b	field_4286_b	buffer
 F	hj	d	field_4288_d	imageData
 F	up	j	field_956_i	options
@@ -957,6 +957,7 @@ F	hl	c	field_805_c	delayBeforeCanPickup
 F	hl	f	field_802_f	health
 F	dc	a	field_787_a	movementInput
 F	dc	b	field_788_bg	mc
+F	ul	a	field_1088_a	data
 F	bu	a	WOOD	WOOD
 F	bu	b	STONE	STONE
 F	bu	c	IRON	IRON
@@ -1082,7 +1083,7 @@ F	rq	l	field_959_i	selected
 F	rq	n	field_22100_m	saveList
 F	uv	b	field_886_b	chunkMapping
 F	uv	d	field_888_d	worldObj
-F	p	a	field_1097_a	floatValue
+F	p	a	field_1097_a	data
 F	sk	a	field_832_b	furnaceBurnTime
 F	sk	b	field_835_c	currentItemBurnTime
 F	sk	c	field_834_d	furnaceCookTime
@@ -1107,7 +1108,7 @@ F	uq	d	field_930_d	itemRenderer
 F	uq	e	field_929_e	chatMessageList
 F	uq	f	field_9423_f	rand
 F	uq	g	field_9422_g	mc
-F	xb	a	field_1098_a	stringValue
+F	xb	a	field_1098_a	data
 F	kx	d	field_896_d	chunkProvider
 F	kx	f	field_894_f	chunks
 F	kx	g	field_893_g	worldObj
@@ -1327,7 +1328,7 @@ F	kh	a	field_27344_a	mc
 F	yr	a	field_582_a	reason
 F	ih	c	field_880_c	worldObj
 F	ih	f	field_877_f	height
-F	mi	a	field_1095_a	longValue
+F	mi	a	field_1095_a	data
 F	sl	i	field_9315_g	inGround
 F	sl	b	field_688_a	arrowShake
 F	sl	c	field_682_g	owner
@@ -1369,6 +1370,7 @@ F	jg	a	TILE	TILE
 F	jg	b	ENTITY	ENTITY
 F	cz	b	field_1767_b	mc
 F	cz	c	field_1769_c	closing
+F	qp	a	field_1092_a	data
 F	vb	a	field_22166_a	fileName
 F	vb	b	field_22165_b	displayName
 F	gx	a	field_566_a	xPosition
@@ -1396,7 +1398,7 @@ F	rg	c	field_513_c	yPosition
 F	rg	d	field_512_d	zPosition
 F	rg	e	field_511_e	yaw
 F	rg	f	field_510_f	pitch
-F	pp	a	field_1093_a	intValue
+F	pp	a	field_1093_a	data
 F	tv	a	field_492_a	xPosition
 F	tv	b	field_491_b	yPosition
 F	tv	c	field_495_c	zPosition
@@ -1858,6 +1860,7 @@ F	sc	h	field_1248_h	spiderLeg5
 F	sc	i	field_1247_i	spiderLeg6
 F	sc	j	field_1246_j	spiderLeg7
 F	sc	k	field_1245_m	spiderLeg8
+F	hn	a	field_1096_a	data
 F	il	a	field_1271_a	head
 F	il	c	field_1276_c	body
 F	il	d	field_1275_d	leg1
@@ -2150,6 +2153,8 @@ M	sn	c	(Lnu;)Z	func_358_c	addEntityID
 M	sn	d	(Lnu;)V	func_363_d	writeToNBT
 M	sn	e	(Lnu;)V	func_368_e	readFromNBT
 M	sn	aj	()Ljava/lang/String;	func_389_H	getEntityString
+M	sn	a	([D)Lsp;	func_375_a	newDoubleNBTList
+M	sn	a	([F)Lsp;	func_377_a	newFloatNBTList
 M	sn	b	(II)Lhl;	func_367_b	dropItem
 M	sn	a	(IIF)Lhl;	func_394_a	dropItemWithOffset
 M	sn	a	(Liz;F)Lhl;	func_21058_a	entityDropItem

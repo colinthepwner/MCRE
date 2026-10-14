@@ -22940,7 +22940,7 @@ function install(vm) {
 	};
 	var runTasks = function (vm, list) {
 		(list || []).forEach(function (t) {
-			if (!t || !t.cls || t.cls.native || t.$brainOff) return;
+			if (!t || !t.cls || t.$brainOff || (t.cls.native && !(vm.natives[t.cls.name] && vm.natives[t.cls.name].active))) return;
 			try {
 				if (!t.$running) {
 					if (vm.callVirtual(t, 'shouldExecute', '()Z', [])) { t.$running = true; vm.callVirtual(t, 'startExecuting', '()V', []); }
@@ -23365,7 +23365,7 @@ function brainOf(vm, o) {
 	}
 	if (c.$brain) return true;
 	var lists = [o[':tasks'] && o[':tasks'].$list, o[':targetTasks'] && o[':targetTasks'].$list];
-	return lists.some(function (l) { return (l || []).some(function (t) { return t && t.cls && !t.cls.native; }); });
+	return lists.some(function (l) { return (l || []).some(function (t) { return t && t.cls && (!t.cls.native || (vm.natives[t.cls.name] && vm.natives[t.cls.name].active)); }); });
 }
 
 JVM.despawnVerdict = function (vm, o) {
@@ -35012,7 +35012,17 @@ function install(vm) {
 		['setEntityState(' + E + 'B)V']: function (vm, self, a) { if (a[0]) { try { vm.callVirtual(a[0], 'handleHealthUpdate', '(B)V', [a[1]]); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; } } },
 	});
 
+	var nbtList = function (vm, arr, tagCls, desc) {
+		var l = vm.newObject(vm.loadClass(SRC + 'NBTTagList')); vm.callVirtual(l, '<init>', '()V', []);
+		for (var i = 0; arr && i < arr.a.length; i++) {
+			var t = vm.newObject(vm.loadClass(SRC + tagCls)); vm.callVirtual(t, '<init>', '(Ljava/lang/String;' + desc + ')V', [null, arr.a[i]]);
+			vm.callVirtual(l, 'appendTag', '(Lnet/minecraft/src/NBTBase;)V', [t]);
+		}
+		return l;
+	};
 	add('Entity', {
+		'newDoubleNBTList([D)Lnet/minecraft/src/NBTTagList;': function (vm, self, a) { return nbtList(vm, a[0], 'NBTTagDouble', 'D'); },
+		'newFloatNBTList([F)Lnet/minecraft/src/NBTTagList;': function (vm, self, a) { return nbtList(vm, a[0], 'NBTTagFloat', 'F'); },
 		'isEntityEqual(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) { return self === a[0] ? 1 : 0; },
 		'setSneaking(Z)V': function (vm, self, a) { self.$sneakFlag = !!a[0]; },
 	});
@@ -35037,6 +35047,67 @@ function install(vm) {
 		'getFlySpeed()F': function (vm, self) { return self[':flySpeed'] != null ? self[':flySpeed'] : 0.05; },
 		'setFlySpeed(F)V': function (vm, self, a) { self[':flySpeed'] = a[0]; },
 	});
+
+	add('EntityFireball', { 'getMotionFactor()F': function () { return Math.fround(0.95); } });
+
+	if (!vm.natives[SRC + 'ChunkProviderGenerate']) vm.defineNative(SRC + 'ChunkProviderGenerate', { interfaces: [SRC + 'IChunkProvider'], methods: {
+		'provideChunk(II)Lnet/minecraft/src/Chunk;': function (vm, self, a) { return vm.callVirtual(JVM.mc152.worldObj(vm), 'getChunkFromChunkCoords', '(II)Lnet/minecraft/src/Chunk;', [a[0], a[1]]); },
+		'loadChunk(II)Lnet/minecraft/src/Chunk;': function (vm, self, a) { return vm.callVirtual(JVM.mc152.worldObj(vm), 'getChunkFromChunkCoords', '(II)Lnet/minecraft/src/Chunk;', [a[0], a[1]]); },
+		'chunkExists(II)Z': function () { return 1; },
+		'populate(Lnet/minecraft/src/IChunkProvider;II)V': function () {},
+		'canSave()Z': function () { return 1; },
+		'makeString()Ljava/lang/String;': function () { return 'RandomLevelSource'; },
+		'getLoadedChunkCount()I': function () { return 0; },
+		'recreateStructures(II)V': function () {},
+	} });
+
+	if (!vm.natives[SRC + 'SpawnerAnimals']) vm.defineNative(SRC + 'SpawnerAnimals', {});
+	var ri = function (vm, r, n) { return vm.callVirtual(r, 'nextInt', '(I)I', [n]) | 0; };
+	var canCreatureSpawn = function (vm, w, x, y, z) {
+		var cv = function (n, d, a) { return vm.callVirtual(w, n, d, a); };
+		if (!cv('doesBlockHaveSolidTopSurface', '(III)Z', [x, y - 1, z])) return false;
+		if (cv('getBlockId', '(III)I', [x, y - 1, z]) === 7) return false;
+		if (cv('isBlockNormalCube', '(III)Z', [x, y, z]) || cv('isBlockNormalCube', '(III)Z', [x, y + 1, z])) return false;
+		var mat = cv('getBlockMaterial', '(III)Lnet/minecraft/src/Material;', [x, y, z]);
+		return !(mat && vm.callVirtual(mat, 'isLiquid', '()Z', []));
+	};
+	vm.setNativeMethod(SRC + 'SpawnerAnimals', 'performWorldGenSpawning(Lnet/minecraft/src/World;Lnet/minecraft/src/BiomeGenBase;IIIILjava/util/Random;)V', function (vm, n, a) {
+		var w = a[0], biome = a[1], x0 = a[2], z0 = a[3], wd = a[4], ht = a[5], r = a[6];
+		if (!w || !biome || !r) return;
+		var EC = vm.loadClass(SRC + 'EnumCreatureType'); vm.initClass(EC);
+		var list = vm.callVirtual(biome, 'getSpawnableList', '(Lnet/minecraft/src/EnumCreatureType;)Ljava/util/List;', [EC.statics.creature]);
+		var entries = list ? JVM.iterate(vm, list).filter(Boolean) : [];
+		if (!entries.length) return;
+		var chance = vm.callVirtual(biome, 'getSpawningChance', '()F', []);
+		var wr = w[':rand'] || r;
+		while (vm.callVirtual(r, 'nextFloat', '()F', []) < chance) {
+			var total = 0; entries.forEach(function (e) { total += e[':itemWeight'] | 0; });
+			if (total <= 0) return;
+			var pick = ri(vm, wr, total), e = entries[0];
+			for (var i = 0; i < entries.length; i++) { pick -= entries[i][':itemWeight'] | 0; if (pick < 0) { e = entries[i]; break; } }
+			var mn = e[':minGroupCount'] | 0, mx = e[':maxGroupCount'] | 0;
+			var count = mn + ri(vm, r, 1 + mx - mn);
+			var x = x0 + ri(vm, r, wd), z = z0 + ri(vm, r, ht), ox = x, oz = z;
+			for (var k = 0; k < count; k++) {
+				var done = false;
+				for (var t = 0; !done && t < 4; t++) {
+					var y = vm.callVirtual(w, 'getTopSolidOrLiquidBlock', '(II)I', [x, z]);
+					if (canCreatureSpawn(vm, w, x, y, z)) {
+						var cls = e[':entityClass'] && e[':entityClass'].$cls, ctor = cls && cls.findDeclared('<init>(Lnet/minecraft/src/World;)V');
+						if (!ctor) return;
+						var ent = vm.newObject(cls);
+						vm.invoke(ctor, ent, [w]);
+						vm.callVirtual(ent, 'setLocationAndAngles', '(DDDFF)V', [x + 0.5, y, z + 0.5, vm.callVirtual(r, 'nextFloat', '()F', []) * 360, 0]);
+						vm.callVirtual(w, 'spawnEntityInWorld', '(Lnet/minecraft/src/Entity;)Z', [ent]);
+						if (ent.cls.findMethod('initCreature()V')) vm.callVirtual(ent, 'initCreature', '()V', []);
+						done = true;
+					}
+					x += ri(vm, r, 5) - ri(vm, r, 5);
+					for (z += ri(vm, r, 5) - ri(vm, r, 5); x < x0 || x >= x0 + wd || z < z0 || z >= z0 + wd; z = oz + ri(vm, r, 5) - ri(vm, r, 5)) x = ox + ri(vm, r, 5) - ri(vm, r, 5);
+				}
+			}
+		}
+	}, { static: true, keep: true });
 
 	var LANG = SRC + 'Language', LM = SRC + 'LanguageManager';
 	if (!vm.natives[LANG]) vm.defineNative(LANG, { interfaces: ['java/lang/Comparable'], methods: {
@@ -38044,7 +38115,7 @@ function install(vm) {
 
 	def('EntityAIBase', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT, methods: {} });
 	def('IEntitySelector', { access: I });
-	def('IRangedAttackMob', { access: I });
+	def('IRangedAttackMob', { access: I, abstractMethods: { 'attackEntityWithRangedAttack(Lnet/minecraft/src/EntityLiving;F)V': true } });
 	var AI = {
 		EntityAITarget: ['EntityAIBase', 0, {
 			'<init>(Lnet/minecraft/src/EntityLiving;FZ)V': ['taskOwner', 'targetDistance', 'shouldCheckSight'],
@@ -38328,6 +38399,42 @@ function install(vm) {
 	if (BRK) def('EntitySlimeFX', { super: SRC + 'EntityBreakingFX', methods: {
 		'<init>(Lnet/minecraft/src/World;DDDLnet/minecraft/src/Item;)V': function (vm, self, a) { var f = BRK.methods['<init>(Lnet/minecraft/src/World;DDDLnet/minecraft/src/Item;)V']; if (f) f(vm, self, a); },
 	} });
+
+	var AA = SRC + 'EntityAIArrowAttack', ELB = 'L' + SRC + 'EntityLiving;';
+	if (vm.natives[AA]) {
+		vm.natives[AA].active = true;
+		var host = function (self) { return self[':rangedAttackEntityHost'] || self[':entityHost']; };
+		var tgtOf = function (vm, self) { var h = host(self); if (!h) return null; var t = null; try { t = vm.callVirtual(h, 'getAttackTarget', '()' + ELB, []); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; } return t || h[':attackTarget'] || h[':entityToAttack'] || null; };
+		var range = function (self) { return +self[':field_96562_i'] || 15; };
+		var interval = function (self, f) { var mx = self[':maxRangedAttackTime'] | 0, mn = self[':field_96561_g'] != null ? self[':field_96561_g'] | 0 : mx; return Math.floor(f * (mx - mn) + mn); };
+		var aa = {
+			'shouldExecute()Z': function (vm, self) { var t = tgtOf(vm, self); if (!t || t[':isDead']) return 0; self[':attackTarget'] = t; return 1; },
+			'continueExecuting()Z': function (vm, self) { var t = tgtOf(vm, self); return t && !t[':isDead'] ? 1 : 0; },
+			'startExecuting()V': function () {},
+			'resetTask()V': function (vm, self) { self[':attackTarget'] = null; self[':field_75318_f'] = 0; self[':rangedAttackTime'] = -1; },
+			'updateTask()V': function (vm, self) {
+				var h = host(self), t = self[':attackTarget'];
+				if (!h || !t) return;
+				var bb = t[':boundingBox'], ty = bb ? bb[':minY'] : t[':posY'];
+				var dx = h[':posX'] - t[':posX'], dy = h[':posY'] - ty, dz = h[':posZ'] - t[':posZ'], d0 = dx * dx + dy * dy + dz * dz;
+				var see = !!vm.callVirtual(h, 'canEntityBeSeen', '(L' + SRC + 'Entity;)Z', [t]);
+				self[':field_75318_f'] = see ? (self[':field_75318_f'] | 0) + 1 : 0;
+				var r = range(self), r2 = r * r, f;
+				if (self[':rangedAttackTime'] == null) self[':rangedAttackTime'] = -1;
+				if (--self[':rangedAttackTime'] === 0) {
+					if (d0 > r2 || !see) return;
+					f = Math.fround(Math.sqrt(d0) / r);
+					var f1 = Math.min(1, Math.max(0.1, f));
+					vm.callVirtual(h, 'attackEntityWithRangedAttack', '(' + ELB + 'F)V', [t, Math.fround(f1)]);
+					self[':rangedAttackTime'] = interval(self, f);
+				} else if (self[':rangedAttackTime'] < 0) {
+					f = Math.fround(Math.sqrt(d0) / r);
+					self[':rangedAttackTime'] = interval(self, f);
+				}
+			},
+		};
+		Object.keys(aa).forEach(function (k) { vm.setNativeMethod(AA, k, aa[k]); });
+	}
 }
 JVM.installGapsEntity = install;
 })();

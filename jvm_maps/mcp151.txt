@@ -1728,6 +1728,12 @@ F	acr	d	field_75046_d	field_75046_d
 F	acw	a	field_75040_a	range
 F	acw	b	field_75038_b	rand
 F	acw	c	field_75039_c	worldObj
+F	acy	d	field_73210_d	noise3
+F	acy	k	field_73220_k	rand
+F	acy	p	field_73230_p	worldObj
+F	acy	t	field_73226_t	caveGenerator
+F	acy	v	field_73224_v	villageGenerator
+F	acy	y	field_73232_y	ravineGenerator
 F	adb	b	field_76505_b	rand
 F	adb	c	field_76506_c	worldObj
 F	adb	f	field_76501_f	height
@@ -2999,6 +3005,7 @@ F	ph	b	field_82641_b	rangedAttackEntityHost
 F	ph	c	field_75323_c	attackTarget
 F	ph	d	field_75320_d	rangedAttackTime
 F	ph	e	field_75321_e	entityMoveSpeed
+F	ph	f	field_75318_f	field_75318_f
 F	ph	g	field_96561_g	field_96561_g
 F	ph	h	field_75325_h	maxRangedAttackTime
 F	ph	i	field_96562_i	field_96562_i
@@ -3645,6 +3652,7 @@ M	aal	b	()Ljava/lang/String;	func_77128_b	getTranslateName
 M	aal	c	()I	func_77131_c	getGeneratorVersion
 M	aal	d	()Z	func_77126_d	getCanBeCreated
 M	aal	f	()I	func_82747_f	getWorldTypeID
+M	aan	a	(Laab;Laav;IIIILjava/util/Random;)V	func_77191_a	performWorldGenSpawning
 M	aao	a	(J)V	func_85189_a	removeStalePortalLocations
 M	aao	a	(Lmp;)Z	func_85188_a	makePortal
 M	aao	a	(Lmp;DDDF)V	func_77185_a	placeInPortal
@@ -3811,6 +3819,18 @@ M	acw	a	(Labt;Laab;II[B)V	func_75036_a	generate
 M	acx	a	(JII[BDDD)V	func_75044_a	generateLargeCaveNode
 M	acx	a	(JII[BDDDFFFIID)V	func_75043_a	generateCaveNode
 M	acx	a	(Laab;IIII[B)V	func_75037_a	recursiveGenerate
+M	acy	a	(II)Z	func_73149_a	chunkExists
+M	acy	a	(Laab;Ljava/lang/String;III)Laat;	func_73150_a	findClosestStructure
+M	acy	a	(Labt;II)V	func_73153_a	populate
+M	acy	a	(Lnn;III)Ljava/util/List;	func_73155_a	getPossibleCreatures
+M	acy	a	(ZLlc;)Z	func_73151_a	saveChunks
+M	acy	b	()Z	func_73156_b	unloadQueuedChunks
+M	acy	c	()Z	func_73157_c	canSave
+M	acy	c	(II)Labw;	func_73158_c	loadChunk
+M	acy	d	()Ljava/lang/String;	func_73148_d	makeString
+M	acy	d	(II)Labw;	func_73154_d	provideChunk
+M	acy	e	()I	func_73152_e	getLoadedChunkCount
+M	acy	e	(II)V	func_82695_e	recreateStructures
 M	adb	a	(DDD)V	func_76487_a	setScale
 M	adb	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
 M	adc	a	(Laab;Ljava/util/Random;III)Z	func_76484_a	generate
@@ -5682,6 +5702,8 @@ M	mp	a	(Lmp;Z)V	func_82141_a	copyDataFrom
 M	mp	a	(Lng;)V	func_70074_a	onKillEntity
 M	mp	a	(Lre;)V	func_70077_a	onStruckByLightning
 M	mp	a	(Lwm;F)Lrh;	func_70099_a	entityDropItem
+M	mp	a	([D)Lca;	func_70087_a	newDoubleNBTList
+M	mp	a	([F)Lca;	func_70049_a	newFloatNBTList
 M	mp	a_	(Lsq;)Z	func_70085_c	interact
 M	mp	aa	()I	func_82147_ab	getPortalCooldown
 M	mp	ac	()V	func_70059_ac	updateCloak
@@ -6284,6 +6306,7 @@ M	qo	i	(Z)V	func_70893_e	setSheared
 M	qo	m	()I	func_70896_n	getFleeceColor
 M	qo	n	()Z	func_70892_o	getSheared
 M	qo	s	(I)V	func_70891_b	setFleeceColor
+M	qq	a	(Lng;F)V	func_82196_d	attackEntityWithRangedAttack
 M	qq	a	(ZI)V	func_70628_a	dropFewItems
 M	qq	aW	()I	func_70667_aM	getMaxHealth
 M	qq	be	()I	func_70633_aT	getDropItemId
@@ -6546,6 +6569,7 @@ M	sc	j	()Lmp;	func_70782_k	findPlayerToAttack
 M	sc	l	(I)V	func_70600_l	dropRareDrop
 M	sc	l_	()V	func_70071_h_	onUpdate
 M	sc	p	(Lmp;)V	func_70835_c	becomeAngryAt
+M	sd	a	(Lng;F)V	func_82196_d	attackEntityWithRangedAttack
 M	se	a	(III)F	func_70783_a	getBlockPathWeight
 M	se	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	se	a	(Lmp;F)V	func_70785_a	attackEntity
@@ -6567,6 +6591,7 @@ M	sf	a	()V	func_70088_a	entityInit
 M	sf	a	(I)V	func_82201_a	setSkeletonType
 M	sf	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	sf	a	(Lmg;)V	func_70645_a	onDeath
+M	sf	a	(Lng;F)V	func_82196_d	attackEntityWithRangedAttack
 M	sf	a	(ZI)V	func_70628_a	dropFewItems
 M	sf	aW	()I	func_70667_aM	getMaxHealth
 M	sf	b	(Lbs;)V	func_70014_b	writeEntityToNBT
@@ -6621,6 +6646,7 @@ M	sh	m	()F	func_70840_n	spiderScaleAmount
 M	sh	o	()Z	func_70841_p	isBesideClimbableBlock
 M	si	a	()V	func_70088_a	entityInit
 M	si	a	(B)V	func_70103_a	handleHealthUpdate
+M	si	a	(Lng;F)V	func_82196_d	attackEntityWithRangedAttack
 M	si	a	(Z)V	func_82197_f	setAggressive
 M	si	a	(ZI)V	func_70628_a	dropFewItems
 M	si	aW	()I	func_70667_aM	getMaxHealth
@@ -6803,6 +6829,7 @@ M	su	a	(Lbs;)V	func_70037_a	readEntityFromNBT
 M	su	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	su	b	(F)I	func_70070_b	getBrightnessForRender
 M	su	b	(Lbs;)V	func_70014_b	writeEntityToNBT
+M	su	c	()F	func_82341_c	getMotionFactor
 M	su	c	(F)F	func_70013_c	getBrightness
 M	su	l_	()V	func_70071_h_	onUpdate
 M	sw	Q	()F	func_70053_R	getShadowSize
@@ -7379,12 +7406,6 @@ R	field_76723_c	chunkZ
 R	field_73163_a	worldObj
 R	field_73161_b	random
 R	field_73175_o	worldObj
-R	field_73210_d	noise3
-R	field_73220_k	rand
-R	field_73230_p	worldObj
-R	field_73226_t	caveGenerator
-R	field_73224_v	villageGenerator
-R	field_73232_y	ravineGenerator
 R	field_74976_a	hasSpawner
 R	field_75194_a	pieceClass
 R	field_75192_b	pieceWeight
@@ -8596,6 +8617,7 @@ R	func_70623_bb	despawnEntity
 R	func_70073_O	getTexture
 R	func_70069_a	fall
 R	func_70078_a	mountEntity
+R	func_82196_d	attackEntityWithRangedAttack
 R	func_70628_a	dropFewItems
 R	func_70658_aO	getTotalArmorValue
 R	func_70110_aj	setInWeb
@@ -8625,6 +8647,7 @@ R	func_70183_g	func_70183_g
 R	func_70185_h	getGravityVelocity
 R	func_70227_a	onImpact
 R	func_70027_ad	isBurning
+R	func_82341_c	getMotionFactor
 R	func_75132_a	addCraftingToCrafters
 R	func_75142_b	detectAndSendChanges
 R	func_75137_b	updateProgressBar
@@ -8688,6 +8711,7 @@ D	net/minecraft/src/ColorizerGrass	grassBuffer:[I:s
 D	net/minecraft/src/World	scheduledUpdatesAreImmediate:Z:|loadedEntityList:Ljava/util/List;:|unloadedEntityList:Ljava/util/List;:|loadedTileEntityList:Ljava/util/List;:|addedTileEntityList:Ljava/util/List;:|entityRemoval:Ljava/util/List;:|playerEntities:Ljava/util/List;:|weatherEffects:Ljava/util/List;:|cloudColour:J:|skylightSubtracted:I:|updateLCG:I:|DIST_HASH_MAGIC:I:|prevRainingStrength:F:|rainingStrength:F:|prevThunderingStrength:F:|thunderingStrength:F:|lastLightningBolt:I:|difficultySetting:I:|rand:Ljava/util/Random;:|provider:Lnet/minecraft/src/WorldProvider;:|worldAccesses:Ljava/util/List;:|chunkProvider:Lnet/minecraft/src/IChunkProvider;:|saveHandler:Lnet/minecraft/src/ISaveHandler;:|worldInfo:Lnet/minecraft/src/WorldInfo;:|findingSpawnPoint:Z:|mapStorage:Lnet/minecraft/src/MapStorage;:|villageCollectionObj:Lnet/minecraft/src/VillageCollection;:|villageSiegeObj:Lnet/minecraft/src/VillageSiege;:|theProfiler:Lnet/minecraft/src/Profiler;:|vecPool:Lnet/minecraft/src/Vec3Pool;:|theCalendar:Ljava/util/Calendar;:|worldScoreboard:Lnet/minecraft/src/Scoreboard;:|worldLogAgent:Lnet/minecraft/src/ILogAgent;:|collidingBoundingBoxes:Ljava/util/ArrayList;:|scanningTileEntities:Z:|spawnHostileMobs:Z:|spawnPeacefulMobs:Z:|activeChunkSet:Ljava/util/Set;:|ambientTickCountdown:I:|lightUpdateBlockList:[I:|isRemote:Z:
 D	net/minecraft/src/EnumGameType	NOT_SET:Lnet/minecraft/src/EnumGameType;:s|SURVIVAL:Lnet/minecraft/src/EnumGameType;:s|CREATIVE:Lnet/minecraft/src/EnumGameType;:s|ADVENTURE:Lnet/minecraft/src/EnumGameType;:s|id:I:|name:Ljava/lang/String;:|$VALUES:[Lnet/minecraft/src/EnumGameType;:s
 D	net/minecraft/src/WorldType	worldTypes:[Lnet/minecraft/src/WorldType;:s|DEFAULT:Lnet/minecraft/src/WorldType;:s|FLAT:Lnet/minecraft/src/WorldType;:s|LARGE_BIOMES:Lnet/minecraft/src/WorldType;:s|DEFAULT_1_1:Lnet/minecraft/src/WorldType;:s|worldTypeId:I:|worldType:Ljava/lang/String;:|generatorVersion:I:|canBeCreated:Z:|isWorldTypeVersioned:Z:
+D	net/minecraft/src/SpawnerAnimals	eligibleChunksForSpawning:Ljava/util/HashMap;:s|nightSpawnEntities:[Ljava/lang/Class;:s
 D	net/minecraft/src/Teleporter	worldServerInstance:Lnet/minecraft/src/WorldServer;:|random:Ljava/util/Random;:|destinationCoordinateCache:Lnet/minecraft/src/LongHashMap;:|destinationCoordinateKeys:Ljava/util/List;:
 D	net/minecraft/src/ChunkCache	chunkX:I:|chunkZ:I:|chunkArray:[[Lnet/minecraft/src/Chunk;:|isEmpty:Z:|worldObj:Lnet/minecraft/src/World;:
 D	net/minecraft/src/NextTickListEntry	nextTickEntryID:J:s|xCoord:I:|yCoord:I:|zCoord:I:|blockID:I:|scheduledTime:J:|priority:I:|tickEntryID:J:
@@ -8706,6 +8730,7 @@ D	net/minecraft/src/AnvilChunkLoader	chunksToRemove:Ljava/util/List;:|pendingAnv
 D	net/minecraft/src/WorldProvider	worldObj:Lnet/minecraft/src/World;:|terrainType:Lnet/minecraft/src/WorldType;:|field_82913_c:Ljava/lang/String;:|worldChunkMgr:Lnet/minecraft/src/WorldChunkManager;:|isHellWorld:Z:|hasNoSky:Z:|lightBrightnessTable:[F:|dimensionId:I:|colorsSunriseSunset:[F:
 D	net/minecraft/src/MapGenRavine	field_75046_d:[F:
 D	net/minecraft/src/MapGenBase	range:I:|rand:Ljava/util/Random;:|worldObj:Lnet/minecraft/src/World;:
+D	net/minecraft/src/ChunkProviderGenerate	rand:Ljava/util/Random;:|noiseGen1:Lnet/minecraft/src/NoiseGeneratorOctaves;:|noiseGen2:Lnet/minecraft/src/NoiseGeneratorOctaves;:|noiseGen3:Lnet/minecraft/src/NoiseGeneratorOctaves;:|noiseGen4:Lnet/minecraft/src/NoiseGeneratorOctaves;:|noiseGen5:Lnet/minecraft/src/NoiseGeneratorOctaves;:|noiseGen6:Lnet/minecraft/src/NoiseGeneratorOctaves;:|mobSpawnerNoise:Lnet/minecraft/src/NoiseGeneratorOctaves;:|worldObj:Lnet/minecraft/src/World;:|mapFeaturesEnabled:Z:|noiseArray:[D:|stoneNoise:[D:|caveGenerator:Lnet/minecraft/src/MapGenBase;:|strongholdGenerator:Lnet/minecraft/src/MapGenStronghold;:|villageGenerator:Lnet/minecraft/src/MapGenVillage;:|mineshaftGenerator:Lnet/minecraft/src/MapGenMineshaft;:|scatteredFeatureGenerator:Lnet/minecraft/src/MapGenScatteredFeature;:|ravineGenerator:Lnet/minecraft/src/MapGenBase;:|biomesForGeneration:[Lnet/minecraft/src/BiomeGenBase;:|noise3:[D:|noise1:[D:|noise2:[D:|noise5:[D:|noise6:[D:|parabolicField:[F:|field_73219_j:[[I:
 D	net/minecraft/src/WorldGenBigTree	otherCoordPairs:[B:s|rand:Ljava/util/Random;:|worldObj:Lnet/minecraft/src/World;:|basePos:[I:|heightLimit:I:|height:I:|heightAttenuation:D:|branchDensity:D:|branchSlope:D:|scaleWidth:D:|leafDensity:D:|trunkSize:I:|heightLimitLimit:I:|leafDistanceLimit:I:|leafNodes:[[I:
 D	net/minecraft/src/WorldGenClay	clayBlockId:I:|numberOfBlocks:I:
 D	net/minecraft/src/WorldGenDeadBush	deadBushID:I:

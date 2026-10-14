@@ -943,6 +943,7 @@ F	net/minecraft/class_142	field_566	field_566	delayBeforeCanPickup
 F	net/minecraft/class_142	field_569	field_569	health
 F	net/minecraft/class_162	field_573	field_573	boatSides
 F	net/minecraft/class_58	field_575	field_575	dirty
+F	net/minecraft/class_165	field_576	field_576	data
 F	net/minecraft/class_170	field_592	field_592	id
 F	net/minecraft/class_171	field_593	field_593	windowId
 F	net/minecraft/class_87	field_619	field_619	bipedHead
@@ -1173,7 +1174,7 @@ F	net/minecraft/class_272	field_1118	field_1118	zPosition
 F	net/minecraft/class_272	field_1119	field_1119	rotation
 F	net/minecraft/class_272	field_1120	field_1120	pitch
 F	net/minecraft/class_272	field_1121	field_1121	currentItem
-F	net/minecraft/class_273	field_1122	field_1122	longValue
+F	net/minecraft/class_273	field_1122	field_1122	data
 F	net/minecraft/class_276	field_1123	field_1123	windowId
 F	net/minecraft/class_277	field_1124	field_1124	craftMatrix
 F	net/minecraft/class_277	field_1125	field_1125	craftResult
@@ -1258,12 +1259,13 @@ F	net/minecraft/class_343	field_1304	field_1304	solaris
 F	net/minecraft/class_343	field_1305	field_1305	windows
 F	net/minecraft/class_343	field_1306	field_1306	macos
 F	net/minecraft/class_343	field_1307	field_1307	unknown
-F	net/minecraft/class_347	field_1312	field_1312	intValue
+F	net/minecraft/class_347	field_1312	field_1312	data
 F	net/minecraft/class_353	field_1316	field_1316	fileName
 F	net/minecraft/class_353	field_1318	field_1318	offsets
 F	net/minecraft/class_356	field_1326	field_1326	mc
-F	net/minecraft/class_358	field_1336	field_1336	floatValue
+F	net/minecraft/class_358	field_1336	field_1336	data
 F	net/minecraft/class_359	field_1350	field_1350	worldObj
+F	net/minecraft/class_360	field_1356	field_1356	data
 F	net/minecraft/class_363	field_1365	field_1365	action
 F	net/minecraft/class_363	field_1366	field_1366	itemStack
 F	net/minecraft/class_33	field_1368	field_1368	width
@@ -1455,7 +1457,7 @@ F	net/minecraft/class_414	field_1665	field_1665	yPosition
 F	net/minecraft/class_414	field_1666	field_1666	zPosition
 F	net/minecraft/class_414	field_1670	field_1670	type
 F	net/minecraft/class_416	field_1672	field_1672	modelBlock
-F	net/minecraft/class_419	field_1680	field_1680	doubleValue
+F	net/minecraft/class_419	field_1680	field_1680	data
 F	net/minecraft/class_420	field_1681	field_1681	blocksEffectiveAgainst
 F	net/minecraft/class_428	field_1688	field_1688	WOOD
 F	net/minecraft/class_428	field_1689	field_1689	STONE
@@ -1493,6 +1495,7 @@ F	net/minecraft/class_437	field_1754	field_1754	rotating
 F	net/minecraft/class_432	field_1755	field_1755	xPosition
 F	net/minecraft/class_432	field_1756	field_1756	yPosition
 F	net/minecraft/class_432	field_1757	field_1757	zPosition
+F	net/minecraft/class_462	field_1770	field_1770	data
 F	net/minecraft/class_465	field_1771	field_1771	enumOptions
 F	net/minecraft/class_470	field_1774	field_1774	recipeItems
 F	net/minecraft/class_471	field_1782	field_1782	renderDistance
@@ -1704,7 +1707,7 @@ F	net/minecraft/class_50	field_2177	field_2177	hasNoSky
 F	net/minecraft/class_50	field_2178	field_2178	lightBrightnessTable
 F	net/minecraft/class_50	field_2179	field_2179	worldType
 F	net/minecraft/class_521	field_2189	field_2189	recipeItems
-F	net/minecraft/class_522	field_2190	field_2190	stringValue
+F	net/minecraft/class_522	field_2190	field_2190	data
 F	net/minecraft/class_526	field_2206	field_2206	random
 F	net/minecraft/class_529	field_2209	field_2209	liquidBlockId
 F	net/minecraft/class_531	field_2210	field_2210	linux
@@ -2492,6 +2495,8 @@ M	net/minecraft/class_57	method_1324	(FFF)V	method_1324	moveFlying
 M	net/minecraft/class_57	method_1325	(IIF)Lnet/minecraft/class_142;	method_1325	dropItemWithOffset
 M	net/minecraft/class_57	method_1327	(Lnet/minecraft/class_31;F)Lnet/minecraft/class_142;	method_1327	entityDropItem
 M	net/minecraft/class_57	method_1328	(Lnet/minecraft/class_15;)Z	method_1328	isInsideOfMaterial
+M	net/minecraft/class_57	method_1329	([D)Lnet/minecraft/class_202;	method_1329	newDoubleNBTList
+M	net/minecraft/class_57	method_1330	([F)Lnet/minecraft/class_202;	method_1330	newFloatNBTList
 M	net/minecraft/class_57	method_1331	()Lnet/minecraft/class_216;	method_1331	getDataWatcher
 M	net/minecraft/class_57	method_1333	()Z	method_1333	isWet
 M	net/minecraft/class_57	method_1334	()Z	method_1334	isInWater
