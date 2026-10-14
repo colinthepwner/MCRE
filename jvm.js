@@ -11307,9 +11307,10 @@ JVM.collectContent = function (vm, modId) {
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED) || it.$scriptedUse) { json.scripted = true; out.scripted.items[id] = true; }
 		if (json.scripted && !it.$scriptedUse && !overrides(it, [ITEM_SCRIPTED[1]])) json.scripted = 'air';
-		if (!it.$food && overrides(it, ['onPlayerStoppedUsing(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;I)V'])) {
+		var usingTick = !it.$food && overrides(it, ['onUsingItemTick(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;I)V']);
+		if (!it.$food && (usingTick || overrides(it, ['onPlayerStoppedUsing(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;I)V']))) {
 			var udur = safe(function () { return vm.callVirtual(it, 'getMaxItemUseDuration', '(Lnet/minecraft/src/ItemStack;)I', [JVM.mc152.newStack(vm, id, 1, meta)]); }, 0);
-			if (udur > 0) { json.java_bow = true; if (it[':maxDamage'] > 0) json.durability = it[':maxDamage']; }
+			if (udur > 0) { json.java_bow = true; if (usingTick) json.java_using = true; if (it[':maxDamage'] > 0) json.durability = it[':maxDamage']; }
 		}
 		var rec = JVM.recordNameOf(vm, it);
 		if (rec) json.record = JVM.recordSound(modId, rec);
@@ -14028,7 +14029,7 @@ function install(vm) {
 	if (IS) IS.methods = Object.assign({}, IS.methods || {}, {
 		'getItemDamageForDisplay()I': function (vm, self) { return self[':itemDamage'] | 0; },
 	});
-	def(SRC + 'ColorizerFoliage', { staticMethods: {} });
+	if (!vm.natives[SRC + 'ColorizerFoliage']) def(SRC + 'ColorizerFoliage', { staticMethods: {} });
 	var CF = vm.natives[SRC + 'ColorizerFoliage'];
 	if (CF) CF.staticMethods = Object.assign({}, CF.staticMethods || {}, {
 		'getFoliageColorPine()I': function () { return 0x619961; },
@@ -20461,7 +20462,7 @@ var NAMES = [null, 'speed', 'slowness', 'haste', 'mining_fatigue', 'strength', '
 JVM.effectName = function (id) { return NAMES[id] || null; };
 
 function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
-function entityId(o) { return o ? (o.$info && o.$info.id != null ? o.$info.id : o.$entityId != null ? o.$entityId : null) : null; }
+function entityId(o) { return o ? (o.$info && o.$info.id != null ? o.$info.id : o.$entityId != null ? o.$entityId : o.$mobKey && o[':entityId'] ? o[':entityId'] : null) : null; }
 
 function installPotions(vm) {
 	var def = function (n, s) { vm.defineNative(SRC + n, s); };
@@ -20495,13 +20496,25 @@ function installPotions(vm) {
 		'getEffectName()Ljava/lang/String;': function (vm, self) { return 'potion.' + (NAMES[self[':potionID']] || 'empty'); },
 	} });
 	var L = vm.natives[SRC + 'EntityLiving'];
-	var effectsOf = function (vm, self) { var i = self.$info; return i && Array.isArray(i.effects) ? i.effects : []; };
+	var effectsOf = function (vm, self) {
+		var i = self.$info;
+		if (i && Array.isArray(i.effects)) return i.effects;
+		var now = vm.mcTicks | 0;
+		return (self.$fx || []).filter(function (e) { return e.until > now; }).map(function (e) { return { id: e.id, ticks: e.until - now, amp: e.amp }; });
+	};
 	L.methods = Object.assign({}, L.methods, {
 		'addPotionEffect(Lnet/minecraft/src/PotionEffect;)V': function (vm, self, a) {
 			var id = entityId(self), p = a[0];
-			if (id == null || !p) return;
+			if (!p) return;
 			if (!NAMES[p[':potionID']]) { vm.warnOnce('potion:id:' + p[':potionID'], 'potion effect ' + p[':potionID'] + ' is not one of the game\'s'); return; }
-			op(vm, 'effect', id, p[':potionID'], Math.max(1, p[':duration']), Math.max(0, p[':amplifier']));
+			var fx = [p[':potionID'], Math.max(1, p[':duration']), Math.max(0, p[':amplifier'])];
+			if (!self.$info) {
+				var now = vm.mcTicks | 0, list = (self.$fx || []).filter(function (e) { return e.until > now && e.id !== fx[0]; });
+				list.push({ id: fx[0], until: now + fx[1], amp: fx[2] });
+				self.$fx = list;
+			}
+			if (id == null) { (self.$pendingFx || (self.$pendingFx = [])).push(fx); return; }
+			op(vm, 'effect', id, fx[0], fx[1], fx[2]);
 		},
 		'removePotionEffect(I)V': function (vm, self, a) { var id = entityId(self); if (id != null) op(vm, 'rmeffect', id, a[0]); },
 		'clearActivePotions()V': function (vm, self) { var id = entityId(self); if (id != null) op(vm, 'clreffect', id); },
@@ -21385,6 +21398,19 @@ JVM.itemReleased = function (vm, javaId, count, data, left) {
 		return r.ok ? st : null;
 	} finally { vm.$heldPin = prev; }
 };
+JVM.itemUsingTick = function (vm, javaId, count, data, left) {
+	var it = JVM.mc152.reg(vm).items[javaId];
+	if (!it || !running(vm)) return null;
+	var pl = JVM.mc152.playerObj(vm, null), st = newStack(vm, javaId, count, data);
+	var prev = vm.$heldPin;
+	vm.$heldPin = st;
+	pl.$inUse = st; pl.$inUseCount = left | 0;
+	try {
+		var r = JVM.run(vm, function () { vm.callVirtual(it, 'onUsingItemTick', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/EntityPlayer;I)V', [st, pl, left | 0]); });
+		var stop = !pl.$inUse;
+		return r.ok ? { stack: st, stop: stop } : null;
+	} finally { vm.$heldPin = prev; }
+};
 JVM.modBlockDrops = function (vm, e) {
 	var b = JVM.mc152.reg(vm).blocks[e.id];
 	if (!b || !b.$javaDrops || !running(vm)) return 0;
@@ -21678,7 +21704,7 @@ function installMobs(vm) {
 		'isImmuneToFire()Z': function (vm, self) { return self[':isImmuneToFire'] ? 1 : 0; },
 		'getEntityName()Ljava/lang/String;': function (vm, self) { var e = mobs(vm).entities.filter(function (x) { return x.cls && vm.classOf(self).isSubclassOf(x.cls); })[0]; return e ? e.name : 'generic'; },
 		'getEntityId()I': function (vm, self) { return self[':entityId'] | 0; },
-		'setFire(I)V': function () {},
+		'setFire(I)V': function (vm, self, a) { var id = self[':entityId']; if (id && a[0] > 0) op(vm, 'fire', id, (a[0] | 0) * 20); },
 		'extinguish()V': function () {},
 		'isBurning()Z': function () { return 0; },
 		'isInWater()Z': function () { return 0; },
@@ -21848,6 +21874,7 @@ function installMobs(vm) {
 	} });
 	function biomeInit(vm, self, id) {
 		self[':biomeID'] = id; self[':biomeName'] = 'Biome ' + id;
+		if (self.$mod == null && self.cls && !self.cls.native) self.$mod = vm.currentMod || self.cls.source || null;
 		var bc = vm.loadClass(SRC + 'BiomeGenBase');
 		if (bc.initState !== 2) vm.initClass(bc);
 		if (bc.statics.biomeList && id >= 0 && id < bc.statics.biomeList.a.length) bc.statics.biomeList.a[id] = self;
@@ -21872,6 +21899,9 @@ function installMobs(vm) {
 		var c = vm.loadClass(SRC + 'BiomeGenBase'); vm.initClass(c);
 		var list = c.statics.biomeList.a;
 		for (var i = 0; i < list.length; i++) if (list[i] && list[i][':biomeName'].toLowerCase().replace(/ /g, '_') === n) return list[i];
+		if (n && String(n).indexOf(':') > 0 && JVM.biomeKeyOf) {
+			for (var k = 0; k < list.length; k++) if (list[k] && list[k].$mod && JVM.biomeKeyOf(vm, list[k]) === n) return list[k];
+		}
 		return c.statics.plains;
 	};
 
@@ -21967,11 +21997,18 @@ function installMobs(vm) {
 					if (!id) return 0;
 					e[':entityId'] = id;
 					var live = mobs(vm).live || (mobs(vm).live = new Map());
-					if (!live.has(id) && !vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving'))) {
+					var living = vm.isInstance(e, vm.loadClass(SRC + 'EntityLiving'));
+					if (!live.has(id) && !living) {
 						e.$mobKey = String(name).split(':').pop();
 						live.set(id, e);
 						if (JVM.mobSaveState) JVM.mobSaveState(vm, e, id);
 					}
+					else if (!live.has(id) && living && !e.cls.native && keys && keys.get(e.cls)) {
+						e.$mobKey = String(name).toLowerCase().replace(/[^a-z0-9_]+/g, '_').split(':').pop();
+						live.set(id, e);
+						if (vm.game && vm.game.mode === 'run') { if (JVM.mobLook) JVM.mobLook(vm, e, id); if (JVM.mobSaveState) JVM.mobSaveState(vm, e, id); }
+					}
+					if (e.$pendingFx) { e.$pendingFx.forEach(function (p) { op(vm, 'effect', id, p[0], p[1], p[2]); }); e.$pendingFx = null; }
 					var yaw = +e[':rotationYaw'] || 0;
 					if (yaw) op(vm, 'setrot', id, yaw, +e[':rotationPitch'] || 0);
 					return 1;
@@ -22292,7 +22329,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		else json.egg = false;
 		json.spawn = spawn.map(function (s) {
 			var r = { weight: s.weight || 10, group: [Math.max(1, s.min | 0), Math.max(1, s.max | 0)] };
-			if (s.biomes && s.biomes.length) r.biomes = s.biomes.filter(Boolean).map(function (b) { return b.$biomeKey || String(b[':biomeName'] || '').toLowerCase().replace(/ /g, '_'); });
+			if (s.biomes && s.biomes.length) r.biomes = s.biomes.filter(Boolean).map(function (b) { return b.$biomeKey || (JVM.biomeKeyOf && JVM.biomeKeyOf(vm, b)) || String(b[':biomeName'] || '').toLowerCase().replace(/ /g, '_'); });
 			if (s.type === 'monster') r.light = [0, 7];
 			if (s.dimension) {
 				r.dimension = s.dimension;
@@ -29649,14 +29686,14 @@ function installStation(vm) {
 	var wcm = function (vm) { return vm.$wcm || (vm.$wcm = vm.newObject(vm.loadClass(SRC + 'WorldChunkManager'))); };
 	var Wn = vm.natives[SRC + 'World'];
 	if (Wn) Wn.methods = Object.assign({}, Wn.methods, { 'getWorldChunkManager()Lnet/minecraft/src/WorldChunkManager;': function (vm) { return wcm(vm); } });
-	vm.defineNative(SRC + 'ColorizerGrass', { staticMethods: { 'getGrassColor(DD)I': function () { return 0x91bd59; } } });
+	vm.defineNative(SRC + 'ColorizerGrass', { staticMethods: { 'getGrassColor(DD)I': function (vm, n, a) { return JVM.colormap(vm, 'grass', a[0], a[1]); } } });
 	var BCI = 'net/modificationstation/stationapi/impl/worldgen/BiomeColorInterpolator', BCOL = { GRASS_INTERPOLATOR: 0x91bd59, FOLIAGE_INTERPOLATOR: 0x77ab2f, WATER_INTERPOLATOR: 0x3f76e4 };
 	vm.defineNative(BCI, { methods: { 'getColor(Lnet/minecraft/src/WorldChunkManager;DD)I': function (vm, self) { return self.$col | 0; } } });
 	vm.defineNative('net/modificationstation/stationapi/impl/worldgen/BiomeColorsImpl', { statics: { GRASS_INTERPOLATOR: null, FOLIAGE_INTERPOLATOR: null, WATER_INTERPOLATOR: null }, clinit: function (vm, c) {
 		Object.keys(BCOL).forEach(function (k) { var o = vm.newObject(vm.loadClass(BCI)); o.$col = BCOL[k]; c.statics[k] = o; });
 	} });
 	vm.defineNative(SRC + 'ColorizerFoliage', { staticMethods: {
-		'getFoliageColor(DD)I': function () { return 0x77ab2f; }, 'getFoliageColorBirch()I': function () { return 0x80a755; },
+		'getFoliageColor(DD)I': function (vm, n, a) { return JVM.colormap(vm, 'foliage', a[0], a[1]); }, 'getFoliageColorBirch()I': function () { return 0x80a755; },
 		'getFoliageColorPine()I': function () { return 0x619961; }, 'func_31073_c()I': function () { return 0x48b518; },
 	} });
 	ev('client/event/color/block/BlockColorsRegisterEvent', null, { fields: { blockColors: 'L' + BC + 'BlockColors;' } });
@@ -31333,6 +31370,32 @@ JVM.babricKind = function (fj, files) {
 	return { runnable: runnable || data, mixins: mixins, menus: menus };
 };
 
+var COLORMAP = { grass: [0x47cd33, 0xbfb755, 0x80b497], foliage: [0x1abf00, 0xaea42a, 0x60a17b] };
+var COLORMAP_EXACT = [[0.5, 0.5, 0x8eb971, 0x71a74d], [0.8, 0.4, 0x91bd59, 0x77ab2f], [1, 0, 0xbfb755, 0xaea42a], [0.2, 0.3, 0x8ab689, 0x6da36b],
+	[0.7, 0.8, 0x79c05a, 0x59ae30], [0.05, 0.8, 0x82b593, 0x63a277], [0.8, 0.9, 0x6ac44e, 0x45b421], [0, 0.5, 0x80b497, 0x60a17b],
+	[0.9, 1, 0x55c93f, 0x2bbb0f], [1, 0.9, 0x53ca37, 0x29bc05]];
+JVM.colormap = function (vm, kind, t0, r0) {
+	var k = COLORMAP[kind] || COLORMAP.grass;
+	var t = +t0, r = +r0;
+	t = isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5;
+	r = isFinite(r) ? Math.max(0, Math.min(1, r)) : 0.5;
+	var c = -1;
+	for (var e = 0; e < COLORMAP_EXACT.length && c < 0; e++) {
+		var x = COLORMAP_EXACT[e];
+		if (Math.fround(x[0]) === Math.fround(t) && Math.fround(x[1]) === Math.fround(r)) c = kind === 'foliage' ? x[3] : x[2];
+	}
+	if (c < 0) {
+		var rt = r * t, wA = rt, wB = t - rt, wC = 1 - t;
+		var ch = function (sh) {
+			var v = Math.round(wA * ((k[0] >> sh) & 255) + wB * ((k[1] >> sh) & 255) + wC * ((k[2] >> sh) & 255));
+			return Math.max(0, Math.min(255, v));
+		};
+		c = (ch(16) << 16) | (ch(8) << 8) | ch(0);
+	}
+	if (vm) vm.$colormap = { kind: kind, c: c, t: t, r: r };
+	return c;
+};
+
 JVM.installStation = installStation;
 JVM.station = { st: st, fire: fire, identifier: identifier, parseId: parseId, itemIdOf: itemIdOf,
 	blockInTag: function (vm, tag, block) {
@@ -32871,27 +32934,82 @@ JVM.collectWorldTypes = function (vm, modId) {
 	if (def.length) out['default'] = { remove_biomes: def };
 	return out;
 };
+function biomeKeyOf(vm, b) {
+	if (!b) return null;
+	if (b.$biomeKey) return b.$biomeKey;
+	if (!b.$mod || !b.cls || b.cls.native) return null;
+	var r = reg(vm), keys = r.biomeKeys || (r.biomeKeys = {});
+	var k = b.$mod + ':' + keyName(b[':biomeName']);
+	if (keys[k] && keys[k] !== b) k += '_' + ((b[':biomeID'] | 0) & 255);
+	b.$biomeKey = k;
+	keys[k] = b;
+	return k;
+}
+JVM.biomeKeyOf = biomeKeyOf;
+function unplaced(vm, modId) {
+	var dl = JVM.dimsOf ? JVM.dimsOf(vm).list : [];
+	if (!dl.some(function (d) { return (d.$mod || '') === modId; })) return [];
+	var c = vm.loadClass(SRC + 'BiomeGenBase');
+	if (c.initState !== 2) vm.initClass(c);
+	var list = c.statics.biomeList && c.statics.biomeList.a;
+	if (!list) return [];
+	var have = placed(vm), out = [];
+	for (var i = 0; i < list.length; i++) {
+		var b = list[i];
+		if (!b || b.$mod !== modId || !b.cls || b.cls.native || out.indexOf(b) >= 0) continue;
+		var isPlaced = false;
+		for (var k = 0; k < have.length && !isPlaced; k++) isPlaced = have[k].b === b;
+		if (!isPlaced) out.push(b);
+	}
+	return out;
+}
 JVM.collectBiomes = function (vm, modId, ref, safe) {
 	var out = {};
-	placed(vm).forEach(function (p) {
+	var list = placed(vm).slice();
+	safe(function () { unplaced(vm, modId).forEach(function (b) { list.push({ b: b, mod: modId, hosts: ['none'], weight: 0, dimOnly: true }); }); });
+	list.forEach(function (p) {
 		if (p.mod !== modId) return;
 		if (p.b.$worldTypes && !p.b.$worldTypes.length) return;
+		if (p.dimOnly && !biomeKeyOf(vm, p.b)) return;
 		var b = p.b, j = { name: String(b[':biomeName'] || 'Biome'), weight: p.weight };
+		var jid = b[':biomeID'] | 0;
+		if (jid >= 0 && jid < 255) j.java_id = jid;
 		j.hosts = p.hosts.length ? p.hosts.slice() : 'climate';
 		var dep = +b[':minHeight'], sca = +b[':maxHeight'];
 		if (isFinite(dep) && isFinite(sca) && (Math.abs(dep - 0.1) > 1e-3 || Math.abs(sca - 0.3) > 1e-3)) j.terrain = { depth: dep, scale: sca };
 		j.temperature = Math.max(0, Math.min(2, +b[':temperature'] || 0.5));
 		j.rainfall = Math.max(0, Math.min(1, +b[':rainfall'] || 0.5));
+		if (p.dimOnly) {
+			var t0 = +b[':temperature'], r0 = +b[':rainfall'];
+			if (b[':temperature'] != null && isFinite(t0)) j.temperature = Math.max(0, Math.min(2, t0));
+			if (b[':rainfall'] != null && isFinite(r0)) j.rainfall = Math.max(0, Math.min(1, r0));
+		}
 		var top = b[':topBlock'] & 255, fill = b[':fillerBlock'] & 255;
 		if (top && top !== 2) j.top = ref(top, 0);
 		if (fill && fill !== 3) j.filler = ref(fill, 0);
 		if (b[':enableSnow']) j.snow = true;
 		if (b[':enableRain'] === 0) j.rain = false;
 		var own = function (sig) { for (var c = b.cls; c && !c.native; c = c.superClass) if (c.findDeclared(sig)) return true; return false; };
-		var ask = function (fn) { b.$defaultColor = false; var v = safe(function () { return vm.callVirtual(b, fn, '()I', []); }, null); return b.$defaultColor ? null : v; };
-		var g = b.$grass != null ? b.$grass : own('getBiomeGrassColor()I') ? ask('getBiomeGrassColor') : null;
-		var f = b.$leaves != null ? b.$leaves : own('getBiomeFoliageColor()I') ? ask('getBiomeFoliageColor') : null;
+		var tOwn = Math.max(0, Math.min(1, +b[':temperature'] || 0)), rOwn = Math.max(0, Math.min(1, +b[':rainfall'] || 0));
+		var ask = function (fn, kind) {
+			var seen = [];
+			for (var i = 0; i < 16; i++) {
+				b.$defaultColor = false; vm.$colormap = null;
+				var v = safe(function () { return vm.callVirtual(b, fn, '()I', []); }, null);
+				if (b.$defaultColor || typeof v !== 'number') return null;
+				v = (v >>> 0) & 0xffffff;
+				var cm = vm.$colormap;
+				if (cm && cm.kind === kind && cm.c === v && Math.abs(cm.t - tOwn) < 1e-4 && Math.abs(cm.r - rOwn) < 1e-4) return null;
+				if (seen.indexOf(v) < 0) seen.push(v);
+				if (i === 1 && seen.length === 1) break;
+			}
+			return seen.length > 1 ? seen : seen[0];
+		};
+		var g = b.$grass != null ? b.$grass : own('getBiomeGrassColor()I') ? ask('getBiomeGrassColor', 'grass') : null;
+		var f = b.$leaves != null ? b.$leaves : own('getBiomeFoliageColor()I') ? ask('getBiomeFoliageColor', 'foliage') : null;
 		var hex = function (v) { return '#' + ('00000' + ((v >>> 0) & 0xffffff).toString(16)).slice(-6); };
+		if (Array.isArray(g)) { j.grass_colors = g.map(hex); g = g[0]; }
+		if (Array.isArray(f)) { j.foliage_colors = f.map(hex); f = f[0]; }
 		if (typeof g === 'number') j.grass_color = hex(g);
 		if (typeof f === 'number') j.foliage_color = hex(f);
 		if (own('getSkyColorByTemp(F)I')) {
@@ -34859,13 +34977,52 @@ function withDim(vm, l, fn) {
 	w[':provider'] = l.dim; l.dim[':worldObj'] = w;
 	try { return fn(); } finally { w[':provider'] = prev; }
 }
+function dimBiomeIds(vm, l, cx, cz) {
+	var w = l.dim && l.dim[':worldChunkMgr'];
+	if (!w || !w.cls || w.cls.native) return null;
+	var ids = null;
+	withDim(vm, l, function () {
+		var r = JVM.run(vm, function () {
+			return vm.callVirtual(w, 'loadBlockGeneratorData', '([Lnet/minecraft/src/BiomeGenBase;IIII)[Lnet/minecraft/src/BiomeGenBase;', [null, cx * 16, cz * 16, 16, 16]);
+		});
+		var arr = r.ok && r.value && r.value.a;
+		if (arr && arr.length >= 256) {
+			ids = new Int32Array(256);
+			for (var i = 0; i < 256; i++) ids[i] = arr[i] ? (arr[i][':biomeID'] | 0) & 255 : 255;
+			return;
+		}
+		ids = new Int32Array(256);
+		var any = false;
+		for (var k = 0; k < 256; k++) {
+			var x = cx * 16 + (k & 15), z = cz * 16 + (k >> 4);
+			var r1 = JVM.run(vm, function () { return vm.callVirtual(w, 'getBiomeGenAt', '(II)Lnet/minecraft/src/BiomeGenBase;', [x, z]); });
+			if (!r1.ok) { any = false; break; }
+			ids[k] = r1.value ? (r1.value[':biomeID'] | 0) & 255 : 255;
+			any = any || !!r1.value;
+		}
+		if (!any) ids = null;
+	});
+	return ids;
+}
 JVM.dimChunk = function (vm, contentKey, cx, cz) {
 	var l = live(vm, contentKey);
 	if (!l) return null;
 	var ch = null;
 	var r = withDim(vm, l, function () { return JVM.run(vm, function () { ch = vm.callVirtual(l.provider, 'provideChunk', '(II)Lnet/minecraft/src/Chunk;', [cx, cz]); }); });
 	if (!r.ok || !ch) return null;
-	return chunkOut(ch);
+	var out = chunkOut(ch);
+	var ba = ch.$biomes && ch.$biomes.a, bio = null;
+	if (ba && ba.length >= 256) {
+		for (var i = 0; i < 256 && !bio; i++) if (ba[i]) bio = true;
+		if (bio) { bio = new Int32Array(256); for (var k = 0; k < 256; k++) bio[k] = ba[k] & 255; }
+	}
+	if (!bio) bio = dimBiomeIds(vm, l, cx, cz);
+	out.biomes = bio;
+	return out;
+};
+JVM.dimBiomes = function (vm, contentKey, cx, cz) {
+	var l = live(vm, contentKey);
+	return l ? dimBiomeIds(vm, l, cx, cz) : null;
 };
 JVM.dimPopulate = function (vm, contentKey, cx, cz) {
 	var l = live(vm, contentKey);

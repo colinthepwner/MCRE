@@ -2030,6 +2030,8 @@
                     case 'heal': {
                         if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
+                    case 'stopusing': case 'usingsync':
+                        return actor ? 0 : mp(name);
                     case 'setslot':
                         var sbase = a[1] ? itemRef(a[1], a[3]) : 'id:0', sref2 = a[1] ? sbase + enchSpec(a[4]) : 'id:0';
                         if (actor) { jset(a[0] | 0, sref2, sbase, a[1] ? a[2] | 0 : 0, variantRef(sbase) ? 0 : gameData(a[1], a[3] | 0), enchSpec(a[4]).slice(2)); return 1; }
@@ -2117,7 +2119,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1, using: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -2294,21 +2296,18 @@
             }
             var dimSeeds = {};
             Module.mcDims = {
-                chunk: function (key, cx, cz, blocksPtr, dataPtr, seed) {
+                chunk: function (key, cx, cz, blocksPtr, dataPtr, seed, biomesPtr) {
                     var r = reg();
                     if (!vm || !r || !window.JVM || !window.JVM.dimChunk) return false;
                     var JV = window.JVM, prev = vm.game, out = null, prevDim = vm.mcDim;
-                    if (seed != null && dimSeeds[key] !== (seed | 0)) {
-                        if (JV.dimsLive) JV.dimsLive(vm);
-                        dimSeeds[key] = seed | 0;
-                    }
-                    if (seed != null) vm.mcSeed = seed | 0;
+                    dimSeed(JV, key, seed);
                     genFresh();
                     vm.game = genBridge; vm.steps = 0;
                     var mdk = (Module.mcModDims || {})[key];
                     if (mdk && mdk.id != null) vm.mcDim = mdk.id;
                     try { out = JV.dimChunk(vm, key, cx, cz); } finally { vm.game = prev; vm.mcDim = prevDim; }
                     if (!out) return false;
+                    if (biomesPtr && out.biomes) for (var bi = 0; bi < 256; bi++) HEAPU8[biomesPtr + bi] = out.biomes[bi] & 255;
                     var cache = {};
                     for (var i = 0; i < 32768; i++) {
                         var id = out.ids[i];
@@ -2324,7 +2323,29 @@
                     }
                     return true;
                 },
+                biomes: function (key, cx, cz, outPtr, seed) {
+                    var r = reg();
+                    if (!vm || !r || !window.JVM || !window.JVM.dimBiomes) return -1;
+                    if (vm.frames && vm.frames.length) return -1;
+                    var JV = window.JVM, prev = vm.game, prevDim = vm.mcDim, ids = null;
+                    dimSeed(JV, key, seed);
+                    genFresh();
+                    vm.game = genBridge; vm.steps = 0;
+                    var mdk = (Module.mcModDims || {})[key];
+                    if (mdk && mdk.id != null) vm.mcDim = mdk.id;
+                    try { ids = JV.dimBiomes(vm, key, cx, cz); } finally { vm.game = prev; vm.mcDim = prevDim; }
+                    if (!ids) return 0;
+                    for (var i = 0; i < 256; i++) HEAPU8[outPtr + i] = ids[i] & 255;
+                    return 1;
+                },
             };
+            function dimSeed(JV, key, seed) {
+                if (seed != null && dimSeeds[key] !== (seed | 0)) {
+                    if (JV.dimsLive) JV.dimsLive(vm);
+                    dimSeeds[key] = seed | 0;
+                }
+                if (seed != null) vm.mcSeed = seed | 0;
+            }
             J.populate = function (cx, cz, dim, seed) {
                 var r = reg();
                 if (!vm || !r) return;
@@ -2621,6 +2642,26 @@
                     return;
                 }
                 if (e.t === 'interact') { if (JV.mobInteract) JV.mobInteract(vm, e); return; }
+                if (e.t === 'using') {
+                    if (!e.item || !JV.itemUsingTick) return;
+                    var uj = javaOf(e.item, e.data), uc = e.count != null ? e.count | 0 : 1, upl = M.playerObj(vm, null), uslot = upl.$info ? upl.$info.slot : 0;
+                    var ur = JV.itemUsingTick(vm, uj.id, uc, uj.data, e.left | 0);
+                    if (!ur) return;
+                    var uout = ur.stack, uchanged = uout && (uout[':itemID'] !== uj.id || uout[':stackSize'] !== uc || uout[':itemDamage'] !== uj.data);
+                    if (uchanged || ur.stop) {
+                        var uby = actor && actor.guid;
+                        Promise.resolve().then(function () {
+                            try {
+                                var uput = function () {
+                                    if (uchanged) { bridge.op('setslot', uslot, uout[':stackSize'] > 0 ? uout[':itemID'] : 0, Math.max(0, uout[':stackSize']), uout[':itemDamage']); bridge.op('usingsync'); }
+                                    if (ur.stop) bridge.op('stopusing');
+                                };
+                                if (uby) withActor(uby, uput); else uput();
+                            } catch (x) { console.warn('[java] using', x); }
+                        });
+                    }
+                    return;
+                }
                 if (e.t === 'release') {
                     if (!e.item || !JV.itemReleased) return;
                     var rj = javaOf(e.item, e.data), rc = e.count != null ? e.count | 0 : 1, rpl = M.playerObj(vm, null), rslot = rpl.$info ? rpl.$info.slot : 0;
@@ -5188,6 +5229,7 @@
                         out.push('throw=' + [Math.max(0.1, num(th.speed, 1.5)), Math.max(0, num(th.gravity, 0.03)), Math.max(0, num(th.damage, 0) | 0)].join(','));
                     }
                     if (j.java_bow === true) out.push('ranged=' + ['*java', 1, Math.max(0, num(j.durability, 0) | 0)].join(','));
+                    if (j.java_using === true) out.push('using=1');
                     else if (j.ranged) {
                         var rg = typeof j.ranged === 'object' ? j.ranged : {};
                         var ammo = ref(rg.ammo || 'minecraft:arrow', it.mod, it.file);
@@ -5520,12 +5562,19 @@
                         return full;
                     });
                     var tags = (Array.isArray(j.tags) ? j.tags : j.tags ? [j.tags] : []).map(function (x) { return String(x).toLowerCase().replace(/[^a-z_]/g, ''); }).filter(Boolean);
+                    var jidN = Math.round(Number(j.java_id)), javaId = j.java_id !== undefined && isFinite(jidN) && jidN >= 0 && jidN < 255 ? jidN : '-';
+                    var palette = function (v, what) {
+                        if (!Array.isArray(v) || !v.length) return '-';
+                        var cs = v.slice(0, 64).map(function (c) { var h = hexColor(c, b.mod, b.file, what); return h === -1 ? null : h; }).filter(Boolean);
+                        return cs.join(';') || '-';
+                    };
                     lines.push(['biome', key, clean(j.name || pretty(b.name)), hosts.join(';') || '-', Math.round(num(j.weight, 10, 0, 1000)),
                                 num(j.temperature, 0.7, -1, 2), num(j.rainfall, 0.5, 0, 1), top || '-', filler || '-',
                                 hexColor(j.grass_color, b.mod, b.file, 'grass_color'), hexColor(j.foliage_color, b.mod, b.file, 'foliage_color'),
                                 trees, num(j.trees_per_chunk, trees === 'none' ? 0 : 3, 0, 64), Math.round(num(j.flowers_per_chunk, 2, 0, 64)),
                                 Math.round(num(j.grass_per_chunk, 1, 0, 64)), j.snow ? 1 : 0, j.rain === false ? 0 : 1, rules.join(';') || '-', terrain,
-                                wts.join(';') || 'default', tags.join(';') || '-', hexColor(j.sky_color, b.mod, b.file, 'sky_color')].join('\t'));
+                                wts.join(';') || 'default', tags.join(';') || '-', hexColor(j.sky_color, b.mod, b.file, 'sky_color'),
+                                javaId, palette(j.grass_colors, 'grass_colors'), palette(j.foliage_colors, 'foliage_colors')].join('\t'));
                 });
                 var REPLACES = { 0: ['id:1'], '-1': ['id:87'], 1: ['id:121'], 99: ['id:1', 'id:87', 'id:121'] };
                 function ore(o, blockRef, mod, file) {
