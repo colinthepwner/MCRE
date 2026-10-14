@@ -10171,6 +10171,25 @@ function installMc152(vm) {
 		'getSaturationModifier()F': function (vm, self) { return self.$food[1]; },
 		'setAlwaysEdible()Lnet/minecraft/src/ItemFood;': function (vm, self) { self.$alwaysEdible = true; return self; },
 		'setPotionEffect(IIIF)Lnet/minecraft/src/ItemFood;': function (vm, self) { return self; },
+		'onEaten(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;': function (vm, self, a) {
+			var st = a[0], w = a[1], pl = a[2];
+			if (st) st[':stackSize'] = (st[':stackSize'] | 0) - 1;
+			if (pl) {
+				var fs = vm.callVirtual(pl, 'getFoodStats', '()Lnet/minecraft/src/FoodStats;', []);
+				var n = vm.callVirtual(self, 'getHealAmount', '()I', []), sat = vm.callVirtual(self, 'getSaturationModifier', '()F', []);
+				if (fs) vm.callVirtual(fs, 'addStats', '(IF)V', [n | 0, Math.fround(+sat || 0)]);
+				if (w && w.cls.findMethod('playSoundAtEntity(Lnet/minecraft/src/Entity;Ljava/lang/String;FF)V')) vm.callVirtual(w, 'playSoundAtEntity', '(Lnet/minecraft/src/Entity;Ljava/lang/String;FF)V', [pl, 'random.burp', 0.5, Math.fround(Math.random() * 0.1 + 0.9)]);
+			}
+			vm.callVirtual(self, 'onFoodEaten', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)V', [st, w, pl]);
+			return st;
+		},
+		'onFoodEaten(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)V': function (vm, self, a) {
+			var fx = self.$foodEffect, pl = a[2];
+			if (!fx || !pl || Math.random() >= (+fx.chance || 0)) return;
+			var pe = vm.newObject(vm.loadClass(SRC + 'PotionEffect'));
+			vm.callVirtual(pe, '<init>', '(III)V', [fx.id | 0, (fx.seconds | 0) * 20, Math.max(0, (fx.level | 0) - 1)]);
+			vm.callVirtual(pl, 'addPotionEffect', '(Lnet/minecraft/src/PotionEffect;)V', [pe]);
+		},
 	} });
 	var toolInit = function (kind) { return function (vm, self, a) { initItem(vm, self, 256 + a[0]); self.$tool = kind; self.$toolMat = a[1]; self[':toolMaterial'] = a[1]; self[':maxStackSize'] = 1; self[':maxDamage'] = a[1] ? a[1].$m[1] : 0; }; };
 	def('ItemTool', { super: SRC + 'Item', methods: { '<init>(IILnet/minecraft/src/EnumToolMaterial;[Lnet/minecraft/src/Block;)V': function (vm, self, a) { toolInit('tool')(vm, self, [a[0], a[2]]); } } });
@@ -10766,7 +10785,11 @@ function installWorld(vm, def) {
 	def('EntityPlayerMP', { super: SRC + 'EntityClientPlayerMP', methods: {} });
 	def('PlayerCapabilities', { methods: { '<init>()V': function () {} } });
 	def('FoodStats', { methods: {
-		'addStats(IF)V': function (vm, self, a) { op(vm, 'feed', a[0], a[1]); },
+		'addStats(IF)V': function (vm, self, a) {
+			var fp = vm.$foodProbe;
+			if (fp) { fp.hunger = (fp.hunger || 0) + (a[0] | 0); fp.sat = Math.max(fp.sat || 0, +a[1] || 0); fp.fed = true; return; }
+			op(vm, 'feed', a[0], a[1]);
+		},
 		'getFoodLevel()I': function (vm) { var i = op(vm, 'player'); return i ? i.food : 20; },
 	} });
 	def('InventoryPlayer', { methods: {
@@ -11293,6 +11316,14 @@ JVM.collectContent = function (vm, modId) {
 		if (it.$mod !== modId || it.$override) return;
 		JVM.variantsOf(vm, it).forEach(function (meta) { itemEntry(it, id, meta); });
 	});
+	function foodOwn(it, id, meta, json) {
+		var fp = JVM.foodProbe ? JVM.foodProbe(vm, it, id, meta) : null;
+		if (!fp) return;
+		json.food = json.food || { hunger: 0, saturation: 0 };
+		if (fp.fed) { json.food.hunger = fp.hunger | 0; json.food.saturation = +fp.sat || 0; }
+		if (fp.always) json.food.always_edible = true;
+		if (fp.ownEat) json.food.java_eat = true;
+	}
 	function itemEntry(it, id, meta) {
 		var t = stationTex(it, -1, meta) || legacy(it, 0, meta) || tex(safe(function () { return vm.callVirtual(it, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [meta]); }, null));
 		if (t && !t.vanilla && (t.file || t.sheet != null || !vm.$stFiles)) out.textures['items/' + t.name] = t;
@@ -11303,6 +11334,7 @@ JVM.collectContent = function (vm, modId) {
 		if (it.$food && it.$foodEffect && JVM.effectName && JVM.effectName(it.$foodEffect.id))
 			json.food.effects = [{ effect: JVM.effectName(it.$foodEffect.id), seconds: it.$foodEffect.seconds, level: it.$foodEffect.level, chance: it.$foodEffect.chance }];
 		if (it.$food && it.$alwaysEdible) json.food.always_edible = true;
+		if (it.$food) foodOwn(it, id, meta, json);
 		if (it.$tool && it.$toolMat) json.tool = { type: it.$tool, level: it.$toolMat.$m[0], uses: it.$toolMat.$m[1], speed: it.$toolMat.$m[2], damage: it.$toolMat.$m[3] };
 		if (it.$armor) json.armor = { slot: ['head', 'chest', 'legs', 'feet'][it.$armor.slot], protection: it[':damageReduceAmount'], durability: it[':maxDamage'] };
 		if (overrides(it, ITEM_SCRIPTED) || it.$scriptedUse) { json.scripted = true; out.scripted.items[id] = true; }
@@ -11417,6 +11449,25 @@ JVM.collectContent = function (vm, modId) {
 	return out;
 };
 
+JVM.foodProbe = function (vm, it, id, meta) {
+	var EAT = 'onEaten(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;';
+	var RC = 'onItemRightClick(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;';
+	var mine = function (k) { var m = it.cls.findMethod(k); return m && !m.cls.native ? m : null; };
+	var me = mine(EAT), mr = mine(RC);
+	if (!me && !mr) return null;
+	var w = JVM.mc152.worldObj(vm), pl = null;
+	JVM.run(vm, function () { pl = JVM.mc152.playerObj(vm, null); });
+	if (!w || !pl) return null;
+	var fp = { fed: false, hunger: 0, sat: 0, always: false, ownEat: !!me };
+	var log = vm.log, prev = vm.$foodProbe;
+	vm.log = function (level) { if (level !== 'error') return log.apply(vm, arguments); };
+	vm.$foodProbe = fp;
+	try {
+		if (me) JVM.run(vm, function () { vm.invoke(me, it, [JVM.mc152.newStack(vm, id, 2, meta), w, pl]); });
+		if (mr) JVM.run(vm, function () { vm.invoke(mr, it, [JVM.mc152.newStack(vm, id, 2, meta), w, pl]); });
+	} finally { vm.$foodProbe = prev; vm.log = log; pl.$inUse = null; pl.$inUseCount = 0; }
+	return fp;
+};
 JVM.javaSoundName = function (name) {
 	var n = String(name == null ? '' : name);
 	if (n.indexOf(':') < 0 && n.indexOf('/') < 0) return n;
@@ -21396,6 +21447,17 @@ JVM.itemReleased = function (vm, javaId, count, data, left) {
 		var r = JVM.run(vm, function () { vm.callVirtual(it, 'onPlayerStoppedUsing', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;I)V', [st, w, pl, left | 0]); });
 		pl.$inUse = null; pl.$inUseCount = 0;
 		return r.ok ? st : null;
+	} finally { vm.$heldPin = prev; }
+};
+JVM.itemEaten = function (vm, javaId, count, data) {
+	var it = JVM.mc152.reg(vm).items[javaId];
+	if (!it || !running(vm)) return null;
+	var w = JVM.mc152.worldObj(vm), pl = JVM.mc152.playerObj(vm, null), st = newStack(vm, javaId, count, data);
+	var prev = vm.$heldPin;
+	vm.$heldPin = st;
+	try {
+		var r = JVM.run(vm, function () { return vm.callVirtual(it, 'onEaten', '(Lnet/minecraft/src/ItemStack;Lnet/minecraft/src/World;Lnet/minecraft/src/EntityPlayer;)Lnet/minecraft/src/ItemStack;', [st, w, pl]); });
+		return r.ok ? (r.value !== undefined && r.value !== null ? r.value : st) : null;
 	} finally { vm.$heldPin = prev; }
 };
 JVM.itemUsingTick = function (vm, javaId, count, data, left) {
@@ -38343,7 +38405,10 @@ function install(vm) {
 		'getCurrentPlayerStrVsBlock(Lnet/minecraft/src/Block;I)F': function (vm, self, a) { return strVsBlock(vm, self, a[0], a[1] | 0); },
 		'getCurrentPlayerStrVsBlock(Lnet/minecraft/src/Block;ZI)F': function (vm, self, a) { return strVsBlock(vm, self, a[0], a[2] | 0); },
 		'canHarvestBlock(Lnet/minecraft/src/Block;)Z': canHarvest,
-		'canEat(Z)Z': function (vm, self, a) { return (a[0] || cv(foodOf(self), 'needFood', '()Z')) && !noDamage(self) ? 1 : 0; },
+		'canEat(Z)Z': function (vm, self, a) {
+			if (vm.$foodProbe) { if (a[0]) vm.$foodProbe.always = true; return 0; }
+			return (a[0] || cv(foodOf(self), 'needFood', '()Z')) && !noDamage(self) ? 1 : 0;
+		},
 		'addExhaustion(F)V': function (vm, self, a) { if (!noDamage(self)) cv(foodOf(self), 'addExhaustion', '(F)V', [a[0]]); },
 		'xpBarCap()I': function (vm, self) { var l = xpLevel(self); return l >= 30 ? 62 + (l - 30) * 7 : l >= 15 ? 17 + (l - 15) * 3 : 17; },
 		'canCurrentToolHarvestBlock(III)Z': adventureExempt,

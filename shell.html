@@ -2030,6 +2030,10 @@
                     case 'heal': {
                         if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
+                    case 'feed': {
+                        if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
+                        return mp(['feed', a[0] | 0, +a[1] || 0].join('\t'));
+                    }
                     case 'stopusing': case 'usingsync':
                         return actor ? 0 : mp(name);
                     case 'setslot':
@@ -2119,7 +2123,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1, using: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1, using: 1, eaten: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -2659,6 +2663,17 @@
                                 if (uby) withActor(uby, uput); else uput();
                             } catch (x) { console.warn('[java] using', x); }
                         });
+                    }
+                    return;
+                }
+                if (e.t === 'eaten') {
+                    if (!e.item || !JV.itemEaten) return;
+                    var ej = javaOf(e.item, e.data), ec = e.count != null ? e.count | 0 : 1, epl = M.playerObj(vm, null), eslot = epl.$info ? epl.$info.slot : 0;
+                    var eout = JV.itemEaten(vm, ej.id, ec, ej.data);
+                    if (eout && (eout[':itemID'] !== ej.id || eout[':stackSize'] !== ec || eout[':itemDamage'] !== ej.data)) {
+                        var eid = eout[':stackSize'] > 0 ? eout[':itemID'] : 0, en = Math.max(0, eout[':stackSize']), ed = eout[':itemDamage'];
+                        var eby = actor && actor.guid;
+                        Promise.resolve().then(function () { try { var eput = function () { bridge.op('setslot', eslot, eid, en, ed); }; if (eby) withActor(eby, eput); else eput(); } catch (x) { console.warn('[java] eaten', x); } });
                     }
                     return;
                 }
@@ -5224,6 +5239,7 @@
                         if (es.length) out.push('effects=' + es.join(';'));
                     }
                     if (j.always_edible || (j.food && j.food.always_edible)) out.push('edible=1');
+                    if (j.food && j.food.java_eat === true) out.push('javaeat=1');
                     if (j.throwable) {
                         var th = typeof j.throwable === 'object' ? j.throwable : {};
                         out.push('throw=' + [Math.max(0.1, num(th.speed, 1.5)), Math.max(0, num(th.gravity, 0.03)), Math.max(0, num(th.damage, 0) | 0)].join(','));
