@@ -4060,12 +4060,12 @@
                 return new Promise(function (res) { c.toBlob(res, 'image/png'); })
                     .then(function (b) { return b.arrayBuffer(); }).then(function (ab) { return new Uint8Array(ab); });
             }
-            function cellsFor(kind, name) {
+            function cellsFor(kind, name, strict) {
                 var m = /^cell_(\d+)$/.exec(name);
                 if (m) return [parseInt(m[1], 10)];
                 var t = names && names[kind];
                 if (t && t[name]) return t[name];
-                var alt = kind === 'blocks' ? modernTexture(name) : '';
+                var alt = kind === 'blocks' ? modernTexture(name, strict) : '';
                 if (alt && t && t[alt]) return t[alt];
                 var sw = /^([a-z]+)_([a-z]+)$/.exec(name);
                 if (sw && t && t[sw[2] + '_' + sw[1]]) return t[sw[2] + '_' + sw[1]];
@@ -4087,6 +4087,7 @@
                 var schems = [];
                 var newTex = { blocks: {}, items: {} };
                 mobFiles = {}; texFiles = {};
+                var javaOwnTex = {};
                 Object.keys(picUrls).forEach(function (k) { URL.revokeObjectURL(picUrls[k]); });
                 guiFiles = {}; picUrls = {};
                 sdFiles = {};
@@ -4148,6 +4149,7 @@
                         if (!Module.mcJava || !Module.mcJava.hasClasses(files)) return files;
                         return Module.mcJava.define(id, files, function (file, text) { problem(id, file, text, 'load'); }).then(function (add) {
                             Object.keys(add).forEach(function (k) {
+                                if (/^textures[/]/.test(k)) javaOwnTex[id + ':' + k.toLowerCase()] = 1;
                                 if (k === 'lang/en_us.lang' && files[k]) { var a = files[k], b = add[k], m2 = new Uint8Array(a.length + 1 + b.length); m2.set(a); m2[a.length] = 10; m2.set(b, a.length + 1); files[k] = m2; }
                                 else files[k] = add[k];
                             });
@@ -4181,7 +4183,7 @@
                                 texFiles[id + ':' + path.toLowerCase()] = { path: path, data: data };
                                 var items = m[1].charAt(0) === 'i';
                                 var fp2 = items ? '/data/images/gui/items.png' : '/data/images/terrain.png';
-                                var cells = cellsFor(items ? 'items' : 'blocks', m[2]);
+                                var cells = javaOwnTex[id + ':' + path.toLowerCase()] ? [] : cellsFor(items ? 'items' : 'blocks', m[2], true);
                                 if (!cells.length) {
                                     newTex[items ? 'items' : 'blocks'][id + ':' + m[2].toLowerCase()] = data;
                                     return;
@@ -4615,7 +4617,7 @@
                     north: { texture: '#wool', cullface: 'north' }, south: { texture: '#wool', cullface: 'south' }, west: { texture: '#wool', cullface: 'west' }, east: { texture: '#wool', cullface: 'east' } } }] }
             };
             BUILTIN_MODELS['block/tinted_cross'] = BUILTIN_MODELS['block/cross'];
-            function modernTexture(n) {
+            function modernTexture(n, strict) {
                 var W = { oak: 1, spruce: 1, birch: 1, jungle: 1 };
                 var m;
                 var fixed = { stone_bricks: 'stonebrick', mossy_stone_bricks: 'stonebrick_mossy', cracked_stone_bricks: 'stonebrick_cracked',
@@ -4639,6 +4641,13 @@
                     dead_bush: 'deadbush', lapis_block: 'lapis_block', end_stone: 'end_stone', melon_side: 'melon_side', melon_top: 'melon_top',
                     terracotta: 'clay', snow: 'snow', crafting_table_front: 'crafting_table_front' };
                 if (fixed[n]) return fixed[n];
+                if (strict) {
+                    if ((m = /^(oak|spruce|birch|jungle)_(planks|log|sapling)$/.exec(n))) return m[2] + '_' + m[1];
+                    if ((m = /^(oak|spruce|birch|jungle)_log_top$/.exec(n))) return m[1] === 'oak' ? 'log_oak_top' : '';
+                    if ((m = /^(\w+?)_wool$/.exec(n))) return 'wool_colored_' + (m[1] === 'light_gray' ? 'silver' : m[1]);
+                    if ((m = /^(wheat|carrots|potatoes|beetroots|nether_wart)_stage(\d)$/.exec(n))) return m[1] + '_stage_' + m[2];
+                    return '';
+                }
                 if ((m = /^(\w+?)_planks$/.exec(n))) return 'planks_' + (W[m[1]] ? m[1] : 'oak');
                 if ((m = /^(\w+?)_log_top$/.exec(n))) return 'log_oak_top';
                 if ((m = /^(\w+?)_log$/.exec(n))) return 'log_' + (W[m[1]] ? m[1] : 'oak');
