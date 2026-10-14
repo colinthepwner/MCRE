@@ -193,6 +193,8 @@ function genMods(r) {
 }
 function job(m) {
 	if (!ready || !T || T.bind !== m.bind) { post({ t: 'done', id: m.id, fallback: true, why: ready ? 'tables' : 'not ready' }); return; }
+	H = m.h === 256 ? 256 : 128;
+	vm.mcLevelH = H;
 	J = { id: m.id, x0: m.x0, z0: m.z0, blocks: m.blocks, biomes: m.biomes, biomeNames: m.biomeNames, orig: new Map(), ticks: [], fallback: null };
 	var r = vm.mcReg, cx = m.cx, cz = m.cz, dim = m.dim, seed = m.seed;
 	var gm = dim === 0 || dim === -1 ? genMods(r) : [];

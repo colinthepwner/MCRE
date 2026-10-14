@@ -9559,6 +9559,11 @@ var JAVA_LANG = {
 	'container.inventory': 'Inventory', 'container.chest': 'Chest', 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chestDouble': 'Large Chest',
 	'stat.generalButton': 'General', 'stat.itemsButton': 'Items', 'gui.achievements': 'Achievements', 'gui.stats': 'Statistics',
 };
+JVM.levelHeight = function (vm) {
+	if (vm && vm.mcLevelH) return vm.mcLevelH;
+	try { if (typeof Module !== 'undefined' && Module._mcLevelHeight) return Module._mcLevelHeight() === 256 ? 256 : 128; } catch (e) { }
+	return 128;
+};
 function reg(vm) { return vm.mcReg || (vm.mcReg = { blocks: {}, items: {}, recipes: [], smelting: [], names: {}, lang: {}, tickMods: [], mods: [], vanilla: true }); }
 function op(vm, n, a, b, c, d, e, f, h, i) {
 	var g = vm.game;
@@ -10412,8 +10417,8 @@ function installWorldGen(vm, def) {
 		'isSurfaceWorld()Z': function (vm, self) { return self[':dimensionId'] === 0 ? 1 : 0; },
 		'getDimensionName()Ljava/lang/String;': function (vm, self) { var d = self[':dimensionId']; return d === -1 ? 'Nether' : d === 1 ? 'The End' : 'Overworld'; },
 		'getAverageGroundLevel()I': function () { return 64; },
-		'getHeight()I': function () { return 128; },
-		'getActualHeight()I': function () { return 128; },
+		'getHeight()I': function (vm) { return JVM.levelHeight(vm); },
+		'getActualHeight()I': function (vm) { return JVM.levelHeight(vm); },
 	} });
 	def('WorldGenerator', { access: JVM.ACC_PUBLIC | JVM.ACC_ABSTRACT,
 		abstractMethods: { 'generate(Lnet/minecraft/src/World;Ljava/util/Random;III)Z': true },
@@ -10656,9 +10661,9 @@ function installWorld(vm, def) {
 		'getTotalWorldTime()J': function (vm) { return BigInt(op(vm, 'time') || 0); },
 		'setWorldTime(J)V': function (vm, self, a) { op(vm, 'settime', Number(a[0])); },
 		'isDaytime()Z': function (vm) { var t = (op(vm, 'time') || 0) % 24000; return t < 12000 ? 1 : 0; },
-		'getHeightValue(II)I': function (vm, self, a) { var y = 127; while (y > 0 && LIGHT0[tileP(vm, a[0], y, a[1]) >>> 16]) y--; return y + 1; },
-		'getTopSolidOrLiquidBlock(II)I': function (vm, self, a) { var y = 127, id; while (y > 0 && (NOMOVE[id = tileP(vm, a[0], y, a[1]) >>> 16] || id === 18)) y--; return y + 1; },
-		'getPrecipitationHeight(II)I': function (vm, self, a) { var y = 127, id; while (y > 0 && NOMOVE[id = tileP(vm, a[0], y, a[1]) >>> 16] && id !== 8 && id !== 9 && id !== 10 && id !== 11) y--; return y + 1; },
+		'getHeightValue(II)I': function (vm, self, a) { var y = JVM.levelHeight(vm) - 1; while (y > 0 && LIGHT0[tileP(vm, a[0], y, a[1]) >>> 16]) y--; return y + 1; },
+		'getTopSolidOrLiquidBlock(II)I': function (vm, self, a) { var y = JVM.levelHeight(vm) - 1, id; while (y > 0 && (NOMOVE[id = tileP(vm, a[0], y, a[1]) >>> 16] || id === 18)) y--; return y + 1; },
+		'getPrecipitationHeight(II)I': function (vm, self, a) { var y = JVM.levelHeight(vm) - 1, id; while (y > 0 && NOMOVE[id = tileP(vm, a[0], y, a[1]) >>> 16] && id !== 8 && id !== 9 && id !== 10 && id !== 11) y--; return y + 1; },
 		'markBlockForUpdate(III)V': function () {},
 		'notifyBlocksOfNeighborChange(IIII)V': function () {},
 		'scheduleBlockUpdate(IIIII)V': function () {},
@@ -16966,10 +16971,11 @@ function install(vm) {
 		if (x0 < 0) x0 = 0; if (x1 > 16) x1 = 16;
 		if (y0 < 1) y0 = 1; if (y1 > 120) y1 = 120;
 		if (z0 < 0) z0 = 0; if (z1 > 16) z1 = 16;
+		var S = (bytes.length >> 8) || 128;
 		var water = false, i, j, k;
 		for (i = x0; !water && i < x1; i++) for (k = z0; !water && k < z1; k++) for (j = y1 + 1; !water && j >= y0 - 1; j--) {
-			if (j >= 0 && j < 128) {
-				var v = bytes[(i * 16 + k) * 128 + j];
+			if (j >= 0 && j < S) {
+				var v = bytes[(i * 16 + k) * S + j];
 				if (v === 8 || v === 9) water = true;
 				if (j !== y0 - 1 && i !== x0 && i !== x1 - 1 && k !== z0 && k !== z1 - 1) j = y0;
 			}
@@ -16979,7 +16985,7 @@ function install(vm) {
 			var dx = (i + cx * 16 + 0.5 - x) / w;
 			for (k = z0; k < z1; k++) {
 				var dz = (k + cz * 16 + 0.5 - z) / w;
-				var p = (i * 16 + k) * 128 + y1, grass = false;
+				var p = (i * 16 + k) * S + y1, grass = false;
 				if (dx * dx + dz * dz < 1) {
 					for (j = y1 - 1; j >= y0; j--) {
 						var dy = (j + 0.5 - y) / h;
@@ -17702,8 +17708,83 @@ function install(vm, H) {
 	var KEYS = { can: 'canSpawnStructureAtCoords(II)Z', start: 'getStructureStart(II)Lnet/minecraft/src/StructureStart;', sizeable: 'isSizeableStructure()Z' };
 	var chunkKey = function (x, z) { return JVM.box(vm, BigInt.asIntN(64, (BigInt(x) & 0xFFFFFFFFn) | ((BigInt(z) & 0xFFFFFFFFn) << 32n)), 'J'); };
 	var startsMap = function (g) { var m = g[':structureMap']; if (!m) { m = g[':structureMap'] = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); } return m; };
+	var PLAN_FILE = 'world/data/mcre_structplan.json', PLAN_MAX = 128, PLAN_MARGIN = 3, PLAN_CLEAR = 4, PLAN_SEEDS = 6;
+	var gop = function () { var gm = vm.game; return gm && gm.op ? gm.op.apply(null, arguments) : undefined; };
+	var randKeep = function (r) { var o = {}; Object.keys(r).forEach(function (k) { if (k.charAt(0) === '$' || k.charAt(0) === ':') o[k] = r[k]; }); return o; };
+	var randBack = function (r, o) { Object.keys(o).forEach(function (k) { r[k] = o[k]; }); };
+	var planRead = function (mod) {
+		var prev = vm.currentMod; vm.currentMod = mod;
+		try { var b = vm.fs && vm.fs.read(PLAN_FILE); return b ? JSON.parse(new TextDecoder().decode(b)) || {} : {}; }
+		catch (e) { return {}; } finally { vm.currentMod = prev; }
+	};
+	var planWrite = function (mod, all) {
+		var prev = vm.currentMod; vm.currentMod = mod;
+		try { if (vm.fs) { vm.fs.mkdirs('world/data'); vm.fs.write(PLAN_FILE, new TextEncoder().encode(JSON.stringify(all))); } }
+		catch (e) { } finally { vm.currentMod = prev; }
+	};
+	var planFor = function (vm, g, w) {
+		if (g.$plan !== undefined) return;
+		g.$plan = null;
+		var size = +gop('worldsize') || 0;
+		if (!size || size > PLAN_MAX || !vm.fs) return;
+		var mod = g.cls.source || vm.currentMod, key = g.cls.name + '@' + (vm.mcDim | 0);
+		var all = planRead(mod), rec = all[key];
+		var r = g[':rand'], keepR = randKeep(r), keepSeed = vm.mcSeed;
+		var can = ov(g, KEYS.can), sm = ov(g, KEYS.start);
+		var canAt = function (cx, cz) { return can ? !!vm.invoke(can, g, [cx, cz]) : !!jsOf(g, '$can')(g, cx, cz); };
+		var seeded = function (s32) {
+			var seed = BigInt.asIntN(64, BigInt(s32 | 0));
+			H.rSetSeed(r, seed);
+			var l1 = H.rLong(r), l2 = H.rLong(r);
+			return function (cx, cz) { H.rSetSeed(r, BigInt.asIntN(64, BigInt(cx) * l1) ^ BigInt.asIntN(64, BigInt(cz) * l2) ^ seed); H.rInt0(r); };
+		};
+		var make = function (p) {
+			vm.mcSeed = p.s | 0;
+			seeded(p.s)(p.x, p.z);
+			if (!canAt(p.x, p.z)) return;
+			var s = sm ? vm.invoke(sm, g, [p.x, p.z]) : jsOf(g, '$start')(g, p.x, p.z);
+			if (!s) return;
+			var m = startsMap(g), k = chunkKey(p.x, p.z);
+			if (m.$m && m.cls.native) m.$m.put(k, s); else vm.callVirtual(m, 'put', '(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;', [k, s]);
+		};
+		try {
+			if (rec === undefined) {
+				rec = 'none';
+				var at = seeded(keepSeed), natural = false;
+				for (var x = 0; x < size && !natural; x++) for (var z = 0; z < size && !natural; z++) { at(x, z); if (canAt(x, z)) natural = true; }
+				if (natural) rec = 'natural';
+				else {
+					var lo = PLAN_MARGIN, hi = size - PLAN_MARGIN, cells = [];
+					for (var cx = lo; cx < hi; cx++) for (var cz = lo; cz < hi; cz++) cells.push([cx, cz]);
+					for (var k = 1; k <= PLAN_SEEDS && rec === 'none'; k++) {
+						var s32 = ((keepSeed | 0) ^ Math.imul(k, 0x6C8E9CF5)) | 0;
+						var sh = H.jRandom(BigInt(s32)), order = cells.slice();
+						for (var i = order.length - 1; i > 0; i--) { var j = H.rInt(sh, i + 1), t = order[i]; order[i] = order[j]; order[j] = t; }
+						vm.mcSeed = s32;
+						var at2 = seeded(s32);
+						for (var q = 0; q < order.length; q++) {
+							var c = order[q];
+							at2(c[0], c[1]);
+							if (!canAt(c[0], c[1])) continue;
+							if (+gop('chunksmade', c[0] - PLAN_CLEAR, c[1] - PLAN_CLEAR, c[0] + PLAN_CLEAR, c[1] + PLAN_CLEAR)) continue;
+							rec = { x: c[0], z: c[1], s: s32 };
+							break;
+						}
+					}
+				}
+				all[key] = rec;
+				planWrite(mod, all);
+			}
+			if (rec && typeof rec === 'object') make(rec);
+		} catch (e) {
+			if (e instanceof JVM.JavaThrow) vm.log('warn', 'structure plan for ' + key + ': the mod\'s check failed');
+			else throw e;
+		} finally { vm.mcSeed = keepSeed; randBack(r, keepR); }
+		g.$plan = rec;
+	};
 	var structRG = function (vm, g, w, cx, cz) {
 		vm.$structTouched = true;
+		if (g.$plan === undefined) planFor(vm, g, w);
 		var m = startsMap(g), k = chunkKey(cx, cz);
 		if (m.$m ? m.$m.has(k) : vm.callVirtual(m, 'containsKey', '(Ljava/lang/Object;)Z', [k])) return;
 		H.rInt0(g[':rand']);
@@ -20929,7 +21010,7 @@ function installServer(vm) {
 		'isRaining()Z': function () { return 0; }, 'isThundering()Z': function () { return 0; },
 		'getRainStrength(F)F': function () { return 0; }, 'canLightningStrikeAt(III)Z': function () { return 0; },
 		'addWeatherEffect(Lnet/minecraft/src/Entity;)Z': function (vm) { vm.warnOnce('w:weather', 'lightning from mods is not available here (left unplugged)'); return 0; },
-		'getActualHeight()I': function () { return 128; }, 'getHeight()I': function () { return 128; },
+		'getActualHeight()I': function (vm) { return JVM.levelHeight(vm); }, 'getHeight()I': function (vm) { return JVM.levelHeight(vm); },
 	});
 	function worldInfo(vm) {
 		var wi = vm.mcWorldInfo || (vm.mcWorldInfo = vm.newObject(vm.loadClass(SRC + 'WorldInfo')));
@@ -32700,7 +32781,7 @@ function installStates(vm) {
 	if (W) W.methods = Object.assign({}, W.methods, {
 		'getBottomY()I': function () { return 0; },
 		'getTopY()I': function () { return 128; },
-		'getHeight()I': function () { return 128; },
+		'getHeight()I': function (vm) { return JVM.betaTag && JVM.betaTag(vm.$tag) ? 128 : JVM.levelHeight(vm); },
 		'getBlockState(III)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return getState(vm, self, a[0], a[1], a[2]); },
 		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
 		'setBlockStateWithNotify(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3], true); },
@@ -34609,33 +34690,75 @@ function noise3(vm, self, a) {
 	return arr;
 }
 
+function levelYb(vm) { return JVM.levelHeight(vm) === 256 ? 8 : 7; }
 function chunkInit(vm, self, world, blocks, cx, cz) {
 	self[':worldObj'] = world; self[':xPosition'] = cx; self[':zPosition'] = cz;
-	self[':blocks'] = blocks || vm.newArray('B', 32768);
+	var yb = blocks && blocks.a ? (blocks.a.length >= 65536 ? 8 : 7) : levelYb(vm);
+	self.$yb = yb;
+	self[':blocks'] = blocks || vm.newArray('B', 256 << yb);
 	var nib = vm.newObject(vm.loadClass(SRC + 'NibbleArray'));
-	vm.callVirtual(nib, '<init>', '(I)V', [32768]);
+	vm.callVirtual(nib, '<init>', '(I)V', [256 << yb]);
 	self[':data'] = nib;
 	self.$ids = null;
-	self.$meta = new Uint8Array(32768);
 }
-function cidx(x, y, z) { return (x & 15) << 11 | (z & 15) << 7 | (y & 127); }
+function cidx(c, x, y, z) { var yb = c.$yb; return (x & 15) << (yb + 4) | (z & 15) << yb | y; }
+function chunkHas(c, y) { return y >= 0 && y < (1 << c.$yb); }
+function chunkFits(vm, c, y) {
+	if (y < 0) return false;
+	if (y < (1 << c.$yb)) return true;
+	if (y >= JVM.levelHeight(vm)) return false;
+	chunkGrow(vm, c);
+	return y < (1 << c.$yb);
+}
+function chunkGrow(vm, c) {
+	var oy = c.$yb, ny = levelYb(vm);
+	if (ny <= oy || !c[':blocks']) return;
+	var oh = 1 << oy, ob = c[':blocks'].a, nb = vm.newArray('B', 256 << ny);
+	var on = c[':data'] && c[':data'][':data'] ? c[':data'][':data'].a : null, nn = vm.newArray('B', 128 << ny);
+	var ids = c.$ids ? new Int32Array(256 << ny) : null;
+	for (var col = 0; col < 256; col++) {
+		nb.a.set(ob.subarray(col << oy, (col << oy) + oh), col << ny);
+		if (on) nn.a.set(on.subarray((col << oy) >> 1, ((col << oy) + oh) >> 1), (col << ny) >> 1);
+		if (ids) ids.set(c.$ids.subarray(col << oy, (col << oy) + oh), col << ny);
+	}
+	c[':blocks'] = nb;
+	if (c[':data']) c[':data'][':data'] = nn;
+	c.$ids = ids;
+	c.$yb = ny;
+}
 function chunkId(self, i) { return self.$ids ? self.$ids[i] : self[':blocks'].a[i] & 255; }
 function chunkSetId(self, i, id) {
-	if (id > 255 && !self.$ids) { self.$ids = new Int32Array(32768); var b = self[':blocks'].a; for (var k = 0; k < 32768; k++) self.$ids[k] = b[k] & 255; }
+	if (id > 255 && !self.$ids) { var n = 256 << self.$yb; self.$ids = new Int32Array(n); var b = self[':blocks'].a; for (var k = 0; k < n; k++) self.$ids[k] = b[k] & 255; }
 	if (self.$ids) self.$ids[i] = id;
 	self[':blocks'].a[i] = id & 255;
 }
 function nibGet(n, i) { var b = n[':data'].a[i >> 1]; return (i & 1) ? (b >> 4) & 15 : b & 15; }
 function nibSet(n, i, v) { var a = n[':data'].a, k = i >> 1; a[k] = (i & 1) ? (a[k] & 15) | ((v & 15) << 4) : (a[k] & 240) | (v & 15); }
-function chunkOut(c) {
-	var ids = new Int32Array(32768), meta = new Uint8Array(32768), b = c[':blocks'] && c[':blocks'].a, n = c[':data'];
-	if (c.$ids) fillIds(ids, c.$ids); else if (b) fillBytes(ids, b);
-	if (n && n[':data']) fillNibbles(meta, n[':data'].a);
+function chunkOut(vm, c) {
+	var ly = levelYb(vm), n = 256 << ly;
+	var ids = new Int32Array(n), meta = new Uint8Array(n), b = c[':blocks'] && c[':blocks'].a, nb = c[':data'];
+	var cy = c.$yb || 7;
+	if (cy === ly) {
+		if (c.$ids) fillIds(ids, c.$ids, n); else if (b) fillBytes(ids, b, n);
+		if (nb && nb[':data']) fillNibbles(meta, nb[':data'].a, n >> 1);
+		return { ids: ids, meta: meta };
+	}
+	var t = new Int32Array(256 << cy), tm = new Uint8Array(256 << cy);
+	if (c.$ids) fillIds(t, c.$ids, t.length); else if (b) fillBytes(t, b, t.length);
+	if (nb && nb[':data']) fillNibbles(tm, nb[':data'].a, tm.length >> 1);
+	relayCols(ids, meta, ly, t, tm, cy);
 	return { ids: ids, meta: meta };
 }
-function fillIds(ids, big) { for (var i = 0; i < 32768; i++) ids[i] = big[i]; }
-function fillBytes(ids, b) { for (var i = 0; i < 32768; i++) ids[i] = b[i] & 255; }
-function fillNibbles(meta, d) { for (var k = 0; k < 16384; k++) { var v = d[k]; meta[k << 1] = v & 15; meta[(k << 1) | 1] = (v >> 4) & 15; } }
+function fillIds(ids, big, n) { for (var i = 0; i < n; i++) ids[i] = big[i] | 0; }
+function fillBytes(ids, b, n) { for (var i = 0; i < n; i++) ids[i] = b[i] & 255; }
+function fillNibbles(meta, d, n) { for (var k = 0; k < n; k++) { var v = d[k]; meta[k << 1] = v & 15; meta[(k << 1) | 1] = (v >> 4) & 15; } }
+function relayCols(ids, meta, ly, t, tm, cy) {
+	var h = Math.min(1 << ly, 1 << cy);
+	for (var col = 0; col < 256; col++) {
+		ids.set(t.subarray(col << cy, (col << cy) + h), col << ly);
+		meta.set(tm.subarray(col << cy, (col << cy) + h), col << ly);
+	}
+}
 
 function ebsView(vm, chunk, yBase) {
 	var e = vm.newObject(vm.loadClass(SRC + 'ExtendedBlockStorage'));
@@ -34654,22 +34777,22 @@ function ebsBind(e, chunk, vm) {
 	e.$chunk = chunk; e.$vm = vm;
 	var own = e.$own;
 	e.$own = null;
-	if (own && e.$y < 128) {
+	if (own && e.$y < JVM.levelHeight(vm)) {
 		for (var k in own) { var v = own[k], x = k >> 8, y = (k >> 4) & 15, z = k & 15; if (v.id != null) ebsSet(e, x, y, z, v.id, false); if (v.m != null) ebsSet(e, x, y, z, v.m, true); }
 	}
 }
 function ebsGet(e, x, y, z, meta) {
 	if (!e.$chunk) { var v = e.$own && e.$own[x << 8 | y << 4 | z]; return v ? (meta ? v.m | 0 : v.id | 0) : 0; }
-	if (e.$y + y >= 128) return 0;
 	if (e.$chunk.$live) return ebsWorld(e, x, y, z, 0, meta, false);
-	var i = cidx(x, e.$y + y, z);
+	if (!chunkHas(e.$chunk, e.$y + y)) return 0;
+	var i = cidx(e.$chunk, x, e.$y + y, z);
 	return meta ? nibGet(e.$chunk[':data'], i) : chunkId(e.$chunk, i);
 }
 function ebsSet(e, x, y, z, v, meta) {
 	if (!e.$chunk) { var o = e.$own || (e.$own = {}), k = x << 8 | y << 4 | z, c = o[k] || (o[k] = {}); if (meta) c.m = v & 15; else c.id = v; return; }
-	if (e.$y + y >= 128) return;
 	if (e.$chunk.$live) { ebsWorld(e, x, y, z, v, meta, true); return; }
-	var i = cidx(x, e.$y + y, z);
+	if (!chunkFits(e.$vm, e.$chunk, e.$y + y)) return;
+	var i = cidx(e.$chunk, x, e.$y + y, z);
 	if (meta) nibSet(e.$chunk[':data'], i, v); else chunkSetId(e.$chunk, i, v);
 }
 
@@ -34716,8 +34839,8 @@ function install(vm) {
 	def(SRC + 'NibbleArray', { fields: { data: '[B' }, methods: {
 		'<init>(I)V': function (vm, self, a) { self[':data'] = vm.newArray('B', a[0] >> 1); },
 		'<init>([B)V': function (vm, self, a) { self[':data'] = a[0]; },
-		'getNibble(III)I': function (vm, self, a) { return nibGet(self, cidx(a[0], a[1], a[2])); },
-		'setNibble(IIII)V': function (vm, self, a) { nibSet(self, cidx(a[0], a[1], a[2]), a[3]); },
+		'getNibble(III)I': function (vm, self, a) { var yb = self[':data'].a.length >= 32768 ? 8 : 7; if (a[1] < 0 || a[1] >= (1 << yb)) return 0; return nibGet(self, (a[0] & 15) << (yb + 4) | (a[2] & 15) << yb | a[1]); },
+		'setNibble(IIII)V': function (vm, self, a) { var yb = self[':data'].a.length >= 32768 ? 8 : 7; if (a[1] < 0 || a[1] >= (1 << yb)) return; nibSet(self, (a[0] & 15) << (yb + 4) | (a[2] & 15) << yb | a[1], a[3]); },
 		'isValid()Z': function () { return 1; },
 	} });
 	var C = SRC + 'Chunk';
@@ -34725,9 +34848,9 @@ function install(vm) {
 		chunkInit(vm, self, a[0], null, a[3], a[4]);
 		var ids = a[1] && a[1].a, meta = a[2] && a[2].a;
 		if (!ids) return;
-		var h = (ids.length / 256) | 0;
-		for (var col = 0; col < 256; col++) for (var y = 0; y < 128 && y < h; y++) {
-			var s = col * h + y, i = (col << 7) | y;
+		var h = (ids.length / 256) | 0, top = Math.min(h, 1 << self.$yb), yb = self.$yb;
+		for (var col = 0; col < 256; col++) for (var y = 0; y < top; y++) {
+			var s = col * h + y, i = (col << yb) | y;
 			var id = ids[s] & mask;
 			if (id) chunkSetId(self, i, id);
 			if (meta && meta[s]) nibSet(self[':data'], i, meta[s] & 15);
@@ -34741,31 +34864,32 @@ function install(vm) {
 		'getBlockStorageArray()[Lnet/minecraft/src/ExtendedBlockStorage;': function (vm, self) {
 			if (self.$ebs) return self.$ebs;
 			var arr = vm.newArray('Lnet/minecraft/src/ExtendedBlockStorage;', 16);
-			for (var s = 0; s < 8; s++) arr.a[s] = ebsView(vm, self, s << 4);
+			var n = JVM.levelHeight(vm) >> 4;
+			for (var s = 0; s < n; s++) arr.a[s] = ebsView(vm, self, s << 4);
 			return (self.$ebs = arr);
 		},
 		'setStorageArrays([Lnet/minecraft/src/ExtendedBlockStorage;)V': function (vm, self, a) {
 			var arr = a[0];
 			if (!arr || !arr.a) return;
-			for (var s = 0; s < 8 && s < arr.a.length; s++) { var e = arr.a[s]; if (e) ebsBind(e, self, vm); }
+			for (var s = 0; s < 16 && s < arr.a.length; s++) { var e = arr.a[s]; if (e) ebsBind(e, self, vm); }
 			self.$ebs = arr;
 		},
 		'resetRelightChecks()V': function () {}, 'enqueueRelightChecks()V': function () {},
 		'getBiomeArray()[B': function (vm, self) { return self.$biomes || (self.$biomes = vm.newArray('B', 256)); },
 		'setBiomeArray([B)V': function (vm, self, a) { self.$biomes = a[0]; },
-		'getBlockID(III)I': function (vm, self, a) { return chunkId(self, cidx(a[0], a[1], a[2])); },
-		'setBlockID(IIII)Z': function (vm, self, a) { chunkSetId(self, cidx(a[0], a[1], a[2]), a[3]); return 1; },
-		'setBlockIDWithMetadata(IIIII)Z': function (vm, self, a) { var i = cidx(a[0], a[1], a[2]); chunkSetId(self, i, a[3]); nibSet(self[':data'], i, a[4]); return 1; },
-		'getBlockMetadata(III)I': function (vm, self, a) { return nibGet(self[':data'], cidx(a[0], a[1], a[2])); },
-		'setBlockMetadata(IIII)V': function (vm, self, a) { nibSet(self[':data'], cidx(a[0], a[1], a[2]), a[3]); },
-		'getHeightValue(II)I': function (vm, self, a) { for (var y = 127; y > 0; y--) if (chunkId(self, cidx(a[0], y - 1, a[1]))) return y; return 0; },
+		'getBlockID(III)I': function (vm, self, a) { return chunkHas(self, a[1]) ? chunkId(self, cidx(self, a[0], a[1], a[2])) : 0; },
+		'setBlockID(IIII)Z': function (vm, self, a) { if (!chunkFits(vm, self, a[1])) return 0; chunkSetId(self, cidx(self, a[0], a[1], a[2]), a[3]); return 1; },
+		'setBlockIDWithMetadata(IIIII)Z': function (vm, self, a) { if (!chunkFits(vm, self, a[1])) return 0; var i = cidx(self, a[0], a[1], a[2]); chunkSetId(self, i, a[3]); nibSet(self[':data'], i, a[4]); return 1; },
+		'getBlockMetadata(III)I': function (vm, self, a) { return chunkHas(self, a[1]) ? nibGet(self[':data'], cidx(self, a[0], a[1], a[2])) : 0; },
+		'setBlockMetadata(IIII)V': function (vm, self, a) { if (chunkFits(vm, self, a[1])) nibSet(self[':data'], cidx(self, a[0], a[1], a[2]), a[3]); },
+		'getHeightValue(II)I': function (vm, self, a) { for (var y = (1 << self.$yb) - 1; y > 0; y--) if (chunkId(self, cidx(self, a[0], y - 1, a[1]))) return y; return 0; },
 		'generateHeightMap()V': function () {}, 'func_1024_c()V': function () {}, 'func_4143_d()V': function () {},
 		'generateSkylightMap()V': function () {}, 'func_1014_a()V': function () {}, 'setChunkModified()V': function () {},
 		'onChunkLoad()V': function () {}, 'onChunkUnload()V': function () {},
 		'getChunkPosition()Lnet/minecraft/src/ChunkCoordIntPair;': function () { return null; },
 		'getBlockState(III)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return stateAt(vm, self, a[0], a[1], a[2]); },
 		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3]); },
-		'setBlockStateWithMetadata(IIILnet/modificationstation/stationapi/api/block/BlockState;I)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { var r = setState(vm, self, a[0], a[1], a[2], a[3]); nibSet(self[':data'], cidx(a[0], a[1], a[2]), a[4]); return r; },
+		'setBlockStateWithMetadata(IIILnet/modificationstation/stationapi/api/block/BlockState;I)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { var r = setState(vm, self, a[0], a[1], a[2], a[3]); if (chunkHas(self, a[1])) nibSet(self[':data'], cidx(self, a[0], a[1], a[2]), a[4]); return r; },
 	};
 	def(C, { fields: { blocks: '[B', data: 'L' + SRC + 'NibbleArray;', xPosition: 'I', zPosition: 'I', worldObj: 'L' + SRC + 'World;', isTerrainPopulated: 'Z' }, methods: chunkMethods });
 	var stateOut = function (vm, s) {
@@ -34774,7 +34898,7 @@ function install(vm) {
 	};
 	var statesCls = null, blockCls = null;
 	var stateAt = function (vm, c, x, y, z) {
-		var i = cidx(x, y, z), id = chunkId(c, i);
+		var i = chunkHas(c, y) ? cidx(c, x, y, z) : -1, id = i < 0 ? 0 : chunkId(c, i);
 		if (!id) { var sc = statesCls || (statesCls = vm.loadClass(STA + 'block/States')); if (sc.initState !== 2) vm.initClass(sc); return sc.statics.AIR || null; }
 		var bc = blockCls || (blockCls = vm.loadClass(SRC + 'Block')); if (bc.initState !== 2) vm.initClass(bc);
 		var bl = bc.statics.blocksList, b = (bl && bl.a && bl.a[id]) || reg(vm).blocks[id];
@@ -34785,7 +34909,8 @@ function install(vm) {
 		return st !== undefined ? st : (byMeta[meta] = JVM.stationState.stateOfMeta(vm, b, meta));
 	};
 	var setState = function (vm, c, x, y, z, s) {
-		var o = stateOut(vm, s), i = cidx(x, y, z);
+		if (!chunkFits(vm, c, y)) return s;
+		var o = stateOut(vm, s), i = cidx(c, x, y, z);
 		chunkSetId(c, i, o.id); nibSet(c[':data'], i, o.meta);
 		return s;
 	};
@@ -34803,7 +34928,7 @@ function install(vm) {
 		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return setState(vm, self, a[0], a[1], a[2], a[3]); },
 		'setBlockState(IIILnet/modificationstation/stationapi/api/block/BlockState;I)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) {
 			var r = setState(vm, self, a[0], a[1], a[2], a[3]);
-			nibSet(self[':data'], cidx(a[0], a[1], a[2]), a[4]);
+			if (chunkHas(self, a[1])) nibSet(self[':data'], cidx(self, a[0], a[1], a[2]), a[4]);
 			return r;
 		},
 		'getBlockState(III)Lnet/modificationstation/stationapi/api/block/BlockState;': function (vm, self, a) { return stateAt(vm, self, a[0], a[1], a[2]); },
@@ -34966,6 +35091,7 @@ JVM.collectDims = function (vm, modId, safe) {
 		var dim = safe(function () { return makeDimension(vm, c); }, null);
 		var j = { name: c.$title || path.replace(/^the_/, 'the ').replace(/_/g, ' ').replace(/\b\w/g, function (x) { return x.toUpperCase(); }).replace(/^The /, 'the '),
 			terrain: 'script', java_generator: true, arrival_block: 'minecraft:glowstone' };
+		j.height = c.$forgeCls ? 256 : 128;
 		if (dim) {
 			var world = JVM.mc152.worldObj(vm);
 			safe(function () { vm.callVirtual(dim, 'registerWorld', '(Lnet/minecraft/src/World;)V', [world]); });
@@ -35072,7 +35198,7 @@ JVM.dimChunk = function (vm, contentKey, cx, cz) {
 	var ch = null;
 	var r = withDim(vm, l, function () { return JVM.run(vm, function () { ch = vm.callVirtual(l.provider, 'provideChunk', '(II)Lnet/minecraft/src/Chunk;', [cx, cz]); }); });
 	if (!r.ok || !ch) return null;
-	var out = chunkOut(ch);
+	var out = chunkOut(vm, ch);
 	var ba = ch.$biomes && ch.$biomes.a, bio = null;
 	if (ba && ba.length >= 256) {
 		for (var i = 0; i < 256 && !bio; i++) if (ba[i]) bio = true;
@@ -40581,7 +40707,7 @@ function install(vm) {
 			var l = Math.max(tryCall(vm, cw(self), 'getFullBlockLightValue', '(III)I', [a[0], a[1], a[2]], 15) | 0, a[3] | 0), f = 1 - l / 15;
 			return Math.fround((1 - f) / (f * 3 + 1));
 		},
-		'getHeight()I': function () { return 128; },
+		'getHeight()I': function (vm) { return JVM.levelHeight(vm); },
 		'extendedLevelsInChunkCache()Z': function () { return 0; },
 	} });
 

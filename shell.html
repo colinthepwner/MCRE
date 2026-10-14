@@ -2030,6 +2030,8 @@
                     case 'heal': {
                         if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
                         var hh = player(); return hh ? mp(['sethealth', hh.id, Math.min(20, (hh.health | 0) + (a[0] | 0))].join('\t')) : null; }
+                    case 'worldsize': return +mp('worldsize') || 0;
+                    case 'chunksmade': return +mp(['chunksmade', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t')) || 0;
                     case 'feed': {
                         if (actor) { toActor({ t: 'heal', n: a[0] | 0 }); return 1; }
                         return mp(['feed', a[0] | 0, +a[1] || 0].join('\t'));
@@ -2244,6 +2246,8 @@
                 op: function (name, x, y, z, b, d) {
                     x |= 0; y |= 0; z |= 0;
                     switch (name) {
+                    case 'worldsize': return +Module.ccall('mcModpeOp', 'string', ['string'], ['worldsize']) || 0;
+                    case 'chunksmade': return +Module.ccall('mcModpeOp', 'string', ['string'], [['chunksmade', x, y, z, b | 0].join('\t')]) || 0;
                     case 'tile': { var t = genJava(Module._mcJavaGenTile(x, y, z)); return { id: t.id, data: t.data }; }
                     case 'settile': {
                         if (!b) { Module._mcJavaGenSet(x, y, z, 0, 0); return 0; }
@@ -2313,7 +2317,8 @@
                     if (!out) return false;
                     if (biomesPtr && out.biomes) for (var bi = 0; bi < 256; bi++) HEAPU8[biomesPtr + bi] = out.biomes[bi] & 255;
                     var cache = {};
-                    for (var i = 0; i < 32768; i++) {
+                    var nCells = Math.min(out.ids.length, 256 * (Module._mcLevelHeight ? Module._mcLevelHeight() : 128));
+                    for (var i = 0; i < nCells; i++) {
                         var id = out.ids[i];
                         if (!id) continue;
                         var m = out.meta[i], ck = id * 16 + m, g = cache[ck];
@@ -2495,13 +2500,14 @@
                 var x0 = cx * 16, z0 = cz * 16;
                 var ptr = Module._mcJavaGenSnap(x0, z0);
                 if (!ptr) return 0;
-                var H8 = typeof HEAPU8 !== 'undefined' ? HEAPU8 : Module.HEAPU8, blocks = new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * 128 * 2).buffer);
+                var h = Module._mcLevelHeight ? Module._mcLevelHeight() : 128;
+                var H8 = typeof HEAPU8 !== 'undefined' ? HEAPU8 : Module.HEAPU8, blocks = new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * h * 2).buffer);
                 var names = [], index = {}, biomes = new Uint8Array(32 * 32);
                 UTF8ToString(Module._mcJavaGenBiomeGrid(x0, z0)).split('\n').slice(0, 1024).forEach(function (n, i) {
                     if (index[n] === undefined) { index[n] = names.length; names.push(n); }
                     biomes[i] = index[n];
                 });
-                gw.postMessage({ t: 'job', id: id, bind: genBind, cx: cx, cz: cz, dim: dim, seed: seed, x0: x0, z0: z0, blocks: blocks, biomes: biomes, biomeNames: names, dimKey: dimKeyOf(dim) },
+                gw.postMessage({ t: 'job', id: id, bind: genBind, cx: cx, cz: cz, dim: dim, seed: seed, x0: x0, z0: z0, h: h, blocks: blocks, biomes: biomes, biomeNames: names, dimKey: dimKeyOf(dim) },
                                [blocks.buffer, biomes.buffer]);
                 gwStats.sent++;
                 gwJobInfo[id] = [cx, cz, dim, seed];
@@ -2510,8 +2516,9 @@
             var gwJobInfo = {};
             function gwSnapNow(x0, z0) {
                 var ptr = Module._mcJavaGenSnap(x0, z0), H8 = typeof HEAPU8 !== 'undefined' ? HEAPU8 : Module.HEAPU8;
-                return ptr ? new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * 128 * 2).buffer) : null;
+                return ptr ? new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * gwH() * 2).buffer) : null;
             }
+            function gwH() { return Module._mcLevelHeight ? Module._mcLevelHeight() : 128; }
             function gwCompare(id, m) {
                 var info = gwJobInfo[id], st = gwStats.cmp || (gwStats.cmp = { jobs: 0, same: 0, workerOnly: 0, pageOnly: 0, differ: 0 });
                 if (!info) return;
@@ -2520,7 +2527,8 @@
                 var s1 = gwSnapNow(x0, z0);
                 if (!s0 || !s1) return;
                 var w = {};
-                for (var i = 0; i + 4 < m.changes.length; i += 5) w[((m.changes[i] - x0) * 32 + (m.changes[i + 2] - z0)) * 128 + m.changes[i + 1]] = m.changes[i + 3];
+                var hh = gwH();
+                for (var i = 0; i + 4 < m.changes.length; i += 5) w[((m.changes[i] - x0) * 32 + (m.changes[i + 2] - z0)) * hh + m.changes[i + 1]] = m.changes[i + 3];
                 st.jobs++;
                 for (var k = 0; k < s1.length; k++) {
                     var pc = s0[k] !== s1[k], wc = w[k] !== undefined;
@@ -4903,7 +4911,8 @@
                                 j.arrival_block ? (ref(j.arrival_block, d.mod, d.file) || '-') : '-', j.mobs === false ? 0 : 1, j.respawn ? 1 : 0,
                                 j.clouds === false ? 0 : 1,
                                 String(j.entering_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-',
-                                String(j.leaving_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-'].join('\t'));
+                                String(j.leaving_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-',
+                                Number(j.height) === 256 ? 256 : 128].join('\t'));
                 });
                 var dimRef = function (v, mod) { v = String(v || '').toLowerCase(); return dimIds[v] || dimIds[mod + ':' + v] || 0; };
                 contentKeys = {};
@@ -7241,6 +7250,7 @@
                             explode: function (x, y, z, power, fire) { act(mod, ['explode', +x, +y, +z, +power || 2, fire ? 1 : 0]); },
                             time: function () { return ask(mod, ['time']).then(function (r) { return r.time; }); },
                             worldType: function () { return ask(mod, ['worldtype']).then(function (r) { return r.type || 'default'; }); },
+                            height: function () { return ask(mod, ['height']).then(function (r) { return r.height || 128; }); },
                             setTime: function (t) { act(mod, ['settime', t | 0]); },
                             DAY: 19200,
                             timeOfDay: function () {
