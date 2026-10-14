@@ -2192,6 +2192,7 @@
                 if (window.JVM.storageReset) window.JVM.storageReset(vm);
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
                 if (window.JVM.hookWorldStart) window.JVM.hookWorldStart(vm);
+                setTimeout(function () { J.genWorkerStart(); }, 0);
                 return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {}, genBind = -1;
@@ -2344,6 +2345,8 @@
                 try {
                     JV.run(vm, function () {
                         var world = JV.mc152.worldObj(vm);
+                        var wrnd = world && world[':rand'];
+                        if (wrnd) vm.callVirtual(wrnd, 'setSeed', '(J)V', [BigInt.asIntN(64, BigInt(cx) * 341873128712n + BigInt(cz) * 132897987541n + BigInt(seed | 0))]);
                         var S = BigInt(seed | 0), rnd = vm.newObject(vm.loadClass('java/util/Random'));
                         vm.callVirtual(rnd, '<init>', '(J)V', [S]);
                         var l1 = vm.callVirtual(rnd, 'nextLong', '()J', []) / 2n * 2n + 1n;
@@ -2366,6 +2369,155 @@
                     if (JV.structPendingCount && JV.structPendingCount(vm)) { try { Module.ccall('mcModpeOp', 'string', ['string'], ['wanttick']); } catch (x) { } }
                 }
             };
+            var gw = null, gwReady = false, gwSig = '', gwDone = {}, gwCancelled = {}, gwTables = -1, gwStats = { sent: 0, applied: 0, fallback: 0, why: {} };
+            J.defineOrder = [];
+            J.genStats = function () { return gwStats; };
+            J.genWorkerOn = function () { return !!(gw && gwReady); };
+            function gwStop() { if (gw) { try { gw.terminate(); } catch (e) { } } gw = null; gwReady = false; gwSig = ''; gwDone = {}; gwCancelled = {}; gwTables = -1; }
+            function readTree(dir) {
+                var out = {};
+                var walk = function (d, rel) {
+                    var names = [];
+                    try { names = FS.readdir(d); } catch (e) { return; }
+                    names.forEach(function (n) {
+                        if (n === '.' || n === '..') return;
+                        var p = d + '/' + n, st = null;
+                        try { st = FS.stat(p); } catch (e) { return; }
+                        if (FS.isDir(st.mode)) { if (n !== 'world') walk(p, rel + n + '/'); }
+                        else { try { out[rel + n] = FS.readFile(p); } catch (e) { } }
+                    });
+                };
+                walk(dir, '');
+                return out;
+            }
+            J.genWorkerStart = function () {
+                try {
+                    if (typeof Worker === 'undefined' || !vm || !window.JVM || !J.genCheck()) { gwStop(); return; }
+                    if (navigator.deviceMemory && navigator.deviceMemory < 4) return;
+                    if (window.MCRE_NO_GEN_WORKER) { gwStop(); return; }
+                    var sig = J.defineOrder.join(',');
+                    if (gw && gwSig === sig) return;
+                    gwStop();
+                    var mods = J.defineOrder.map(function (id) {
+                        var pre = J.pre[id];
+                        if (!pre || pre.skip || !pre.files) return null;
+                        return { id: id, tag: (vm.$modTag && vm.$modTag[id]) || 'mcp152', files: pre.files,
+                                 settings: Module.mcMods && Module.mcMods.savedSettings ? Module.mcMods.savedSettings(id) : null,
+                                 cfg: readTree('/games/java/' + safeName(id)) };
+                    }).filter(Boolean);
+                    if (!mods.length) return;
+                    var tags = { babric: 1 };
+                    mods.forEach(function (m) { tags[m.tag] = 1; });
+                    var dimKeys = {};
+                    for (var d = -8; d <= 64; d++) { var k = dimKeyOf(d); if (k) dimKeys[d] = k; }
+                    var suffix = MCRE_BUILD === 'dev' ? '?t=' + Date.now() : '?v=' + encodeURIComponent(MCRE_BUILD);
+                    var w = new Worker('jvmgen.js' + suffix);
+                    gw = w; gwSig = sig;
+                    w.onmessage = function (ev) {
+                        if (gw !== w) return;
+                        var m = ev.data;
+                        if (m.t === 'ready') { gwReady = true; console.log('[java] decoration worker ready'); }
+                        else if (m.t === 'failed') { console.warn('[java] decoration worker could not start: ' + m.why); gwStop(); gwBroken = true; }
+                        else if (m.t === 'done') {
+                            if (gwCancelled[m.id]) { delete gwCancelled[m.id]; return; }
+                            gwDone[m.id] = m;
+                        }
+                    };
+                    w.onerror = function (e) { console.warn('[java] decoration worker', e && e.message); if (gw === w) gwStop(); };
+                    Promise.all(Object.keys(tags).map(function (t) { return loadMap(t).then(function (txt) { return [t, txt]; }); })).then(function (l) {
+                        if (gw !== w) return;
+                        var maps = {};
+                        l.forEach(function (p) { if (p[1]) maps[p[0]] = p[1]; });
+                        w.postMessage({ t: 'init', jvmUrl: new URL('jvm.js' + suffix, location.href).href, mods: mods, maps: maps, dimKeys: dimKeys });
+                    });
+                } catch (e) { console.warn('[java] decoration worker', e); gwStop(); }
+            };
+            function gwSendTables() {
+                genFresh();
+                var r = reg();
+                if (!r) return false;
+                var java = new Float64Array(4096), mod = new Uint8Array(4096), state = new Uint8Array(4096), game = new Int32Array(65536), solid = new Uint8Array(256);
+                for (var raw = 0; raw < 4096; raw++) {
+                    var g = genJava(raw);
+                    java[raw] = g ? g.id * 65536 + (g.data & 65535) : -1;
+                    mod[raw] = g && g.mod ? 1 : 0;
+                    state[raw] = g && g.mod && stateBlock(g.id) ? 1 : 0;
+                }
+                var ids = {};
+                for (var v = 0; v < 256; v++) ids[v] = 1;
+                Object.keys(r.blocks).forEach(function (k) { if (+k >= 0 && +k < 4096) ids[k] = 1; });
+                Object.keys(ids).forEach(function (k) {
+                    var jid = +k;
+                    for (var jd = 0; jd < 16; jd++) {
+                        var gg = genGame(jid, jd);
+                        game[jid * 16 + jd] = gg ? (gg.id & 255 | (gg.aux & 255) << 8 | (gg.mod ? 1 : 0) << 16) + 1 : -1;
+                    }
+                });
+                for (var t = 0; t < 256; t++) solid[t] = Module._mcTileSolid ? Module._mcTileSolid(t) : 0;
+                gw.postMessage({ t: 'tables', bind: genBind, java: java, mod: mod, state: state, game: game, solid: solid }, [java.buffer, mod.buffer, state.buffer, game.buffer, solid.buffer]);
+                gwTables = genBind;
+                return true;
+            }
+            var gwTried = 0, gwBroken = false;
+            J.genSubmit = function (id, cx, cz, dim, seed) {
+                if (!gw && !gwBroken && vm && running && Date.now() - gwTried > 5000) { gwTried = Date.now(); J.genWorkerStart(); }
+                if (!gw || !gwReady || !vm) return 0;
+                genFresh();
+                if (gwTables !== genBind && !gwSendTables()) return 0;
+                var x0 = cx * 16, z0 = cz * 16;
+                var ptr = Module._mcJavaGenSnap(x0, z0);
+                if (!ptr) return 0;
+                var H8 = typeof HEAPU8 !== 'undefined' ? HEAPU8 : Module.HEAPU8, blocks = new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * 128 * 2).buffer);
+                var names = [], index = {}, biomes = new Uint8Array(32 * 32);
+                UTF8ToString(Module._mcJavaGenBiomeGrid(x0, z0)).split('\n').slice(0, 1024).forEach(function (n, i) {
+                    if (index[n] === undefined) { index[n] = names.length; names.push(n); }
+                    biomes[i] = index[n];
+                });
+                gw.postMessage({ t: 'job', id: id, bind: genBind, cx: cx, cz: cz, dim: dim, seed: seed, x0: x0, z0: z0, blocks: blocks, biomes: biomes, biomeNames: names, dimKey: dimKeyOf(dim) },
+                               [blocks.buffer, biomes.buffer]);
+                gwStats.sent++;
+                gwJobInfo[id] = [cx, cz, dim, seed];
+                return 1;
+            };
+            var gwJobInfo = {};
+            function gwSnapNow(x0, z0) {
+                var ptr = Module._mcJavaGenSnap(x0, z0), H8 = typeof HEAPU8 !== 'undefined' ? HEAPU8 : Module.HEAPU8;
+                return ptr ? new Uint16Array(H8.slice(ptr, ptr + 32 * 32 * 128 * 2).buffer) : null;
+            }
+            function gwCompare(id, m) {
+                var info = gwJobInfo[id], st = gwStats.cmp || (gwStats.cmp = { jobs: 0, same: 0, workerOnly: 0, pageOnly: 0, differ: 0 });
+                if (!info) return;
+                var x0 = info[0] * 16, z0 = info[1] * 16, s0 = gwSnapNow(x0, z0);
+                J.populate(info[0], info[1], info[2], info[3]);
+                var s1 = gwSnapNow(x0, z0);
+                if (!s0 || !s1) return;
+                var w = {};
+                for (var i = 0; i + 4 < m.changes.length; i += 5) w[((m.changes[i] - x0) * 32 + (m.changes[i + 2] - z0)) * 128 + m.changes[i + 1]] = m.changes[i + 3];
+                st.jobs++;
+                for (var k = 0; k < s1.length; k++) {
+                    var pc = s0[k] !== s1[k], wc = w[k] !== undefined;
+                    if (pc && wc) { if (w[k] === s1[k]) st.same++; else { st.differ++; var dk = (s0[k] & 255) + ':' + (s0[k] >> 8) + ' page ' + (s1[k] & 255) + ':' + (s1[k] >> 8) + ' worker ' + (w[k] & 255) + ':' + (w[k] >> 8); (st.d = st.d || {})[dk] = (st.d[dk] || 0) + 1; } }
+                    else if (pc) { var pk = (s0[k] & 255) + ':' + (s0[k] >> 8) + '->' + (s1[k] & 255) + ':' + (s1[k] >> 8); (st.p = st.p || {})[pk] = (st.p[pk] || 0) + 1; }
+                    if (pc && !wc) st.pageOnly++;
+                    else if (wc && w[k] !== s1[k]) st.workerOnly++;
+                }
+            }
+            J.genReadyId = function () { for (var k in gwDone) return +k; return -1; };
+            J.genApply = function (id) {
+                var m = gwDone[id];
+                delete gwDone[id];
+                if (!m || m.fallback) { gwStats.fallback++; if (m && m.why) gwStats.why[m.why] = (gwStats.why[m.why] || 0) + 1; return 0; }
+                if (window.MCRE_GEN_COMPARE) { gwCompare(id, m); delete gwJobInfo[id]; return 1; }
+                delete gwJobInfo[id];
+                var c = m.changes;
+                for (var i = 0; i + 4 < c.length; i += 5) {
+                    if (Module._mcJavaGenTile(c[i], c[i + 1], c[i + 2]) === c[i + 4]) Module._mcJavaGenSet(c[i], c[i + 1], c[i + 2], c[i + 3] & 255, c[i + 3] >> 8);
+                }
+                for (var t = 0; t + 2 < m.ticks.length; t += 3) Module._mcJavaGenTick(m.ticks[t], m.ticks[t + 1], m.ticks[t + 2]);
+                gwStats.applied++;
+                return 1;
+            };
+            J.genCancel = function (id) { if (gwDone[id]) delete gwDone[id]; else gwCancelled[id] = 1; };
             J.worldStop = function () {
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
@@ -2958,7 +3110,7 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); J.menusSoon(); };
+            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; J.defineOrder = []; gwStop(); if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); J.menusSoon(); };
             J.menusSoon = function () {
                 clearTimeout(J.menuTimer);
                 J.menuTimer = setTimeout(function () {
@@ -3085,6 +3237,7 @@
                     setTimeout(J.menusSoon, 0);
                     if (!st || st.skip) return {};
                     files = st.files || files;
+                    if (J.defineOrder.indexOf(modId) < 0) J.defineOrder.push(modId);
                     var JVM = window.JVM, ver = st.ver, classes = st.classes;
                     var entry = classes.filter(function (c) { return /^(net[/]minecraft[/]src[/])?mod_[^\/$]+$/.test(c); });
                     vm.currentMod = modId;
