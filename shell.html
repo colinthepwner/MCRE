@@ -5633,6 +5633,7 @@
                     var isUnder = function (p, re) { for (var q = p.parent, n = 0; q >= 0 && n < 64; q = model.parts[q].parent, n++) if (re.test(model.parts[q].name)) return true; return false; };
                     var animOf = function (p) {
                         var g = given[p.name];
+                        if (g && typeof g === 'object') g = g.kind || 'none';
                         var kind = g !== undefined ? String(g).toLowerCase() :
                             /head/.test(p.name) && !headDone && !isUnder(p, /head/) ? 'head' :
                             /leg/.test(p.name) && !isUnder(p, /leg/) ? 'leg' :
@@ -5649,10 +5650,15 @@
                     };
                     var hiddenNames = Array.isArray(j.hidden_parts) ? j.hidden_parts.map(function (n) { return String(n).toLowerCase(); }) : [];
                     hiddenNames.forEach(function (n) { if (!model.parts.some(function (p) { return p.name === n; })) problem(mb.mod, file, '"hidden_parts": the model has no part "' + n + '"'); });
+                    var swingsOf = function (p) {
+                        var g = given[p.name], sw = g && typeof g === 'object' && Array.isArray(g.swing) ? g.swing : [];
+                        return sw.slice(0, 6).filter(function (s) { return Array.isArray(s) && /^[xyz]$/.test(s[0]) && /^(age|walk)$/.test(s[1]); })
+                            .map(function (s) { return [s[0], s[1] === 'walk' ? 'w' : 'a', s[2] ? 1 : 0, numStr(+s[3] || 0, 4), numStr(+s[4] || 0, 4), numStr(+s[5] || 0, 4), numStr(+s[6] || 0, 4)].join(','); }).join(';');
+                    };
                     model.parts.forEach(function (p, i) {
                         lines.push(['mobpart', key, i, p.parent, p.pivot.map(numStr).join(','), p.rot.map(function (r) { return numStr(r, 5); }).join(','), p.name, animOf(p),
                                     p.boxes.map(function (b) { return b.map(function (v) { return numStr(v); }).join(','); }).join(';'),
-                                    p.hidden || hiddenNames.indexOf(p.name) >= 0 ? 1 : 0].join('\t'));
+                                    p.hidden || hiddenNames.indexOf(p.name) >= 0 ? 1 : 0, swingsOf(p)].join('\t'));
                     });
                     if (egg) {
                         var eggKey = key + '_spawn_egg';

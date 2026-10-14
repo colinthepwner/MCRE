@@ -12381,12 +12381,59 @@ JVM.probeAnims = function (vm, model, entity, idOf) {
 		return list.map(function (r) { return [+r[':rotateAngleX'] || 0, +r[':rotateAngleY'] || 0, +r[':rotateAngleZ'] || 0]; });
 	};
 	var base = angles(0, 0, 0, 0);
+	var N = 64, STEP = 0.1;
+	var series = function (mk) { var s = []; for (var i = 0; i < N; i++) s.push(angles.apply(null, mk(i * STEP))); return s; };
+	var sAge = series(function (t) { return [0, 0, t, 0]; });
+	var sAgeW = series(function (t) { return [0, 1, t, 0]; });
+	var sWalk = series(function (t) { return [t, 1, 0, 0]; });
+	var fit = function (y) {
+		var lo = Infinity, hi = -Infinity;
+		y.forEach(function (v) { if (v < lo) lo = v; if (v > hi) hi = v; });
+		if (hi - lo < 0.03) return null;
+		var best = null, n = y.length, sy = 0;
+		for (var q = 0; q < n; q++) sy += y[q];
+		var tryK = function (k) {
+			var cc = 0, ss = 0, cs = 0, yc = 0, ys = 0, sc = 0, sn = 0;
+			for (var i = 0; i < n; i++) {
+				var x = i * STEP, c = Math.cos(k * x), s = Math.sin(k * x);
+				cc += c * c; ss += s * s; cs += c * s; yc += y[i] * c; ys += y[i] * s; sc += c; sn += s;
+			}
+			var M = [[n, sc, sn], [sc, cc, cs], [sn, cs, ss]], R = [sy, yc, ys];
+			var d3 = function (A3) { return A3[0][0] * (A3[1][1] * A3[2][2] - A3[1][2] * A3[2][1]) - A3[0][1] * (A3[1][0] * A3[2][2] - A3[1][2] * A3[2][0]) + A3[0][2] * (A3[1][0] * A3[2][1] - A3[1][1] * A3[2][0]); };
+			var det = d3(M);
+			if (Math.abs(det) < 1e-6) return;
+			var col = function (ci) { return M.map(function (row, ri) { return row.map(function (v, cj) { return cj === ci ? R[ri] : v; }); }); };
+			var m = d3(col(0)) / det, a = d3(col(1)) / det, b = d3(col(2)) / det, res = 0;
+			for (var j = 0; j < n; j++) { var xj = j * STEP, e = y[j] - m - a * Math.cos(k * xj) - b * Math.sin(k * xj); res += e * e; }
+			if (!best || res < best.res) best = { k: k, m: m, a: a, b: b, res: res };
+		};
+		for (var kc = 0.05; kc <= 6; kc += 0.02) tryK(kc);
+		if (!best) return null;
+		var k0 = best.k;
+		for (var kf = Math.max(0.05, k0 - 0.03); kf <= Math.min(6, k0 + 0.03); kf += 0.001) tryK(kf);
+		var A = Math.sqrt(best.a * best.a + best.b * best.b);
+		if (A < 0.02 || Math.sqrt(best.res / n) > 0.12 * A || best.k > 5.99) return null;
+		return [+best.k.toFixed(4), +A.toFixed(4), +Math.atan2(-best.b, best.a).toFixed(4), +best.m.toFixed(4)];
+	};
+	var swingsOf = function (i) {
+		var out = [];
+		for (var ax = 0; ax < 3; ax++) {
+			var b0 = base[i][ax];
+			var age = fit(sAge.map(function (s) { return s[i][ax] - b0; }));
+			if (age) out.push(['xyz'[ax], 'age', 0].concat(age));
+			var ageW = fit(sAgeW.map(function (s, n) { return s[i][ax] - sAge[n][i][ax]; }));
+			if (ageW) out.push(['xyz'[ax], 'age', 1].concat(ageW));
+			var walk = ageW ? null : fit(sWalk.map(function (s) { return s[i][ax] - b0; }));
+			if (walk) out.push(['xyz'[ax], 'walk', 1].concat(walk));
+		}
+		return out;
+	};
 	var YAW = 40, yawRad = YAW * Math.PI / 180;
 	var head = angles(0, 0, 0, YAW);
 	var step = angles(0, 1, 0, 0), later = [[1.1, 0], [2.3, 0], [3.7, 0], [Math.PI / 0.6662, 0], [0, 3.3], [0, 9.1]].map(function (t) { return angles(t[0], 1, t[1], 0); });
 	var aged = angles(0, 0, 7, 0);
-	angles(0, 0, 0, 0);
 	var out = {};
+	angles(0, 0, 0, 0);
 	list.forEach(function (r, i) {
 		var id = idOf.get(r);
 		if (!id) return;
@@ -12395,9 +12442,13 @@ JVM.probeAnims = function (vm, model, entity, idOf) {
 		var sx = step[i][0] - b[0], moves = later.some(function (l) { return Math.abs(l[i][0] - step[i][0]) > 0.1; });
 		var az = aged[i][2] - b[2], ay = aged[i][1] - b[1];
 		if (Math.abs(dy - yawRad) < yawRad * 0.25) kind = 'head';
-		else if (Math.abs(sx) > 0.15 && moves) kind = sx > 0 ? 'leg_a' : 'leg_b';
-		else if (Math.abs(az) > 0.05) kind = az > 0 ? 'wing_l' : 'wing_r';
-		else if ((Math.abs(ay) > 0.03 || later.some(function (l) { return Math.abs(l[i][1] - b[1]) > 0.03; })) && String(id).indexOf('tail') >= 0) kind = 'tail';
+		var sw = swingsOf(i);
+		if (sw.length) { out[id] = { kind: kind, swing: sw }; return; }
+		if (kind !== 'head') {
+			if (Math.abs(sx) > 0.15 && moves) kind = sx > 0 ? 'leg_a' : 'leg_b';
+			else if (Math.abs(az) > 0.05) kind = az > 0 ? 'wing_l' : 'wing_r';
+			else if ((Math.abs(ay) > 0.03 || later.some(function (l) { return Math.abs(l[i][1] - b[1]) > 0.03; })) && String(id).indexOf('tail') >= 0) kind = 'tail';
+		}
 		out[id] = kind;
 	});
 	return out;
