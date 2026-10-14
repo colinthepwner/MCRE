@@ -4467,6 +4467,7 @@ M	bba	b	(I)V	func_78342_b	bindTexture
 M	bba	b	(Ljava/lang/String;)I	func_78341_b	getTexture
 M	bbb	a	()V	func_78595_a	clearOverrideBlockTexture
 M	bbb	a	(DDDDDD)V	func_83020_a	setRenderBounds
+M	bbb	a	(IIII)I	func_78602_a	getAoBrightness
 M	bbb	a	(Lake;III)Z	func_78582_a	renderBlockFence
 M	bbb	a	(Lamh;III)Z	func_78565_t	renderBlockStairs
 M	bbb	a	(Lamq;)V	func_83018_a	setRenderBoundsFromBlock

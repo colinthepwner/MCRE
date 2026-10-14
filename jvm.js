@@ -27760,6 +27760,13 @@ function install(vm) {
 	};
 	var BL = 'Lnet/minecraft/src/Block;', IC2 = 'Lnet/minecraft/src/Icon;';
 	var setB = function (self, a) { ['renderMinX', 'renderMinY', 'renderMinZ', 'renderMaxX', 'renderMaxY', 'renderMaxZ'].forEach(function (k, i) { self[':' + k] = a[i]; }); };
+	var aoBrightness = function (vm, self, a) {
+		var p = a[0] | 0, q = a[1] | 0, r = a[2] | 0, d = a[3] | 0;
+		if (p === 0) p = d;
+		if (q === 0) q = d;
+		if (r === 0) r = d;
+		return ((p + q + r + d) >> 2) & 16711935;
+	};
 	var rbMethods = {
 		'<init>()V': function (vm, self) { setB(self, [0, 0, 0, 1, 1, 1]); },
 		'<init>(Lnet/minecraft/src/IBlockAccess;)V': function (vm, self, a) { setB(self, [0, 0, 0, 1, 1, 1]); self[':blockAccess'] = a[0]; },
@@ -27806,6 +27813,8 @@ function install(vm) {
 		'getBlockIconFromSide(Lnet/minecraft/src/Block;I)Lnet/minecraft/src/Icon;': function (vm, self, a) { return override(vm, self, a[0]) || sideMetaPic(vm, a[0], a[1], metaNow(vm)); },
 		'getBlockIcon(Lnet/minecraft/src/Block;)Lnet/minecraft/src/Icon;': function (vm, self, a) { return override(vm, self, a[0]) || sideMetaPic(vm, a[0], 1, metaNow(vm)); },
 		'getIconSafe(Lnet/minecraft/src/Icon;)Lnet/minecraft/src/Icon;': function (vm, self, a) { return a[0]; },
+		'getAoBrightness(IIII)I': aoBrightness,
+		'func_78602_a(IIII)I': aoBrightness,
 		'renderBlockAsItem(Lnet/minecraft/src/Block;IF)V': function (vm, self, a) { standard(vm, self, [a[0], 0, 0, 0]); },
 	};
 	['renderFaceYNeg', 'renderFaceYPos', 'renderFaceZNeg', 'renderFaceZPos', 'renderFaceXNeg', 'renderFaceXPos'].forEach(function (n, side) {

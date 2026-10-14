@@ -5233,6 +5233,7 @@ M	bfq	d	()V	func_78379_d	reset
 M	bfq	d	(I)V	func_78378_d	setColorOpaque_I
 M	bfr	a	()V	func_78595_a	clearOverrideBlockTexture
 M	bfr	a	(DDDDDD)V	func_83020_a	setRenderBounds
+M	bfr	a	(IIII)I	func_78602_a	getAoBrightness
 M	bfr	a	(Laoh;III)Z	func_78582_a	renderBlockFence
 M	bfr	a	(Laqp;III)Z	func_78565_t	renderBlockStairs
 M	bfr	a	(Laqz;)V	func_83018_a	setRenderBoundsFromBlock
