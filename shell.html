@@ -1772,7 +1772,7 @@
             var fsCache = {};
             function runningMod() {
                 var fr = vm && vm.frames;
-                if (fr) for (var i = fr.length - 1; i >= 0; i--) { var s = fr[i].m.cls.source; if (s && s !== 'client') return s; }
+                if (fr) for (var i = fr.length - 1; i >= 0; i--) { var s = fr[i].m.cls.source; if (s && s !== 'client' && s.indexOf('lib:') !== 0) return s; }
                 return vm && vm.currentMod || '_';
             }
             function modFs() {
@@ -2448,6 +2448,8 @@
                     if (JV.shotTick) JV.shotTick(vm);
                     if (JV.mobTick) JV.mobTick(vm);
                     if (JV.accessoryTick) JV.accessoryTick(vm);
+                    if (JV.effectTick) JV.effectTick(vm);
+                    if (JV.runDeferred) JV.runDeferred(vm);
                     if (JV.guiTick) JV.guiTick(vm);
                     if (JV.remoteGuiTick) JV.remoteGuiTick(vm);
                     if (JV.tileTick) {
@@ -3044,6 +3046,11 @@
                                 install: function (v) { v.$tag = mtag; if (map) JVM.loadMap(v, map, mtag); if (bmap && mtag !== 'babric') JVM.loadMap(v, bmap, 'babric'); JVM.installMc152(v); },
                             });
                             vm.gameTexture = function (kind, n) { return Module.mcMods && Module.mcMods.hasTexture ? Module.mcMods.hasTexture(kind, n) : true; };
+                            vm.gameResource = function (p) {
+                                var f = p === 'textures/font/ascii.png' ? '/data/images/font/default8.png' : /^textures[/]/.test(p) ? '/data/images/' + p.slice(9) : null;
+                                if (!f) return null;
+                                try { return FS.readFile(f); } catch (e) { return null; }
+                            };
                             vm.mcDimKeyOf = function (d) { return dimKeyOf(d); };
                             vm.$tag = ver.tag || 'mcp152';
                             vm.$legacy = vm.$tag === 'mcp147';
@@ -3065,7 +3072,12 @@
                                 classes.push(cn);
                             } else if (!/^META-INF[/]/i.test(k)) vm.resources[k] = files[k];
                         });
-                        return (J.pre[modId] = { ver: ver, classes: classes, files: files });
+                        var libs = JVM.runtimeLibsFor ? JVM.runtimeLibsFor(vm, files) : [];
+                        return Promise.all(libs.map(function (lib) {
+                            return fetch(lib.file).then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+                                .then(function (b) { return JVM.readZip(new Uint8Array(b)); })
+                                .then(function (ents) { JVM.addRuntimeLib(vm, lib, ents); }, function (e) { console.warn('[java] library ' + lib.name + ' could not be fetched', e); });
+                        })).then(function () { return (J.pre[modId] = { ver: ver, classes: classes, files: files }); });
                     });
                 }).catch(function (e) {
                     problem('', 'Java mod could not run: ' + (e && e.message || e));
