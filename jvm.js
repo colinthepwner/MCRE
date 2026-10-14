@@ -10412,14 +10412,20 @@ function installWorldGen(vm, def) {
 	};
 	var minable = function (vm, self, world, rand, x, y, z) {
 		var n = self[':numberOfBlocks'], id = self[':minableBlockId'], meta = self[':minableBlockMeta'] | 0, target = self[':field_94523_c'];
-		var getId = vcall(vm, world, 'getBlockId', '(III)I'), setB = vcall(vm, world, 'setBlock', '(IIIIII)Z'), nextD = vcall(vm, rand, 'nextDouble', '()D');
-		var f = Math.fround(vm.callVirtual(rand, 'nextFloat', '()F', []) * FPI);
+		var b2j = g(vm).blockToJava;
+		var getBlk = function (bx, by, bz) {
+			var tid = tileP(vm, bx, by, bz) >>> 16;
+			return target === 1 && tid === 1 ? 1 : b2j(tid);
+		};
+		var nextD = vcall(vm, rand, 'nextDouble', '()D');
+		var emptyArr = [];
+		var f = Math.fround(vm.callVirtual(rand, 'nextFloat', '()F', emptyArr) * FPI);
 		var s = Math.fround(Math.fround(mhSin(f) * n) / 8), c = Math.fround(Math.fround(mhCos(f) * n) / 8);
 		var d0 = Math.fround(x + 8 + s), d1 = Math.fround(x + 8 - s), d2 = Math.fround(z + 8 + c), d3 = Math.fround(z + 8 - c);
 		var d4 = y + vm.callVirtual(rand, 'nextInt', '(I)I', [3]) - 2, d5 = y + vm.callVirtual(rand, 'nextInt', '(I)I', [3]) - 2;
 		for (var l = 0; l <= n; l++) {
 			var d6 = d0 + (d1 - d0) * l / n, d7 = d4 + (d5 - d4) * l / n, d8 = d2 + (d3 - d2) * l / n;
-			var d9 = nextD([]) * n / 16;
+			var d9 = nextD(emptyArr) * n / 16;
 			var sw = Math.fround(mhSin(Math.fround(Math.fround(l * FPI) / n)) + 1);
 			var d10 = sw * d9 + 1, d11 = sw * d9 + 1;
 			var i1 = fl(d6 - d10 / 2), j1 = fl(d7 - d11 / 2), k1 = fl(d8 - d10 / 2);
@@ -10432,8 +10438,8 @@ function installWorldGen(vm, def) {
 					if (d12 * d12 + d13 * d13 >= 1) continue;
 					for (var i3 = k1; i3 <= j2; i3++) {
 						var d14 = (i3 + 0.5 - d8) / (d10 / 2);
-						if (d12 * d12 + d13 * d13 + d14 * d14 < 1 && getId([k2, l2, i3]) === target)
-							setB([k2, l2, i3, id, meta, 2]);
+						if (d12 * d12 + d13 * d13 + d14 * d14 < 1 && getBlk(k2, l2, i3) === target)
+							setBlock(vm, world, k2, l2, i3, id, meta);
 					}
 				}
 			}
