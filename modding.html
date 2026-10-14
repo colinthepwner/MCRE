@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Making mods - Minecraft RE</title>
+<title>Rube - making mods for Minecraft RE</title>
 <style>
 :root { --bg: #1d1b19; --panel: #2a2724; --text: #e8e2d8; --dim: #a59d90; --accent: #8fd16a; --code: #f1d38a; }
 * { box-sizing: border-box; }
@@ -29,7 +29,7 @@ mark { background: #6b5a1d; color: #fff; }
 .dl:hover { background: #4d8536; }
 @media (max-width: 760px) { .wrap { display: block; } nav { position: static; width: auto; max-height: none; } main { padding: 8px 12px 40px; } }
 </style></head><body>
-<header><h1>Example Pack - how a Minecraft RE mod is made</h1><p>Everything a mod can contain and every function its scripts can call. In a world, <code>/console</code> shows your scripts' log and errors and lets you try the API.</p></header>
+<header><h1>Rube - making mods for Minecraft RE</h1><p>Everything a mod can contain and every function its scripts can call. In a world, <code>/console</code> shows your scripts' log and errors and lets you try the API.</p></header>
 <div class="wrap"><nav><input id="search" placeholder="Search the guide"><div id="toc"><a href="#introduction">Introduction</a>
 <a href="#presets">Presets</a>
 <a href="#what-s-inside">What&#x27;s inside</a>
@@ -41,11 +41,24 @@ mark { background: #6b5a1d; color: #fff; }
 <a href="#rules">Rules</a>
 <a href="#loot-tables">Loot tables</a>
 <a href="#order">Order</a>
+<a href="#the-mods-tab">The Mods tab</a>
+<a href="#worlds-and-mods">Worlds and mods</a>
+<a href="#playing-together">Playing together</a>
+<a href="#when-mods-overlap">When mods overlap</a>
 <a href="#making-a-mod">Making a mod</a>
 <a href="#sharing-a-mod">Sharing a mod</a>
 <a href="#old-pocket-edition-mods-modpe">Old Pocket Edition mods (ModPE)</a>
 <a href="#java-resource-packs">Java resource packs</a>
-<a href="#types-mcre-d-ts">Types (mcre.d.ts)</a></div></nav><main><section id="introduction"><h2>Introduction</h2><pre>A mod is a .zip file. Turn this one on in the Mods tab to see what a mod can do:
+<a href="#java-mods">Java mods</a>
+<a href="#types-mcre-d-ts">Types (mcre.d.ts)</a></div></nav><main><section id="introduction"><h2>Introduction</h2><pre>Rube is Minecraft RE&#x27;s mod loader: everything in the Mods tab goes through it. It loads
+  - Rube mods: a .zip (or a folder) like this one - textures, sounds, blocks, items, recipes,
+    creatures, structures, world generation and scripts (most of this page);
+  - Java Edition mods: ModLoader and Forge mods for Minecraft 1.4.7, 1.5 and 1.6, and Babric /
+    Better Than Adventure mods for Beta 1.7.3 - the .jar as it is (see Java mods below);
+  - Pocket Edition ModPE scripts (BlockLauncher&#x27;s .js and .modpkg) and Java resource packs.
+Mods of every kind run together, in one list.
+
+This mod, the Example Pack, is a Rube mod. Turn it on in the Mods tab to see what a mod can do:
   - it changes how the game looks, sounds and reads: dirt turns purple, the apple turns gold,
     menu buttons pop instead of click, and both get new names;
   - it adds blocks, items and recipes: Example Ore underground (and in the Nether), which
@@ -772,6 +785,30 @@ replaces it, null turns it off) - e.g. protect an arena while a game runs. See /
 Use them in blocks (&quot;loot&quot;: &quot;my_table&quot; drops from the table instead of &quot;drops&quot;), in structures
 (above) and from scripts (world.fillLoot, dropLoot, rollLoot).</pre></section>
 <section id="order"><h2>Order</h2><pre>Mods higher in the list win when two change the same thing. A mod you add goes on top.</pre></section>
+<section id="the-mods-tab"><h2>The Mods tab</h2><pre>Add mod takes a .zip, a .jar, a .js / .modpkg, a resource pack, a structure file or a folder
+(drop a file on the game to add it too). Each mod&#x27;s row shows:
+  - whether it&#x27;s on (On / Off) - its place in the list decides which mod wins (see Order);
+  - how well it runs: Works, Partly works (with what isn&#x27;t here yet - &quot;custom-drawn blocks
+    and items&quot;, &quot;new potion effects&quot;...) or Can&#x27;t run (and why: made for a version Rube doesn&#x27;t
+    load, a server plugin, source code instead of the mod...);
+  - what it&#x27;s made for: any device, computers or phones;
+  - its problems, counted (open the mod to read them) and its Settings, if it has any.
+Download gives the mod back as a file, Remove deletes it, Reload loads every mod again (or
+/reload in a world).</pre></section>
+<section id="worlds-and-mods"><h2>Worlds and mods</h2><pre>A world remembers the exact mods it was saved with. In the world list, a world saved with
+other mods is greyed out (&quot;Other mods&quot; or &quot;Mods missing&quot;); open it to see which mods it wants
+turned on or off, and Switch mods sets them for you. Worlds from before this existed open with
+any mods.</pre></section>
+<section id="playing-together"><h2>Playing together</h2><pre>Only the host&#x27;s mods run in a shared game. Joining a game with mods asks first and lists them;
+Join downloads the ones you don&#x27;t have (&quot;Keep these mods after I leave&quot; adds them to your
+list, switched off). While
+you&#x27;re there your own mods are off; leaving brings them back. Blocks, items, creatures and
+world generation come from the host&#x27;s mods for everyone; scripts and Java mods&#x27; code run on
+the host, and what they show (menus, messages, sounds) reaches the players they&#x27;re for.</pre></section>
+<section id="when-mods-overlap"><h2>When mods overlap</h2><pre>Mods often add the same thing - copper from three mods, three kinds of rubies. Rube makes them
+count as one where it matters: a recipe that asks for one mod&#x27;s copper takes any mod&#x27;s
+copper (Forge&#x27;s ore dictionary names), so mixed mods still craft. When
+two mods change the same texture, sound or setting, the higher one in the list wins.</pre></section>
 <section id="making-a-mod"><h2>Making a mod</h2><pre>Start from this one: Download it from the Mods tab, unzip it, change it.
   - Open the folder, not a .zip, while you work: Add mod -&gt; Open a folder (Chrome and Edge).
     The game reads it straight from your disk. Change a file, then press Reload in the Mods
@@ -805,6 +842,21 @@ under sdcard/ in its zip are there to read (a config it expects). The network is
 sees what a phone with no connection saw (most just skip their update check).</pre></section>
 <section id="java-resource-packs"><h2>Java resource packs</h2><pre>A Java Edition resource pack .zip (with pack.mcmeta) can be added as it is: its block and item
 textures, sounds and en_us.lang lines are used.</pre></section>
+<section id="java-mods"><h2>Java mods</h2><pre>Add mod -&gt; choose the .jar (or the .zip it came as). Rube runs the mod&#x27;s own Java code - no
+Java install, nothing to set up - and turns what it registers into the game&#x27;s own things:
+  - blocks, items, tools, armour, food, recipes, smelting and fuel;
+  - creatures with their models, textures, drops and spawning, and how their models move;
+  - biomes, world types, ore and structure generation, and new dimensions with their portals;
+  - its key bindings and config options, as Settings in the Mods tab;
+  - what its code does in the world: using items and blocks, ticking blocks and creatures,
+    commands, chat, events.
+Loaders: ModLoader and Forge (Minecraft 1.4.7, 1.5.x and 1.6.4), Babric with StationAPI and
+Better Than Adventure (Beta 1.7.3). Mods for different Minecraft versions can be on together.
+A mod that needs a library (LomLib, Player API...) gets it downloaded for it when you&#x27;re
+online; one it can&#x27;t find is named on the mod&#x27;s row.
+What Rube can&#x27;t do for a Java mod is said on its row (see The Mods tab): parts drawn by the
+mod&#x27;s own OpenGL code it can&#x27;t reproduce, and changes it makes to Minecraft&#x27;s own classes,
+leave just that part out - the rest of the mod still works.</pre></section>
 <section id="types-mcre-d-ts"><h2>Types (mcre.d.ts)</h2><p>Every script's API, for editors that read TypeScript types (VS Code...): put it next to your scripts with a jsconfig.json and <code>mod.</code>, <code>world.</code>... complete as you type. <a id="dl" href="#">Download mcre.d.ts</a></p><pre>// Minecraft RE - mod scripting API, for editors (VS Code and others read this file and complete
 // the API as you type). Keep it next to your scripts: this mod&#x27;s jsconfig.json points the editor
 // at types/*.d.ts and scripts/*.js. Nothing here runs - it only describes what the game gives
