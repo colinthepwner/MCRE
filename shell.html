@@ -2372,7 +2372,7 @@
             var gw = null, gwReady = false, gwSig = '', gwDone = {}, gwCancelled = {}, gwTables = -1, gwStats = { sent: 0, applied: 0, fallback: 0, why: {} };
             J.defineOrder = [];
             J.genStats = function () { return gwStats; };
-            J.genWorkerOn = function () { return !!(gw && gwReady); };
+            J.genWorkerOn = function () { return !!(gw && gwReady && !gwStateful); };
             function gwStop() { if (gw) { try { gw.terminate(); } catch (e) { } } gw = null; gwReady = false; gwSig = ''; gwDone = {}; gwCancelled = {}; gwTables = -1; }
             function readTree(dir) {
                 var out = {};
@@ -2391,6 +2391,7 @@
                 return out;
             }
             J.genWorkerStart = function () {
+                gwStateful = false;
                 try {
                     if (typeof Worker === 'undefined' || !vm || !window.JVM || !J.genCheck()) { gwStop(); return; }
                     if (navigator.deviceMemory && navigator.deviceMemory < 4) return;
@@ -2419,6 +2420,7 @@
                         if (m.t === 'ready') { gwReady = true; console.log('[java] decoration worker ready'); }
                         else if (m.t === 'failed') { console.warn('[java] decoration worker could not start: ' + m.why); gwStop(); gwBroken = true; }
                         else if (m.t === 'done') {
+                            if (m.stateful && !gwStateful) { gwStateful = true; console.log('[java] decoration builds structures: kept on the page'); }
                             if (gwCancelled[m.id]) { delete gwCancelled[m.id]; return; }
                             gwDone[m.id] = m;
                         }
@@ -2458,10 +2460,11 @@
                 gwTables = genBind;
                 return true;
             }
-            var gwTried = 0, gwBroken = false;
+            var gwTried = 0, gwBroken = false, gwStateful = false;
             J.genSubmit = function (id, cx, cz, dim, seed) {
                 if (!gw && !gwBroken && vm && running && Date.now() - gwTried > 5000) { gwTried = Date.now(); J.genWorkerStart(); }
                 if (!gw || !gwReady || !vm) return 0;
+                if (gwStateful || dimKeyOf(dim)) return -1;
                 genFresh();
                 if (gwTables !== genBind && !gwSendTables()) return 0;
                 var x0 = cx * 16, z0 = cz * 16;

@@ -17096,7 +17096,7 @@ function install(vm, H) {
 	var listAdd = function (l, o) { if (l.$list && l.cls.native) l.$list.push(o); else vm.callVirtual(l, 'add', '(Ljava/lang/Object;)Z', [o]); };
 
 	var getId = function (w, x, y, z) { return vm.callVirtual(w, 'getBlockId', '(III)I', [x, y, z]); };
-	var setB = function (w, x, y, z, id, meta, fl) { vm.callVirtual(w, 'setBlock', '(IIIIII)Z', [x, y, z, id, meta, fl]); };
+	var setB = function (w, x, y, z, id, meta, fl) { vm.$structTouched = true; vm.callVirtual(w, 'setBlock', '(IIIIII)Z', [x, y, z, id, meta, fl]); };
 	var isAir = function (w, x, y, z) { return !!vm.callVirtual(w, 'isAirBlock', '(III)Z', [x, y, z]); };
 	var blocksList = function () { var c = cls('Block'); if (c.initState !== 2) vm.initClass(c); return c.statics.blocksList && c.statics.blocksList.a; };
 	var liquid = function (id) {
@@ -17634,7 +17634,7 @@ function install(vm, H) {
 		'<init>(II)V': function (vm, s, a) { s[':components'] = newList('java/util/LinkedList'); s.$cx = a[0]; s.$cz = a[1]; },
 		'getBoundingBox()Lnet/minecraft/src/StructureBoundingBox;': function (vm, s) { return s[':boundingBox']; },
 		'getComponents()Ljava/util/LinkedList;': function (vm, s) { return s[':components']; },
-		'generateStructure(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { generateStructure(s, a[0], a[1], a[2]); },
+		'generateStructure(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/StructureBoundingBox;)V': function (vm, s, a) { vm.$structTouched = true; generateStructure(s, a[0], a[1], a[2]); },
 		'updateBoundingBox()V': function (vm, s) { updateBB(s); },
 		'markAvailableHeight(Lnet/minecraft/src/World;Ljava/util/Random;I)V': function (vm, s, a) { markHeight(s, a[0], a[1], a[2]); },
 		'setRandomHeight(Lnet/minecraft/src/World;Ljava/util/Random;II)V': function (vm, s, a) { randomHeight(s, a[0], a[1], a[2], a[3]); },
@@ -17650,6 +17650,7 @@ function install(vm, H) {
 	var chunkKey = function (x, z) { return JVM.box(vm, BigInt.asIntN(64, (BigInt(x) & 0xFFFFFFFFn) | ((BigInt(z) & 0xFFFFFFFFn) << 32n)), 'J'); };
 	var startsMap = function (g) { var m = g[':structureMap']; if (!m) { m = g[':structureMap'] = vm.newObject(vm.loadClass('java/util/HashMap')); vm.callVirtual(m, '<init>', '()V', []); } return m; };
 	var structRG = function (vm, g, w, cx, cz) {
+		vm.$structTouched = true;
 		var m = startsMap(g), k = chunkKey(cx, cz);
 		if (m.$m ? m.$m.has(k) : vm.callVirtual(m, 'containsKey', '(Ljava/lang/Object;)Z', [k])) return;
 		H.rInt0(g[':rand']);
@@ -17679,6 +17680,7 @@ function install(vm, H) {
 	var sizeable = function (s) { var m = ov(s, KEYS.sizeable); return m ? !!vm.invoke(m, s, []) : jsOf(s, '$sizeable')(s); };
 	var startBB = function (s) { return s[':boundingBox']; };
 	var genInChunk = function (g, w, rand, cx, cz) {
+		vm.$structTouched = true;
 		var x = (cx << 4) + 8, z = (cz << 4) + 8, did = false, cb = null;
 		javaMapOrder(startsMap(g)).forEach(function (s) {
 			if (!s || !sizeable(s) || !meets4(startBB(s), x, z, x + 15, z + 15)) return;

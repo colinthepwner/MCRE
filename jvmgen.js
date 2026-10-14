@@ -200,7 +200,9 @@ function job(m) {
 	var sg = !!(JVM.stationWantsGen && JVM.stationWantsGen(vm));
 	var dk = m.dimKey || null;
 	var dg = dim === 0 && !!(JVM.decorWantsGen && JVM.decorWantsGen(vm));
+	if (dk) { post({ t: 'done', id: m.id, fallback: true, why: 'mod dimension' }); J = null; return; }
 	var pendingBefore = JVM.structPendingCount ? JVM.structPendingCount(vm) : 0;
+	vm.$structTouched = false;
 	vm.game = bridge; vm.mcSeed = seed | 0; vm.mcDim = dim; vm.steps = 0;
 	JVM.run(vm, function () {
 		var world = JVM.mc152.worldObj(vm);
@@ -227,6 +229,7 @@ function job(m) {
 		J.fallback = J.fallback || 'queued for the level';
 		if (JVM.structPendingDrop) JVM.structPendingDrop(vm);
 	}
+	if (vm.$structTouched) { post({ t: 'done', id: m.id, fallback: true, why: 'structures', stateful: true }); J = null; return; }
 	if (J.fallback) { post({ t: 'done', id: m.id, fallback: true, why: J.fallback }); J = null; return; }
 	var out = new Int32Array(J.orig.size * 5), n = 0;
 	J.orig.forEach(function (was, i) {
