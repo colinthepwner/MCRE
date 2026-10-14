@@ -1050,10 +1050,6 @@
             logo.src = 'icons/logo.png';
             ov.appendChild(logo);
             var gap = document.createElement('div'); gap.style.height = (big * 6) + 'px'; ov.appendChild(gap);
-            var title = document.createElement('div');
-            title.style.cssText = 'font:bold ' + (big * 5) + 'px monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f';
-            title.textContent = 'Loading';
-            ov.appendChild(title);
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-top:' + (big * 3) + 'px;width:min(400px,70vw);height:' + Math.max(4, big) + 'px;background:#808080;border:0';
             var fill = document.createElement('div');
@@ -1061,7 +1057,7 @@
             bar.appendChild(fill); ov.appendChild(bar);
             var line = document.createElement('div');
             line.style.cssText = 'margin-top:' + (big * 3) + 'px;font:bold ' + (big * 3) + 'px monospace;color:#c6c6c6;text-shadow:2px 2px 0 #3f3f3f;min-height:1.2em;text-align:center;padding:0 12px';
-            line.textContent = 'Building terrain';
+            line.style.display = 'none';
             ov.appendChild(line);
             document.body.appendChild(ov);
 
@@ -1070,7 +1066,6 @@
                 frac = Math.max(shown, Math.min(1, frac));
                 shown = frac;
                 fill.style.width = (frac * 100).toFixed(1) + '%';
-                if (text) line.textContent = text;
             };
             var prevStatus = Module.setStatus, maxDeps = 0;
             Module.setStatus = function (text) {
@@ -1091,7 +1086,7 @@
             var hide = function () { if (gone) return; gone = true; set(1); ov.style.opacity = '0'; setTimeout(function () { ov.remove(); }, 400); };
             Module.mcTitleShown = function () { setTimeout(hide, 150); };
             Module.postRun.push(function () { set(0.97, 'Starting'); setTimeout(hide, 20000); });
-            window.mcLoadingFail = function (why) { line.textContent = String(why || 'Something went wrong'); };
+            window.mcLoadingFail = function (why) { line.textContent = String(why || 'Something went wrong'); line.style.display = ''; };
         })();
     </script>
     <script type='text/javascript'>
