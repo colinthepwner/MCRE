@@ -2301,6 +2301,7 @@ M	ls	y	()Z	func_22049_v	isMovementBlocked
 M	ls	f_	()V	func_418_b_	updateEntityActionState
 M	ls	b	(Lsn;)V	func_419_b	onDeath
 M	ls	N	()Z	func_22051_K	isPlayerSleeping
+M	ls	R	()V	func_424_C	jump
 M	ls	u	()Z	func_25023_u	canDespawn
 M	ls	k	()F	func_6393_h	getSoundVolume
 M	ls	q	()V	func_21066_o	dropFewItems

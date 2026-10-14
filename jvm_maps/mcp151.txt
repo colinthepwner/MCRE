@@ -2892,6 +2892,7 @@ F	ng	bp	field_70715_bh	targetTasks
 F	ng	bq	field_82174_bp	equipmentDropChances
 F	ng	br	field_82175_bq	isSwingInProgress
 F	ng	bs	field_82173_br	swingProgressInt
+F	ng	g	field_70751_d	lastAttackingEntity
 F	ng	j	field_70749_g	lookHelper
 F	nn	a	monster	monster
 F	nn	b	creature	creature
@@ -3078,6 +3079,8 @@ F	sn	b	field_75100_b	isFlying
 F	sn	c	field_75101_c	allowFlying
 F	sn	d	field_75098_d	isCreativeMode
 F	sn	e	field_75099_e	allowEdit
+F	sn	f	field_75096_f	flySpeed
+F	sn	g	field_75097_g	walkSpeed
 F	so	a	field_70462_a	mainInventory
 F	so	b	field_70460_b	armorInventory
 F	so	c	field_70461_c	currentItem
@@ -5699,6 +5702,7 @@ M	mp	b	(F)I	func_70070_b	getBrightnessForRender
 M	mp	b	(FF)V	func_70101_b	setRotation
 M	mp	b	(II)Lrh;	func_70025_b	dropItem
 M	mp	b	(Lbs;)V	func_70014_b	writeEntityToNBT
+M	mp	b	(Z)V	func_70095_a	setSneaking
 M	mp	b_	(Lsq;)V	func_70100_b_	onCollideWithPlayer
 M	mp	c	(F)F	func_70013_c	getBrightness
 M	mp	c	(FF)V	func_70082_c	setAngles
@@ -5833,6 +5837,7 @@ M	ng	aB	()Lnx;	func_70683_ar	getJumpHelper
 M	ng	aC	()Lpx;	func_70661_as	getNavigator
 M	ng	aD	()Lpy;	func_70635_at	getEntitySenses
 M	ng	aE	()Ljava/util/Random;	func_70681_au	getRNG
+M	ng	aG	()Lng;	func_70680_aw	getLastAttackingEntity
 M	ng	aH	()I	func_70654_ax	getAge
 M	ng	aI	()F	func_70689_ay	getAIMoveSpeed
 M	ng	aJ	()Lng;	func_70638_az	getAttackTarget
@@ -5878,9 +5883,11 @@ M	ng	bf	()Z	func_70648_aU	canBreatheUnderwater
 M	ng	bh	()Z	func_70650_aV	isAIEnabled
 M	ng	bi	()Z	func_70613_aW	isClientWorld
 M	ng	bj	()Z	func_70610_aX	isMovementBlocked
+M	ng	bl	()V	func_70664_aZ	jump
 M	ng	bm	()Z	func_70692_ba	canDespawn
 M	ng	bn	()V	func_70623_bb	despawnEntity
 M	ng	bo	()V	func_70619_bc	updateAITasks
+M	ng	bp	()V	func_70629_bd	updateAITick
 M	ng	bq	()V	func_70626_be	updateEntityActionState
 M	ng	br	()V	func_82168_bl	updateArmSwingProgress
 M	ng	bs	()I	func_70646_bf	getVerticalFaceSpeed
@@ -5901,6 +5908,7 @@ M	ng	h_	()Z	func_70631_g_	isChild
 M	ng	i	(F)Larc;	func_70676_i	getLook
 M	ng	j	(I)V	func_70691_i	heal
 M	ng	l	(I)V	func_70600_l	dropRareDrop
+M	ng	l	(Lmp;)V	func_70607_j	setLastAttackingEntity
 M	ng	l_	()V	func_70071_h_	onUpdate
 M	ng	m	(I)Z	func_82165_m	isPotionActive
 M	ng	m	(Lmp;)Z	func_70652_k	attackEntityAsMob
@@ -6175,6 +6183,7 @@ M	qh	aQ	()I	func_70627_aG	getTalkInterval
 M	qh	a_	(Lsq;)Z	func_70085_c	interact
 M	qh	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	qh	bm	()Z	func_70692_ba	canDespawn
+M	qh	bp	()V	func_70629_bd	updateAITick
 M	qh	bv	()Z	func_70601_bi	getCanSpawnHere
 M	qh	c	()V	func_70636_d	onLivingUpdate
 M	qh	c	(Lwm;)Z	func_70877_b	isBreedingItem
@@ -6230,6 +6239,7 @@ M	qm	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
 M	qm	be	()I	func_70633_aT	getDropItemId
 M	qm	bh	()Z	func_70650_aV	isAIEnabled
 M	qm	bm	()Z	func_70692_ba	canDespawn
+M	qm	bp	()V	func_70629_bd	updateAITick
 M	qm	bv	()Z	func_70601_bi	getCanSpawnHere
 M	qm	c	(Lwm;)Z	func_70877_b	isBreedingItem
 M	qm	m	(Lmp;)Z	func_70652_k	attackEntityAsMob
@@ -6302,6 +6312,7 @@ M	qs	bb	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	qs	bc	()Ljava/lang/String;	func_70621_aR	getHurtSound
 M	qs	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
 M	qs	bh	()Z	func_70650_aV	isAIEnabled
+M	qs	bp	()V	func_70629_bd	updateAITick
 M	qs	c	()V	func_70636_d	onLivingUpdate
 M	qs	i	(Z)V	func_70849_f	setPlayerCreated
 M	qs	m	(Lmp;)Z	func_70652_k	attackEntityAsMob
@@ -6334,6 +6345,7 @@ M	qu	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
 M	qu	be	()I	func_70633_aT	getDropItemId
 M	qu	bh	()Z	func_70650_aV	isAIEnabled
 M	qu	bm	()Z	func_70692_ba	canDespawn
+M	qu	bp	()V	func_70629_bd	updateAITick
 M	qu	bs	()I	func_70646_bf	getVerticalFaceSpeed
 M	qu	c	()V	func_70636_d	onLivingUpdate
 M	qu	c	(Lwm;)Z	func_70877_b	isBreedingItem
@@ -6501,6 +6513,7 @@ M	sa	b	(F)I	func_70070_b	getBrightnessForRender
 M	sa	bc	()Ljava/lang/String;	func_70621_aR	getHurtSound
 M	sa	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
 M	sa	be	()I	func_70633_aT	getDropItemId
+M	sa	bl	()V	func_70664_aZ	jump
 M	sa	bv	()Z	func_70601_bi	getCanSpawnHere
 M	sa	c	(F)F	func_70013_c	getBrightness
 M	sa	l	()Z	func_70800_m	canDamagePlayer
@@ -6658,11 +6671,16 @@ M	sm	bc	()Ljava/lang/String;	func_70621_aR	getHurtSound
 M	sm	bd	()Ljava/lang/String;	func_70673_aS	getDeathSound
 M	sm	bh	()Z	func_70650_aV	isAIEnabled
 M	sm	bm	()Z	func_70692_ba	canDespawn
+M	sm	bp	()V	func_70629_bd	updateAITick
 M	sm	m	()I	func_70946_n	getProfession
 M	sm	n	()Z	func_70941_o	isMating
 M	sm	o	()Z	func_70945_p	isPlaying
 M	sm	p	()Z	func_70940_q	isTrading
 M	sm	s	(I)V	func_70938_b	setProfession
+M	sn	a	()F	func_75093_a	getFlySpeed
+M	sn	a	(F)V	func_75092_a	setFlySpeed
+M	sn	b	()F	func_75094_b	getWalkSpeed
+M	sn	b	(F)V	func_82877_b	setPlayerWalkSpeed
 M	so	a	(I)Lwm;	func_70301_a	getStackInSlot
 M	so	a	(II)Lwm;	func_70298_a	decrStackSize
 M	so	a	(ILwm;)V	func_70299_a	setInventorySlotContents
@@ -6732,6 +6750,7 @@ M	sq	bW	()I	func_71057_bx	getItemInUseDuration
 M	sq	bX	()V	func_71034_by	stopUsingItem
 M	sq	bY	()V	func_71041_bz	clearItemInUse
 M	sq	bj	()Z	func_70610_aX	isMovementBlocked
+M	sq	bl	()V	func_70664_aZ	jump
 M	sq	bq	()V	func_70626_be	updateEntityActionState
 M	sq	bz	()Z	func_70608_bn	isPlayerSleeping
 M	sq	c	()V	func_70636_d	onLivingUpdate
@@ -7695,6 +7714,8 @@ R	field_73362_a	disableDamage
 R	field_73360_b	isFlying
 R	field_73361_c	allowFlying
 R	field_73358_d	isCreativeMode
+R	field_73359_e	flySpeed
+R	field_73357_f	walkSpeed
 R	field_73345_a	xPosition
 R	field_73343_b	yPosition
 R	field_73344_c	zPosition
@@ -8454,7 +8475,10 @@ R	func_98199_k	getOffsetZ
 R	func_98197_l	getSpeed
 R	func_73571_i	getVolume
 R	func_73573_j	getPitch
+R	func_73351_a	setFlySpeed
 R	func_73346_h	isCreativeMode
+R	func_73347_i	getFlySpeed
+R	func_82558_j	getWalkSpeed
 R	func_73391_d	getMetadata
 R	func_73322_d	getEntityId
 R	func_73401_h	getDirection
@@ -8552,7 +8576,6 @@ R	func_70085_c	interact
 R	func_82333_j	getRotation
 R	func_70643_av	getAITarget
 R	func_70684_aJ	isPlayer
-R	func_70664_aZ	jump
 R	func_70641_bl	getMaxSpawnedInChunk
 R	func_70637_d	setJumping
 R	func_75669_b	getObject

@@ -35012,6 +35012,32 @@ function install(vm) {
 		['setEntityState(' + E + 'B)V']: function (vm, self, a) { if (a[0]) { try { vm.callVirtual(a[0], 'handleHealthUpdate', '(B)V', [a[1]]); } catch (e) { if (e instanceof JVM.JavaThrow) throw e; } } },
 	});
 
+	add('Entity', {
+		'isEntityEqual(Lnet/minecraft/src/Entity;)Z': function (vm, self, a) { return self === a[0] ? 1 : 0; },
+		'setSneaking(Z)V': function (vm, self, a) { self.$sneakFlag = !!a[0]; },
+	});
+	add('EntityLiving', {
+		'jump()V': function (vm, self) {
+			var my = 0.41999998688697815;
+			var PC = vm.loadClass(SRC + 'Potion'); vm.initClass(PC);
+			var jb = PC.statics.potionTypes && PC.statics.potionTypes.a[8];
+			var pe = jb ? vm.callVirtual(self, 'getActivePotionEffect', '(Lnet/minecraft/src/Potion;)Lnet/minecraft/src/PotionEffect;', [jb]) : null;
+			if (pe) my += ((pe[':amplifier'] | 0) + 1) * 0.1;
+			self[':motionY'] = my;
+			if (self[':sprinting'] || self.$sprinting) { var f = (+self[':rotationYaw'] || 0) * 0.017453292; self[':motionX'] = (+self[':motionX'] || 0) - Math.sin(f) * 0.2; self[':motionZ'] = (+self[':motionZ'] || 0) + Math.cos(f) * 0.2; }
+			self[':isAirBorne'] = 1;
+		},
+		'setLastAttackingEntity(Lnet/minecraft/src/Entity;)V': function (vm, self, a) { if (a[0] && vm.isInstance(a[0], vm.loadClass(SRC + 'EntityLiving'))) self[':lastAttackingEntity'] = a[0]; },
+		'getLastAttackingEntity()Lnet/minecraft/src/EntityLiving;': function (vm, self) { return self[':lastAttackingEntity'] || null; },
+		'updateAITick()V': function () {},
+	});
+	add('PlayerCapabilities', {
+		'setPlayerWalkSpeed(F)V': function (vm, self, a) { self[':walkSpeed'] = a[0]; },
+		'getWalkSpeed()F': function (vm, self) { return self[':walkSpeed'] != null ? self[':walkSpeed'] : 0.1; },
+		'getFlySpeed()F': function (vm, self) { return self[':flySpeed'] != null ? self[':flySpeed'] : 0.05; },
+		'setFlySpeed(F)V': function (vm, self, a) { self[':flySpeed'] = a[0]; },
+	});
+
 	var LANG = SRC + 'Language', LM = SRC + 'LanguageManager';
 	if (!vm.natives[LANG]) vm.defineNative(LANG, { interfaces: ['java/lang/Comparable'], methods: {
 		'<init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V': function (vm, self, a) { self.$code = a[0]; self.$region = a[1]; self.$name = a[2]; self.$bidi = !!a[3]; },

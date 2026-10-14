@@ -2321,6 +2321,7 @@ M	net/minecraft/class_127	method_939	(I)V	method_939	heal
 M	net/minecraft/class_127	method_940	()Z	method_940	canDespawn
 M	net/minecraft/class_127	method_942	()Z	method_942	isMovementBlocked
 M	net/minecraft/class_127	method_943	()Z	method_943	isPlayerSleeping
+M	net/minecraft/class_127	method_944	()V	method_944	jump
 M	net/minecraft/class_127	method_945	(FF)V	method_945	moveEntityWithHeading
 M	net/minecraft/class_134	method_947	()V	method_947	onInventoryChanged
 M	net/minecraft/class_134	method_948	()I	method_948	getSizeInventory

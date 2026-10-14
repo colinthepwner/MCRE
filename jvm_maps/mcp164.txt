@@ -3169,6 +3169,8 @@ F	uc	b	field_75100_b	isFlying
 F	uc	c	field_75101_c	allowFlying
 F	uc	d	field_75098_d	isCreativeMode
 F	uc	e	field_75099_e	allowEdit
+F	uc	f	field_75096_f	flySpeed
+F	uc	g	field_75097_g	walkSpeed
 F	ud	a	field_70462_a	mainInventory
 F	ud	b	field_70460_b	armorInventory
 F	ud	c	field_70461_c	currentItem
@@ -5971,6 +5973,7 @@ M	nn	b	(I)V	func_71027_c	travelToDimension
 M	nn	b	(II)Lss;	func_70025_b	dropItem
 M	nn	b	(Lby;)V	func_70014_b	writeEntityToNBT
 M	nn	b	(Lnn;I)V	func_70084_c	addToPlayerScore
+M	nn	b	(Z)V	func_70095_a	setSneaking
 M	nn	b_	(Luf;)V	func_70100_b_	onCollideWithPlayer
 M	nn	c	(F)I	func_70070_b	getBrightnessForRender
 M	nn	c	(FF)V	func_70082_c	setAngles
@@ -6081,10 +6084,12 @@ M	of	b	(Lni;)Lnj;	func_70660_b	getActivePotionEffect
 M	of	b	(ZI)V	func_70628_a	dropFewItems
 M	of	ba	()F	func_70599_aP	getSoundVolume
 M	of	bc	()Z	func_70610_aX	isMovementBlocked
+M	of	be	()V	func_70664_aZ	jump
 M	of	bf	()Z	func_70650_aV	isAIEnabled
 M	of	bg	()F	func_70689_ay	getAIMoveSpeed
 M	of	bh	()Z	func_70608_bn	isPlayerSleeping
 M	of	bi	()V	func_70619_bc	updateAITasks
+M	of	bk	()V	func_70629_bd	updateAITick
 M	of	bl	()V	func_70626_be	updateEntityActionState
 M	of	bm	()Z	func_70613_aW	isClientWorld
 M	of	bn	()F	func_110139_bj	getAbsorptionAmount
@@ -6485,6 +6490,7 @@ M	rp	bL	()Lnn;	func_70782_k	findPlayerToAttack
 M	rp	bX	()V	func_110196_bT	func_110196_bT
 M	rp	bY	()Z	func_70880_s	isInLove
 M	rp	bZ	()V	func_70875_t	resetInLove
+M	rp	bk	()V	func_70629_bd	updateAITick
 M	rp	bs	()Z	func_70601_bi	getCanSpawnHere
 M	rp	c	()V	func_70636_d	onLivingUpdate
 M	rp	c	(Lye;)Z	func_70877_b	isBreedingItem
@@ -6535,6 +6541,7 @@ M	rx	b	(Lby;)V	func_70014_b	writeEntityToNBT
 M	rx	b	(ZI)V	func_70628_a	dropFewItems
 M	rx	ba	()F	func_70599_aP	getSoundVolume
 M	rx	bf	()Z	func_70650_aV	isAIEnabled
+M	rx	bk	()V	func_70629_bd	updateAITick
 M	rx	bs	()Z	func_70601_bi	getCanSpawnHere
 M	rx	c	(Lye;)Z	func_70877_b	isBreedingItem
 M	rx	ca	()I	func_70913_u	getTameSkin
@@ -6613,6 +6620,7 @@ M	sd	bU	()I	func_70854_o	getAttackTimer
 M	sd	bV	()I	func_70853_p	getHoldRoseTick
 M	sd	bW	()Z	func_70850_q	isPlayerCreated
 M	sd	bf	()Z	func_70650_aV	isAIEnabled
+M	sd	bk	()V	func_70629_bd	updateAITick
 M	sd	c	()V	func_70636_d	onLivingUpdate
 M	sd	i	(Z)V	func_70849_f	setPlayerCreated
 M	sd	m	(Lnn;)Z	func_70652_k	attackEntityAsMob
@@ -6635,6 +6643,7 @@ M	sf	az	()V	func_110147_ax	applyEntityAttributes
 M	sf	b	(Lby;)V	func_70014_b	writeEntityToNBT
 M	sf	ba	()F	func_70599_aP	getSoundVolume
 M	sf	bf	()Z	func_70650_aV	isAIEnabled
+M	sf	bk	()V	func_70629_bd	updateAITick
 M	sf	bp	()I	func_70646_bf	getVerticalFaceSpeed
 M	sf	c	()V	func_70636_d	onLivingUpdate
 M	sf	c	(Lye;)Z	func_70877_b	isBreedingItem
@@ -6812,6 +6821,7 @@ M	tl	b	(F)V	func_70069_a	fall
 M	tl	b	(ZI)V	func_70628_a	dropFewItems
 M	tl	bN	()Z	func_70800_m	canDamagePlayer
 M	tl	bO	()I	func_70805_n	getAttackStrength
+M	tl	be	()V	func_70664_aZ	jump
 M	tl	bs	()Z	func_70601_bi	getCanSpawnHere
 M	tl	c	(F)I	func_70070_b	getBrightnessForRender
 M	tl	d	(F)F	func_70013_c	getBrightness
@@ -6968,9 +6978,14 @@ M	ub	bU	()Z	func_70941_o	isMating
 M	ub	bV	()Z	func_70945_p	isPlaying
 M	ub	bW	()Z	func_70940_q	isTrading
 M	ub	bf	()Z	func_70650_aV	isAIEnabled
+M	ub	bk	()V	func_70629_bd	updateAITick
 M	ub	p	(I)V	func_70938_b	setProfession
 M	ub	r	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	ub	t	()Z	func_70692_ba	canDespawn
+M	uc	a	()F	func_75093_a	getFlySpeed
+M	uc	a	(F)V	func_75092_a	setFlySpeed
+M	uc	b	()F	func_75094_b	getWalkSpeed
+M	uc	b	(F)V	func_82877_b	setPlayerWalkSpeed
 M	ud	a	(I)Lye;	func_70301_a	getStackInSlot
 M	ud	a	(II)Lye;	func_70298_a	decrStackSize
 M	ud	a	(ILye;)V	func_70299_a	setInventorySlotContents
@@ -7037,6 +7052,7 @@ M	uf	bF	()Lt;	func_70997_bJ	getBedLocation
 M	uf	bH	()I	func_71050_bK	xpBarCap
 M	uf	bI	()Lux;	func_71024_bL	getFoodStats
 M	uf	bc	()Z	func_70610_aX	isMovementBlocked
+M	uf	be	()V	func_70664_aZ	jump
 M	uf	bg	()F	func_70689_ay	getAIMoveSpeed
 M	uf	bh	()Z	func_70608_bn	isPlayerSleeping
 M	uf	bl	()V	func_70626_be	updateEntityActionState
@@ -7811,6 +7827,8 @@ R	field_73362_a	disableDamage
 R	field_73360_b	isFlying
 R	field_73361_c	allowFlying
 R	field_73358_d	isCreativeMode
+R	field_73359_e	flySpeed
+R	field_73357_f	walkSpeed
 R	field_73345_a	xPosition
 R	field_73343_b	yPosition
 R	field_73344_c	zPosition
@@ -8568,7 +8586,10 @@ R	func_73571_i	getVolume
 R	func_73573_j	getPitch
 R	func_73282_a	readString
 R	func_73271_a	writeString
+R	func_73351_a	setFlySpeed
 R	func_73346_h	isCreativeMode
+R	func_73347_i	getFlySpeed
+R	func_82558_j	getWalkSpeed
 R	func_73391_d	getMetadata
 R	func_73322_d	getEntityId
 R	func_73401_h	getDirection
@@ -8661,7 +8682,6 @@ R	func_130002_c	interactFirst
 R	func_82333_j	getRotation
 R	func_70039_c	writeToNBTOptional
 R	func_70684_aJ	isPlayer
-R	func_70664_aZ	jump
 R	func_70637_d	setJumping
 R	func_70641_bl	getMaxSpawnedInChunk
 R	func_70902_q	getOwner
