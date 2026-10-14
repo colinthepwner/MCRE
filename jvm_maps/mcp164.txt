@@ -2946,6 +2946,7 @@ F	nu	c	field_75612_c	secondaryColor
 F	nz	c	field_96567_c	field_96567_c
 F	oa	e	field_70530_e	xpValue
 F	of	aE	field_70733_aJ	swingProgress
+F	of	aH	field_70754_ba	limbSwing
 F	of	aN	field_70761_aq	renderYawOffset
 F	of	aP	field_70759_as	rotationYawHead
 F	of	aT	field_70718_bc	recentlyHit
@@ -8493,6 +8494,7 @@ R	func_78471_a	renderWorld
 R	func_78443_a	renderItem
 R	func_72714_a	renderSky
 R	func_72733_a	renderAllRenderLists
+R	func_78597_b	renderItemIn3d
 R	func_78613_a	renderFaceYNeg
 R	func_78604_a	renderBlockUsingTexture
 R	func_78617_b	renderFaceYPos

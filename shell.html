@@ -4863,6 +4863,7 @@
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : j.java_drops === true ? '*java' : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
+                    if (j.flat_item === true) lines.push(['flatitem', key].join('\t'));
                     if (j.log_axis === 1 || j.log_axis === 2) lines.push(['logaxis', key, j.log_axis].join('\t'));
                     if (j.leaves === true) {
                         var lft = j.texture_fast, lff = tex;
@@ -5627,7 +5628,7 @@
                                 (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
                                 egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';')].join('\t'));
-                    var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8 };
+                    var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8, leg_a: 2, leg_b: 3, arm_a: 4, arm_b: 5, wing_l: 6, wing_r: 7 };
                     var legs = 0, arms = 0, wings = 0, headDone = false, given = j.animations || {};
                     var isUnder = function (p, re) { for (var q = p.parent, n = 0; q >= 0 && n < 64; q = model.parts[q].parent, n++) if (re.test(model.parts[q].name)) return true; return false; };
                     var animOf = function (p) {
@@ -5639,6 +5640,7 @@
                             /wing/.test(p.name) && !isUnder(p, /wing/) ? 'wing' :
                             /tail/.test(p.name) && !isUnder(p, /tail/) ? 'tail' : 'none';
                         if (ANIM[kind] === undefined) { problem(mb.mod, file, 'animations: "' + g + '" isn\'t one of head, leg, arm, wing, tail, none'); kind = 'none'; }
+                        if (/_/.test(kind)) return ANIM[kind];
                         if (kind === 'head') { headDone = true; return 1; }
                         if (kind === 'leg') { var l = legs++ % 4; return l === 0 || l === 3 ? 2 : 3; }
                         if (kind === 'arm') return arms++ % 2 ? 5 : 4;

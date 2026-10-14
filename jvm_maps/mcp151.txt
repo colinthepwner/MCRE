@@ -2892,6 +2892,7 @@ F	ng	bV	field_82172_bs	canPickUpLoot
 F	ng	bW	field_82179_bU	persistenceRequired
 F	ng	bd	field_70729_aU	dead
 F	ng	be	field_70728_aV	experienceValue
+F	ng	bj	field_70754_ba	limbSwing
 F	ng	bl	field_70718_bc	recentlyHit
 F	ng	bo	field_70714_bg	tasks
 F	ng	bp	field_70715_bh	targetTasks
@@ -8411,6 +8412,7 @@ R	func_72733_a	renderAllRenderLists
 R	func_78343_a	updateDynamicTextures
 R	func_96448_c	getMissingIcon
 R	func_94152_c	refreshTextureMaps
+R	func_78597_b	renderItemIn3d
 R	func_78613_a	renderBottomFace
 R	func_78604_a	renderBlockUsingTexture
 R	func_78617_b	renderTopFace

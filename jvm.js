@@ -11170,6 +11170,7 @@ JVM.collectContent = function (vm, modId) {
 					var flat = [span(xs), span(ys), span(zs)].filter(function (v) { return v < 0.01; }).length === 1;
 					return flat && [xs, ys, zs].every(function (a) { return Math.min.apply(null, a) >= -0.01 && Math.max.apply(null, a) <= 16.01 && (span(a) < 0.01 ? (Math.abs(a[0]) < 0.01 || Math.abs(a[0] - 16) < 0.01) : span(a) > 15.99); }); });
 				if (jq.length && !cube) { json.quads = jq; json.transparent = true; delete json.shape; }
+				if (json.quads && JVM.flatItem && safe(function () { return JVM.flatItem(vm, b); }, false)) json.flat_item = true;
 			}
 		}
 		if (b[':slipperiness'] !== 0.6) json.friction = b[':slipperiness'];
@@ -12363,6 +12364,45 @@ JVM.pose = function (vm, model, entity) {
 	JVM.run(vm, function () { vm.callVirtual(model, 'setRotationAngles', '(FFFFFFLnet/minecraft/src/Entity;)V', [0, 0, 0, 0, 0, 0.0625, e]); });
 	callIfOwn(vm, model, 'setRotationAngles(FFFFFF)V', [0, 0, 0, 0, 0, 0.0625]);
 };
+JVM.probeAnims = function (vm, model, entity, idOf) {
+	var own = function (k) { var mm = model.cls.findMethod(k); return !!(mm && !mm.cls.native); };
+	var viaRender = own('render(Lnet/minecraft/src/Entity;FFFFFF)V');
+	if (!viaRender && !own('setRotationAngles(FFFFFFLnet/minecraft/src/Entity;)V') && !own('setRotationAngles(FFFFFF)V')) return null;
+	var e = entity || vm.newObject(vm.loadClass(SRC + 'EntityLiving'));
+	var all = partsOf(vm, model), seen = new Set(), list = [];
+	var add = function (r) { if (!r || seen.has(r)) return; seen.add(r); list.push(r); listArr(vm, r[':childModels']).forEach(add); };
+	all.forEach(add);
+	var angles = function (f, f1, f2, f3) {
+		if (viaRender) JVM.run(vm, function () { vm.callVirtual(model, 'render', '(Lnet/minecraft/src/Entity;FFFFFF)V', [e, f, f1, f2, f3, 0, 0.0625]); });
+		else {
+			JVM.run(vm, function () { vm.callVirtual(model, 'setRotationAngles', '(FFFFFFLnet/minecraft/src/Entity;)V', [f, f1, f2, f3, 0, 0.0625, e]); });
+			callIfOwn(vm, model, 'setRotationAngles(FFFFFF)V', [f, f1, f2, f3, 0, 0.0625]);
+		}
+		return list.map(function (r) { return [+r[':rotateAngleX'] || 0, +r[':rotateAngleY'] || 0, +r[':rotateAngleZ'] || 0]; });
+	};
+	var base = angles(0, 0, 0, 0);
+	var YAW = 40, yawRad = YAW * Math.PI / 180;
+	var head = angles(0, 0, 0, YAW);
+	var step = angles(0, 1, 0, 0), later = [[1.1, 0], [2.3, 0], [3.7, 0], [Math.PI / 0.6662, 0], [0, 3.3], [0, 9.1]].map(function (t) { return angles(t[0], 1, t[1], 0); });
+	var aged = angles(0, 0, 7, 0);
+	angles(0, 0, 0, 0);
+	var out = {};
+	list.forEach(function (r, i) {
+		var id = idOf.get(r);
+		if (!id) return;
+		var b = base[i], kind = 'none';
+		var dy = head[i][1] - b[1];
+		var sx = step[i][0] - b[0], moves = later.some(function (l) { return Math.abs(l[i][0] - step[i][0]) > 0.1; });
+		var az = aged[i][2] - b[2], ay = aged[i][1] - b[1];
+		if (Math.abs(dy - yawRad) < yawRad * 0.25) kind = 'head';
+		else if (Math.abs(sx) > 0.15 && moves) kind = sx > 0 ? 'leg_a' : 'leg_b';
+		else if (Math.abs(az) > 0.05) kind = az > 0 ? 'wing_l' : 'wing_r';
+		else if ((Math.abs(ay) > 0.03 || later.some(function (l) { return Math.abs(l[i][1] - b[1]) > 0.03; })) && String(id).indexOf('tail') >= 0) kind = 'tail';
+		out[id] = kind;
+	});
+	return out;
+};
+
 JVM.drawnParts = function (vm, model, entity) {
 	var all = partsOf(vm, model);
 	all.forEach(function (r) { r.$drawn = false; });
@@ -21882,7 +21922,7 @@ function partNames(vm, model) {
 	all.filter(function (r) { return !childSet.has(r); }).forEach(function (r, i) { walk(r, i); });
 	return out;
 }
-function jemOf(vm, model, entity, yShift) {
+function jemOf(vm, model, entity, yShift, idOf) {
 	var d = JVM.modelData(vm, model);
 	if (!d || !d.parts.length) return null;
 	var names = {};
@@ -21913,6 +21953,7 @@ function jemOf(vm, model, entity, yShift) {
 		var o = bb(abs[0], abs[1], abs[2]);
 		var out = { id: nameFor(r, i), translate: [parentO[0] - o[0], parentO[1] - o[1], parentO[2] - o[2]],
 			rotate: [r[':rotateAngleX'] * R, -r[':rotateAngleY'] * R, -r[':rotateAngleZ'] * R], boxes: [] };
+		if (idOf) idOf.set(r, out.id);
 		if (!r[':showModel'] || r[':isHidden']) out.hidden = true;
 		r.$boxes.forEach(function (b) {
 			var jx = abs[0] + b.x, jy = abs[1] + b.y, jz = abs[2] + b.z;
@@ -22002,15 +22043,17 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (model && render) safe(function () { renderSetup(vm, render, ent, true); });
 		var shift = 0, RLc = vm.natives[SRC + 'RenderLiving'] ? vm.loadClass(SRC + 'RenderLiving') : null;
 		if (render && render.$modelAt && render.$modelAt.a < 0 && !(RLc && vm.isInstance(render, RLc))) shift = 24 - 16 * render.$modelAt.b / -render.$modelAt.a;
-		var jem = model ? safe(function () { return jemOf(vm, model, ent, shift); }, null) : null;
+		var ids = new Map();
+		var jem = model ? safe(function () { return jemOf(vm, model, ent, shift, ids); }, null) : null;
 		if (!jem) return { skip: 'no model' };
+		var anims = JVM.probeAnims ? safe(function () { return JVM.probeAnims(vm, model, ent, ids); }, null) : null;
 		var et = entityTexture(vm, render, ent, vanilla, safe);
 		var texture;
 		if (et.res) { out.files['textures/entity/' + key + '.png'] = vm.resources[et.res]; texture = 'textures/entity/' + key + '.png'; }
 		else if (et.game) texture = et.game;
 		else return { skip: 'no texture ' + et.skip };
 		out.files['models/entity/' + key + '.jem'] = JSON.stringify(jem);
-		return { model: 'models/entity/' + key + '.jem', texture: texture, res: et.res || null };
+		return { model: 'models/entity/' + key + '.jem', texture: texture, res: et.res || null, anims: anims };
 	};
 	var entityCls = vm.loadClass(SRC + 'Entity');
 	var segmentsOf = function (ent) {
@@ -22053,7 +22096,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			var json = { name: (reg(vm).lang['entity.' + e.name + '.name']) || e.name, behaviour: 'object', health: 20, speed: 0.25,
 				size: [Math.max(0.1, +ent[':width'] || 0.6), Math.max(0.1, +ent[':height'] || 0.6)], xp: 0, egg: false, spawn: [],
 					sounds: { ambient: 'none', hurt: 'none', death: 'none' }, no_fall_damage: true, no_step_sounds: true };
-				if (look.invisible) json.invisible = true; else { json.model = look.model; json.texture = look.texture; }
+				if (look.invisible) json.invisible = true; else { json.model = look.model; json.texture = look.texture; if (look.anims) json.animations = look.anims; }
 			var im = e.cls.findMethod('interact(Lnet/minecraft/src/EntityPlayer;)Z');
 			if (im && !im.cls.native) json.java_interact = true;
 			out.mobs[key] = json;
@@ -22176,6 +22219,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (look.invisible) { json.invisible = true; out.mobs[key] = json; (mb.keys || (mb.keys = new Map())).set(e.cls, modId + ':' + key); return; }
 		if (look.skip) { out.skipped.push(e.name + ' (' + look.skip + ')'); return; }
 		json.model = look.model; json.texture = look.texture;
+		if (look.anims) json.animations = look.anims;
 		if (has('EntitySlime')) safe(function () {
 			var rs = null;
 			for (var rk = e.cls; !rs && rk; rk = rk.superClass) rs = renderers.get(rk) || null;
@@ -22205,7 +22249,7 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 			var sl = so ? lookOf(seg.cls, so, sk, null) : { skip: 'no segment' };
 			if (!sl.skip && !sl.invisible) {
 				var sw = +so[':width'] || json.size[0], sh = +so[':height'] || json.size[1];
-				out.mobs[sk] = { name: json.name, behaviour: 'segment', health: json.health, size: [sw, sh], model: sl.model, texture: sl.texture, egg: false, spawn: [], fire_immune: json.fire_immune };
+				out.mobs[sk] = { name: json.name, behaviour: 'segment', health: json.health, size: [sw, sh], model: sl.model, texture: sl.texture, animations: sl.anims || undefined, egg: false, spawn: [], fire_immune: json.fire_immune };
 				json.segments = { mob: sk, count: seg.count, spacing: Math.max(0.5, Math.min(4, sw)) };
 			}
 		}
@@ -27981,12 +28025,29 @@ function install(vm) {
 		var prevUid = ML.staticMethods['getUniqueBlockModelID(Lnet/minecraft/src/BaseMod;Z)I'];
 		ML.staticMethods['getUniqueBlockModelID(Lnet/minecraft/src/BaseMod;Z)I'] = function (vm, n, a) {
 			var id = prevUid ? prevUid(vm, n, a) : 0;
-			if (a[0]) reg(vm).handlers[id] = { modLoader: a[0] };
+			if (a[0]) reg(vm).handlers[id] = { modLoader: a[0], full3D: !!a[1] };
 			return id;
 		};
 	}
 	if (JVM.installWorldRec) JVM.installWorldRec(vm);
 }
+
+JVM.flatItem = function (vm, b) {
+	var D = vm.mcReg && vm.mcReg.draw;
+	if (!D) return false;
+	var rt = 0;
+	try { rt = vm.callVirtual(b, 'getRenderType', '()I', []); } catch (e) { return false; }
+	var h = D.handlers[rt];
+	if (!h) return false;
+	if (h.modLoader) return h.full3D === false;
+	if (!h.cls) return false;
+	var r3d = true;
+	try {
+		if (h.cls.findMethod('shouldRender3DInInventory()Z')) r3d = !!vm.callVirtual(h, 'shouldRender3DInInventory', '()Z', []);
+		else if (h.cls.findMethod('shouldRender3DInInventory(I)Z')) r3d = !!vm.callVirtual(h, 'shouldRender3DInInventory', '(I)Z', [rt]);
+	} catch (e) { r3d = true; }
+	return !r3d;
+};
 
 JVM.recordBlock = function (vm, b, id, meta, modId, pos) {
 	var P = pos || { x: 0, y: 0, z: 0 };
