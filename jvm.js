@@ -11149,6 +11149,22 @@ JVM.collectContent = function (vm, modId) {
 			Object.keys(faces).forEach(function (f) { var t0 = out.textures['blocks/' + faces[f]]; if (t0 && t0.base && t0.tint != null) { faces[f] = t0.base; unbaked = true; } });
 			if (unbaked) { var uq = Object.keys(faces).map(function (k) { return faces[k]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }); json.texture = uq.length === 1 ? uq[0] : faces; }
 		}
+		var ib = b.$itemBlock, gi = ib && ib.cls && ib.cls.findMethod ? ib.cls.findMethod('getIconFromDamage(I)Lnet/minecraft/src/Icon;') : null;
+		if (gi && !gi.cls.native) {
+			if (!ib.$ownIcons && JVM.textureMapOf) {
+				ib.$ownIcons = true;
+				var rim = ib.cls.findMethod('registerIcons(Lnet/minecraft/src/IconRegister;)V');
+				if (rim && !rim.cls.native) safe(function () { vm.callVirtual(ib, 'registerIcons', '(Lnet/minecraft/src/IconRegister;)V', [JVM.textureMapOf(vm, 1)]); });
+			}
+			var iic = null;
+			safe(function () { iic = vm.callVirtual(ib, 'getIconFromDamage', '(I)Lnet/minecraft/src/Icon;', [meta]); });
+			var it2 = iic ? tex(iic) : null;
+			var own = typeof json.texture === 'string' ? [json.texture] : json.texture ? Object.keys(json.texture).map(function (k) { return json.texture[k]; }) : [];
+			if (it2 && !it2.vanilla && own.indexOf(it2.name) < 0) {
+				out.textures['blocks/' + it2.name] = it2;
+				json.item_texture = it2.name;
+			}
+		}
 		if (JVM.recordBlock && !sshape) {
 			var probeB = vm.natives[SRC + 'BiomeGenBase'] ? vm.newObject(vm.loadClass(SRC + 'BiomeGenBase')) : null;
 			if (probeB) { probeB.$grass = 0xF01080; probeB.$leaves = 0x1080F0; }
@@ -11379,8 +11395,17 @@ JVM.collectContent = function (vm, modId) {
 	if (fo) {
 		out.oredict = {};
 		Object.keys(fo).forEach(function (name) {
-			var mine = fo[name].filter(function (s) { var o = r.blocks[s[':itemID']] || r.items[s[':itemID']]; return o && o.$mod === modId && !o.$override; })
-				.map(function (s) { return ref(s[':itemID'], s[':itemDamage'] === 32767 || s[':itemDamage'] < 0 ? 0 : s[':itemDamage']); });
+			var mine = [];
+			fo[name].filter(function (s) { var o = r.blocks[s[':itemID']] || r.items[s[':itemID']]; return o && o.$mod === modId && !o.$override; })
+				.forEach(function (s) {
+					var d = s[':itemDamage'];
+					if (d === 32767 || d < 0) {
+						var o = r.blocks[s[':itemID']] || r.items[s[':itemID']];
+						var vs = safe(function () { return JVM.variantsOf(vm, o); }, [0]) || [0];
+						vs.forEach(function (v) { mine.push(ref(s[':itemID'], v)); });
+					} else mine.push(ref(s[':itemID'], d));
+				});
+			mine = mine.filter(function (v, i, l) { return l.indexOf(v) === i; });
 			if (mine.length) out.oredict[name] = mine;
 		});
 	}

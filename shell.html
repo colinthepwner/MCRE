@@ -4737,6 +4737,10 @@
                             if (nm && MATERIAL.test(nm)) (named[nm] = named[nm] || []).push({ mod: e.mod, r: r });
                         });
                     });
+                    [['plankWood', 5], ['stickWood', 280]].forEach(function (a) {
+                        var mine = (byOre[a[0]] || []).filter(function (r) { return /^mod:/.test(r); });
+                        if (mine.length) lines.push(['orealias', a[1], mine.filter(function (v, i, l) { return l.indexOf(v) === i; }).join(';')].join('\t'));
+                    });
                     Object.keys(byOre).forEach(function (n) { join(byOre[n]); });
                     Object.keys(named).forEach(function (n) {
                         var l = named[n];
@@ -4864,6 +4868,7 @@
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
                     if (j.flat_item === true) lines.push(['flatitem', key].join('\t'));
+                    if (typeof j.item_texture === 'string' && j.item_texture) lines.push(['itemtex', key, cellOf('blocks', b.mod, j.item_texture, b.file)].join('\t'));
                     if (j.log_axis === 1 || j.log_axis === 2) lines.push(['logaxis', key, j.log_axis].join('\t'));
                     if (j.leaves === true) {
                         var lft = j.texture_fast, lff = tex;
