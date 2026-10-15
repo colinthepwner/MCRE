@@ -73,7 +73,15 @@
                 'uniformMatrix2fv', 'uniformMatrix3fv', 'uniformMatrix4fv', 'vertexAttrib1fv', 'vertexAttrib2fv', 'vertexAttrib3fv', 'vertexAttrib4fv',
                 'texImage3D', 'texSubImage3D', 'bufferSubData'];
             var odd = function (v) { var b = v && ArrayBuffer.isView(v) ? v.buffer : null; return !!(b && (b.resizable || b.growable || (typeof SharedArrayBuffer !== 'undefined' && b instanceof SharedArrayBuffer))); };
-            var plain = function (args) { return Array.prototype.map.call(args, function (v) { return odd(v) ? v.slice() : v; }); };
+            var scratch = {};
+            var copyOf = function (v) {
+                var C = v.constructor, k = C.name, n = v.length, s = scratch[k];
+                if (!s || s.length < n) { var cap = 1024; while (cap < n) cap *= 2; s = scratch[k] = new C(cap); }
+                var w = n === s.length ? s : s.subarray(0, n);
+                w.set(v);
+                return w;
+            };
+            var plain = function (args) { var out = Array.prototype.slice.call(args); for (var i = 0; i < out.length; i++) if (odd(out[i])) out[i] = copyOf(out[i]); return out; };
             [window.WebGLRenderingContext, window.WebGL2RenderingContext].forEach(function (C) {
                 if (!C || !C.prototype) return;
                 NAMES.forEach(function (n) {
@@ -102,7 +110,7 @@
                             catch (e) { if (!(e instanceof TypeError) || !odd(px)) throw e; rcopy = true; }
                         }
                         if (!odd(px)) return rp.apply(this, arguments);
-                        var tmp = new px.constructor(px.length), args = Array.prototype.slice.call(arguments);
+                        var tmp = copyOf(px), args = Array.prototype.slice.call(arguments);
                         args[6] = tmp;
                         var r = rp.apply(this, args);
                         px.set(tmp);
