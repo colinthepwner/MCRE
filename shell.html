@@ -92,6 +92,25 @@
                     w.$plain = true;
                     C.prototype[n] = w;
                 });
+                var rp = C.prototype.readPixels;
+                if (typeof rp === 'function' && !rp.$plain) {
+                    var rcopy = false;
+                    var rw = function () {
+                        var px = arguments[6];
+                        if (!rcopy) {
+                            try { return rp.apply(this, arguments); }
+                            catch (e) { if (!(e instanceof TypeError) || !odd(px)) throw e; rcopy = true; }
+                        }
+                        if (!odd(px)) return rp.apply(this, arguments);
+                        var tmp = new px.constructor(px.length), args = Array.prototype.slice.call(arguments);
+                        args[6] = tmp;
+                        var r = rp.apply(this, args);
+                        px.set(tmp);
+                        return r;
+                    };
+                    rw.$plain = true;
+                    C.prototype.readPixels = rw;
+                }
             });
         })();
 

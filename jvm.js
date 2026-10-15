@@ -31081,7 +31081,7 @@ function jsonRecipe(vm, modId, j, file) {
 }
 
 var FACE = ['down', 'up', 'north', 'south', 'west', 'east'];
-function btaModelFile(files, id) { var p = String(id).split(':'); return p.length > 1 && !!files['assets/' + p[0] + '/models/' + p[1] + '.json']; }
+function btaModelFile(files, id) { var p = String(id).toLowerCase().split(':'); return p.length > 1 && !!(files['assets/' + p[0] + '/models/' + p[1] + '.json'] || files['models/' + p[1] + '.json']); }
 function texFile(id) {
 	var p = String(id).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
 	return { ns: ns, path: path, file: 'assets/' + ns + '/stationapi/textures/' + path + '.png' };
@@ -31094,13 +31094,16 @@ function texRef(files, id) {
 		return { mod: null, name: vanillaTexName(kind, bare) };
 	}
 	if (!files[t.file] && files['assets/' + t.ns + '/textures/' + t.path + '.png']) t.file = 'assets/' + t.ns + '/textures/' + t.path + '.png';
+	if (!files[t.file] && files['textures/' + t.path + '.png']) t.file = 'textures/' + t.path + '.png';
+	if (!files[t.file] && t.path !== t.path.toLowerCase()) return texRef(files, t.ns + ':' + t.path.toLowerCase());
 	if (!files[t.file]) return null;
 	return { mod: null, name: (t.ns + '_' + t.path).toLowerCase().replace(/[^a-z0-9]+/g, '_'), file: t.file };
 }
 function modelTextures(files, modelId, depth) {
 	if (!modelId || depth > 8) return {};
 	var p = String(modelId).split(':'), ns = p.length > 1 ? p[0] : 'minecraft', path = p.length > 1 ? p[1] : p[0];
-	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json') || json(files, 'assets/' + ns + '/models/' + path + '.json');
+	var j = json(files, 'assets/' + ns + '/stationapi/models/' + path + '.json') || json(files, 'assets/' + ns + '/models/' + path + '.json')
+		|| json(files, 'models/' + path + '.json') || json(files, 'assets/' + ns + '/models/' + path.toLowerCase() + '.json') || json(files, 'models/' + path.toLowerCase() + '.json');
 	if (!j) return { $parent: path };
 	if (Array.isArray(j.overrides) && j.overrides.length && LASTVM && LASTVM.$modelObj) {
 		var ov = JVM.stationOverride(LASTVM, LASTVM.$modelObj, j.overrides);
@@ -34137,14 +34140,20 @@ function install(vm) {
 	} });
 	var IM = CLIENT + 'render/item/model/';
 	def(IM + 'ItemModel', { anyInit: function (vm, self, a) { var it = a && a[0]; self.$item = it; }, methods: {} });
-	def(IM + 'ItemModelStandard', { super: IM + 'ItemModel', anyInit: function (vm, self, a) { self.$item = a && a[0]; if (a && typeof a[1] === 'string' && self.$item) self.$item.$stTex = a[1]; }, methods: {
+	def(IM + 'ItemModelStandard', { super: IM + 'ItemModel', fields: { icon: 'L' + IC + ';' }, anyInit: function (vm, self, a) { self.$item = a && a[0]; var t = a && a[1] != null ? str(a[1]) : null; if (t && /[:/]/.test(t) && self.$item) self.$item.$stTex = t; }, methods: {
 		'setIcon(Ljava/lang/String;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self, a) { if (self.$item) self.$item.$stTex = str(a[0]); return self; },
 		'setIcon(Lnet/minecraft/core/util/collection/NamespaceID;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self, a) { if (self.$item) self.$item.$stTex = nsText(a[0]); return self; },
 		'setFullBright()Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self) { return self; },
 		'setDisplayPos(Ljava/lang/String;Lorg/useless/dragonfly/DisplayPos;)Lnet/minecraft/client/render/item/model/ItemModelStandard;': function (vm, self) { return self; },
 	} });
 	def(IM + 'ItemModelDispatcher', { super: DISP, statics: {}, methods: {
-		'addDispatch(Lnet/minecraft/client/render/item/model/ItemModel;)V': function (vm, self, a) { if (a[0] && a[0].$item) vm.callVirtual(dispMap(vm, self), 'put', '(' + OBJ + OBJ + ')' + OBJ, [a[0].$item, a[0]]); },
+		'addDispatch(Lnet/minecraft/client/render/item/model/ItemModel;)V': function (vm, self, a) {
+			var m = a[0];
+			if (!m || !m.$item) return;
+			var ic = m[':icon'];
+			if (ic && ic.$id) m.$item.$stTex = String(ic.$id);
+			vm.callVirtual(dispMap(vm, self), 'put', '(' + OBJ + OBJ + ')' + OBJ, [m.$item, m]);
+		},
 	}, staticMethods: { 'getInstance()Lnet/minecraft/client/render/item/model/ItemModelDispatcher;': function (vm) { if (!vm.$imd) { vm.$imd = vm.newObject(vm.loadClass(IM + 'ItemModelDispatcher')); dispMap(vm, vm.$imd); } return vm.$imd; } } });
 	var BM = CLIENT + 'render/block/model/';
 	var sideIdx = function (s) { return s ? (s.$ordinal != null ? s.$ordinal : s[':ordinal'] | 0) : 0; };
@@ -34209,7 +34218,7 @@ function install(vm) {
 	var bmModelInit = function (vm, self, a) {
 		bmInit(vm, self, a);
 		var m = modelArg(a);
-		if (self.$block) { if (m && !self.$block.$btaModel) self.$block.$btaModel = m.replace(/[.]json$/, ''); vm.$curBlockModel = self; self.$block.$btaModelsMeta = []; }
+		if (self.$block) { if (m && !self.$block.$btaModel) self.$block.$btaModel = m.replace(/[.]json$/, '').toLowerCase(); vm.$curBlockModel = self; self.$block.$btaModelsMeta = []; }
 	};
 	def(BM + 'generic/BlockModelGeneric', { super: BM + 'BlockModelStandard', anyInit: bmModelInit, methods: {} });
 	['Lamp', 'Chest', 'Rotatable', 'VeryRotatable', 'Slab', 'Stairs'].forEach(function (n) {
@@ -34229,7 +34238,7 @@ function install(vm) {
 	}, staticMethods: {
 		'getInstance()Lnet/minecraft/client/render/block/model/BlockModelDispatcher;': function (vm) { if (!vm.$bmd) { vm.$bmd = vm.newObject(vm.loadClass(BM + 'BlockModelDispatcher')); dispMap(vm, vm.$bmd); } return vm.$bmd; },
 		'loadDataModel(Ljava/lang/String;)Lorg/useless/dragonfly/data/block/mojang/BlockModelMojangData;': function (vm, n, a) {
-			var o = vm.newObject(vm.loadClass(DF + 'data/block/mojang/BlockModelMojangData')); o.$model = str(a[0]).replace(/[.]json$/, '');
+			var o = vm.newObject(vm.loadClass(DF + 'data/block/mojang/BlockModelMojangData')); o.$model = str(a[0]).replace(/[.]json$/, '').toLowerCase();
 			var cur = vm.$curBlockModel; if (cur && cur.$block && cur.$block.$btaModelsMeta) cur.$block.$btaModelsMeta.push(o.$model);
 			return o;
 		},
@@ -34277,11 +34286,11 @@ function entryObjects(vm, list) {
 	});
 	return out;
 }
-function each(vm, objs, name, desc, modId, what) {
+function each(vm, objs, name, desc, modId, what, args) {
 	objs.forEach(function (o) {
 		var m = o.cls.findMethod(name + desc);
 		if (!m || (m.access & JVM.ACC_ABSTRACT)) return;
-		var r = JVM.run(vm, function () { vm.callVirtual(o, name, desc, []); });
+		var r = JVM.run(vm, function () { vm.callVirtual(o, name, desc, args || []); });
 		if (!r.ok) vm.log('error', modId + ': ' + what + ' failed');
 	});
 }
@@ -34366,8 +34375,16 @@ JVM.btaLoad = function (vm, modId, fj, files, classes) {
 	each(vm, get('afterClientStart'), 'afterClientStart', '()V', modId, 'afterClientStart');
 	halpEmit(vm, 'AFTER_CLIENT_START', modId, HC);
 	var mdl = get('initModels');
-	['initBlockModels', 'initItemModels', 'initEntityModels', 'initTileEntityModels', 'initBlockColors', 'initItemColors'].forEach(function (n) {
-		each(vm, mdl, n, '()V', modId, n);
+	var CR = 'net/minecraft/client/render/';
+	[['initBlockModels', CR + 'block/model/BlockModelDispatcher', disp], ['initItemModels', CR + 'item/model/ItemModelDispatcher', disp],
+	 ['initEntityModels', CR + 'EntityRendererDispatcher', dispNew], ['initTileEntityModels', CR + 'TileEntityRenderDispatcher', dispNew],
+	 ['initBlockColors', CR + 'block/color/BlockColorDispatcher', dispNew], ['initItemColors', CR + 'item/color/ItemColorDispatcher', dispNew]].forEach(function (e) {
+		var withArg = mdl.filter(function (o) { var m = o.cls.findMethod(e[0] + '(L' + e[1] + ';)V'); return m && !(m.access & JVM.ACC_ABSTRACT); });
+		if (withArg.length) {
+			var dsp = e[2](e[1]);
+			each(vm, withArg, e[0], '(L' + e[1] + ';)V', modId, e[0], [dsp]);
+		}
+		each(vm, mdl, e[0], '()V', modId, e[0]);
 	});
 };
 })();
