@@ -67,6 +67,34 @@
             canvas: (function () { return document.getElementById('canvas'); })()
         };
 
+        (function () {
+            var NAMES = ['bufferData', 'bufferSubData', 'texImage2D', 'texSubImage2D', 'compressedTexImage2D', 'compressedTexSubImage2D',
+                'uniform1fv', 'uniform2fv', 'uniform3fv', 'uniform4fv', 'uniform1iv', 'uniform2iv', 'uniform3iv', 'uniform4iv',
+                'uniformMatrix2fv', 'uniformMatrix3fv', 'uniformMatrix4fv', 'vertexAttrib1fv', 'vertexAttrib2fv', 'vertexAttrib3fv', 'vertexAttrib4fv',
+                'texImage3D', 'texSubImage3D', 'bufferSubData'];
+            var odd = function (v) { var b = v && ArrayBuffer.isView(v) ? v.buffer : null; return !!(b && (b.resizable || b.growable || (typeof SharedArrayBuffer !== 'undefined' && b instanceof SharedArrayBuffer))); };
+            var plain = function (args) { return Array.prototype.map.call(args, function (v) { return odd(v) ? v.slice() : v; }); };
+            [window.WebGLRenderingContext, window.WebGL2RenderingContext].forEach(function (C) {
+                if (!C || !C.prototype) return;
+                NAMES.forEach(function (n) {
+                    var f = C.prototype[n];
+                    if (typeof f !== 'function' || f.$plain) return;
+                    var copy = false;
+                    var w = function () {
+                        if (copy) return f.apply(this, plain(arguments));
+                        try { return f.apply(this, arguments); }
+                        catch (e) {
+                            if (!(e instanceof TypeError) || !Array.prototype.some.call(arguments, odd)) throw e;
+                            copy = true;
+                            return f.apply(this, plain(arguments));
+                        }
+                    };
+                    w.$plain = true;
+                    C.prototype[n] = w;
+                });
+            });
+        })();
+
         var MCRE_BUILD = (function () {
             var m = document.querySelector('meta[name="mcre-build"]');
             return (m && m.getAttribute('content')) || 'dev';
