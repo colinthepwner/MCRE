@@ -568,6 +568,21 @@
                 }, { capture: true, passive: true });
             });
             var buffers = {};
+            var SOUND_CAP = 32 * 1024 * 1024, soundBytes = 0, soundLru = new Map();
+            function soundUsed(u, buf) {
+                var had = soundLru.get(u);
+                if (had !== undefined) soundLru.delete(u);
+                else if (buf) { had = buf.length * buf.numberOfChannels * 4; soundBytes += had; }
+                if (had === undefined) return;
+                soundLru.set(u, had);
+                if (soundBytes <= SOUND_CAP) return;
+                for (var it = soundLru.keys(), k = it.next(); !k.done && soundBytes > SOUND_CAP; k = it.next()) {
+                    if (k.value === u) continue;
+                    soundBytes -= soundLru.get(k.value);
+                    soundLru.delete(k.value);
+                    delete buffers[k.value];
+                }
+            }
             var pendingPlay = {};
             var liveSources = 0;
             var LOAD_TIMEOUT = 8000, RETRY_MS = 30000;
@@ -589,6 +604,7 @@
                 }).then(function (buf) {
                     if (loadStarted[u] !== started) return;
                     buffers[u] = buf;
+                    soundUsed(u, buf);
                     var pend = pendingPlay[u];
                     delete pendingPlay[u];
                     if (pend && Date.now() - pend[2] < 600) playBuffer(buf, pend[0], pend[1]);
@@ -654,7 +670,7 @@
                 if (actx) {
                     if (buffers[u] === 'loading' || buffers[u] === 'failed') loadBuffer(u);
                     var b = buffers[u];
-                    if (b && b !== 'loading' && b !== 'failed') { playBuffer(b, volume, pitch); return true; }
+                    if (b && b !== 'loading' && b !== 'failed') { soundUsed(u, b); playBuffer(b, volume, pitch); return true; }
                     if (b !== 'failed') {
                         loadBuffer(u);
                         pendingPlay[u] = [volume, pitch, Date.now()];
@@ -2475,6 +2491,11 @@
                 walk(dir, '');
                 return out;
             }
+            var genFiles = function (files) {
+                var out = {};
+                Object.keys(files || {}).forEach(function (k) { if (!/[.](ogg|wav|mp3|png|jpe?g|gif)$/i.test(k)) out[k] = files[k]; });
+                return out;
+            };
             J.genWorkerStart = function () {
                 gwStateful = false;
                 try {
@@ -2487,7 +2508,7 @@
                     var mods = J.defineOrder.map(function (id) {
                         var pre = J.pre[id];
                         if (!pre || pre.skip || !pre.files) return null;
-                        return { id: id, tag: (vm.$modTag && vm.$modTag[id]) || 'mcp152', files: pre.files,
+                        return { id: id, tag: (vm.$modTag && vm.$modTag[id]) || 'mcp152', files: genFiles(pre.files),
                                  settings: Module.mcMods && Module.mcMods.savedSettings ? Module.mcMods.savedSettings(id) : null,
                                  cfg: readTree('/games/java/' + safeName(id)) };
                     }).filter(Boolean);
@@ -3408,18 +3429,25 @@
                             vm.callVirtual(o, 'load', '()V', []);
                         });
                     });
-                    if (forgeMods.length) {
+                    if (forgeMods.length || kind.coremod) {
                         var info = null;
                         try { var mi = files['mcmod.info']; if (mi) info = mcLenientJson(new TextDecoder().decode(mi)); } catch (e) { info = null; }
                         if (info && !Array.isArray(info)) info = info.modList || info.modlist || [info];
-                        JVM.forgeLoad(vm, forgeMods, classes, info);
+                        if (JVM.forgeLoadJar) JVM.forgeLoadJar(vm, modId, files, classes, info);
+                        else JVM.forgeLoad(vm, forgeMods, classes, info);
+                        if (kind.coremod && JVM.coremodOnlyPatches && JVM.coremodOnlyPatches(vm, modId, classes)) {
+                            J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: JVM.COREMOD_ONLY_CANT });
+                            problem('', "Can't run: " + JVM.COREMOD_ONLY_CANT);
+                            return {};
+                        }
                     }
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes, menuMixins: kind.menus || 0,
                         errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
-                            .concat(mixLeft(kind, modId) ? ["changes to the game's own code (" + mixLeft(kind, modId) + (mixLeft(kind, modId) === 1 ? ' mixin)' : ' mixins)')] : []) });
+                            .concat(mixLeft(kind, modId) ? ["changes to the game's own code (" + mixLeft(kind, modId) + (mixLeft(kind, modId) === 1 ? ' mixin)' : ' mixins)')] : [])
+                            .concat(JVM.coremodSkipped && JVM.coremodSkipped(vm, modId) ? ["changes to the game's own code (" + JVM.coremodSkipped(vm, modId) + (JVM.coremodSkipped(vm, modId) === 1 ? ' patch)' : ' patches)')] : []) });
                     var add = {}, enc = new TextEncoder();
                     var put = function (path, obj) { add[path] = enc.encode(JSON.stringify(obj)); };
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
@@ -6269,6 +6297,8 @@
             var LIB_KNOWN = {
                 'fabric-language-kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true, name: 'Fabric Language Kotlin' },
                 'Fabric Language Kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true },
+                'CodeChickenCore': { slug: 'codechicken-core', loaders: ['forge'], name: 'CodeChickenCore' },
+                'CodeChickenLib': { slug: 'codechicken-lib', loaders: ['forge'], name: 'CodeChickenLib' },
                 'LomLib': { slug: 'LomLib', name: 'LomLib', cf: {
                     '1.6': { url: 'https://mediafilez.forgecdn.net/files/759/466/LomLib-universal-1.0.9.jar', sha1: '88dafcbe8817533cbc6120131cadde14e8a22dc1' },
                 } },

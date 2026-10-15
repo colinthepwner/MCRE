@@ -940,6 +940,10 @@ F	d	b	field_1717_b	yCoord
 F	d	c	field_1716_c	zCoord
 F	d	j	field_1715_d	hash
 F	d	d	field_1714_e	index
+F	d	e	field_1713_f	totalPathDistance
+F	d	f	field_1712_g	distanceToNext
+F	d	g	field_1711_h	distanceToTarget
+F	d	h	field_1710_i	previous
 F	d	i	field_1709_j	isFirst
 F	lo	a	field_4258_a	body
 F	lo	b	field_4257_b	tentacles
@@ -971,6 +975,7 @@ F	px	c	field_1395_a	itemRenderer
 F	px	J	field_1383_m	random
 F	bj	a	field_25212_a	entityClass
 F	dh	b	field_1764_b	points
+F	dh	a	field_1765_a	pathLength
 F	bw	b	field_191_a	renderManager
 F	bw	e	field_203_d	renderBlocks
 F	bw	c	field_9246_c	shadowSize
@@ -1144,6 +1149,7 @@ F	ht	m	GUI_SCALE	GUI_SCALE
 F	mm	D	field_1052_A	sendQueue
 F	jx	a	field_1590_a	slots
 F	jx	b	field_1589_b	count
+F	lf	a	field_1556_a	pathPoints
 F	lf	b	field_1555_b	count
 F	gm	b	field_4015_b	itemRand
 F	gm	c	field_233_c	itemsList
@@ -2167,7 +2173,10 @@ M	sn	ac	()Lbt;	func_4037_H	getLookVec
 M	sn	ak	()Z	func_21062_U	isBurning
 M	sn	al	()Z	func_21063_V	isRiding
 M	sn	t	()Z	func_381_o	isSneaking
+M	sn	d	(I)Z	func_21060_d	getEntityFlag
+M	sn	b	(IZ)V	func_21059_b	setEntityFlag
 M	sn	a	(Lc;)V	func_27014_a	onStruckByLightning
+M	sn	c	(DDD)Z	func_28014_c	pushOutOfBlocks
 M	bf	b	()V	func_811_b	saveExtraData
 M	eq	a	(DDDDDD)Leq;	func_1168_a	getBoundingBox
 M	eq	b	(DDDDDD)Leq;	func_1161_b	getBoundingBox
@@ -2317,6 +2326,7 @@ M	ls	V	()V	func_415_z	spawnExplosionParticle
 M	ls	a	(Lsn;IDD)V	func_434_a	knockBack
 M	ls	d_	()Z	func_21067_c_	canBreatheUnderwater
 M	ls	a	(Lsn;FF)V	func_426_b	faceEntity
+M	ls	Y	()Z	func_25025_V	hasCurrentTarget
 M	ls	e	(F)Lbt;	func_427_e	getPosition
 M	ls	f	(F)Lbt;	func_430_f	getLook
 M	ls	a	(DF)Lvf;	func_416_a	rayTrace
@@ -2344,6 +2354,11 @@ M	ny	a	(Lgt;)Lny;	func_27092_a	setStatStringFormatter
 M	ny	f	()Z	func_27093_f	getSpecial
 M	bd	a	()Ljava/io/File;	func_1263_a	getMinecraftDir
 M	bd	a	(Ljava/lang/String;)Ljava/io/File;	func_1264_a	getAppDir
+M	lf	a	(Ld;)Ld;	func_1034_a	addPoint
+M	lf	a	()V	func_1038_a	clearPath
+M	lf	b	()Ld;	func_1036_b	dequeue
+M	lf	a	(Ld;F)V	func_1035_a	changeDistance
+M	lf	c	()Z	func_1039_c	isPathEmpty
 M	gm	a	(Liz;Lgs;Lfd;IIII)Z	func_192_a	onItemUse
 M	gm	b	()Z	func_4017_a	isFull3D
 M	gm	a	(Luu;)Z	func_4018_a	canHarvestBlock
@@ -2430,6 +2445,7 @@ M	yw	l	()I	func_25011_l	getHealAmount
 M	yw	m	()Z	func_25012_m	getIsWolfsFavoriteMeat
 M	bp	a	(DDDD)Z	func_27023_a	isCourseTraversable
 M	sl	a	(DDDFF)V	func_408_a	setThrowableHeading
+M	i	a	(Ljava/lang/String;)Ljava/io/InputStream;	func_6481_a	getResourceAsStream
 M	am	a	(DDD)D	func_802_a	generateNoise
 M	am	b	(DDD)D	func_804_b	lerp
 M	am	a	(DD)D	func_801_a	func_801_a
@@ -2526,6 +2542,8 @@ M	fd	p	(III)V	func_692_l	removeBlockTileEntity
 M	fd	b	(Lsn;Leq;)Ljava/util/List;	func_659_b	getEntitiesWithinAABBExcludingEntity
 M	fd	a	(Ljava/lang/Class;Leq;)Ljava/util/List;	func_657_a	getEntitiesWithinAABB
 M	fd	a	(IIIIZI)Z	func_695_a	canBlockBePlacedAt
+M	fd	a	(Lsn;Lsn;F)Ldh;	func_702_a	getPathToEntity
+M	fd	a	(Lsn;IIIF)Ldh;	func_637_a	getEntityPathToXYZ
 M	fd	j	(IIII)Z	func_668_j	isBlockProvidingPowerTo
 M	fd	r	(III)Z	func_646_n	isBlockGettingPowered
 M	fd	k	(IIII)Z	func_706_k	isBlockIndirectlyProvidingPowerTo

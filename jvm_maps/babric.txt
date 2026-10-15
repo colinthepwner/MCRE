@@ -729,6 +729,10 @@ F	net/minecraft/class_29	field_140	field_140	xCoord
 F	net/minecraft/class_29	field_141	field_141	yCoord
 F	net/minecraft/class_29	field_142	field_142	zCoord
 F	net/minecraft/class_29	field_143	field_143	index
+F	net/minecraft/class_29	field_144	field_144	totalPathDistance
+F	net/minecraft/class_29	field_145	field_145	distanceToNext
+F	net/minecraft/class_29	field_146	field_146	distanceToTarget
+F	net/minecraft/class_29	field_147	field_147	previous
 F	net/minecraft/class_29	field_148	field_148	isFirst
 F	net/minecraft/class_29	field_149	field_149	hash
 F	net/minecraft/class_32	field_151	field_151	mc
@@ -1101,6 +1105,7 @@ F	net/minecraft/class_242	field_907	field_907	dyeColorNames
 F	net/minecraft/class_242	field_908	field_908	dyeColors
 F	net/minecraft/class_245	field_909	field_909	mainModel
 F	net/minecraft/class_245	field_910	field_910	renderPassModel
+F	net/minecraft/class_109	field_931	field_931	pathPoints
 F	net/minecraft/class_109	field_932	field_932	count
 F	net/minecraft/class_238	field_942	field_942	monster
 F	net/minecraft/class_238	field_943	field_943	creature
@@ -1861,6 +1866,7 @@ F	net/minecraft/class_579	field_2680	field_2680	renderBlocks
 F	net/minecraft/class_104	field_2681	field_2681	delay
 F	net/minecraft/class_104	field_2682	field_2682	yaw
 F	net/minecraft/class_104	field_2684	field_2684	mobID
+F	net/minecraft/class_61	field_2690	field_2690	pathLength
 F	net/minecraft/class_61	field_2691	field_2691	points
 F	net/minecraft/class_613	field_2698	field_2698	fleeceColorTable
 F	net/minecraft/class_632	field_2711	field_2711	toolMaterial
@@ -2008,8 +2014,10 @@ M	net/minecraft/class_18	method_185	(Lnet/minecraft/class_57;B)V	method_185	setE
 M	net/minecraft/class_18	method_186	(Lnet/minecraft/class_57;D)Lnet/minecraft/class_54;	method_186	getClosestPlayerToEntity
 M	net/minecraft/class_18	method_187	(Lnet/minecraft/class_57;DDDF)Lnet/minecraft/class_60;	method_187	createExplosion
 M	net/minecraft/class_18	method_188	(Lnet/minecraft/class_57;DDDFZ)Lnet/minecraft/class_60;	method_188	newExplosion
+M	net/minecraft/class_18	method_189	(Lnet/minecraft/class_57;IIIF)Lnet/minecraft/class_61;	method_189	getEntityPathToXYZ
 M	net/minecraft/class_18	method_190	(Lnet/minecraft/class_57;Lnet/minecraft/class_25;)Ljava/util/List;	method_190	getCollidingBoundingBoxes
 M	net/minecraft/class_18	method_191	(Lnet/minecraft/class_57;Ljava/lang/String;FF)V	method_191	playSoundAtEntity
+M	net/minecraft/class_18	method_192	(Lnet/minecraft/class_57;Lnet/minecraft/class_57;F)Lnet/minecraft/class_61;	method_192	getPathToEntity
 M	net/minecraft/class_18	method_197	()Lnet/minecraft/class_51;	method_197	getChunkProvider
 M	net/minecraft/class_18	method_198	(F)F	method_198	getCelestialAngle
 M	net/minecraft/class_18	method_199	(II)Lnet/minecraft/class_43;	method_199	getChunkFromBlockCoords
@@ -2261,6 +2269,11 @@ M	net/minecraft/class_245	method_825	(Lnet/minecraft/class_127;IF)Z	method_825	s
 M	net/minecraft/class_245	method_826	(Lnet/minecraft/class_127;DDD)V	method_826	func_22012_b
 M	net/minecraft/class_245	method_827	(Lnet/minecraft/class_127;F)V	method_827	renderEquippedItems
 M	net/minecraft/class_245	method_828	(Lnet/minecraft/class_127;F)F	method_828	func_170_d
+M	net/minecraft/class_109	method_841	()V	method_841	clearPath
+M	net/minecraft/class_109	method_843	(Lnet/minecraft/class_29;)Lnet/minecraft/class_29;	method_843	addPoint
+M	net/minecraft/class_109	method_844	(Lnet/minecraft/class_29;F)V	method_844	changeDistance
+M	net/minecraft/class_109	method_845	()Lnet/minecraft/class_29;	method_845	dequeue
+M	net/minecraft/class_109	method_847	()Z	method_847	isPathEmpty
 M	net/minecraft/class_43	method_857	()V	method_857	func_1014_a
 M	net/minecraft/class_43	method_859	(III)I	method_859	getBlockID
 M	net/minecraft/class_43	method_860	(IIII)Z	method_860	setBlockID
@@ -2307,6 +2320,7 @@ M	net/minecraft/class_127	method_914	()I	method_914	getDropItemId
 M	net/minecraft/class_127	method_915	()F	method_915	getSoundVolume
 M	net/minecraft/class_127	method_918	()V	method_918	playLivingSound
 M	net/minecraft/class_127	method_919	()V	method_919	spawnExplosionParticle
+M	net/minecraft/class_127	method_921	()Z	method_921	hasCurrentTarget
 M	net/minecraft/class_127	method_924	(Lnet/minecraft/class_57;FF)V	method_924	faceEntity
 M	net/minecraft/class_127	method_925	(Lnet/minecraft/class_57;IDD)V	method_925	knockBack
 M	net/minecraft/class_127	method_926	(F)Lnet/minecraft/class_26;	method_926	getLook
@@ -2337,6 +2351,7 @@ M	net/minecraft/class_134	method_954	(I)Lnet/minecraft/class_31;	method_954	getS
 M	net/minecraft/class_135	method_956	()I	method_956	catchFish
 M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_267;	method_958	getRandomSoundFromSoundPool
 M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
+M	net/minecraft/class_285	method_976	(Ljava/lang/String;)Ljava/io/InputStream;	method_976	getResourceAsStream
 M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
 M	net/minecraft/class_290	method_983	(FF)Lnet/minecraft/class_290;	method_983	setTexturePosition
 M	net/minecraft/class_299	method_990	(Lnet/minecraft/class_18;III)V	method_990	removeLeaves
@@ -2493,6 +2508,7 @@ M	net/minecraft/class_57	method_1322	(DDD)V	method_1322	addVelocity
 M	net/minecraft/class_57	method_1323	(Lnet/minecraft/class_54;)Z	method_1323	interact
 M	net/minecraft/class_57	method_1324	(FFF)V	method_1324	moveFlying
 M	net/minecraft/class_57	method_1325	(IIF)Lnet/minecraft/class_142;	method_1325	dropItemWithOffset
+M	net/minecraft/class_57	method_1326	(IZ)V	method_1326	setEntityFlag
 M	net/minecraft/class_57	method_1327	(Lnet/minecraft/class_31;F)Lnet/minecraft/class_142;	method_1327	entityDropItem
 M	net/minecraft/class_57	method_1328	(Lnet/minecraft/class_15;)Z	method_1328	isInsideOfMaterial
 M	net/minecraft/class_57	method_1329	([D)Lnet/minecraft/class_202;	method_1329	newDoubleNBTList
@@ -2509,6 +2525,7 @@ M	net/minecraft/class_57	method_1340	(DDD)V	method_1340	setPosition
 M	net/minecraft/class_57	method_1341	(DDDFF)V	method_1341	setLocationAndAngles
 M	net/minecraft/class_57	method_1342	(FF)V	method_1342	setRotation
 M	net/minecraft/class_57	method_1343	(Lnet/minecraft/class_8;)Z	method_1343	addEntityID
+M	net/minecraft/class_57	method_1345	(I)Z	method_1345	getEntityFlag
 M	net/minecraft/class_57	method_1346	(Lnet/minecraft/class_8;)V	method_1346	writeToNBT
 M	net/minecraft/class_57	method_1347	(DDD)D	method_1347	getDistanceSq
 M	net/minecraft/class_57	method_1348	(Lnet/minecraft/class_8;)V	method_1348	readFromNBT
@@ -2531,6 +2548,7 @@ M	net/minecraft/class_57	method_1368	(Lnet/minecraft/class_8;)V	method_1368	writ
 M	net/minecraft/class_57	method_1369	()F	method_1369	getCollisionBorderSize
 M	net/minecraft/class_57	method_1370	()V	method_1370	onUpdate
 M	net/minecraft/class_57	method_1371	(DDD)V	method_1371	moveEntity
+M	net/minecraft/class_57	method_1372	(DDD)Z	method_1372	pushOutOfBlocks
 M	net/minecraft/class_57	method_1373	()Z	method_1373	isSneaking
 M	net/minecraft/class_57	method_1374	(DZ)V	method_1374	updateFallState
 M	net/minecraft/class_57	method_1375	(Lnet/minecraft/class_18;)V	method_1375	setWorld
