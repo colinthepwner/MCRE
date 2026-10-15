@@ -1744,6 +1744,8 @@ F	net/minecraft/class_163	field_2302	field_2302	faces
 F	net/minecraft/class_163	field_2303	field_2303	textureOffsetX
 F	net/minecraft/class_163	field_2304	field_2304	textureOffsetY
 F	net/minecraft/class_163	field_2305	field_2305	compiled
+F	net/minecraft/class_474	field_2307	field_2307	chanceToEncourageFire
+F	net/minecraft/class_474	field_2308	field_2308	abilityToCatchFire
 F	net/minecraft/class_433	field_2322	field_2322	reason
 F	net/minecraft/class_553	field_2324	field_2324	blockType
 F	net/minecraft/class_554	field_2325	field_2325	healAmount
@@ -2007,6 +2009,7 @@ M	net/minecraft/class_18	method_175	(Ljava/lang/Class;Lnet/minecraft/class_25;)L
 M	net/minecraft/class_18	method_176	(Ljava/lang/Class;Ljava/lang/String;)Lnet/minecraft/class_58;	method_176	loadItemData
 M	net/minecraft/class_18	method_177	(Ljava/lang/String;)Lnet/minecraft/class_54;	method_177	getPlayerEntityByName
 M	net/minecraft/class_18	method_178	(Ljava/lang/String;DDDDDD)V	method_178	spawnParticle
+M	net/minecraft/class_18	method_179	(Ljava/lang/String;III)V	method_179	playRecord
 M	net/minecraft/class_18	method_180	(Ljava/lang/String;Lnet/minecraft/class_58;)V	method_180	setItemData
 M	net/minecraft/class_18	method_183	(Lnet/minecraft/class_59;)V	method_183	addWorldAccess
 M	net/minecraft/class_18	method_184	(Lnet/minecraft/class_57;)Z	method_184	addWeatherEffect
@@ -2024,6 +2027,7 @@ M	net/minecraft/class_18	method_199	(II)Lnet/minecraft/class_43;	method_199	getC
 M	net/minecraft/class_18	method_200	(IIII)Z	method_200	setBlock
 M	net/minecraft/class_18	method_201	(IIIII)Z	method_201	setBlock
 M	net/minecraft/class_18	method_202	(IIIIII)V	method_202	markBlockRangeForRenderUpdate
+M	net/minecraft/class_18	method_205	(Lnet/minecraft/class_56;IIII)V	method_205	setLightValue
 M	net/minecraft/class_18	method_207	(Lnet/minecraft/class_25;Lnet/minecraft/class_15;)Z	method_207	isAABBInMaterial
 M	net/minecraft/class_18	method_208	(Ljava/lang/String;)I	method_208	getUniqueDataId
 M	net/minecraft/class_18	method_210	(Lnet/minecraft/class_57;)Z	method_210	spawnEntityInWorld
@@ -2281,6 +2285,7 @@ M	net/minecraft/class_43	method_861	(IIIII)Z	method_861	setBlockIDWithMetadata
 M	net/minecraft/class_43	method_862	(IIILnet/minecraft/class_55;)V	method_862	setChunkBlockTileEntity
 M	net/minecraft/class_43	method_863	(J)Ljava/util/Random;	method_863	func_997_a
 M	net/minecraft/class_43	method_864	(Lnet/minecraft/class_56;III)I	method_864	getSavedLightValue
+M	net/minecraft/class_43	method_865	(Lnet/minecraft/class_56;IIII)V	method_865	setLightValue
 M	net/minecraft/class_43	method_867	(Lnet/minecraft/class_55;)V	method_867	addTileEntity
 M	net/minecraft/class_43	method_868	(Lnet/minecraft/class_57;)V	method_868	addEntity
 M	net/minecraft/class_43	method_869	(Lnet/minecraft/class_57;I)V	method_869	removeEntityAtIndex
@@ -2320,7 +2325,9 @@ M	net/minecraft/class_127	method_914	()I	method_914	getDropItemId
 M	net/minecraft/class_127	method_915	()F	method_915	getSoundVolume
 M	net/minecraft/class_127	method_918	()V	method_918	playLivingSound
 M	net/minecraft/class_127	method_919	()V	method_919	spawnExplosionParticle
+M	net/minecraft/class_127	method_920	()V	method_920	func_27021_X
 M	net/minecraft/class_127	method_921	()Z	method_921	hasCurrentTarget
+M	net/minecraft/class_127	method_922	()Lnet/minecraft/class_57;	method_922	getCurrentTarget
 M	net/minecraft/class_127	method_924	(Lnet/minecraft/class_57;FF)V	method_924	faceEntity
 M	net/minecraft/class_127	method_925	(Lnet/minecraft/class_57;IDD)V	method_925	knockBack
 M	net/minecraft/class_127	method_926	(F)Lnet/minecraft/class_26;	method_926	getLook
@@ -2425,6 +2432,7 @@ M	net/minecraft/class_117	method_1123	(Lnet/minecraft/class_169;)V	method_1123	a
 M	net/minecraft/class_239	method_1142	(Lnet/minecraft/class_18;Ljava/util/Random;III)Z	method_1142	generate
 M	net/minecraft/class_59	method_1150	(IIIIII)V	method_1150	markBlockRangeNeedsUpdate
 M	net/minecraft/class_59	method_1153	(Ljava/lang/String;DDDDDD)V	method_1153	spawnParticle
+M	net/minecraft/class_59	method_1155	(Ljava/lang/String;III)V	method_1155	playRecord
 M	net/minecraft/class_59	method_1156	(Lnet/minecraft/class_57;)V	method_1156	obtainEntitySkin
 M	net/minecraft/class_59	method_1157	(Lnet/minecraft/class_57;)V	method_1157	releaseEntitySkin
 M	net/minecraft/class_33	method_1185	(II)V	method_1185	mouseReleased
@@ -2726,6 +2734,10 @@ M	net/minecraft/class_163	method_1818	(FFFIIIF)V	method_1818	addBox
 M	net/minecraft/class_163	method_1819	(F)V	method_1819	renderWithRotation
 M	net/minecraft/class_163	method_1820	(F)V	method_1820	postRender
 M	net/minecraft/class_474	method_1822	(III)V	method_1822	setBurnRate
+M	net/minecraft/class_474	method_1823	(Lnet/minecraft/class_18;IIIILjava/util/Random;I)V	method_1823	tryToCatchBlockOnFire
+M	net/minecraft/class_474	method_1824	(Lnet/minecraft/class_14;III)Z	method_1824	canBlockCatchFire
+M	net/minecraft/class_474	method_1825	(Lnet/minecraft/class_18;IIII)I	method_1825	getChanceToEncourageFire
+M	net/minecraft/class_474	method_1827	(Lnet/minecraft/class_18;III)I	method_1827	getChanceOfNeighborsEncouragingFire
 M	net/minecraft/class_554	method_1835	()I	method_1835	getHealAmount
 M	net/minecraft/class_554	method_1836	()Z	method_1836	getIsWolfsFavoriteMeat
 M	net/minecraft/class_555	method_1837	()V	method_1837	updateRenderer

@@ -1195,10 +1195,17 @@
                     define: function (name, value, description, range) {
                         defs[name] = { value: value, description: String(description || ''), min: range ? range[0] : null, max: range ? range[1] : null };
                     },
-                    get: function (name) { var d = defs[name]; return !d ? undefined : (name in values ? values[name] : d.value); },
+                    bind: function (name, getter, setter) { var d = defs[name]; if (d) { d.getter = getter; d.setter = setter; } },
+                    get: function (name) {
+                        var d = defs[name];
+                        if (!d) return undefined;
+                        if (d.getter) { var gv; try { gv = d.getter(); } catch (e) { gv = undefined; } if (gv !== undefined && gv !== null) return fit(d, gv); }
+                        return name in values ? values[name] : d.value;
+                    },
                     set: function (name, v) {
                         var d = defs[String(name)];
                         if (!d) return false;
+                        if (d.setter) { try { d.setter(v === null || v === undefined ? d.value : fit(d, v)); } catch (e) { } return true; }
                         if (v === null || v === undefined) delete values[name];
                         else values[name] = fit(d, v);
                         return true;
@@ -1384,6 +1391,12 @@
             Module.mcGameRules.define('jukeboxNowPlaying', true, 'A record starting shows "Now playing: <disc>" above the hotbar');
             Module.mcGameRules.define('modSkyColors', true, "Mods' biomes show their own sky colour (off: the usual sky there)");
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
+            Module.mcGameRules.define('generateStructures', true, 'Villages, mineshafts, strongholds and temples appear in newly explored parts of the world (saved with the world)');
+            Module.mcGameRules.bind('generateStructures', function () {
+                if (!Module.ccall) return undefined;
+                var v = Module.ccall('mcModpeOp', 'string', ['string'], ['structures']);
+                return v === '1' ? true : v === '0' ? false : undefined;
+            }, function (v) { if (Module.ccall) Module.ccall('mcModpeOp', 'string', ['string'], ['structures\t' + (v ? 1 : 0)]); });
             function rule(n) { return Module.mcGameRules.get(n); }
             Module.mcSky = Module.mcSky || {
                 script: -1,
@@ -1881,7 +1894,12 @@
             function javaOf(ref, data) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
                 if (/^id:38(\D|$)/.test(ref || '')) return { id: 38, data: 0 };
-                if (m && javaMods[m[1]]) return { id: refToJava(ref), data: window.JVM.stateBlockOf && window.JVM.stateBlockOf(vm, m[1], m[2]) ? data | 0 : window.JVM.contentMeta(vm, m[1], m[2]) };
+                if (m && javaMods[m[1]]) {
+                    if (window.JVM.stateBlockOf && window.JVM.stateBlockOf(vm, m[1], m[2])) return { id: refToJava(ref), data: data | 0 };
+                    var jid0 = refToJava(ref), cm = window.JVM.contentMeta(vm, m[1], m[2]), r0 = reg(), io = r0 && r0.items[jid0];
+                    if (!cm && io && !io.$override && !(r0.blocks && r0.blocks[jid0]) && window.JVM.variantsOf(vm, io).length <= 1) return { id: jid0, data: data | 0 };
+                    return { id: jid0, data: cm };
+                }
                 return { id: refToJava(ref), data: data | 0 };
             }
             function stateBlock(jid) { var b = reg() && reg().blocks[jid]; return !!(b && !b.$override && window.JVM.stateShapeOf && window.JVM.stateShapeOf(vm, b)); }
@@ -2137,7 +2155,7 @@
                     case 'xp': case 'xplevel':
                         return mp([name, a[0] | 0, actor ? actor.id | 0 : ''].join('\t'));
                     case 'spawnmob': return mp(['spawnmob', clean(a[0]), +a[1], +a[2], +a[3]].join('\t'));
-                    case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
+                    case 'shoot': return mp(['shoot', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], typeof a[6] === 'string' ? a[6] : a[6] ? itemRef(a[6], a[7] | 0) : 'id:332', +a[8] || 0, +a[9] || 0.99, a[10] | 0, a[11] | 0].join('\t'));
                     case 'remove': return mp(['remove', a[0] | 0].join('\t'));
                     case 'entsin': {
                         var es = mp(['entsin', +a[0], +a[1], +a[2], +a[3], +a[4], +a[5], a[6] | 0].join('\t'));
@@ -2177,6 +2195,23 @@
                     case 'entjava': return mp(['entjava', a[0] | 0].concat(a.length > 1 && a[1] != null ? [String(a[1]).replace(/[\t\r\n]/g, ' ')] : []).join('\t'));
                     case 'sky': return mp(['sky', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'bright': return mp(['bright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                    case 'light': return mp(['light', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0].join('\t'));
+                    case 'setlight': return mp(['setlight', a[0] | 0, a[1] | 0, a[2] | 0, a[3] | 0, a[4] | 0].join('\t'));
+                    case 'bonemeal': return mp(['bonemeal', a[0] | 0, a[1] | 0, a[2] | 0, a[3] == null ? '' : a[3] | 0].join('\t'));
+                    case 'flammable': return mp(['flammable', blockRef(a[0] | 0, 0), a[1] | 0, a[2] | 0].join('\t'));
+                    case 'flammability': return mp(['flammability', blockRef(a[0] | 0, 0)].join('\t'));
+                    case 'jukeboxat': {
+                        var jb = mp(['jukeboxat', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                        if (!jb) return jb;
+                        var jbj = javaOf(jb.item, jb.data);
+                        return { id: jbj.id, data: jbj.data };
+                    }
+                    case 'jukeboxput': { var jref = itemRef(a[3] | 0, a[4] | 0); return mp(['jukeboxput', a[0] | 0, a[1] | 0, a[2] | 0, jref, variantRef(jref) ? '' : a[4] | 0].join('\t')); }
+                    case 'jukeboxeject': return mp(['jukeboxeject', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? 1 : 0].join('\t'));
+                    case 'record': return mp(['record', a[0] | 0, a[1] | 0, a[2] | 0, a[3] ? itemRef(a[3] | 0, 0) : 'none'].join('\t'));
+                    case 'difficulty': return mp(a[0] == null ? 'difficulty' : ['difficulty', a[0] | 0].join('\t'));
+                    case 'wanttick': return mp('wanttick');
+                    case 'structures': return mp(a[0] == null ? 'structures' : ['structures', a[0] ? 1 : 0].join('\t'));
                     case 'fullbright': return mp(['fullbright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
                     case 'hasitem': case 'takeitem': {
                         var want = itemRef(a[0]);
@@ -2271,6 +2306,7 @@
                 if (window.JVM.storageReset) window.JVM.storageReset(vm);
                 if (window.JVM.forgeWorldStart) window.JVM.forgeWorldStart(vm);
                 if (window.JVM.hookWorldStart) window.JVM.hookWorldStart(vm);
+                if (window.JVM.gapsWorldStart) window.JVM.gapsWorldStart(vm);
                 setTimeout(function () { J.genWorkerStart(); }, 0);
                 return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
@@ -2342,6 +2378,13 @@
                     case 'sky': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 0) : undefined;
                     case 'fullbright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 1) : undefined;
                     case 'bright': return Module._mcJavaGenLight ? Module._mcJavaGenLight(x, y, z, 2) : undefined;
+                    case 'light': {
+                        if (!Module._mcJavaGenLight) return undefined;
+                        var gsky = Module._mcJavaGenLight(x, y, z, 1);
+                        if (!b) return gsky;
+                        return Module._mcJavaGenLight(x, y, z, 0) ? 0 : Module._mcJavaGenLight(x, y, z, 3);
+                    }
+                    case 'structures': { var gst = Module.ccall('mcModpeOp', 'string', ['string'], ['structures']); return gst === 'null' ? undefined : +gst; }
                     case 'gentick': if (Module._mcJavaGenTick) Module._mcJavaGenTick(x, y, z); return 0;
                     case 'biome':
                         if (Module._mcJavaGenBiome) { var gb = Module.ccall('mcJavaGenBiome', 'string', ['number', 'number'], [x, y]); if (gb) return gb; }
@@ -2631,6 +2674,7 @@
             };
             J.genCancel = function (id) { if (gwDone[id]) delete gwDone[id]; else gwCancelled[id] = 1; };
             J.worldStop = function () {
+                if (running && vm && window.JVM.gapsWorldStop) { vm.steps = 0; window.JVM.gapsWorldStop(vm); }
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
                 if (running && vm && window.JVM.playerDataSave) { vm.steps = 0; window.JVM.playerDataSave(vm); }
@@ -3254,7 +3298,7 @@
             }
             window.addEventListener('keydown', function (e) { if (jg) jgKey(e, true); }, true);
             window.addEventListener('keyup', function (e) { if (jg) jgKey(e, false); }, true);
-            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; J.defineOrder = []; gwStop(); if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); J.menusSoon(); };
+            J.begin = function () { J.decls = {}; J.reports = {}; J.pre = {}; J.wantTag = null; vm = null; J.defineOrder = []; gwStop(); if (Module._mcJavaGenOn) Module._mcJavaGenOn(0); if (Module._mcDungeonExtras) Module.ccall('mcDungeonExtras', 'number', ['string'], ['']); J.menusSoon(); };
             J.menusSoon = function () {
                 clearTimeout(J.menuTimer);
                 J.menuTimer = setTimeout(function () {
@@ -3443,6 +3487,7 @@
                     }
                     J.genCheck();
                     var c = JVM.collectContent(vm, modId);
+                    if (JVM.dungeonExtras && Module._mcDungeonExtras) { try { Module.ccall('mcDungeonExtras', 'number', ['string'], [JVM.dungeonExtras(vm, itemRef)]); } catch (x) { console.warn('[java] dungeon loot', x); } }
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes, menuMixins: kind.menus || 0,
                         errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
@@ -5338,6 +5383,7 @@
                     }
                     if (j.java_bow === true) out.push('ranged=' + ['*java', 1, Math.max(0, num(j.durability, 0) | 0)].join(','));
                     if (j.java_using === true) out.push('using=1');
+                    if (j.hidden === true) out.push('hidden=1');
                     else if (j.ranged) {
                         var rg = typeof j.ranged === 'object' ? j.ranged : {};
                         var ammo = ref(rg.ammo || 'minecraft:arrow', it.mod, it.file);

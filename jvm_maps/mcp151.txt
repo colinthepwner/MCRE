@@ -1734,6 +1734,7 @@ F	acw	c	field_75039_c	worldObj
 F	acy	d	field_73210_d	noise3
 F	acy	k	field_73220_k	rand
 F	acy	p	field_73230_p	worldObj
+F	acy	q	field_73229_q	mapFeaturesEnabled
 F	acy	t	field_73226_t	caveGenerator
 F	acy	v	field_73224_v	villageGenerator
 F	acy	y	field_73232_y	ravineGenerator
@@ -1949,15 +1950,19 @@ F	ajv	o	field_76104_m	raining
 F	ajv	p	field_76101_n	rainTime
 F	ajv	q	field_76102_o	thundering
 F	ajv	r	field_76114_p	thunderTime
+F	ajv	t	field_76112_r	mapFeaturesEnabled
 F	ajv	u	field_76111_s	hardcore
 F	alb	a	field_72186_a	isPowered
 F	ali	a	field_82537_a	sensible
 F	amb	a	field_82527_a	dispenseBehaviorRegistry
 F	amb	b	field_72284_a	random
+F	aml	a	field_72258_a	chanceToEncourageFire
+F	aml	b	field_72257_b	abilityToCatchFire
 F	amt	c	field_72192_a	fallInstantly
 F	any	a	everything	everything
 F	any	b	mobs	mobs
 F	any	c	players	players
+F	aod	a	field_70417_a	record
 F	aoq	b	field_72157_b	modelBlock
 F	apa	A	field_71978_w	cobblestone
 F	apa	B	field_71988_x	planks
@@ -2907,6 +2912,7 @@ F	ng	bW	field_82179_bU	persistenceRequired
 F	ng	bd	field_70729_aU	dead
 F	ng	be	field_70728_aV	experienceValue
 F	ng	bj	field_70754_ba	limbSwing
+F	ng	bk	field_70717_bb	attackingPlayer
 F	ng	bl	field_70718_bc	recentlyHit
 F	ng	bo	field_70714_bg	tasks
 F	ng	bp	field_70715_bh	targetTasks
@@ -3545,6 +3551,7 @@ M	aab	a	(IIIIZILmp;Lwm;)Z	func_72931_a	canPlaceEntityOnSide
 M	aab	a	(IIILaqp;)V	func_72837_a	setBlockTileEntity
 M	aab	a	(IIIZ)Z	func_94578_a	destroyBlock
 M	aab	a	(Laag;)V	func_72954_a	addWorldAccess
+M	aab	a	(Laam;III)I	func_72925_a	getSkyBlockTypeBrightness
 M	aab	a	(Lapa;I)Z	func_102026_a	isBlockTopFacingSurfaceSolid
 M	aab	a	(Laqx;Laif;)Z	func_72875_a	isMaterialInBB
 M	aab	a	(Laqx;Laif;Lmp;)Z	func_72918_a	handleMaterialAcceleration
@@ -3559,6 +3566,7 @@ M	aab	a	(Ljava/lang/Class;Laqx;Lmy;)Ljava/util/List;	func_82733_a	selectEntities
 M	aab	a	(Ljava/lang/Class;Ljava/lang/String;)Lajo;	func_72943_a	loadItemData
 M	aab	a	(Ljava/lang/String;)Lsq;	func_72924_a	getPlayerEntityByName
 M	aab	a	(Ljava/lang/String;DDDDDD)V	func_72869_a	spawnParticle
+M	aab	a	(Ljava/lang/String;III)V	func_72934_a	playRecord
 M	aab	a	(Ljava/lang/String;Lajo;)V	func_72823_a	setItemData
 M	aab	a	(Lmp;)V	func_72923_a	obtainEntitySkin
 M	aab	a	(Lmp;B)V	func_72960_a	setEntityState
@@ -3580,6 +3588,7 @@ M	aab	b	(IIILaqp;)V	func_72944_b	updateTileEntityChunkAndDoNothing
 M	aab	b	(J)V	func_72877_b	setWorldTime
 M	aab	b	(Laag;)V	func_72848_b	removeWorldAccess
 M	aab	b	(Laam;III)I	func_72972_b	getSavedLightValue
+M	aab	b	(Laam;IIII)V	func_72915_b	setLightValue
 M	aab	b	(Laqx;)Z	func_72855_b	checkNoEntityCollision
 M	aab	b	(Laqx;Laif;)Z	func_72830_b	isAABBInMaterial
 M	aab	b	(Ljava/lang/String;)I	func_72841_b	getUniqueDataId
@@ -3681,6 +3690,7 @@ M	aaq	R	()Z	func_72806_N	extendedLevelsInChunkCache
 M	aaq	T	()Lard;	func_82732_R	getWorldVec3Pool
 M	aaq	a	(II)Laav;	func_72807_a	getBiomeGenForCoords
 M	aaq	a	(III)I	func_72798_a	getBlockId
+M	aaq	a	(Laam;III)I	func_72810_a	getSkyBlockTypeBrightness
 M	aaq	c	(III)Z	func_72799_c	isAirBlock
 M	aaq	g	(III)Laif;	func_72803_f	getBlockMaterial
 M	aaq	h	(III)I	func_72805_g	getBlockMetadata
@@ -3778,6 +3788,7 @@ M	abw	a	(IIILaqp;)V	func_76604_a	setChunkBlockTileEntity
 M	abw	a	(IILaba;)Laav;	func_76591_a	getBiomeGenForWorldCoords
 M	abw	a	(J)Ljava/util/Random;	func_76617_a	getRandomWithSeed
 M	abw	a	(Laam;III)I	func_76614_a	getSavedLightValue
+M	abw	a	(Laam;IIII)V	func_76633_a	setLightValue
 M	abw	a	(Laqp;)V	func_76620_a	addTileEntity
 M	abw	a	(Lmp;)V	func_76612_a	addEntity
 M	abw	a	(Lmp;I)V	func_76608_a	removeEntityAtIndex
@@ -3798,6 +3809,7 @@ M	abw	e	(III)Laqp;	func_76597_e	getChunkBlockTileEntity
 M	abw	f	(III)V	func_76627_f	removeChunkBlockTileEntity
 M	abw	g	()Z	func_76621_g	isEmpty
 M	abw	i	()[Labx;	func_76587_i	getBlockStorageArray
+M	abw	k	()V	func_76586_k	updateSkylight
 M	abw	l	()Lzu;	func_76632_l	getChunkCoordIntPair
 M	abw	m	()[B	func_76605_m	getBiomeArray
 M	abw	n	()V	func_76613_n	resetRelightChecks
@@ -4115,6 +4127,7 @@ M	ajv	o	()I	func_76071_n	getThunderTime
 M	ajv	p	()Z	func_76059_o	isRaining
 M	ajv	q	()I	func_76083_p	getRainTime
 M	ajv	r	()Laaj;	func_76077_q	getGameType
+M	ajv	s	()Z	func_76089_r	isMapFeaturesEnabled
 M	ajv	t	()Z	func_76093_s	isHardcoreModeEnabled
 M	ajv	u	()Laal;	func_76067_t	getTerrainType
 M	ajv	v	()Z	func_76086_u	areCommandsAllowed
@@ -4206,7 +4219,9 @@ M	amb	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
 M	amb	a	(Laz;)Lbi;	func_82525_a	getIPositionFromBlockSource
 M	amb	a	(Lly;)V	func_94332_a	registerIcons
 M	amb	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	amb	b_	(Laab;IIII)I	func_94328_b_	getComparatorInputOverride
 M	amb	j_	(I)Lbf;	func_100009_j_	getFacing
+M	amb	q_	()Z	func_96468_q_	hasComparatorInputOverride
 M	amc	a	(II)Llx;	func_71858_a	getIcon
 M	amc	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	amc	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -4240,6 +4255,27 @@ M	amj	c	()Z	func_71926_d	isOpaqueCube
 M	amj	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
 M	amj	d	()I	func_71857_b	getRenderType
 M	amj	k_	(I)Z	func_72224_c	isFenceGateOpen
+M	aml	a	(II)Llx;	func_71858_a	getIcon
+M	aml	a	(III)V	func_72253_a	setBurnRate
+M	aml	a	(Laab;)I	func_71859_p_	tickRate
+M	aml	a	(Laab;III)V	func_71861_g	onBlockAdded
+M	aml	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
+M	aml	a	(Laab;IIIILjava/util/Random;I)V	func_72255_a	tryToCatchBlockOnFire
+M	aml	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aml	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	aml	a	(Lly;)V	func_94332_a	registerIcons
+M	aml	b	()Z	func_71886_c	renderAsNormalBlock
+M	aml	b	(Laab;III)Laqx;	func_71872_e	getCollisionBoundingBoxFromPool
+M	aml	b	(Laab;IIILjava/util/Random;)V	func_71862_a	randomDisplayTick
+M	aml	c	()Z	func_71926_d	isOpaqueCube
+M	aml	c	(Laab;III)Z	func_71930_b	canPlaceBlockAt
+M	aml	d	()I	func_71857_b	getRenderType
+M	aml	d	(Laab;IIII)I	func_72252_e	getChanceToEncourageFire
+M	aml	d	(Laak;III)Z	func_72256_d	canBlockCatchFire
+M	aml	k	(Laab;III)Z	func_72251_l	canNeighborBurn
+M	aml	m	()Z	func_71935_l	isCollidable
+M	aml	m	(Laab;III)I	func_72254_n	getChanceOfNeighborsEncouragingFire
+M	aml	s_	()V	func_71928_r_	initializeBlock
 M	amt	a	(Laab;)I	func_71859_p_	tickRate
 M	amt	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	amt	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -4312,6 +4348,20 @@ M	ane	n	()I	func_71856_s_	getRenderBlockPass
 M	ane	o	()I	func_71933_m	getBlockColor
 M	aob	a	(II)Llx;	func_71858_a	getIcon
 M	aob	a	(Lly;)V	func_94332_a	registerIcons
+M	aoc	a	(II)Llx;	func_71858_a	getIcon
+M	aoc	a	(Laab;IIIIFI)V	func_71914_a	dropBlockAsItemWithChance
+M	aoc	a	(Laab;IIIII)V	func_71852_a	breakBlock
+M	aoc	a	(Laab;IIILsq;IFFF)Z	func_71903_a	onBlockActivated
+M	aoc	a	(Laab;IIILwm;)V	func_85106_a	insertRecord
+M	aoc	a	(Lly;)V	func_94332_a	registerIcons
+M	aoc	b	(Laab;)Laqp;	func_72274_a	createNewTileEntity
+M	aoc	b_	(Laab;IIII)I	func_94328_b_	getComparatorInputOverride
+M	aoc	o_	(Laab;III)V	func_72276_j_	ejectRecord
+M	aoc	q_	()Z	func_96468_q_	hasComparatorInputOverride
+M	aod	a	()Lwm;	func_96097_a	func_96097_a
+M	aod	a	(Lbs;)V	func_70307_a	readFromNBT
+M	aod	a	(Lwm;)V	func_96098_a	func_96098_a
+M	aod	b	(Lbs;)V	func_70310_b	writeToNBT
 M	aoh	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
 M	aoh	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
 M	aoh	a	(Laab;IIILjava/util/Random;)V	func_71847_b	updateTick
@@ -4388,6 +4438,7 @@ M	apa	a	(Lly;)V	func_94332_a	registerIcons
 M	apa	a	(Lmp;)F	func_71904_a	getExplosionResistance
 M	apa	a	(Lsq;Laab;III)F	func_71908_a	getPlayerRelativeBlockHardness
 M	apa	a	(Lve;)Lapa;	func_71849_a	setCreativeTab
+M	apa	a	(Lzw;)Z	func_85103_a	canDropFromExplosion
 M	apa	b	()Z	func_71886_c	renderAsNormalBlock
 M	apa	b	(F)Lapa;	func_71894_b	setResistance
 M	apa	b	(I)I	func_71889_f_	getRenderColor
@@ -4398,6 +4449,7 @@ M	apa	b	(Laab;IIILmp;)V	func_71891_b	onEntityWalking
 M	apa	b	(Laab;IIILwm;)V	func_71929_a	dropBlockAsItem_do
 M	apa	b	(Laak;IIII)I	func_71865_a	isProvidingWeakPower
 M	apa	b	(Z)Lapa;	func_71907_b	setTickRandomly
+M	apa	b_	(Laab;IIII)I	func_94328_b_	getComparatorInputOverride
 M	apa	b_	(Laak;IIII)Llx;	func_71895_b	getBlockTexture
 M	apa	c	()Z	func_71926_d	isOpaqueCube
 M	apa	c	(F)Lapa;	func_71848_c	setHardness
@@ -4426,6 +4478,7 @@ M	apa	m	()Z	func_71935_l	isCollidable
 M	apa	m	(I)Llx;	func_71851_a	getBlockTextureFromSide
 M	apa	n	()I	func_71856_s_	getRenderBlockPass
 M	apa	o	()I	func_71933_m	getBlockColor
+M	apa	q_	()Z	func_96468_q_	hasComparatorInputOverride
 M	apa	r	()Lapa;	func_71875_q	setBlockUnbreakable
 M	apa	s_	()V	func_71928_r_	initializeBlock
 M	apa	t	()Z	func_71887_s	hasTileEntity
@@ -5019,6 +5072,7 @@ M	bfz	a	()V	func_72712_a	loadRenderers
 M	bfz	a	(III)V	func_72710_a	markBlockForUpdate
 M	bfz	a	(IIIIII)V	func_72707_a	markBlockRangeForRenderUpdate
 M	bfz	a	(Ljava/lang/String;DDDDDD)V	func_72708_a	spawnParticle
+M	bfz	a	(Ljava/lang/String;III)V	func_72702_a	playRecord
 M	bfz	a	(Lmp;)V	func_72703_a	onEntityCreate
 M	bfz	b	(III)V	func_72711_b	markBlockForRenderUpdate
 M	bfz	b	(IIIIII)V	func_72725_b	markBlocksForUpdate
@@ -5962,6 +6016,7 @@ M	ng	d	(Lml;)V	func_70690_d	addPotionEffect
 M	ng	e	()F	func_70047_e	getEyeHeight
 M	ng	e	(F)V	func_70659_e	setAIMoveSpeed
 M	ng	e	(FF)V	func_70612_e	moveEntityWithHeading
+M	ng	f	(F)V	func_70657_f	setMoveForward
 M	ng	g	(Z)V	func_94061_f	setAlwaysRenderNameTag
 M	ng	g_	()Z	func_70617_f_	isOnLadder
 M	ng	h	(F)Larc;	func_70666_h	getPosition
@@ -7249,6 +7304,7 @@ M	wy	a	(Lly;)V	func_94581_a	registerIcons
 M	wy	a	(Lwm;Lsq;Laab;IIIIFFF)Z	func_77648_a	onItemUse
 M	wy	a	(Lwm;Lsq;Ljava/util/List;Z)V	func_77624_a	addInformation
 M	wy	a_	(I)Llx;	func_77617_a	getIconFromDamage
+M	wy	d	(Ljava/lang/String;)Lwy;	func_90042_d	getRecord
 M	wy	f	(Lwm;)Lwx;	func_77613_e	getRarity
 M	wy	g	()Ljava/lang/String;	func_90043_g	getRecordTitle
 M	x	a	()I	func_82362_a	getRequiredPermissionLevel
@@ -7443,6 +7499,7 @@ R	field_77485_a	theWorld
 R	field_77405_a	theWorld
 R	field_77440_a	theWorld
 R	field_77174_a	seed
+R	field_77173_c	mapFeaturesEnabled
 R	field_77171_e	terrainType
 R	field_76923_d	blockID
 R	field_76689_a	data
@@ -7482,7 +7539,6 @@ R	field_73664_a	x
 R	field_73662_b	y
 R	field_73663_c	z
 R	field_72218_a	blockType
-R	field_70417_a	record
 R	field_72178_a	glowing
 R	field_72166_a	powered
 R	field_82539_a	types
@@ -7565,6 +7621,7 @@ R	field_73923_C	seed
 R	field_73916_E	worldTypeId
 R	field_73924_a	parentGuiScreen
 R	field_73927_m	gameMode
+R	field_73925_n	generateStructures
 R	field_78316_a	pattern
 R	field_78315_c	line
 R	field_74023_b	lock
@@ -7659,12 +7716,21 @@ R	field_78550_b	xPosition
 R	field_78551_c	yPosition
 R	field_78549_d	zPosition
 R	field_77073_a	scale
+R	field_94192_a	originX
+R	field_94190_b	originY
 R	field_94191_c	width
 R	field_94188_d	height
 R	field_94187_f	holder
+R	field_94227_c	rotated
+R	field_94224_d	originX
+R	field_94225_e	originY
 R	field_94235_h	textureName
 R	field_94233_j	width
 R	field_94234_k	height
+R	field_94231_l	minU
+R	field_94232_m	maxU
+R	field_94229_n	minV
+R	field_94230_o	maxV
 R	field_94313_f	maxHeight
 R	field_94320_l	textureName
 R	field_94292_c	textureType
@@ -7673,6 +7739,7 @@ R	field_94290_e	height
 R	field_94297_m	textureName
 R	field_94204_c	width
 R	field_94201_d	height
+R	field_94202_e	rotated
 R	field_71349_l	mc
 R	field_77527_e	address
 R	field_77312_b	mc
@@ -7996,7 +8063,6 @@ R	func_72852_a	addTileEntity
 R	func_72844_a	getEntityPathToXYZ
 R	func_94576_a	getEntitiesWithinAABBExcludingEntity
 R	func_72865_a	getPathEntityToEntity
-R	func_72915_b	setLightValue
 R	func_72946_b	findClosestStructure
 R	func_72948_g	getFogColor
 R	func_72870_g	updateEntity
@@ -8006,6 +8072,7 @@ R	func_72710_a	markBlockForUpdate
 R	func_72707_a	markBlockRangeForRenderUpdate
 R	func_72708_a	spawnParticle
 R	func_72704_a	playSound
+R	func_72702_a	playRecord
 R	func_72703_a	onEntityCreate
 R	func_72706_a	playAuxSFX
 R	func_85102_a	playSoundToNearExcept
@@ -8013,6 +8080,7 @@ R	func_72711_b	markBlockForRenderUpdate
 R	func_72709_b	onEntityDestroy
 R	func_77160_d	getSeed
 R	func_77162_e	getGameType
+R	func_77164_g	isMapFeaturesEnabled
 R	func_77165_h	getTerrainType
 R	func_77163_i	areCommandsAllowed
 R	valueOf	valueOf
@@ -8185,6 +8253,7 @@ R	func_76071_n	getThunderTime
 R	func_76059_o	isRaining
 R	func_76083_p	getRainTime
 R	func_76077_q	getGameType
+R	func_76089_r	isMapFeaturesEnabled
 R	func_76093_s	isHardcoreModeEnabled
 R	func_76067_t	getTerrainType
 R	func_76086_u	areCommandsAllowed
@@ -8239,6 +8308,8 @@ R	func_72227_n	setBounds
 R	func_71925_a	quantityDropped
 R	func_71871_a	addCollisionBoxesToList
 R	func_71862_a	randomDisplayTick
+R	func_94328_b_	getComparatorInputOverride
+R	func_96468_q_	hasComparatorInputOverride
 R	func_72260_l	getOrientation
 R	func_71921_a	onBlockClicked
 R	func_71911_a_	getSelectedBoundingBoxFromPool
@@ -8252,10 +8323,6 @@ R	func_71893_a	harvestBlock
 R	func_71898_d	onBlockDestroyedByPlayer
 R	func_82526_n	dispense
 R	func_71906_q_	canSilkHarvest
-R	func_72253_a	setBurnRate
-R	func_72256_d	canBlockCatchFire
-R	func_71935_l	isCollidable
-R	func_71928_r_	initializeBlock
 R	func_71856_s_	getRenderBlockPass
 R	func_71889_f_	getRenderColor
 R	func_71895_b	getBlockTexture
@@ -8265,8 +8332,6 @@ R	func_72240_d	getFullSlabName
 R	func_71519_b	canCommandSenderUseCommand
 R	func_71910_a	quantityDroppedWithBonus
 R	func_72216_n	isFlammable
-R	func_70307_a	readFromNBT
-R	func_70310_b	writeToNBT
 R	func_72169_f	isPoweredOrRepeater
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
@@ -8276,6 +8341,7 @@ R	func_71932_i	isNormalCube
 R	func_72676_a	getBreakSound
 R	func_82593_b	getPlaceSound
 R	func_71867_k	onBlockDestroyedByExplosion
+R	func_85103_a	canDropFromExplosion
 R	func_72125_l	canPlaceTorchOn
 R	func_72140_j	isValidSupportBlock
 R	func_72145_a	playSoundEffect
@@ -8286,10 +8352,12 @@ R	func_72150_l	canVineStay
 R	func_70301_a	getStackInSlot
 R	func_70298_a	decrStackSize
 R	func_70299_a	setInventorySlotContents
+R	func_70307_a	readFromNBT
 R	func_70300_a	isUseableByPlayer
 R	func_70303_b	getInvName
 R	func_70304_b	getStackInSlotOnClosing
 R	func_94041_b	isStackValidForSlot
+R	func_70310_b	writeToNBT
 R	func_94042_c	isInvNameLocalized
 R	func_70297_j_	getInventoryStackLimit
 R	func_70295_k_	openChest
@@ -8609,6 +8677,7 @@ R	remove	remove
 R	size	size
 R	func_76041_a	lookup
 R	func_76043_a	getSlotIndex
+R	func_76040_a	insert
 R	func_76038_a	addKey
 R	func_76037_b	containsItem
 R	func_76047_h	grow
@@ -8865,11 +8934,14 @@ D	net/minecraft/src/BlockCactus	cactusTopIcon:Lnet/minecraft/src/Icon;:|cactusBo
 D	net/minecraft/src/BlockCloth	iconArray:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/IRegistry;:s|random:Ljava/util/Random;:|furnaceTopIcon:Lnet/minecraft/src/Icon;:|furnaceFrontIcon:Lnet/minecraft/src/Icon;:|field_96473_e:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDoor	doorIconNames:[Ljava/lang/String;:s|doorTypeForIcon:I:|iconArray:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockFire	chanceToEncourageFire:[I:|abilityToCatchFire:[I:|iconArray:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockSand	fallInstantly:Z:s
 D	net/minecraft/src/BlockLeaves	LEAF_TYPES:[Ljava/lang/String;:s|field_94396_b:[[Ljava/lang/String;:s|iconType:I:|iconArray:[[Lnet/minecraft/src/Icon;:|adjacentTreeBlocks:[I:
 D	net/minecraft/src/BlockFluid	theIcon:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/EnumMobType	everything:Lnet/minecraft/src/EnumMobType;:s|mobs:Lnet/minecraft/src/EnumMobType;:s|players:Lnet/minecraft/src/EnumMobType;:s|$VALUES:[Lnet/minecraft/src/EnumMobType;:s
 D	net/minecraft/src/BlockRail	theIcon:Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockJukeBox	theIcon:Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/TileEntityRecordPlayer	record:Lnet/minecraft/src/ItemStack;:
 D	net/minecraft/src/BlockStairs	field_72159_a:[[I:s|modelBlock:Lnet/minecraft/src/Block;:|modelBlockMetadata:I:|field_72156_cr:Z:|field_72160_cs:I:
 D	net/minecraft/src/Block	displayOnCreativeTab:Lnet/minecraft/src/CreativeTabs;:|soundPowderFootstep:Lnet/minecraft/src/StepSound;:s|soundWoodFootstep:Lnet/minecraft/src/StepSound;:s|soundGravelFootstep:Lnet/minecraft/src/StepSound;:s|soundGrassFootstep:Lnet/minecraft/src/StepSound;:s|soundStoneFootstep:Lnet/minecraft/src/StepSound;:s|soundMetalFootstep:Lnet/minecraft/src/StepSound;:s|soundGlassFootstep:Lnet/minecraft/src/StepSound;:s|soundClothFootstep:Lnet/minecraft/src/StepSound;:s|soundSandFootstep:Lnet/minecraft/src/StepSound;:s|soundSnowFootstep:Lnet/minecraft/src/StepSound;:s|soundLadderFootstep:Lnet/minecraft/src/StepSound;:s|soundAnvilFootstep:Lnet/minecraft/src/StepSound;:s|blocksList:[Lnet/minecraft/src/Block;:s|opaqueCubeLookup:[Z:s|lightOpacity:[I:s|canBlockGrass:[Z:s|lightValue:[I:s|useNeighborBrightness:[Z:s|stone:Lnet/minecraft/src/Block;:s|grass:Lnet/minecraft/src/BlockGrass;:s|dirt:Lnet/minecraft/src/Block;:s|cobblestone:Lnet/minecraft/src/Block;:s|planks:Lnet/minecraft/src/Block;:s|sapling:Lnet/minecraft/src/Block;:s|bedrock:Lnet/minecraft/src/Block;:s|waterMoving:Lnet/minecraft/src/BlockFluid;:s|waterStill:Lnet/minecraft/src/Block;:s|lavaMoving:Lnet/minecraft/src/BlockFluid;:s|lavaStill:Lnet/minecraft/src/Block;:s|sand:Lnet/minecraft/src/Block;:s|gravel:Lnet/minecraft/src/Block;:s|oreGold:Lnet/minecraft/src/Block;:s|oreIron:Lnet/minecraft/src/Block;:s|oreCoal:Lnet/minecraft/src/Block;:s|wood:Lnet/minecraft/src/Block;:s|leaves:Lnet/minecraft/src/BlockLeaves;:s|sponge:Lnet/minecraft/src/Block;:s|glass:Lnet/minecraft/src/Block;:s|oreLapis:Lnet/minecraft/src/Block;:s|blockLapis:Lnet/minecraft/src/Block;:s|dispenser:Lnet/minecraft/src/Block;:s|sandStone:Lnet/minecraft/src/Block;:s|music:Lnet/minecraft/src/Block;:s|bed:Lnet/minecraft/src/Block;:s|railPowered:Lnet/minecraft/src/Block;:s|railDetector:Lnet/minecraft/src/Block;:s|pistonStickyBase:Lnet/minecraft/src/BlockPistonBase;:s|web:Lnet/minecraft/src/Block;:s|tallGrass:Lnet/minecraft/src/BlockTallGrass;:s|deadBush:Lnet/minecraft/src/BlockDeadBush;:s|pistonBase:Lnet/minecraft/src/BlockPistonBase;:s|pistonExtension:Lnet/minecraft/src/BlockPistonExtension;:s|cloth:Lnet/minecraft/src/Block;:s|pistonMoving:Lnet/minecraft/src/BlockPistonMoving;:s|plantYellow:Lnet/minecraft/src/BlockFlower;:s|plantRed:Lnet/minecraft/src/BlockFlower;:s|mushroomBrown:Lnet/minecraft/src/BlockFlower;:s|mushroomRed:Lnet/minecraft/src/BlockFlower;:s|blockGold:Lnet/minecraft/src/Block;:s|blockIron:Lnet/minecraft/src/Block;:s|stoneDoubleSlab:Lnet/minecraft/src/BlockHalfSlab;:s|stoneSingleSlab:Lnet/minecraft/src/BlockHalfSlab;:s|brick:Lnet/minecraft/src/Block;:s|tnt:Lnet/minecraft/src/Block;:s|bookShelf:Lnet/minecraft/src/Block;:s|cobblestoneMossy:Lnet/minecraft/src/Block;:s|obsidian:Lnet/minecraft/src/Block;:s|torchWood:Lnet/minecraft/src/Block;:s|fire:Lnet/minecraft/src/BlockFire;:s|mobSpawner:Lnet/minecraft/src/Block;:s|stairsWoodOak:Lnet/minecraft/src/Block;:s|chest:Lnet/minecraft/src/BlockChest;:s|redstoneWire:Lnet/minecraft/src/BlockRedstoneWire;:s|oreDiamond:Lnet/minecraft/src/Block;:s|blockDiamond:Lnet/minecraft/src/Block;:s|workbench:Lnet/minecraft/src/Block;:s|crops:Lnet/minecraft/src/Block;:s|tilledField:Lnet/minecraft/src/Block;:s|furnaceIdle:Lnet/minecraft/src/Block;:s|furnaceBurning:Lnet/minecraft/src/Block;:s|signPost:Lnet/minecraft/src/Block;:s|doorWood:Lnet/minecraft/src/Block;:s|ladder:Lnet/minecraft/src/Block;:s|rail:Lnet/minecraft/src/Block;:s|stairsCobblestone:Lnet/minecraft/src/Block;:s|signWall:Lnet/minecraft/src/Block;:s|lever:Lnet/minecraft/src/Block;:s|pressurePlateStone:Lnet/minecraft/src/Block;:s|doorIron:Lnet/minecraft/src/Block;:s|pressurePlatePlanks:Lnet/minecraft/src/Block;:s|oreRedstone:Lnet/minecraft/src/Block;:s|oreRedstoneGlowing:Lnet/minecraft/src/Block;:s|torchRedstoneIdle:Lnet/minecraft/src/Block;:s|torchRedstoneActive:Lnet/minecraft/src/Block;:s|stoneButton:Lnet/minecraft/src/Block;:s|snow:Lnet/minecraft/src/Block;:s|ice:Lnet/minecraft/src/Block;:s|blockSnow:Lnet/minecraft/src/Block;:s|cactus:Lnet/minecraft/src/Block;:s|blockClay:Lnet/minecraft/src/Block;:s|reed:Lnet/minecraft/src/Block;:s|jukebox:Lnet/minecraft/src/Block;:s|fence:Lnet/minecraft/src/Block;:s|pumpkin:Lnet/minecraft/src/Block;:s|netherrack:Lnet/minecraft/src/Block;:s|slowSand:Lnet/minecraft/src/Block;:s|glowStone:Lnet/minecraft/src/Block;:s|portal:Lnet/minecraft/src/BlockPortal;:s|pumpkinLantern:Lnet/minecraft/src/Block;:s|cake:Lnet/minecraft/src/Block;:s|redstoneRepeaterIdle:Lnet/minecraft/src/BlockRedstoneRepeater;:s|redstoneRepeaterActive:Lnet/minecraft/src/BlockRedstoneRepeater;:s|lockedChest:Lnet/minecraft/src/Block;:s|trapdoor:Lnet/minecraft/src/Block;:s|silverfish:Lnet/minecraft/src/Block;:s|stoneBrick:Lnet/minecraft/src/Block;:s|mushroomCapBrown:Lnet/minecraft/src/Block;:s|mushroomCapRed:Lnet/minecraft/src/Block;:s|fenceIron:Lnet/minecraft/src/Block;:s|thinGlass:Lnet/minecraft/src/Block;:s|melon:Lnet/minecraft/src/Block;:s|pumpkinStem:Lnet/minecraft/src/Block;:s|melonStem:Lnet/minecraft/src/Block;:s|vine:Lnet/minecraft/src/Block;:s|fenceGate:Lnet/minecraft/src/Block;:s|stairsBrick:Lnet/minecraft/src/Block;:s|stairsStoneBrick:Lnet/minecraft/src/Block;:s|mycelium:Lnet/minecraft/src/BlockMycelium;:s|waterlily:Lnet/minecraft/src/Block;:s|netherBrick:Lnet/minecraft/src/Block;:s|netherFence:Lnet/minecraft/src/Block;:s|stairsNetherBrick:Lnet/minecraft/src/Block;:s|netherStalk:Lnet/minecraft/src/Block;:s|enchantmentTable:Lnet/minecraft/src/Block;:s|brewingStand:Lnet/minecraft/src/Block;:s|cauldron:Lnet/minecraft/src/BlockCauldron;:s|endPortal:Lnet/minecraft/src/Block;:s|endPortalFrame:Lnet/minecraft/src/Block;:s|whiteStone:Lnet/minecraft/src/Block;:s|dragonEgg:Lnet/minecraft/src/Block;:s|redstoneLampIdle:Lnet/minecraft/src/Block;:s|redstoneLampActive:Lnet/minecraft/src/Block;:s|woodDoubleSlab:Lnet/minecraft/src/BlockHalfSlab;:s|woodSingleSlab:Lnet/minecraft/src/BlockHalfSlab;:s|cocoaPlant:Lnet/minecraft/src/Block;:s|stairsSandStone:Lnet/minecraft/src/Block;:s|oreEmerald:Lnet/minecraft/src/Block;:s|enderChest:Lnet/minecraft/src/Block;:s|tripWireSource:Lnet/minecraft/src/BlockTripWireSource;:s|tripWire:Lnet/minecraft/src/Block;:s|blockEmerald:Lnet/minecraft/src/Block;:s|stairsWoodSpruce:Lnet/minecraft/src/Block;:s|stairsWoodBirch:Lnet/minecraft/src/Block;:s|stairsWoodJungle:Lnet/minecraft/src/Block;:s|commandBlock:Lnet/minecraft/src/Block;:s|beacon:Lnet/minecraft/src/BlockBeacon;:s|cobblestoneWall:Lnet/minecraft/src/Block;:s|flowerPot:Lnet/minecraft/src/Block;:s|carrot:Lnet/minecraft/src/Block;:s|potato:Lnet/minecraft/src/Block;:s|woodenButton:Lnet/minecraft/src/Block;:s|skull:Lnet/minecraft/src/Block;:s|anvil:Lnet/minecraft/src/Block;:s|chestTrapped:Lnet/minecraft/src/Block;:s|pressurePlateGold:Lnet/minecraft/src/Block;:s|pressurePlateIron:Lnet/minecraft/src/Block;:s|redstoneComparatorIdle:Lnet/minecraft/src/BlockComparator;:s|redstoneComparatorActive:Lnet/minecraft/src/BlockComparator;:s|daylightSensor:Lnet/minecraft/src/BlockDaylightDetector;:s|blockRedstone:Lnet/minecraft/src/Block;:s|oreNetherQuartz:Lnet/minecraft/src/Block;:s|hopperBlock:Lnet/minecraft/src/BlockHopper;:s|blockNetherQuartz:Lnet/minecraft/src/Block;:s|stairsNetherQuartz:Lnet/minecraft/src/Block;:s|railActivator:Lnet/minecraft/src/Block;:s|dropper:Lnet/minecraft/src/Block;:s|blockID:I:|blockHardness:F:|blockResistance:F:|blockConstructorCalled:Z:|enableStats:Z:|needsRandomTick:Z:|isBlockContainer:Z:|minX:D:|minY:D:|minZ:D:|maxX:D:|maxY:D:|maxZ:D:|stepSound:Lnet/minecraft/src/StepSound;:|blockParticleGravity:F:|blockMaterial:Lnet/minecraft/src/Material;:|slipperiness:F:|unlocalizedName:Ljava/lang/String;:|blockIcon:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/StepSound	stepSoundName:Ljava/lang/String;:|stepSoundVolume:F:|stepSoundPitch:F:

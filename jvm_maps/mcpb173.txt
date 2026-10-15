@@ -1476,6 +1476,8 @@ F	no	a	field_1258_a	slimeBodies
 F	no	b	field_1257_b	slimeRightEye
 F	no	c	field_1260_c	slimeLeftEye
 F	no	d	field_1259_d	slimeMouth
+F	yq	a	field_449_a	chanceToEncourageFire
+F	yq	b	field_448_b	abilityToCatchFire
 F	kg	a	field_1588_a	mc
 F	ns	a	field_6365_a	entityId
 F	se	a	field_505_a	xPosition
@@ -2325,8 +2327,10 @@ M	ls	T	()V	func_22050_O	playLivingSound
 M	ls	V	()V	func_415_z	spawnExplosionParticle
 M	ls	a	(Lsn;IDD)V	func_434_a	knockBack
 M	ls	d_	()Z	func_21067_c_	canBreatheUnderwater
+M	ls	X	()V	func_27021_X	func_27021_X
 M	ls	a	(Lsn;FF)V	func_426_b	faceEntity
 M	ls	Y	()Z	func_25025_V	hasCurrentTarget
+M	ls	Z	()Lsn;	func_25024_W	getCurrentTarget
 M	ls	e	(F)Lbt;	func_427_e	getPosition
 M	ls	f	(F)Lbt;	func_430_f	getLook
 M	ls	a	(DF)Lvf;	func_416_a	rayTrace
@@ -2516,12 +2520,14 @@ M	fd	n	(III)I	func_618_j	getBlockLightValue
 M	fd	o	(III)Z	func_708_k	canExistingBlockSeeTheSky
 M	fd	d	(II)I	func_666_c	getHeightValue
 M	fd	a	(Leb;III)I	func_641_a	getSavedLightValue
+M	fd	b	(Leb;IIII)V	func_664_b	setLightValue
 M	fd	f	()Z	func_624_b	isDaytime
 M	fd	a	(Lbt;Lbt;)Lvf;	func_645_a	rayTraceBlocks
 M	fd	a	(Lbt;Lbt;Z)Lvf;	func_642_a	rayTraceBlocks_do
 M	fd	a	(Lbt;Lbt;ZZ)Lvf;	func_28105_a	rayTraceBlocks_do_do
 M	fd	a	(Lsn;Ljava/lang/String;FF)V	func_623_a	playSoundAtEntity
 M	fd	a	(DDDLjava/lang/String;FF)V	func_684_a	playSoundEffect
+M	fd	a	(Ljava/lang/String;III)V	func_670_a	playRecord
 M	fd	a	(Ljava/lang/String;DDDDDD)V	func_694_a	spawnParticle
 M	fd	a	(Lsn;)Z	func_27159_a	addWeatherEffect
 M	fd	a	(Lpm;)V	func_613_a	addWorldAccess
@@ -2569,6 +2575,7 @@ M	fd	b	(Ljava/lang/String;)I	func_28101_b	getUniqueDataId
 M	fd	e	(IIIII)V	func_28106_e	func_28106_e
 M	fd	a	(Lgs;IIIII)V	func_28107_a	playAuxSFXAtEntity
 M	pm	b	(IIIIII)V	func_937_b	markBlockRangeNeedsUpdate
+M	pm	a	(Ljava/lang/String;III)V	func_933_a	playRecord
 M	pm	a	(Ljava/lang/String;DDDDDD)V	func_939_a	spawnParticle
 M	pm	a	(Lsn;)V	func_941_a	obtainEntitySkin
 M	pm	b	(Lsn;)V	func_938_b	releaseEntitySkin
@@ -2599,6 +2606,10 @@ M	bt	b	(F)V	func_1249_b	rotateAroundY
 M	ij	b	()Ljava/lang/String;	func_737_b	getKey
 M	ij	b	(B)Ljava/lang/String;	func_731_b	getTagName
 M	yq	a	(III)V	func_264_a	setBurnRate
+M	yq	a	(Lfd;IIIILjava/util/Random;I)V	func_266_a	tryToCatchBlockOnFire
+M	yq	i	(Lfd;III)I	func_262_i	getChanceOfNeighborsEncouragingFire
+M	yq	c	(Lxp;III)Z	func_261_b	canBlockCatchFire
+M	yq	f	(Lfd;IIII)I	func_265_g	getChanceToEncourageFire
 M	pg	a	(Lfd;Ljava/util/Random;III)Z	func_516_a	generate
 M	yn	a	(DDD)V	func_343_a	setPosition
 M	in	a	(F)F	func_1106_a	sin
@@ -2623,6 +2634,7 @@ M	lm	a	(IIII)Z	func_1022_a	setBlockID
 M	lm	b	(III)I	func_1021_b	getBlockMetadata
 M	lm	b	(IIII)V	func_1009_b	setBlockMetadata
 M	lm	a	(Leb;III)I	func_1025_a	getSavedLightValue
+M	lm	a	(Leb;IIII)V	func_1011_a	setLightValue
 M	lm	a	(Lsn;)V	func_1000_a	addEntity
 M	lm	b	(Lsn;)V	func_1015_b	removeEntity
 M	lm	a	(Lsn;I)V	func_1016_a	removeEntityAtIndex
