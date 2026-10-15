@@ -34181,7 +34181,22 @@ function install(vm) {
 		'onRenderLayer(I)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self) { return self; },
 		'withCustomItemBounds(DDDDDD)Lnet/minecraft/client/render/block/model/BlockModelStandard;': function (vm, self) { return self; },
 	} });
-	D().models.forEach(function (p) { if (p[0] !== BM + 'BlockModel' && p[0] !== BM + 'BlockModelStandard' && !/Dispatcher/.test(p[0])) def(p[0], { super: p[1].indexOf(BM) === 0 ? p[1] : BM + 'BlockModelStandard', anyInit: bmInit, methods: {} }); });
+	var DYES = ['white', 'orange', 'magenta', 'lightblue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+	var fmtInit = function (vm, self, a) {
+		bmInit(vm, self, a);
+		var f = null;
+		for (var i = 0; a && i < a.length && !f; i++) {
+			var v = a[i];
+			if (v == null || (typeof v === 'object' && !v.$str && !(v.cls && /String$/.test(v.cls.name)))) continue;
+			var t = null; try { t = str(v); } catch (e) { t = null; }
+			if (typeof t === 'string' && t.indexOf('%s') >= 0 && t.indexOf(':') > 0) f = t;
+		}
+		if (!f || !self.$block) { if (self.$block && !f) bmModelInit(vm, self, a); return; }
+		var ms = DYES.map(function (c) { return f.replace('%s', c).replace(/[.]json$/, ''); });
+		self.$block.$btaModel = ms[0];
+		self.$block.$btaModelsMeta = ms;
+	};
+	D().models.forEach(function (p) { if (p[0] !== BM + 'BlockModel' && p[0] !== BM + 'BlockModelStandard' && !/Dispatcher/.test(p[0])) def(p[0], { super: p[1].indexOf(BM) === 0 ? p[1] : BM + 'BlockModelStandard', anyInit: /generic[/]/.test(p[0]) ? fmtInit : bmInit, methods: {} }); });
 	var DF = 'org/useless/dragonfly/';
 	var modelArg = function (a) { for (var i = 0; a && i < a.length; i++) { var x = a[i]; if (x && typeof x === 'object' && x.$model) return x.$model; if (typeof x === 'string' && /:/.test(x)) return x; } return null; };
 	var modelInit = function (vm, self, a) { self.$model = modelArg(a); };
@@ -34197,6 +34212,9 @@ function install(vm) {
 		if (self.$block) { if (m && !self.$block.$btaModel) self.$block.$btaModel = m.replace(/[.]json$/, ''); vm.$curBlockModel = self; self.$block.$btaModelsMeta = []; }
 	};
 	def(BM + 'generic/BlockModelGeneric', { super: BM + 'BlockModelStandard', anyInit: bmModelInit, methods: {} });
+	['Lamp', 'Chest', 'Rotatable', 'VeryRotatable', 'Slab', 'Stairs'].forEach(function (n) {
+		if (!vm.natives[BM + 'generic/BlockModelGeneric' + n]) def(BM + 'generic/BlockModelGeneric' + n, { super: BM + 'generic/BlockModelGeneric', anyInit: fmtInit, methods: {} });
+	});
 	def(BM + 'BlockModelDispatcher', { super: DISP, statics: {}, methods: {
 		'getDispatch(Ljava/lang/Object;)Ljava/lang/Object;': function (vm, self, a) {
 			var map = dispMap(vm, self), m = vm.callVirtual(map, 'get', '(' + OBJ + ')' + OBJ, [a[0]]);
