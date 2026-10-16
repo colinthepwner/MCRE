@@ -677,6 +677,7 @@ C	z	net/minecraft/src/RecipesArmor
 F	z	b	field_1680_b	recipeItems
 F	nz	b	field_518_b	username
 F	nz	d	field_4073_e	dimension
+F	gg	i	field_984_h	updateCounter
 F	wl	a	field_818_a	stackResult
 F	xw	c	field_669_c	particleTextureJitterX
 F	xw	d	field_668_d	particleTextureJitterY
@@ -718,6 +719,7 @@ F	dn	a	field_1729_a	worldObj
 F	dn	c	field_1731_c	renderer
 F	dn	d	field_1730_d	rand
 F	hr	c	field_1661_c	rand
+F	qh	a	field_965_a	updateCounter
 F	oj	a	field_20029_a	windowId
 F	vf	a	field_1167_a	typeOfHit
 F	vf	b	field_1166_b	blockX
@@ -832,6 +834,7 @@ F	dk	D	field_1742_D	tessellator
 F	dk	c	field_1761_c	posX
 F	dk	d	field_1760_d	posY
 F	dk	e	field_1759_e	posZ
+F	dk	x	field_1734_x	isVisible
 F	dk	F	field_1737_F	tileEntities
 F	xo	a	field_4157_a	liquidBlockId
 F	yo	b	field_590_b	soundPoolSounds
@@ -1053,6 +1056,7 @@ F	qx	e	field_12253_e	exploder
 F	qx	f	field_12252_f	explosionSize
 F	qx	g	field_12251_g	destroyedBlockPositions
 F	pc	a	field_27045_a	isPowered
+F	yc	j	field_4189_i	updateCounter
 F	yc	m	field_20083_l	allowedCharacters
 F	da	b	field_945_b	mc
 F	da	c	field_951_c	width
@@ -1086,6 +1090,7 @@ F	b	a	field_25210_a	instance
 F	gk	a	field_466_a	fallInstantly
 F	rq	l	field_959_i	selected
 F	rq	n	field_22100_m	saveList
+F	oz	i	field_967_h	updateCounter
 F	uv	b	field_886_b	chunkMapping
 F	uv	d	field_888_d	worldObj
 F	p	a	field_1097_a	data
@@ -1113,6 +1118,7 @@ F	uq	d	field_930_d	itemRenderer
 F	uq	e	field_929_e	chatMessageList
 F	uq	f	field_9423_f	rand
 F	uq	g	field_9422_g	mc
+F	uq	h	field_9421_h	updateCounter
 F	xb	a	field_1098_a	data
 F	kx	d	field_896_d	chunkProvider
 F	kx	f	field_894_f	chunks
@@ -1312,6 +1318,7 @@ F	dw	f	field_1618_c	windowId
 F	lx	h	field_4091_h	inGround
 F	lx	a	field_4098_a	shake
 F	lx	b	field_4097_b	angler
+F	lx	i	field_4090_i	ticksInGround
 F	lx	j	field_4089_j	ticksInAir
 F	lx	c	field_4096_c	bobber
 F	s	b	field_21056_b	slot
@@ -1336,8 +1343,10 @@ F	ih	c	field_880_c	worldObj
 F	ih	f	field_877_f	height
 F	mi	a	field_1095_a	data
 F	sl	i	field_9315_g	inGround
+F	sl	a	field_28020_a	doesArrowBelongToPlayer
 F	sl	b	field_688_a	arrowShake
 F	sl	c	field_682_g	owner
+F	sl	j	field_681_h	ticksInGround
 F	sl	k	field_680_i	ticksInAir
 F	qj	b	field_22212_b	fileName
 F	qj	d	field_22218_d	offsets
@@ -1392,6 +1401,7 @@ F	is	d	field_21141_d	recipeItems
 F	is	e	field_21140_e	recipeOutput
 F	is	a	field_21139_a	recipeOutputItemID
 F	fu	a	field_6463_h	rand
+F	fu	i	field_989_j	updateCounter
 F	cw	a	OK	OK
 F	cw	b	NOT_POSSIBLE_HERE	NOT_POSSIBLE_HERE
 F	cw	c	NOT_POSSIBLE_NOW	NOT_POSSIBLE_NOW
@@ -1517,6 +1527,7 @@ F	jl	C	field_25159_y	mineBlockStatArray
 F	in	a	field_1653_a	SIN_TABLE
 F	gz	c	field_762_e	attackStrength
 F	gc	a	field_985_a	message
+F	gc	i	field_986_h	updateCounter
 F	ik	b	field_6533_b	availableTexturePacks
 F	ik	e	field_6537_e	mc
 F	lm	b	field_1539_b	blocks
@@ -1536,6 +1547,7 @@ F	at	a	OBJECT	OBJECT
 F	at	b	ARRAY	ARRAY
 F	at	c	STRING	STRING
 F	at	d	NUMBER	NUMBER
+F	at	e	TRUE	TRUE
 F	at	f	FALSE	FALSE
 F	at	g	NULL	NULL
 F	bc	a	field_331_a	isFull
@@ -1561,6 +1573,7 @@ F	br	a	field_22395_a	x
 F	br	b	field_22394_b	y
 F	br	c	field_22396_c	z
 F	sw	a	field_1297_a	message
+F	sw	b	field_1296_b	updateCounter
 F	ep	a	field_27392_a	minDisplayColumn
 F	ep	b	field_27391_b	minDisplayRow
 F	ep	c	field_27390_c	maxDisplayColumn
@@ -1610,6 +1623,7 @@ F	ro	f	field_22077_f	width
 F	ro	g	field_22076_g	height
 F	ro	h	field_22075_h	text
 F	ro	a	field_22082_a	isFocused
+F	ro	b	field_22081_b	isEnabled
 F	ro	l	field_27107_l	parentGuiScreen
 F	qw	a	field_689_a	fuse
 F	qv	a	field_691_a	direction
@@ -1884,6 +1898,7 @@ F	ds	g	field_208_g	modelArmorChestplate
 F	ds	h	field_207_h	modelArmor
 F	vx	i	field_953_h	cancelled
 F	net/minecraft/client/Minecraft	a	field_21900_a	theMinecraft
+F	net/minecraft/client/Minecraft	c	field_6327_b	playerController
 F	net/minecraft/client/Minecraft	d	field_6326_c	displayWidth
 F	net/minecraft/client/Minecraft	e	field_6325_d	displayHeight
 F	net/minecraft/client/Minecraft	T	field_9237_P	timer
@@ -2085,6 +2100,7 @@ M	gi	C	()Z	func_25040_C	isWolfAngry
 M	gi	c	(Z)V	func_25041_c	setWolfAngry
 M	gi	D	()Z	func_25047_D	isWolfTamed
 M	gi	d	(Z)V	func_25038_d	setWolfTamed
+M	ei	b	()J	func_22288_b	getRandomSeed
 M	ei	c	()I	func_22293_c	getSpawnX
 M	ei	d	()I	func_22295_d	getSpawnY
 M	ei	e	()I	func_22300_e	getSpawnZ
@@ -2232,6 +2248,7 @@ M	wm	b	()Ljava/lang/Object;	func_767_b	getValue
 M	aw	a	()V	func_783_a	onTick
 M	as	a	(Ljava/io/InputStream;)Lnu;	func_1138_a	readCompressed
 M	as	a	(Lnu;Ljava/io/OutputStream;)V	func_1143_a	writeCompressed
+M	ma	b	()Ljava/lang/Object;	func_21158_b	getObject
 M	ab	a	()Lht;	func_20078_a	returnEnumOptions
 M	hm	a	(Lnu;)V	func_28163_a	readFromNBT
 M	hm	b	(Lnu;)V	func_28162_b	writeToNBT
@@ -2339,6 +2356,7 @@ M	ko	a	(FFFFFF)V	func_864_b	render
 M	ko	b	(FFFFFF)V	func_863_a	setRotationAngles
 M	ko	a	(Lls;FFF)V	func_25103_a	setLivingAnimations
 M	uq	a	(FZII)V	func_4066_a	renderGameOverlay
+M	uq	a	()V	func_555_a	updateTick
 M	uq	b	()V	func_28097_b	clearChatMessages
 M	uq	a	(Ljava/lang/String;)V	func_552_a	addChatMessage
 M	uq	b	(Ljava/lang/String;)V	func_553_b	setRecordPlayingMessage

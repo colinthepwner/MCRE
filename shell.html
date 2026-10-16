@@ -2213,6 +2213,9 @@
                     case 'wanttick': return mp('wanttick');
                     case 'structures': return mp(a[0] == null ? 'structures' : ['structures', a[0] ? 1 : 0].join('\t'));
                     case 'fullbright': return mp(['fullbright', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                    case 'hudstate': return mp('hudstate');
+                    case 'furnace': return mp(['furnace', a[0] | 0, a[1] | 0, a[2] | 0].join('\t'));
+                    case 'itemkey': return mp(['itemkey', itemRef(a[0] | 0, a[1] | 0), gameData(a[0] | 0, a[1] | 0)].join('\t'));
                     case 'hasitem': case 'takeitem': {
                         var want = itemRef(a[0]);
                         for (var s = 0; s < 36; s++) {
@@ -2249,6 +2252,25 @@
                 var e; try { e = JSON.parse(json); } catch (x) { return kind === 'hurt' ? -2 : 0; }
                 var dflt = kind === 'hurt' ? e.damage | 0 : 0;
                 if (!running || !vm || !window.JVM.hookAsk) return dflt;
+                if (kind === 'use') {
+                    if (!window.JVM.hookBlockUse) return 0;
+                    var uj = javaOf(e.block, e.data), ug = e.player && e.player.guid, me = player();
+                    if (!uj.id) return 0;
+                    var uRun = function () {
+                        tiles = {}; vm.steps = 0;
+                        try { return window.JVM.hookBlockUse(vm, { id: uj.id, data: uj.data, x: e.x, y: e.y, z: e.z, face: e.face, hx: +e.hx, hy: +e.hy, hz: +e.hz, sneaking: !!e.sneak, held: !!e.held }) | 0; }
+                        catch (x) { console.warn('[java] use', x); return 0; }
+                        finally { tiles = null; }
+                    };
+                    var uRes = 0;
+                    try { uRes = (ug && me && e.player.id !== me.id ? withActor(ug, uRun) : uRun()) | 0; } catch (x) { console.warn('[java] use', x); return 0; }
+                    if (e.handOut) {
+                        var ho = e.handOut, hslot = e.player && e.player.slot != null ? e.player.slot | 0 : (me && me.slot != null ? me.slot | 0 : 0);
+                        var hput = function () { bridge.op('setslot', hslot, ho[0], ho[1], ho[2]); };
+                        Promise.resolve().then(function () { try { if (ug && me && e.player.id !== me.id) withActor(ug, hput); else hput(); } catch (x) { console.warn('[java] hand', x); } });
+                    }
+                    return uRes;
+                }
                 tiles = {}; vm.steps = 0;
                 try { return window.JVM.hookAsk(vm, kind, e) | 0; }
                 catch (x) { console.warn('[java] ask ' + kind, x); return dflt; }
@@ -2282,7 +2304,8 @@
                 var hasMod = function (o) { return Object.keys(o || {}).some(function (k) { return o[k] && o[k].$mod; }); };
                 if (!vm || !r || !window.JVM) return null;
                 var stMods = window.JVM.station && window.JVM.station.st(vm).listeners.length;
-                if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length) || hasMod(r.blocks) || hasMod(r.items) || stMods)) return null;
+                var hookMods = !!(window.JVM.hooksWantTick && (function () { try { return window.JVM.hooksWantTick(vm); } catch (x) { return false; } })());
+                if (!vm || !r || !(r.mods.length || (r.forge && r.forge.mods.length) || hasMod(r.blocks) || hasMod(r.items) || stMods || hookMods)) return null;
                 var wi = mp('world');
                 worldDir = wi && wi.dir ? '/games/com.mojang/minecraftWorlds/' + wi.dir : null;
                 javaMods = {};
@@ -2308,7 +2331,7 @@
                 if (window.JVM.hookWorldStart) window.JVM.hookWorldStart(vm);
                 if (window.JVM.gapsWorldStart) window.JVM.gapsWorldStart(vm);
                 setTimeout(function () { J.genWorkerStart(); }, 0);
-                return r.tickMods.length || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
+                return r.tickMods.length || (r.guiTickMods && r.guiTickMods.length) || (window.JVM.forgeWantsTick && window.JVM.forgeWantsTick(vm)) || (window.JVM.tilesWantTick && window.JVM.tilesWantTick(vm)) || (window.JVM.hooksWantTick && window.JVM.hooksWantTick(vm)) ? ['subscribe\tgametick'] : [];
             };
             var genRefs = {}, genIds = {}, genBind = -1;
             var genPT = null;
@@ -2676,6 +2699,7 @@
             J.worldStop = function () {
                 if (running && vm && window.JVM.gapsWorldStop) { vm.steps = 0; window.JVM.gapsWorldStop(vm); }
                 if (running && vm && window.JVM.forgeWorldStop) { vm.steps = 0; window.JVM.forgeWorldStop(vm); }
+                if (running && vm && window.JVM.hookWorldStop) { vm.steps = 0; try { window.JVM.hookWorldStop(vm); } catch (x) { console.warn('[java] stop', x); } }
                 if (running && vm && window.JVM.tileSave) { vm.steps = 0; window.JVM.tileSave(vm); }
                 if (running && vm && window.JVM.playerDataSave) { vm.steps = 0; window.JVM.playerDataSave(vm); }
                 if (running && vm && window.JVM.storageSave) { vm.steps = 0; window.JVM.storageSave(vm); }
@@ -2737,6 +2761,14 @@
                     if (r.tickMods.length) {
                         var mc = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
                         r.tickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, SIG.tick, [0, mc]); });
+                    }
+                    if (r.guiTickMods && r.guiTickMods.length) {
+                        var scrOpen = false;
+                        try { scrOpen = !!vm.mcGui || JSON.parse(UTF8ToString(Module._mcScreenInfo())).screen !== 'none'; } catch (x) { scrOpen = false; }
+                        if (scrOpen) {
+                            var mcg = vm.callStatic('net/minecraft/src/ModLoader', 'getMinecraftInstance', '()Lnet/minecraft/client/Minecraft;', []);
+                            r.guiTickMods.forEach(function (m) { vm.currentMod = m.cls.source || vm.currentMod; call(m, 'onTickInGUI(FLnet/minecraft/client/Minecraft;Lnet/minecraft/src/GuiScreen;)Z', [0, mcg, vm.mcGui ? vm.mcGui.screen : null]); });
+                        }
                     }
                     if (JV.forgeTick) JV.forgeTick(vm);
                     if (JV.hookTick) JV.hookTick(vm);
@@ -2824,6 +2856,7 @@
                 var x = e.x | 0, y = e.y | 0, z = e.z | 0;
                 if (e.block) {
                     var bj = javaOf(e.block, e.data), bid = bj.id, blk = r.blocks[bid], bdata = bj.data;
+                    vm.$placeFace = e.face != null ? e.face | 0 : null;
                     if (e.t === 'place' && JV.stationBlockSet) JV.stationBlockSet(vm, world, x, y, z, bid, bdata);
                     if (!blk || !javaMods[blk.$mod]) { if (JV.hookVanillaBlock) JV.hookVanillaBlock(vm, e.t, bid, bdata, world, x, y, z, e.player ? M.playerObj(vm, null) : null); return; }
                     var pl = M.playerObj(vm, null);
@@ -2835,7 +2868,7 @@
                     }
                     else if (e.t === 'break') { call(blk, SIG.breakB, [world, x, y, z, bid, bdata]); call(blk, SIG.destroyedBy, [world, x, y, z, bdata]); if (JV.tileBroken) JV.tileBroken(vm, x, y, z); }
                     else if (e.t === 'step') call(blk, SIG.walking, [world, x, y, z, pl]);
-                    else if (e.t === 'tick') call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]);
+                    else if (e.t === 'tick') { vm.$tickRandom = !!e.random; try { call(blk, SIG.updateTick, [world, x, y, z, world[':rand']]); } finally { vm.$tickRandom = false; } }
                     else if (e.t === 'neighbor') call(blk, SIG.neighbor, [world, x, y, z, e.neighbor ? javaOf(e.neighbor, 0).id : 0]);
                     else if (e.t === 'inside' && JV.entityInside) JV.entityInside(vm, blk, world, x, y, z, e, e.player ? pl : null);
                     return;
@@ -2938,6 +2971,7 @@
             J.reportText = function (modId) { var r = J.reports[modId]; return r && window.JVM && window.JVM.javaReportText ? window.JVM.javaReportText(r) : ''; };
             J.decls = {};
             J.settingsOf = function (modId) { return J.decls[modId] || null; };
+            J.takeLateSettings = function () { var o = J.late || {}; J.late = {}; return o; };
             J.saveSettings = function (modId, values) {
                 if (!J.decls[modId] || !window.JVM || !window.JVM.applyJavaSettings) return false;
                 window.JVM.applyJavaSettings(folderFs(modId), values);
@@ -3093,7 +3127,7 @@
                 jgPaint(ctx, ops, jg.w, jg.h);
             }
             function jgPaint(ctx, ops, W, H) {
-                var standIn = false, JV = window.JVM;
+                var standIn = false, JV = window.JVM, clips = 0;
                 ops.forEach(function (o) {
                     switch (o.k) {
                     case 'dim': { var gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(16,16,16,.75)'); gr.addColorStop(1, 'rgba(16,16,16,.82)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); break; }
@@ -3128,7 +3162,24 @@
                     }
                     case 'grad': { var g2 = ctx.createLinearGradient(0, o.y, 0, o.y2); g2.addColorStop(0, argb(o.c)); g2.addColorStop(1, argb(o.c2)); ctx.fillStyle = g2; ctx.fillRect(o.x, o.y, o.x2 - o.x, o.y2 - o.y); break; }
                     case 'slot': if (standIn) jgSlot(ctx, o.x, o.y); break;
-                    case 'text': jgText(ctx, o.s, o.x, o.y, o.c, o.shadow); break;
+                    case 'text':
+                        if (o.sc && o.sc !== 1) { ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.sc, o.sc); jgText(ctx, o.s, 0, 0, o.c, o.shadow); ctx.restore(); }
+                        else jgText(ctx, o.s, o.x, o.y, o.c, o.shadow);
+                        break;
+                    case 'clip': ctx.save(); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip(); clips++; break;
+                    case 'unclip': if (clips > 0) { ctx.restore(); clips--; } break;
+                    case 'tipbox': {
+                        var ta = o.a == null ? 1 : Math.max(0, Math.min(1, o.a));
+                        ctx.fillStyle = 'rgba(16,0,16,' + (0.94 * ta) + ')'; ctx.fillRect(o.x, o.y, o.w, o.h);
+                        if (o.part === 'border' && o.w > 2 && o.h > 2) {
+                            var tg = ctx.createLinearGradient(0, o.y + 1, 0, o.y + o.h - 1);
+                            tg.addColorStop(0, 'rgba(80,0,255,' + (0.31 * ta) + ')'); tg.addColorStop(1, 'rgba(40,0,127,' + (0.31 * ta) + ')');
+                            ctx.fillStyle = tg;
+                            ctx.fillRect(o.x + 1, o.y + 1, o.w - 2, 1); ctx.fillRect(o.x + 1, o.y + o.h - 2, o.w - 2, 1);
+                            ctx.fillRect(o.x + 1, o.y + 1, 1, o.h - 2); ctx.fillRect(o.x + o.w - 2, o.y + 1, 1, o.h - 2);
+                        }
+                        break;
+                    }
                     case 'button': jgButton(ctx, o); break;
                     case 'field':
                         ctx.fillStyle = '#a0a0a0'; ctx.fillRect(o.x - 1, o.y - 1, o.w + 2, o.h + 2);
@@ -3137,7 +3188,8 @@
                         break;
                     case 'item': {
                         var ic = jgIcon(o.id, o.data);
-                        if (ic && ic !== 'missing') ctx.drawImage(ic, o.x, o.y, 16, 16);
+                        var isz = 16 * (o.sc || 1);
+                        if (ic && ic !== 'missing') ctx.drawImage(ic, o.x, o.y, isz, isz);
                         if (o.overlay && o.n > 1) { var t = String(o.n); jgText(ctx, t, o.x + 17 - JV.mcStrWidth(t), o.y + 9, 0xffffff, true); }
                         break;
                     }
@@ -3150,6 +3202,7 @@
                     }
                     }
                 });
+                while (clips-- > 0) ctx.restore();
             }
             var ovlOn = false, ovlTex = {};
             function ovlTexPath(k, r) {
@@ -3439,7 +3492,7 @@
                     if (JVM.applyJavaSettings && Module.mcMods && Module.mcMods.savedSettings) JVM.applyJavaSettings(folderFs(modId), Module.mcMods.savedSettings(modId));
                     var kind = JVM.javaKind ? JVM.javaKind(vm, classes, files) : { loader: '', version: '', cant: '' };
                     if (!kind.version && !kind.cant) kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag] || '1.5.2';
-                    if (ver.guessed && ver.said && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag]; }
+                    if (ver.guessed && ver.said && !kind.versionFromCode && /^made for Minecraft/.test(kind.cant)) { kind.cant = ''; kind.version = JVM.versionOfTag[JVM.tagOf ? JVM.tagOf(vm, modId) : vm.$tag]; }
                     Object.keys(files).forEach(function (k) {
                         if (!/(^|[/])lang[/](en_us[.]lang|en_us[/][^/]+[.]lang)$/i.test(k)) return;
                         var lr = JVM.mc152.reg(vm).lang;
@@ -3489,6 +3542,11 @@
                     var c = JVM.collectContent(vm, modId);
                     if (JVM.dungeonExtras && Module._mcDungeonExtras) { try { Module.ccall('mcDungeonExtras', 'number', ['string'], [JVM.dungeonExtras(vm, itemRef)]); } catch (x) { console.warn('[java] dungeon loot', x); } }
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
+                    if (JVM.javaSettings) Object.keys(J.decls).forEach(function (o) {
+                        if (o === modId) return;
+                        var d2 = null; try { d2 = JVM.javaSettings(vm, o); } catch (x) { d2 = null; }
+                        if (d2 && d2.length > J.decls[o].length) { J.decls[o] = d2; (J.late || (J.late = {}))[o] = d2; }
+                    });
                     if (JVM.javaReport) J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, classes: classes, menuMixins: kind.menus || 0,
                         errors: errorCount - errorsBefore, extraMissing: (c.mobsSkipped && c.mobsSkipped.length ? ['some of its creatures and other entities'] : [])
                             .concat(mixLeft(kind, modId) ? ["changes to the game's own code (" + mixLeft(kind, modId) + (mixLeft(kind, modId) === 1 ? ' mixin)' : ' mixins)')] : [])
@@ -3502,6 +3560,7 @@
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.worldtypes || {}).forEach(function (k) { put('worldtypes/' + k + '.json', c.worldtypes[k]); });
                     if (c.oredict && Object.keys(c.oredict).length) put('oredict.json', c.oredict);
+                    if (c.creative) put('creative.json', c.creative);
                     if (c.accessorySlots) put('accessories.json', c.accessorySlots);
                     Object.keys(c.enchantments || {}).forEach(function (k) { put('enchantments/' + k + '.json', c.enchantments[k]); });
                     Object.keys(c.dimensions || {}).forEach(function (k) { put('dimensions/' + k + '.json', c.dimensions[k]); });
@@ -3593,7 +3652,7 @@
 
         (function () {
             var LIB = '/games/mods', STATE = LIB + '/state.json', BUNDLED = '/data/mods';
-            var MAX_ZIP = 64 * 1024 * 1024, MAX_FILES = 5000;
+            var MAX_ZIP = 64 * 1024 * 1024, MAX_FILES = 20000;
             var mods = [];
             var originals = {};
             var soundUrls = [];
@@ -3723,6 +3782,7 @@
                         if (!root || r.length < root.length) root = r;
                     }
                 });
+                if (root && keys.some(function (k) { return k === 'mcmod.info' || k === 'fabric.mod.json' || (k.indexOf(root) !== 0 && /[.]class$/i.test(k)); })) root = '';
                 if (!root) {
                     var tops = {};
                     keys.forEach(function (k) { tops[k.split('/')[0]] = true; });
@@ -4352,6 +4412,11 @@
                             var jt = Module.mcJava.reportText(id);
                             if (jt) { var sum = contentsOf(files); x.contents = jt + (sum ? ' - ' + sum : ''); }
                             var jd = Module.mcJava.settingsOf(id);
+                            var late = Module.mcJava.takeLateSettings ? Module.mcJava.takeLateSettings() : {};
+                            Object.keys(late).forEach(function (o) {
+                                if (o === id) return;
+                                settingDecls[o] = (settingDecls[o] || []).filter(function (d) { return !late[o].some(function (n) { return n.id === d.id; }); }).concat(late[o]);
+                            });
                             if (jd && jd.length) {
                                 settingDecls[id] = (settingDecls[id] || []).concat(jd);
                                 var all = readSettings(), mine = all[id] || {}, seeded = false;
@@ -4415,6 +4480,8 @@
                                 content.push({ mod: id, kind: 'accessories', name: 'accessories', data: data, file: path });
                             } else if (/^oredict[.]json$/i.test(path)) {
                                 content.push({ mod: id, kind: 'oredict', name: 'oredict', data: data, file: path });
+                            } else if (/^creative[.]json$/i.test(path)) {
+                                content.push({ mod: id, kind: 'creative', name: 'creative', data: data, file: path });
                             } else if ((m = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
@@ -4489,7 +4556,7 @@
             }
 
             var VANILLA = {};
-            'stone:1,grass:2,dirt:3,cobblestone:4,planks:5,sapling:6,bedrock:7,sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,log:17,leaves:18,sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,noteblock:25,golden_rail:27,detector_rail:28,sticky_piston:29,web:30,tallgrass:31,deadbush:32,piston:33,wool:35,yellow_flower:37,red_flower:38,brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,brick_block:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,torch:50,mob_spawner:52,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,farmland:60,furnace:61,ladder:65,rail:66,stone_stairs:67,lever:69,stone_pressure_plate:70,wooden_pressure_plate:72,redstone_ore:73,redstone_torch:76,stone_button:77,snow_layer:78,ice:79,snow:80,cactus:81,clay:82,jukebox:84,fence:85,pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,lit_pumpkin:91,trapdoor:96,stonebrick:98,iron_bars:101,glass_pane:102,melon_block:103,vine:106,fence_gate:107,brick_stairs:108,stone_brick_stairs:109,mycelium:110,waterlily:111,nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,enchanting_table:116,end_stone:121,redstone_lamp:123,wooden_slab:126,sandstone_stairs:128,emerald_ore:129,ender_chest:130,emerald_block:133,spruce_stairs:134,birch_stairs:135,jungle_stairs:136,cobblestone_wall:139,wooden_button:143,anvil:145,trapped_chest:146,redstone_block:152,quartz_ore:153,hopper:154,quartz_block:155,quartz_stairs:156,activator_rail:157,dropper:158,hay_block:170,carpet:171,hardened_clay:172,coal_block:173,iron_shovel:256,iron_pickaxe:257,iron_axe:258,flint_and_steel:259,apple:260,bow:261,arrow:262,coal:263,diamond:264,iron_ingot:265,gold_ingot:266,iron_sword:267,wooden_sword:268,wooden_shovel:269,wooden_pickaxe:270,wooden_axe:271,stone_sword:272,stone_shovel:273,stone_pickaxe:274,stone_axe:275,diamond_sword:276,diamond_shovel:277,diamond_pickaxe:278,diamond_axe:279,stick:280,bowl:281,mushroom_stew:282,golden_sword:283,golden_shovel:284,golden_pickaxe:285,golden_axe:286,string:287,feather:288,gunpowder:289,wooden_hoe:290,stone_hoe:291,iron_hoe:292,diamond_hoe:293,golden_hoe:294,wheat_seeds:295,wheat:296,bread:297,leather_helmet:298,leather_chestplate:299,leather_leggings:300,leather_boots:301,chainmail_helmet:302,chainmail_chestplate:303,chainmail_leggings:304,chainmail_boots:305,iron_helmet:306,iron_chestplate:307,iron_leggings:308,iron_boots:309,diamond_helmet:310,diamond_chestplate:311,diamond_leggings:312,diamond_boots:313,golden_helmet:314,golden_chestplate:315,golden_leggings:316,golden_boots:317,flint:318,porkchop:319,cooked_porkchop:320,painting:321,golden_apple:322,sign:323,wooden_door:324,bucket:325,water_bucket:326,lava_bucket:327,minecart:328,saddle:329,iron_door:330,redstone:331,snowball:332,boat:333,leather:334,milk_bucket:335,brick:336,clay_ball:337,reeds:338,paper:339,book:340,slime_ball:341,egg:344,compass:345,fishing_rod:346,clock:347,glowstone_dust:348,fish:349,cooked_fished:350,dye:351,bone:352,sugar:353,cake:354,bed:355,repeater:356,cookie:357,filled_map:358,shears:359,melon:360,pumpkin_seeds:361,melon_seeds:362,beef:363,cooked_beef:364,chicken:365,cooked_chicken:366,rotten_flesh:367,ender_pearl:368,blaze_rod:369,ghast_tear:370,gold_nugget:371,nether_wart:372,potion:373,glass_bottle:374,spider_eye:375,fermented_spider_eye:376,blaze_powder:377,magma_cream:378,brewing_stand:379,cauldron:380,ender_eye:381,speckled_melon:382,experience_bottle:384,fire_charge:385,emerald:388,item_frame:389,flower_pot:390,carrot:391,potato:392,baked_potato:393,poisonous_potato:394,map:395,golden_carrot:396,skull:397,carrot_on_a_stick:398,nether_star:399,pumpkin_pie:400,comparator:404,netherbrick:405,quartz:406'.split(',').forEach(function (kv) { var p = kv.split(':'); VANILLA[p[0]] = parseInt(p[1], 10); });
+            'stone:1,grass:2,dirt:3,cobblestone:4,planks:5,sapling:6,bedrock:7,sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,log:17,leaves:18,sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,noteblock:25,golden_rail:27,detector_rail:28,sticky_piston:29,web:30,tallgrass:31,deadbush:32,piston:33,wool:35,yellow_flower:37,red_flower:38,brown_mushroom:39,red_mushroom:40,gold_block:41,iron_block:42,stone_slab:44,brick_block:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,torch:50,mob_spawner:52,oak_stairs:53,chest:54,diamond_ore:56,diamond_block:57,crafting_table:58,farmland:60,furnace:61,ladder:65,rail:66,stone_stairs:67,lever:69,stone_pressure_plate:70,wooden_pressure_plate:72,redstone_ore:73,redstone_torch:76,stone_button:77,snow_layer:78,ice:79,snow:80,cactus:81,clay:82,jukebox:84,fence:85,pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,lit_pumpkin:91,trapdoor:96,stonebrick:98,iron_bars:101,glass_pane:102,melon_block:103,vine:106,fence_gate:107,brick_stairs:108,stone_brick_stairs:109,mycelium:110,waterlily:111,nether_brick:112,nether_brick_fence:113,nether_brick_stairs:114,enchanting_table:116,end_stone:121,redstone_lamp:123,wooden_slab:126,sandstone_stairs:128,emerald_ore:129,ender_chest:130,emerald_block:133,spruce_stairs:134,birch_stairs:135,jungle_stairs:136,cobblestone_wall:139,wooden_button:143,anvil:145,trapped_chest:146,redstone_block:152,quartz_ore:153,hopper:154,quartz_block:155,quartz_stairs:156,activator_rail:157,dropper:158,stained_hardened_clay:159,stained_glass_pane:160,leaves2:161,log2:162,acacia_stairs:163,dark_oak_stairs:164,hay_block:170,carpet:171,hardened_clay:172,coal_block:173,packed_ice:174,double_plant:175,stained_glass:176,iron_shovel:256,iron_pickaxe:257,iron_axe:258,flint_and_steel:259,apple:260,bow:261,arrow:262,coal:263,diamond:264,iron_ingot:265,gold_ingot:266,iron_sword:267,wooden_sword:268,wooden_shovel:269,wooden_pickaxe:270,wooden_axe:271,stone_sword:272,stone_shovel:273,stone_pickaxe:274,stone_axe:275,diamond_sword:276,diamond_shovel:277,diamond_pickaxe:278,diamond_axe:279,stick:280,bowl:281,mushroom_stew:282,golden_sword:283,golden_shovel:284,golden_pickaxe:285,golden_axe:286,string:287,feather:288,gunpowder:289,wooden_hoe:290,stone_hoe:291,iron_hoe:292,diamond_hoe:293,golden_hoe:294,wheat_seeds:295,wheat:296,bread:297,leather_helmet:298,leather_chestplate:299,leather_leggings:300,leather_boots:301,chainmail_helmet:302,chainmail_chestplate:303,chainmail_leggings:304,chainmail_boots:305,iron_helmet:306,iron_chestplate:307,iron_leggings:308,iron_boots:309,diamond_helmet:310,diamond_chestplate:311,diamond_leggings:312,diamond_boots:313,golden_helmet:314,golden_chestplate:315,golden_leggings:316,golden_boots:317,flint:318,porkchop:319,cooked_porkchop:320,painting:321,golden_apple:322,sign:323,wooden_door:324,bucket:325,water_bucket:326,lava_bucket:327,minecart:328,saddle:329,iron_door:330,redstone:331,snowball:332,boat:333,leather:334,milk_bucket:335,brick:336,clay_ball:337,reeds:338,paper:339,book:340,slime_ball:341,egg:344,compass:345,fishing_rod:346,clock:347,glowstone_dust:348,fish:349,cooked_fished:350,dye:351,bone:352,sugar:353,cake:354,bed:355,repeater:356,cookie:357,filled_map:358,shears:359,melon:360,pumpkin_seeds:361,melon_seeds:362,beef:363,cooked_beef:364,chicken:365,cooked_chicken:366,rotten_flesh:367,ender_pearl:368,blaze_rod:369,ghast_tear:370,gold_nugget:371,nether_wart:372,potion:373,glass_bottle:374,spider_eye:375,fermented_spider_eye:376,blaze_powder:377,magma_cream:378,brewing_stand:379,cauldron:380,ender_eye:381,speckled_melon:382,experience_bottle:384,fire_charge:385,emerald:388,item_frame:389,flower_pot:390,carrot:391,potato:392,baked_potato:393,poisonous_potato:394,map:395,golden_carrot:396,skull:397,carrot_on_a_stick:398,nether_star:399,pumpkin_pie:400,comparator:404,netherbrick:405,quartz:406'.split(',').forEach(function (kv) { var p = kv.split(':'); VANILLA[p[0]] = parseInt(p[1], 10); });
             ('flowing_water:8,water:9,flowing_lava:10,lava:11,bed_block:26,double_stone_slab:43,fire:51,redstone_wire:55,wheat_block:59,lit_furnace:62,standing_sign:63,' +
              'wooden_door_block:64,wall_sign:68,iron_door_block:71,lit_redstone_ore:74,unlit_redstone_torch:75,reeds_block:83,portal:90,cake_block:92,' +
              'unpowered_repeater:93,powered_repeater:94,pumpkin_stem:104,melon_stem:105,nether_wart_block:115,brewing_stand_block:117,cauldron_block:118,' +
@@ -4567,15 +4634,17 @@
             var WOODS = ['oak', 'spruce', 'birch', 'jungle'];
             var MODERN = {};
             ('air:0,cave_air:0,void_air:0,stone:1,granite:1,polished_granite:1,diorite:1,polished_diorite:1,andesite:1,polished_andesite:1,' +
-             'grass_block:2,dirt:3,coarse_dirt:3,podzol:3,rooted_dirt:3,dirt_path:3,grass_path:3,cobblestone:4,bedrock:7,water:9,lava:11,' +
-             'sand:12,red_sand:12,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,deepslate_gold_ore:14,deepslate_iron_ore:15,deepslate_coal_ore:16,' +
+             'grass_block:2,dirt:3,coarse_dirt:3:1,podzol:3:2,rooted_dirt:3,dirt_path:3,grass_path:3,cobblestone:4,bedrock:7,water:9,lava:11,' +
+             'sand:12,red_sand:12:1,gravel:13,gold_ore:14,iron_ore:15,coal_ore:16,deepslate_gold_ore:14,deepslate_iron_ore:15,deepslate_coal_ore:16,' +
              'sponge:19,wet_sponge:19,glass:20,lapis_ore:21,lapis_block:22,dispenser:23,sandstone:24,chiseled_sandstone:24:1,cut_sandstone:24:2,' +
              'smooth_sandstone:24:2,note_block:25,powered_rail:27,detector_rail:28,sticky_piston:29,cobweb:30,short_grass:31:1,grass:31:1,fern:31:2,' +
-             'tall_grass:31:1,large_fern:31:2,dead_bush:32,piston:33,dandelion:37,poppy:38,blue_orchid:38:1,brown_mushroom:39,red_mushroom:40,' +
+             'tall_grass:175:2,large_fern:175:3,dead_bush:32,piston:33,dandelion:37,poppy:38:1,blue_orchid:38:9,allium:38:2,azure_bluet:38:3,' +
+             'red_tulip:38:4,orange_tulip:38:5,white_tulip:38:6,pink_tulip:38:7,oxeye_daisy:38:8,sunflower:175,lilac:175:1,rose_bush:175:4,peony:175:5,' +
+             'brown_mushroom:39,red_mushroom:40,' +
              'torch:50,wall_torch:50,redstone_wall_torch:76,gold_block:41,iron_block:42,smooth_stone:43:8,bricks:45,tnt:46,bookshelf:47,mossy_cobblestone:48,obsidian:49,fire:51,spawner:52,' +
              'chest:54,redstone_wire:55,diamond_ore:56,deepslate_diamond_ore:56,diamond_block:57,crafting_table:58,wheat:59,farmland:60,furnace:61,' +
              'ladder:65,rail:66,lever:69,stone_pressure_plate:70,oak_pressure_plate:72,redstone_ore:73,deepslate_redstone_ore:73,redstone_torch:76,' +
-             'stone_button:77,snow:78,ice:79,packed_ice:79,blue_ice:79,snow_block:80,cactus:81,clay:82,sugar_cane:83,jukebox:84,pumpkin:86,' +
+             'stone_button:77,snow:78,ice:79,packed_ice:174,blue_ice:174,snow_block:80,cactus:81,clay:82,sugar_cane:83,jukebox:84,pumpkin:86,' +
              'carved_pumpkin:86,netherrack:87,soul_sand:88,glowstone:89,jack_o_lantern:91,cake:92,stone_bricks:98,mossy_stone_bricks:98:1,' +
              'cracked_stone_bricks:98:2,chiseled_stone_bricks:98:3,brown_mushroom_block:99,red_mushroom_block:100,iron_bars:101,glass_pane:102,' +
              'melon:103,pumpkin_stem:104,melon_stem:105,vine:106,mycelium:110,lily_pad:111,nether_bricks:112,nether_brick_fence:113,' +
@@ -4591,15 +4660,20 @@
              'spruce_stairs:134,birch_stairs:135,jungle_stairs:136,quartz_stairs:156').split(',').forEach(function (kv) {
                 var p = kv.split(':'); MODERN[p[0]] = [parseInt(p[1], 10), parseInt(p[2] || '0', 10)];
             });
-            COLORS.forEach(function (c, i) { MODERN[c + '_wool'] = [35, i]; MODERN[c + '_carpet'] = [171, i]; MODERN[c + '_terracotta'] = [172, 0]; MODERN[c + '_bed'] = [26, 0]; MODERN[c + '_stained_glass'] = [20, 0]; MODERN[c + '_stained_glass_pane'] = [102, 0]; });
+            COLORS.forEach(function (c, i) { MODERN[c + '_wool'] = [35, i]; MODERN[c + '_carpet'] = [171, i]; MODERN[c + '_terracotta'] = [159, i]; MODERN[c + '_bed'] = [26, 0]; MODERN[c + '_stained_glass'] = [176, i]; MODERN[c + '_stained_glass_pane'] = [160, i]; });
             WOODS.forEach(function (w, i) {
                 MODERN[w + '_planks'] = [5, i]; MODERN[w + '_log'] = [17, i]; MODERN[w + '_wood'] = [17, i]; MODERN['stripped_' + w + '_log'] = [17, i];
                 MODERN[w + '_leaves'] = [18, i]; MODERN[w + '_sapling'] = [6, i];
             });
-            ['acacia', 'dark_oak', 'mangrove', 'cherry', 'bamboo', 'crimson', 'warped'].forEach(function (w) {
-                var n = w === 'dark_oak' ? 1 : w === 'cherry' ? 2 : 0;
+            ['mangrove', 'cherry', 'bamboo', 'crimson', 'warped'].forEach(function (w) {
+                var n = w === 'cherry' ? 2 : 0;
                 MODERN[w + '_planks'] = [5, n]; MODERN[w + '_log'] = [17, n]; MODERN[w + '_leaves'] = [18, n];
                 MODERN[w + '_stairs'] = [53, 0]; MODERN[w + '_slab'] = [126, n]; MODERN[w + '_fence'] = [85, 0]; MODERN[w + '_door'] = [64, 0];
+            });
+            ['acacia', 'dark_oak'].forEach(function (w, n) {
+                MODERN[w + '_planks'] = [5, 4 + n]; MODERN[w + '_log'] = [162, n]; MODERN[w + '_wood'] = [162, n]; MODERN['stripped_' + w + '_log'] = [162, n];
+                MODERN[w + '_leaves'] = [161, n]; MODERN[w + '_sapling'] = [6, 4 + n];
+                MODERN[w + '_stairs'] = [163 + n, 0]; MODERN[w + '_slab'] = [126, 4 + n]; MODERN[w + '_fence'] = [85, 0]; MODERN[w + '_door'] = [64, 0];
             });
             ['oak', 'spruce', 'birch', 'jungle'].forEach(function (w) { MODERN[w + '_fence'] = [85, 0]; MODERN[w + '_door'] = [64, 0]; MODERN[w + '_trapdoor'] = [96, 0]; MODERN[w + '_fence_gate'] = [107, 0]; });
             ['poppy', 'blue_orchid', 'allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'oxeye_daisy', 'cornflower', 'lily_of_the_valley', 'rose_bush', 'peony', 'lilac'].forEach(function (f) {
@@ -4629,7 +4703,9 @@
                 else if (/_slab$/.test(name)) {
                     if (props.type === 'double') id = id === 126 ? 125 : 43;
                     else if (props.type === 'top') data += 8;
-                } else if (id === 17 && props.axis) data += props.axis === 'x' ? 4 : props.axis === 'z' ? 8 : 0;
+                } else if ((id === 17 || id === 162) && props.axis) data += props.axis === 'x' ? 4 : props.axis === 'z' ? 12 : 0;
+                else if (id === 170 && props.axis) data += props.axis === 'x' ? 4 : props.axis === 'z' ? 8 : 0;
+                else if (id === 175 && props.half === 'upper') data += 8;
                 else if (name === 'wall_torch' || name === 'redstone_wall_torch') { id = name === 'wall_torch' ? 50 : 76; data = { east: 1, west: 2, south: 3, north: 4 }[props.facing] || 5; }
                 else if (name === 'torch') { id = 50; data = 5; }
                 else if (name === 'ladder' || name === 'furnace' || name === 'chest' || name === 'dispenser' || name === 'ender_chest' || name === 'trapped_chest')
@@ -4666,6 +4742,10 @@
                         if (id === 0) return '.';
                         if (id >= 256) return ' ';
                         var d = D[i] & 15;
+                        if (id === 95) id = 176;
+                        else if (id === 38) d = d === 0 ? 1 : d === 1 ? 9 : d;
+                        else if ((id === 17 || id === 162) && (d & 12) === 8) d = (d & 3) | 12;
+                        else if (id === 175 && (d & 8) && y > 0) d = 8 | (D[i - L * W] & 7);
                         return 'id:' + id + (d ? ':' + d : '');
                     } };
                 }
@@ -4971,6 +5051,7 @@
                     if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
+                var creativeFiles = [];
                 var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [], accIcons = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var lootLines = {};
@@ -4985,6 +5066,7 @@
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'worldtypes') { typeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'oredict') { oreFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
+                    if (c.kind === 'creative') { creativeFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'accessories') {
                         if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'accessories.json is { "ring": 2, "pendant": 1 }'); return; }
                         Object.keys(j).forEach(function (t) {
@@ -6119,6 +6201,17 @@
                                .then(function () { return paint('/data/images/gui/items.png', draw.items); });
                 }
                 unifyRecipes();
+                creativeFiles.forEach(function (cf) {
+                    var es = cf.j && Array.isArray(cf.j.entries) ? cf.j.entries : null;
+                    if (!es) { bad(cf.mod, cf.file, 'creative.json is { "entries": [{ "item": "<name>", "after": "<name>" }, ...] }'); return; }
+                    es.slice(0, 4096).forEach(function (e) {
+                        var ir = ref(e && e.item, cf.mod, cf.file);
+                        if (!ir) return;
+                        var ar = e.after ? ref(e.after, cf.mod, '') : '';
+                        var tab = String(e.tab || 'misc').toLowerCase().replace(/[^a-z_]/g, '');
+                        lines.push(['creative', ir, Math.max(0, e.data | 0), tab || 'misc', ar || '-', Math.max(0, e.after_data | 0)].join('\t'));
+                    });
+                });
                 return jobs.then(function () {
                     try { FS.mkdirTree('/data/web_mods'); FS.writeFile('/data/web_mods/content.txt', lines.join('\n') + '\n'); } catch (e) { }
                     return warn;
@@ -6343,8 +6436,12 @@
             var LIB_KNOWN = {
                 'fabric-language-kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true, name: 'Fabric Language Kotlin' },
                 'Fabric Language Kotlin': { slug: 'fabric-language-kotlin', loaders: ['fabric'], any: true },
+                'turniplabs.halplibe': { slug: 'halplibe', loaders: ['bta-babric'], any: true, name: 'HalpLibe' },
+                'halplibe': { slug: 'halplibe', loaders: ['bta-babric'], any: true, name: 'HalpLibe' },
                 'CodeChickenCore': { slug: 'codechicken-core', loaders: ['forge'], name: 'CodeChickenCore' },
                 'CodeChickenLib': { slug: 'codechicken-lib', loaders: ['forge'], name: 'CodeChickenLib' },
+                'Mantle': { slug: 'mantle', loaders: ['forge'], name: 'Mantle' },
+                'mantle': { slug: 'mantle', loaders: ['forge'], name: 'Mantle' },
                 'LomLib': { slug: 'LomLib', name: 'LomLib', cf: {
                     '1.6': { url: 'https://mediafilez.forgecdn.net/files/759/466/LomLib-universal-1.0.9.jar', sha1: '88dafcbe8817533cbc6120131cadde14e8a22dc1' },
                 } },
@@ -6443,7 +6540,7 @@
                     return pr.then(function () {
                         if (want[k].guess) {
                             var rep2 = Module.mcJava.reportOf ? Module.mcJava.reportOf(want[k].mod) : null;
-                            if (rep2 && (rep2.needs || []).indexOf(k) < 0) return;
+                            if (rep2 && (rep2.needs || []).map(function (n) { return LIB_KNOWN[n] ? LIB_KNOWN[n].slug : n; }).indexOf(k) < 0) return;
                         }
                         libTried[k] = true;
                         var nice = LIB_KNOWN[k] && LIB_KNOWN[k].name || k;
@@ -6954,7 +7051,7 @@
                 box.innerHTML =
                     '<h2 style="margin:0 0 10px;color:#fff;font-size:20px;letter-spacing:1px">Add a mod</h2>' +
                     '<p style="margin:0 0 16px;font-size:13px;color:#aaa;line-height:1.4">Choose a mod file (.zip), or drop it here. ' +
-                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and Java mods for Minecraft 1.4.7 to 1.6.4 (ModLoader and Forge) and Beta 1.7.3 (Babric) - .jar or .zip - work too - each one shows how well it runs here.</p>' +
+                    'Java resource packs, old Pocket Edition ModPE scripts (.js, .modpkg) and Java mods for Minecraft 1.4.7 to 1.7.10 (ModLoader and Forge) and Beta 1.7.3 (Babric) - .jar or .zip - work too - each one shows how well it runs here.</p>' +
                     '<button data-browse style="display:block;width:100%;padding:12px;margin-bottom:14px;background:#4a8a4a;color:#fff;' +
                     'border:none;cursor:pointer;font-size:14px;font-family:monospace">Browse mods</button>' +
                     '<label style="display:block;padding:14px;border:2px dashed #777;cursor:pointer;margin-bottom:14px">' +

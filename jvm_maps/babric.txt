@@ -681,6 +681,7 @@ F	argo/jdom/JsonNodeType	NULL	NULL	NULL
 F	argo/jdom/JsonNodeType	NUMBER	NUMBER	NUMBER
 F	argo/jdom/JsonNodeType	OBJECT	OBJECT	OBJECT
 F	argo/jdom/JsonNodeType	STRING	STRING	STRING
+F	argo/jdom/JsonNodeType	TRUE	TRUE	TRUE
 F	net/minecraft/class_4	field_4	field_4	record
 F	net/minecraft/class_6	field_5	field_5	xPosition
 F	net/minecraft/class_6	field_6	field_6	yPosition
@@ -769,6 +770,7 @@ F	net/minecraft/class_66	field_229	field_229	worldObj
 F	net/minecraft/class_66	field_231	field_231	posX
 F	net/minecraft/class_66	field_232	field_232	posY
 F	net/minecraft/class_66	field_233	field_233	posZ
+F	net/minecraft/class_66	field_252	field_252	isVisible
 F	net/minecraft/class_75	field_269	field_269	worldObj
 F	net/minecraft/class_75	field_271	field_271	renderer
 F	net/minecraft/class_75	field_272	field_272	rand
@@ -1011,6 +1013,7 @@ F	net/minecraft/class_193	field_702	field_702	recipeOutput
 F	net/minecraft/class_196	field_708	field_708	craftMatrix
 F	net/minecraft/class_196	field_709	field_709	craftResult
 F	net/minecraft/class_197	field_716	field_716	rand
+F	net/minecraft/class_197	field_717	field_717	updateCounter
 F	net/minecraft/class_201	field_741	field_741	windowId
 F	net/minecraft/class_136	field_745	field_745	mainInventory
 F	net/minecraft/class_136	field_746	field_746	armorInventory
@@ -1026,6 +1029,7 @@ F	net/minecraft/class_206	field_759	field_759	IDtoClassMapping
 F	net/minecraft/class_206	field_760	field_760	classToIDMapping
 F	net/minecraft/class_210	field_784	field_784	entityId
 F	net/minecraft/class_211	field_786	field_786	message
+F	net/minecraft/class_211	field_787	field_787	updateCounter
 F	net/minecraft/class_212	field_789	field_789	TILE
 F	net/minecraft/class_212	field_790	field_790	ENTITY
 F	net/minecraft/class_213	field_792	field_792	field_22280_a
@@ -1062,6 +1066,7 @@ F	net/minecraft/class_217	field_836	field_836	damageDealtStat
 F	net/minecraft/class_217	field_837	field_837	damageTakenStat
 F	net/minecraft/class_217	field_838	field_838	deathsStat
 F	net/minecraft/class_217	field_839	field_839	mobKillsStat
+F	net/minecraft/class_218	field_841	field_841	updateCounter
 F	net/minecraft/class_220	field_842	field_842	isFull
 F	net/minecraft/class_223	field_844	field_844	isSticky
 F	net/minecraft/class_226	field_847	field_847	blockID
@@ -1162,6 +1167,7 @@ F	net/minecraft/class_135	field_1066	field_1066	shake
 F	net/minecraft/class_135	field_1067	field_1067	angler
 F	net/minecraft/class_135	field_1068	field_1068	bobber
 F	net/minecraft/class_135	field_1073	field_1073	inGround
+F	net/minecraft/class_135	field_1074	field_1074	ticksInGround
 F	net/minecraft/class_135	field_1075	field_1075	ticksInAir
 F	net/minecraft/class_266	field_1088	field_1088	rand
 F	net/minecraft/class_271	field_1097	field_1097	MUSIC
@@ -1407,9 +1413,11 @@ F	net/minecraft/class_138	field_1567	field_1567	currentItemBurnTime
 F	net/minecraft/class_138	field_1568	field_1568	furnaceCookTime
 F	net/minecraft/class_409	field_1572	field_1572	body
 F	net/minecraft/class_409	field_1573	field_1573	tentacles
+F	net/minecraft/class_410	field_1574	field_1574	doesArrowBelongToPlayer
 F	net/minecraft/class_410	field_1575	field_1575	arrowShake
 F	net/minecraft/class_410	field_1576	field_1576	owner
 F	net/minecraft/class_410	field_1582	field_1582	inGround
+F	net/minecraft/class_410	field_1583	field_1583	ticksInGround
 F	net/minecraft/class_410	field_1584	field_1584	ticksInAir
 F	net/minecraft/class_26	field_1585	field_1585	xCoord
 F	net/minecraft/class_26	field_1586	field_1586	yCoord
@@ -1713,6 +1721,7 @@ F	net/minecraft/class_50	field_2178	field_2178	lightBrightnessTable
 F	net/minecraft/class_50	field_2179	field_2179	worldType
 F	net/minecraft/class_521	field_2189	field_2189	recipeItems
 F	net/minecraft/class_522	field_2190	field_2190	data
+F	net/minecraft/class_525	field_2205	field_2205	updateCounter
 F	net/minecraft/class_526	field_2206	field_2206	random
 F	net/minecraft/class_529	field_2209	field_2209	liquidBlockId
 F	net/minecraft/class_531	field_2210	field_2210	linux
@@ -1758,11 +1767,13 @@ F	net/minecraft/class_557	field_2367	field_2367	thePlayer
 F	net/minecraft/class_515	field_2378	field_2378	chunkXPos
 F	net/minecraft/class_386	field_2380	field_2380	keyDescription
 F	net/minecraft/class_386	field_2381	field_2381	keyCode
+F	net/minecraft/class_562	field_2382	field_2382	updateCounter
 F	net/minecraft/class_556	field_2401	field_2401	mc
 F	net/minecraft/class_478	field_2411	field_2411	worldObj
 F	net/minecraft/class_546	field_2418	field_2418	signBoard
 F	net/minecraft/class_546	field_2419	field_2419	signStick
 F	net/minecraft/class_181	field_2420	field_2420	isFocused
+F	net/minecraft/class_181	field_2421	field_2421	isEnabled
 F	net/minecraft/class_181	field_2422	field_2422	fontRenderer
 F	net/minecraft/class_181	field_2423	field_2423	xPos
 F	net/minecraft/class_181	field_2424	field_2424	yPos
@@ -1790,6 +1801,7 @@ F	net/minecraft/class_573	field_2466	field_2466	xPosition
 F	net/minecraft/class_573	field_2467	field_2467	yPosition
 F	net/minecraft/class_573	field_2468	field_2468	zPosition
 F	net/minecraft/class_574	field_2469	field_2469	message
+F	net/minecraft/class_574	field_2470	field_2470	updateCounter
 F	net/minecraft/class_577	field_2472	field_2472	head
 F	net/minecraft/class_577	field_2473	field_2473	body
 F	net/minecraft/class_577	field_2474	field_2474	rightLeg
@@ -1825,6 +1837,7 @@ F	net/minecraft/class_588	field_2544	field_2544	itemRenderer
 F	net/minecraft/class_588	field_2545	field_2545	chatMessageList
 F	net/minecraft/class_588	field_2546	field_2546	rand
 F	net/minecraft/class_588	field_2547	field_2547	mc
+F	net/minecraft/class_588	field_2548	field_2548	updateCounter
 F	net/minecraft/class_455	field_2553	field_2553	chunkMapping
 F	net/minecraft/class_455	field_2555	field_2555	worldObj
 F	net/minecraft/class_589	field_2556	field_2556	modelBipedMain
@@ -1849,6 +1862,7 @@ F	net/minecraft/class_77	field_2644	field_2644	particleBlue
 F	net/minecraft/class_77	field_2645	field_2645	interpPosX
 F	net/minecraft/class_77	field_2646	field_2646	interpPosY
 F	net/minecraft/class_77	field_2647	field_2647	interpPosZ
+F	net/minecraft/class_615	field_2657	field_2657	updateCounter
 F	net/minecraft/class_615	field_2659	field_2659	allowedCharacters
 F	net/minecraft/class_141	field_2660	field_2660	OK
 F	net/minecraft/class_141	field_2661	field_2661	NOT_POSSIBLE_HERE
@@ -1887,6 +1901,7 @@ F	net/minecraft/client/Minecraft	field_2779	field_2779	isRaining
 F	net/minecraft/client/Minecraft	field_2784	field_2784	timer
 F	net/minecraft/client/Minecraft	field_2791	field_2791	theMinecraft
 F	net/minecraft/client/Minecraft	field_2797	field_2797	minecraftDir
+F	net/minecraft/client/Minecraft	field_2801	field_2801	playerController
 F	net/minecraft/client/Minecraft	field_2802	field_2802	displayWidth
 F	net/minecraft/client/Minecraft	field_2803	field_2803	displayHeight
 F	net/minecraft/client/Minecraft	field_2804	field_2804	theWorld
@@ -1910,6 +1925,7 @@ M	net/minecraft/class_3	method_1	(I)I	method_1	func_21034_c
 M	net/minecraft/class_3	method_2	(I)I	method_2	func_21035_d
 M	net/minecraft/class_7	method_6	(J)V	method_6	setWorldTime
 M	net/minecraft/class_7	method_10	(Z)V	method_10	setThundering
+M	net/minecraft/class_7	method_11	()J	method_11	getRandomSeed
 M	net/minecraft/class_7	method_12	(I)V	method_12	setThunderTime
 M	net/minecraft/class_7	method_14	(Z)V	method_14	setRaining
 M	net/minecraft/class_7	method_15	()I	method_15	getSpawnX
@@ -2358,6 +2374,7 @@ M	net/minecraft/class_134	method_954	(I)Lnet/minecraft/class_31;	method_954	getS
 M	net/minecraft/class_135	method_956	()I	method_956	catchFish
 M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_267;	method_958	getRandomSoundFromSoundPool
 M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
+M	net/minecraft/class_270	method_963	()Ljava/lang/Object;	method_963	getObject
 M	net/minecraft/class_285	method_976	(Ljava/lang/String;)Ljava/io/InputStream;	method_976	getResourceAsStream
 M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
 M	net/minecraft/class_290	method_983	(FF)Lnet/minecraft/class_290;	method_983	setTexturePosition
@@ -2770,6 +2787,7 @@ M	net/minecraft/class_584	method_1933	(IIIIII)V	method_1933	drawGradientRect
 M	net/minecraft/class_584	method_1934	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1934	drawCenteredString
 M	net/minecraft/class_584	method_1936	(IIIIII)V	method_1936	drawTexturedModalRect
 M	net/minecraft/class_584	method_1937	(Lnet/minecraft/class_34;Ljava/lang/String;III)V	method_1937	drawString
+M	net/minecraft/class_588	method_1944	()V	method_1944	updateTick
 M	net/minecraft/class_588	method_1946	(FZII)V	method_1946	renderGameOverlay
 M	net/minecraft/class_588	method_1949	(Ljava/lang/String;)V	method_1949	addChatMessage
 M	net/minecraft/class_588	method_1950	()V	method_1950	clearChatMessages

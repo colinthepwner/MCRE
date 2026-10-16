@@ -1948,6 +1948,7 @@ F	atn	d	field_73811_d	width
 F	atn	e	field_73812_e	height
 F	atn	f	field_73809_f	text
 F	atn	l	field_73818_l	isFocused
+F	atn	m	field_73819_m	isEnabled
 F	atn	o	field_73817_o	cursorPosition
 F	atn	s	field_73823_s	visible
 F	atq	b	field_78288_b	FONT_HEIGHT
@@ -1962,7 +1963,9 @@ F	atq	q	field_78305_q	alpha
 F	atr	b	field_73841_b	itemRenderer
 F	atr	c	field_73842_c	rand
 F	atr	d	field_73839_d	mc
+F	atr	f	field_73837_f	updateCounter
 F	ats	j	field_73735_i	zLevel
+F	auf	b	field_74049_b	updateCounter
 F	aul	f	field_73882_e	mc
 F	aul	g	field_73880_f	width
 F	aul	h	field_73881_g	height
@@ -2267,6 +2270,7 @@ F	bev	i	field_77376_g	loaded
 F	bev	j	field_77382_h	rand
 F	bex	c	field_77464_c	rand
 F	bey	a	field_73976_a	rand
+F	bey	b	field_73974_b	updateCounter
 F	bfe	a	field_77478_a	defaultTexUnit
 F	bfe	b	field_77476_b	lightmapTexUnit
 F	bh	a	field_82630_a	x
@@ -2622,6 +2626,7 @@ F	nc	a	field_75254_a	mutexBits
 F	nd	a	field_75782_a	taskEntries
 F	nd	b	field_75780_b	executingTaskEntries
 F	nd	c	field_75781_c	theProfiler
+F	nd	d	field_75778_d	tickCount
 F	nd	e	field_75779_e	tickRate
 F	ne	a	field_75733_a	action
 F	ne	b	field_75731_b	priority
@@ -2631,6 +2636,7 @@ F	net/minecraft/client/Minecraft	K	field_71426_K	debug
 F	net/minecraft/client/Minecraft	P	field_71432_P	theMinecraft
 F	net/minecraft/client/Minecraft	T	field_71428_T	timer
 F	net/minecraft/client/Minecraft	an	field_71463_am	minecraftDir
+F	net/minecraft/client/Minecraft	b	field_71442_b	playerController
 F	net/minecraft/client/Minecraft	c	field_71443_c	displayWidth
 F	net/minecraft/client/Minecraft	d	field_71440_d	displayHeight
 F	net/minecraft/client/Minecraft	e	field_71441_e	theWorld
@@ -2730,6 +2736,8 @@ F	om	f	field_75297_f	shouldCheckSight
 F	on	a	field_75515_a	theEntity
 F	on	b	field_75513_b	worldObj
 F	on	d	field_75511_d	speed
+F	on	l	field_75516_l	avoidsWater
+F	on	m	field_75517_m	canSwim
 F	oo	a	field_75526_a	entityObj
 F	ox	d	field_70881_d	inLove
 F	ox	e	field_70882_e	breeding
@@ -2796,6 +2804,7 @@ F	qz	av	field_70256_ap	knockbackStrength
 F	qz	b	field_70249_b	arrowShake
 F	qz	c	field_70250_c	shootingEntity
 F	qz	i	field_70254_i	inGround
+F	qz	j	field_70252_j	ticksInGround
 F	r	a	field_71588_a	oppositeSide
 F	r	b	field_71586_b	offsetsXForSide
 F	r	c	field_71587_c	offsetsYForSide
@@ -2811,11 +2820,13 @@ F	rd	a	field_70206_a	shake
 F	rd	b	field_70204_b	angler
 F	rd	c	field_70205_c	bobber
 F	rd	h	field_70214_h	inGround
+F	rd	i	field_70216_i	ticksInGround
 F	rd	j	field_70211_j	ticksInAir
 F	ri	a	field_70193_a	inGround
 F	ri	b	field_70191_b	throwableShake
 F	ri	g	field_70192_c	thrower
 F	ri	h	field_85053_h	throwerName
+F	ri	i	field_70194_h	ticksInGround
 F	ri	j	field_70195_i	ticksInAir
 F	rp	b	field_75125_b	foodSaturationLevel
 F	rp	c	field_75126_c	foodExhaustionLevel
@@ -3029,6 +3040,7 @@ F	up	ck	field_77777_bU	maxStackSize
 F	up	cl	field_77791_bV	iconIndex
 F	up	cm	field_77789_bW	bFull3D
 F	up	cn	field_77787_bX	hasSubtypes
+F	up	co	field_77785_bY	potionEffect
 F	up	cp	field_77774_bZ	unlocalizedName
 F	up	d	field_77697_d	itemRand
 F	up	e	field_77698_e	itemsList
@@ -4217,6 +4229,7 @@ M	atq	a	(Z)V	func_78264_a	setUnicodeFlag
 M	atq	b	(Ljava/lang/String;I)I	func_78267_b	splitStringWidth
 M	atq	b	(Ljava/lang/String;III)I	func_78276_b	drawString
 M	atq	c	(Ljava/lang/String;I)Ljava/util/List;	func_78271_c	listFormattedStringToWidth
+M	atr	a	()V	func_73831_a	updateTick
 M	atr	a	(FZII)V	func_73830_a	renderGameOverlay
 M	atr	a	(Ljava/lang/String;)V	func_73833_a	setRecordPlayingMessage
 M	atr	b	()Latc;	func_73827_b	getChatGUI
@@ -5500,6 +5513,7 @@ M	net/minecraft/server/MinecraftServer	aa	()Ljava/lang/String;	func_71273_Y	getM
 M	net/minecraft/server/MinecraftServer	ad	()Lgm;	func_71203_ab	getConfigurationManager
 M	net/minecraft/server/MinecraftServer	ah	()I	func_71259_af	getTickCounter
 M	net/minecraft/server/MinecraftServer	b	()Ls;	func_82114_b	getPlayerCoordinates
+M	net/minecraft/server/MinecraftServer	c	()Z	func_71197_b	startServer
 M	net/minecraft/server/MinecraftServer	c_	()Ljava/lang/String;	func_70005_c_	getCommandSenderName
 M	net/minecraft/server/MinecraftServer	f	()Z	func_71225_e	canStructuresSpawn
 M	net/minecraft/server/MinecraftServer	f	(Ljava/lang/String;)V	func_71244_g	logInfo
@@ -5507,6 +5521,7 @@ M	net/minecraft/server/MinecraftServer	g	()Lyl;	func_71265_f	getGameType
 M	net/minecraft/server/MinecraftServer	g	(Ljava/lang/String;)V	func_71236_h	logWarning
 M	net/minecraft/server/MinecraftServer	h	()I	func_71232_g	getDifficulty
 M	net/minecraft/server/MinecraftServer	i	(Ljava/lang/String;)V	func_71201_j	logSevere
+M	net/minecraft/server/MinecraftServer	k	()V	func_71260_j	stopServer
 M	net/minecraft/server/MinecraftServer	q	()V	func_71217_p	tick
 M	net/minecraft/server/MinecraftServer	run	()V	run	run
 M	net/minecraft/server/MinecraftServer	s	()Z	func_71255_r	getAllowNether
@@ -6559,6 +6574,8 @@ M	up	q	()Z	func_77651_p	getShareTag
 M	up	r	()Lup;	func_77668_q	getContainerItem
 M	up	s	()Z	func_77634_r	hasContainerItem
 M	up	t	()Ljava/lang/String;	func_77635_s	getStatName
+M	up	u	()Ljava/lang/String;	func_77666_t	getPotionEffect
+M	up	v	()Z	func_77632_u	isPotionIngredient
 M	up	w	()Ltj;	func_77640_w	getCreativeTab
 M	up	x	()Z	func_82788_x	canItemEditBlocks
 M	uq	a	()I	func_77997_a	getMaxUses
@@ -7124,6 +7141,7 @@ M	zz	m	()[B	func_76605_m	getBiomeArray
 M	zz	n	()V	func_76613_n	resetRelightChecks
 M	zz	o	()V	func_76594_o	enqueueRelightChecks
 R	field_76689_a	data
+R	field_76694_d	blockLight
 R	field_76692_f	data
 R	field_76693_g	blocks
 R	field_76702_h	entities
@@ -7167,6 +7185,7 @@ R	field_72166_a	powered
 R	field_82539_a	types
 R	field_82136_e	levels
 R	field_82354_a	command
+R	field_70378_a	tickCount
 R	field_70376_r	rand
 R	field_70370_a	lidAngle
 R	field_70368_b	prevLidAngle
@@ -7193,6 +7212,7 @@ R	field_74827_c	info
 R	field_74619_a	elements
 R	field_74730_a	elements
 R	field_74625_a	NULL
+R	field_74623_b	TRUE
 R	field_74624_c	FALSE
 R	field_74729_a	key
 R	field_74663_a	stack
@@ -7202,6 +7222,7 @@ R	OBJECT	OBJECT
 R	ARRAY	ARRAY
 R	STRING	STRING
 R	NUMBER	NUMBER
+R	TRUE	TRUE
 R	FALSE	FALSE
 R	NULL	NULL
 R	field_74620_b	value
@@ -7288,6 +7309,7 @@ R	field_74207_v	theItemStack
 R	field_74216_x	rand
 R	field_73749_j	mirrored
 R	field_73981_b	allowedCharacters
+R	field_73980_d	updateCounter
 R	field_78071_a	posX
 R	field_78069_b	posY
 R	field_78070_c	prevPosX
@@ -7296,6 +7318,7 @@ R	field_78078_h	isDead
 R	field_78080_s	rand
 R	field_73776_a	particles
 R	field_73775_b	mc
+R	field_73990_a	updateCounter
 R	field_73988_b	lines
 R	field_74258_b	cancelled
 R	field_78821_a	ip
@@ -7306,6 +7329,7 @@ R	field_78776_a	mc
 R	field_73037_M	mc
 R	field_73035_a	sendQueue
 R	field_78831_a	name
+R	field_74260_b	updateCounter
 R	field_78859_a	mc
 R	field_78858_b	servers
 R	field_70557_a	theEntity
@@ -7316,6 +7340,7 @@ R	field_78924_a	worldObj
 R	field_78923_c	posX
 R	field_78920_d	posY
 R	field_78921_e	posZ
+R	field_78936_t	isVisible
 R	field_78941_z	tessellator
 R	field_78545_a	instance
 R	field_78462_a	image
@@ -7705,6 +7730,7 @@ R	func_71515_b	processCommand
 R	func_71517_b	getCommandName
 R	func_76529_b	growVines
 R	toString	toString
+R	func_82656_d	getMinY
 R	func_78814_a	getNextComponent
 R	func_74954_a	findValidPlacement
 R	func_74951_a	findValidPlacement
@@ -7874,6 +7900,7 @@ R	func_71910_a	quantityDroppedWithBonus
 R	func_72216_n	isFlammable
 R	func_71519_b	canCommandSenderUseCommand
 R	func_73652_a	refreshTrackShape
+R	func_73646_c	canConnectTo
 R	func_72169_f	isPoweredOrRepeater
 R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
@@ -7980,8 +8007,8 @@ R	func_77214_a	drawSlot
 R	func_77213_a	elementClicked
 R	func_77221_c	drawBackground
 R	func_73873_v_	drawDefaultBackground
+R	func_73792_b	writeText
 R	func_78262_a	trimStringToWidth
-R	func_73831_a	updateTick
 R	func_77212_b	getContentHeight
 R	func_73737_a	drawButton
 R	func_77211_a	drawScreen
@@ -8081,9 +8108,11 @@ R	func_76896_a	onWorldChange
 R	func_76893_a	setTileEntityRenderer
 R	func_71262_S	isDedicatedServer
 R	func_71235_a	setGameType
+R	func_71197_b	startServer
 R	func_71225_e	canStructuresSpawn
 R	func_71265_f	getGameType
 R	func_71232_g	getDifficulty
+R	func_71260_j	stopServer
 R	func_71217_p	tick
 R	func_76973_a	getType
 R	func_71746_d	getServer
@@ -8116,7 +8145,10 @@ R	func_73347_i	getFlySpeed
 R	func_82558_j	getWalkSpeed
 R	func_73391_d	getMetadata
 R	func_73322_d	getEntityId
+R	func_73403_d	getXPosition
+R	func_73402_f	getYPosition
 R	func_73401_h	getDirection
+R	func_73406_j	getXOffset
 R	func_73404_l	getYOffset
 R	func_73688_c	parse
 R	func_73706_a	put
@@ -8215,7 +8247,10 @@ R	func_70637_d	setJumping
 R	func_75669_b	getObject
 R	getClientModName	getClientModName
 R	func_71404_a	crashed
+R	func_71402_c	clickMouse
+R	func_71400_g	shutdown
 R	main	main
+R	func_71480_b	shutdown
 R	destroy	destroy
 R	start	start
 R	stop	stop

@@ -22,6 +22,8 @@ C	net/minecraft/core/entity/EntityItem	net/minecraft/src/EntityItem
 C	net/minecraft/core/block/entity/TileEntity	net/minecraft/src/TileEntity
 C	com/mojang/nbt/tags/CompoundTag	net/minecraft/src/NBTTagCompound
 C	com/mojang/nbt/tags/ListTag	net/minecraft/src/NBTTagList
+C	net/minecraft/client/render/font/FontRenderer	net/minecraft/src/FontRenderer
+C	net/minecraft/core/block/entity/TileEntityFurnace	net/minecraft/src/TileEntityFurnace
 F	net/minecraft/core/item/Item	id	-	itemID
 F	net/minecraft/core/item/Item	maxStackSize	-	maxStackSize
 F	net/minecraft/core/item/Item	hasSubtypes	-	hasSubtypes
@@ -60,6 +62,11 @@ F	net/minecraft/core/block/Block	blastResistance	-	blockResistance
 F	net/minecraft/core/block/Block	emission	-	lightValue
 F	net/minecraft/core/block/Block	shouldTick	-	needsRandomTick
 F	net/minecraft/core/block/Block	blockSound	-	stepSound
+F	net/minecraft/client/Minecraft	currentWorld	-	theWorld
+F	net/minecraft/client/Minecraft	font	-	fontRenderer
+F	net/minecraft/core/block/entity/TileEntityFurnace	currentBurnTime	-	furnaceBurnTime
+F	net/minecraft/core/block/entity/TileEntityFurnace	maxBurnTime	-	currentItemBurnTime
+F	net/minecraft/core/block/entity/TileEntityFurnace	currentCookTime	-	furnaceCookTime
 S	net/minecraft/client/sound/NamedSoundRepository	net/minecraft/core/data/registry/Registry	
 S	net/minecraft/client/sound/SoundRepository	net/minecraft/core/data/registry/Registry	
 S	net/minecraft/client/sound/MusicCategory	java/lang/Enum	
