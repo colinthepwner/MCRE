@@ -1390,6 +1390,8 @@
             Module.mcGameRules.define('jukeboxRange', 64, 'How far (blocks) a jukebox\'s record can be heard; it fades out linearly to there (Java: 64)', [8, 256]);
             Module.mcGameRules.define('jukeboxNowPlaying', true, 'A record starting shows "Now playing: <disc>" above the hotbar');
             Module.mcGameRules.define('modSkyColors', true, "Mods' biomes show their own sky colour (off: the usual sky there)");
+            Module.mcGameRules.define('modLiquidFlow', true, "Mods' liquids flow and spread (off: they stay as they are, like still water)");
+            Module.mcGameRules.define('modLiquidFire', true, "Mods' lava-like liquids that set fires (\"sets_fire\") set flammable blocks around them alight");
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
             Module.mcGameRules.define('generateStructures', true, 'Villages, mineshafts, strongholds and temples appear in newly explored parts of the world (saved with the world)');
             Module.mcGameRules.bind('generateStructures', function () {
@@ -1902,7 +1904,7 @@
                 }
                 return { id: refToJava(ref), data: data | 0 };
             }
-            function stateBlock(jid) { var b = reg() && reg().blocks[jid]; return !!(b && !b.$override && window.JVM.stateShapeOf && window.JVM.stateShapeOf(vm, b)); }
+            function stateBlock(jid) { var b = reg() && reg().blocks[jid]; return !!(b && !b.$override && ((window.JVM.stateShapeOf && window.JVM.stateShapeOf(vm, b)) || (window.JVM.liquidOf && window.JVM.liquidOf(vm, b)))); }
             function refToJava(ref) {
                 var m = /^mod:([^:]+):(.+)$/.exec(ref || '');
                 if (m) { var jid = javaMods[m[1]] ? window.JVM.contentId(vm, m[1], m[2]) : null; return jid != null ? jid : 4095; }
@@ -3636,6 +3638,11 @@
                             if (!hit) continue;
                             if (t.tint != null) (function (src, out) { cuts.push(tintPng(src, t.tint).then(function (png) { add[out] = png || src; })); })(hit, 'textures/' + kind + '/' + t.name.toLowerCase() + '.png');
                             else add['textures/' + kind + '/' + t.name.toLowerCase() + '.png'] = hit;
+                            if (kind === 'blocks') {
+                                var amc = fileOf(cands[i] + '.mcmeta'), atx = amc ? null : fileOf(cands[i].replace(/[.]png$/i, '.txt'));
+                                if (amc) add['textures/blocks/' + t.name.toLowerCase() + '.png.mcmeta'] = amc;
+                                else if (atx) add['textures/blocks/' + t.name.toLowerCase() + '.txt'] = atx;
+                            }
                             break;
                         }
                     });
@@ -4341,7 +4348,7 @@
                 var scripts = [];
                 var modpeFiles = [];
                 var schems = [];
-                var newTex = { blocks: {}, items: {} };
+                var newTex = { blocks: {}, items: {}, anim: {} };
                 mobFiles = {}; texFiles = {};
                 var javaOwnTex = {};
                 Object.keys(picUrls).forEach(function (k) { URL.revokeObjectURL(picUrls[k]); });
@@ -4468,6 +4475,8 @@
                                         });
                                     });
                                 }).catch(function () { unknown++; problem(id, path, "isn't a picture this browser can read (use PNG)"); });
+                            } else if ((m = /^textures\/blocks?\/([^\/]+)\.(png\.mcmeta|txt)$/i.exec(path))) {
+                                newTex.anim[id + ':' + m[1].toLowerCase()] = { data: data, txt: /txt$/i.test(m[2]) };
                             } else if ((m = /^sounds\/(.+?)\d*\.(ogg|mp3|wav)$/i.exec(path))) {
                                 var sn = m[1].split('/').join('.').toLowerCase();
                                 var u = URL.createObjectURL(new Blob([data], { type: 'audio/' + (m[2].toLowerCase() === 'mp3' ? 'mpeg' : m[2].toLowerCase()) }));
@@ -5128,6 +5137,11 @@
                 contentKeys = {};
                 Object.keys(blocks).forEach(function (k) { contentKeys[k] = 'block'; });
                 Object.keys(items).forEach(function (k) { contentKeys[k] = 'item'; });
+                var liqAlias = {};
+                Object.keys(blocks).forEach(function (k) {
+                    var lq = blocks[k].j && blocks[k].j.liquid;
+                    if (lq && typeof lq === 'object' && Array.isArray(lq.aliases)) lq.aliases.forEach(function (a) { var ak = blocks[k].mod + ':' + String(a).toLowerCase(); if (!blocks[ak]) { liqAlias[ak] = k; contentKeys[ak] = 'block'; } });
+                });
                 function ref(r, mod, file) {
                     if (typeof r === 'object' && r) r = r.item || r.id || r.block || '';
                     var raw = String(r || '').trim();
@@ -5143,10 +5157,10 @@
                     }
                     if (/^\d+$/.test(p[0])) return 'id:' + p[0] + (p[1] ? ':' + (parseInt(p[1], 10) || 0) : '');
                     if (p.length === 1) {
-                        if (blocks[mod + ':' + p[0]] || items[mod + ':' + p[0]]) return 'mod:' + mod + ':' + p[0];
+                        if (blocks[mod + ':' + p[0]] || items[mod + ':' + p[0]] || liqAlias[mod + ':' + p[0]]) return 'mod:' + mod + ':' + p[0];
                         return VANILLA[p[0]] ? 'id:' + VANILLA[p[0]] : none();
                     }
-                    if (file && !blocks[p[0] + ':' + p[1]] && !items[p[0] + ':' + p[1]])
+                    if (file && !blocks[p[0] + ':' + p[1]] && !items[p[0] + ':' + p[1]] && !liqAlias[p[0] + ':' + p[1]])
                         problem(mod, file, '"' + raw + '" isn\'t loaded (is the ' + p[0] + ' mod on?)');
                     return 'mod:' + p[0] + ':' + p[1];
                 }
@@ -5252,6 +5266,29 @@
                 }
                 var next = { blocks: 512, items: 512 }, given = { blocks: {}, items: {} }, draw = { blocks: [], items: [] };
                 var limit = Math.floor(maxTextureSize() / 16) * 16;
+                var reserved = { blocks: {}, items: {} }, topCell = { blocks: 0, items: 0 };
+                var takeCell = function (kind) {
+                    while (reserved[kind][next[kind]]) next[kind]++;
+                    var c = next[kind]++;
+                    topCell[kind] = Math.max(topCell[kind], c + 1);
+                    return c;
+                };
+                var given2 = { blocks: {}, items: {} };
+                function cellOf2(kind, mod, name, file) {
+                    name = String(name || '').toLowerCase().replace(/\.png$/, '').replace(/^(?:minecraft:)?(?:blocks?|items?)[/]/, '');
+                    var own = newTex[kind][mod + ':' + name], k = mod + ':' + name;
+                    if (!own) { var c1 = cellOf(kind, mod, name, file); return c1; }
+                    if (given2[kind][k] === undefined) {
+                        var c = next[kind];
+                        while (c % 16 === 15 || reserved[kind][c] || reserved[kind][c + 1]) c++;
+                        if (c + 17 >= limit) { bad(mod, file, 'no room for texture "' + name + '" (this device can hold ' + limit + ' cells)'); return 511; }
+                        [c, c + 1, c + 16, c + 17].forEach(function (x) { reserved[kind][x] = true; });
+                        topCell[kind] = Math.max(topCell[kind], c + 18);
+                        given2[kind][k] = c;
+                        draw[kind].push({ cell: c, span: 2, data: own, mod: mod, name: name, anim: newTex.anim && newTex.anim[k] });
+                    }
+                    return given2[kind][k];
+                }
                 function cellOf(kind, mod, name, file) {
                     name = String(name || '').toLowerCase().replace(/\.png$/, '').replace(/^(?:minecraft:)?(?:blocks?|items?)[/]/, '');
                     var own = newTex[kind][mod + ':' + name];
@@ -5259,8 +5296,8 @@
                         var k = mod + ':' + name;
                         if (given[kind][k] === undefined) {
                             if (next[kind] >= limit) { bad(mod, file, 'no room for texture "' + name + '" (this device can hold ' + limit + ' cells)'); return 511; }
-                            given[kind][k] = next[kind]++;
-                            draw[kind].push({ cell: given[kind][k], data: own, mod: mod, name: name });
+                            given[kind][k] = takeCell(kind);
+                            draw[kind].push({ cell: given[kind][k], data: own, mod: mod, name: name, anim: kind === 'blocks' && newTex.anim && newTex.anim[k] });
                         }
                         return given[kind][k];
                     }
@@ -5271,8 +5308,71 @@
                 }
                 var clean = function (s, max) { return String(s == null ? '' : s).replace(/[\t\n\r=]/g, ' ').slice(0, max || 64); };
                 var pretty = function (n) { return n.replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); };
+                var autoFog = [];
+                var LIQ_EFFECTS = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
+                    jump_boost: 8, nausea: 9, regeneration: 10, resistance: 11, fire_resistance: 12, water_breathing: 13, invisibility: 14,
+                    blindness: 15, night_vision: 16, hunger: 17, weakness: 18, poison: 19, wither: 20 };
+                var liquidLine = function (b, key, j) {
+                    var L = j.liquid && typeof j.liquid === 'object' ? j.liquid : {};
+                    var say = function (t) { bad(b.mod, b.file, '"liquid": ' + t); };
+                    var nm = function (v) { return typeof v === 'string' ? v : v && typeof v === 'object' ? (v.all || v.up || v.side || '') : ''; };
+                    var still = nm(L.still) || nm(L.texture) || nm(j.texture) || b.name;
+                    var flowing = nm(L.flowing) || nm(L.flow) || still;
+                    var tint = L.color != null ? (typeof L.color === 'number' ? L.color : parseInt(String(L.color).replace(/^#/, ''), 16)) : null;
+                    if (tint != null && !(tint >= 0)) { say('"color" should be "#rrggbb"'); tint = null; }
+                    var sc = cellOf('blocks', b.mod, still, b.file), fc = cellOf2('blocks', b.mod, flowing, b.file);
+                    if ((fc === 205 || fc === 237) && /flow/i.test(flowing)) fc = fc + 1;
+                    var desc = 'tile.mod.' + key;
+                    lang.push(desc + '.name=' + clean(j.name || pretty(b.name)));
+                    var like = /^lava$/i.test(L.like || '') ? 'lava' : 'water';
+                    if (L.like != null && !/^(water|lava)$/i.test(String(L.like))) say('"like": "water" or "lava"');
+                    var acts = /^(water|lava|none)$/i.test(L.acts || '') ? String(L.acts).toLowerCase() : like;
+                    var num = function (v, d, lo, hi) { v = Number(v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
+                    var f = ['like=' + like, 'acts=' + acts];
+                    f.push('spread=' + Math.round(num(L.spread, like === 'lava' ? 3 : 7, 1, 7)));
+                    if (L.spread_nether != null) f.push('nether=' + Math.round(num(L.spread_nether, 7, 1, 7)));
+                    if (L.tick_rate != null) f.push('tick=' + Math.round(num(L.tick_rate, like === 'lava' ? 30 : 5, 1, 1200)));
+                    var light = L.light != null ? L.light : j.light;
+                    if (light != null) f.push('light=' + (light === true ? 15 : Math.round(num(light, 0, 0, 15))));
+                    if (L.opacity != null) f.push('opacity=' + Math.round(num(L.opacity, 3, 0, 255)));
+                    var tr = L.translucent != null ? !!L.translucent : j.transparent != null ? !!j.transparent : like !== 'lava';
+                    f.push('translucent=' + (tr ? 1 : 0));
+                    f.push('infinite=' + ((L.infinite != null ? !!L.infinite : like === 'water') ? 1 : 0));
+                    if (L.fog_color === 'auto') { f.push('fog=auto'); autoFog.push({ key: key, cell: sc }); }
+                    else if (L.fog_color != null) { var fcol = colourOf(L.fog_color, b.mod, b.file, 'liquid fog_color'); if (fcol >= 0) f.push('fog=' + ('00000' + fcol.toString(16)).slice(-6)); }
+                    if (L.fog_density != null) f.push('fogdensity=' + numStr(num(L.fog_density, 0.1, 0.001, 10), 3));
+                    if (L.sets_fire) f.push('fire=1');
+                    if (j.entity_inside === true || L.entity_inside === true) f.push('inside=1');
+                    if (L.damage != null) f.push('damage=' + Math.round(num(L.damage, 0, 0, 100)));
+                    if (L.effects != null) {
+                        var es = (Array.isArray(L.effects) ? L.effects : [L.effects]).map(function (e) {
+                            if (typeof e === 'string') e = { effect: e };
+                            var id = LIQ_EFFECTS[String(e && e.effect || '').toLowerCase().replace(/^minecraft:/, '')] || (+(e && e.effect) > 0 ? +e.effect : 0);
+                            if (!id) { say('"effects": unknown effect "' + (e && e.effect) + '" (' + Object.keys(LIQ_EFFECTS).join(', ') + ')'); return ''; }
+                            return [id, Math.max(1, Math.round(num(e.seconds !== undefined ? e.seconds : e.duration, 5, 0.05, 3600) * 20)), Math.max(0, Math.min(10, num(e.level, 1, 1, 11) - 1)) | 0,
+                                    num(e.chance, 1, 0, 1)].join('*');
+                        }).filter(Boolean);
+                        if (es.length) f.push('effects=' + es.join(';'));
+                    }
+                    if (L.mix != null) {
+                        var ms = (Array.isArray(L.mix) ? L.mix : [L.mix]).map(function (m) {
+                            if (!m || typeof m !== 'object' || !m.with) { say('"mix": [{ "with": "water", "source": "minecraft:obsidian", "flowing": "minecraft:cobblestone" }]'); return ''; }
+                            var w = /^(water|lava)$/i.test(m.with) ? String(m.with).toLowerCase() : ref(m.with, b.mod, b.file);
+                            var rs = m.source ? (/^(minecraft:)?air$/i.test(m.source) ? 'id:0' : ref(m.source, b.mod, b.file)) : '';
+                            var rf = m.flowing ? (/^(minecraft:)?air$/i.test(m.flowing) ? 'id:0' : ref(m.flowing, b.mod, b.file)) : '';
+                            return w && (rs || rf) ? [w, rs || '-', rf || '-'].join('|') : '';
+                        }).filter(Boolean);
+                        if (ms.length) f.push('mix=' + ms.join(';'));
+                    }
+                    if (L.bucket) { var br = ref(L.bucket, b.mod, b.file); if (br) f.push('bucket=' + br); }
+                    if (L.bucket_empty) { var be = ref(L.bucket_empty, b.mod, b.file); if (be) f.push('bucketempty=' + be); }
+                    if (Array.isArray(L.aliases) && L.aliases.length) f.push('alias=' + L.aliases.map(function (a) { return b.mod + ':' + String(a).toLowerCase(); }).join(';'));
+                    if (tint != null) f.push('color=' + ('00000' + (tint & 0xffffff).toString(16)).slice(-6));
+                    lines.push(['liquid', key, desc, sc, fc].concat(f).join('\t'));
+                };
                 Object.keys(blocks).forEach(function (key) {
                     var b = blocks[key], j = b.j, t = j.texture;
+                    if (j.liquid) { liquidLine(b, key, j); return; }
                     if ((!t || (typeof t === 'object' && !Object.keys(t).some(function (k) { return t[k]; }))) && Array.isArray(j.quads) && j.quads[0] && j.quads[0].t) t = j.quads[0].t;
                     var faces;
                     if (t && typeof t === 'object') {
@@ -6166,7 +6266,7 @@
                 ['items', 'blocks'].forEach(function (kind) {
                     Object.keys(given[kind]).forEach(function (k) { lines.push(['texcell', kind === 'blocks' ? 'b' : 'i', k, given[kind][k]].join('\t')); });
                 });
-                var needCells = Math.max(next.blocks, next.items), rows = 32;
+                var needCells = Math.max(next.blocks, next.items, topCell.blocks, topCell.items), rows = 32;
                 while (rows * 16 < needCells) rows *= 2;
                 lines.unshift('rows\t' + rows);
                 var grow = function (fp) {
@@ -6182,15 +6282,67 @@
                         return c;
                     });
                 };
+                var animOf = function (t, img) {
+                    var meta = {};
+                    if (t.anim && !t.anim.txt) { try { meta = (JSON.parse(new TextDecoder().decode(t.anim.data)) || {}).animation || {}; } catch (e) { bad(t.mod, 'textures/blocks/' + t.name + '.png.mcmeta', "isn't valid JSON"); } }
+                    var fw = Math.max(1, (meta.width | 0) || img.width), fh = Math.max(1, (meta.height | 0) || fw);
+                    var count = Math.floor(img.height / fh);
+                    if (count < 2 || img.width < fw) return null;
+                    var ft = Math.max(1, meta.frametime | 0 || 1), order = [];
+                    if (t.anim && t.anim.txt) {
+                        new TextDecoder().decode(t.anim.data).split(/[,\s]+/).forEach(function (p) { var mm = /^(\d+)(?:\*(\d+))?$/.exec(p); if (mm && +mm[1] < count) order.push(mm[1] + '*' + (mm[2] ? +mm[2] : ft)); });
+                    } else if (Array.isArray(meta.frames)) {
+                        meta.frames.forEach(function (fr) {
+                            var ix = typeof fr === 'number' ? fr : fr && fr.index, tm = fr && typeof fr === 'object' && fr.time ? fr.time | 0 : ft;
+                            if (ix >= 0 && ix < count) order.push((ix | 0) + '*' + Math.max(1, tm));
+                        });
+                    }
+                    if (!order.length) for (var k = 0; k < count; k++) order.push(k + '*' + ft);
+                    return { fw: fw, fh: fh, count: count, order: order, interp: !!meta.interpolate, ft: ft };
+                };
+                var tintCanvas = function (g, x0, y0, w, h, rgb) {
+                    var d = g.getImageData(x0, y0, w, h), p = d.data, r = (rgb >> 16) & 255, gg = (rgb >> 8) & 255, bl = rgb & 255;
+                    for (var i = 0; i < p.length; i += 4) { p[i] = p[i] * r / 255; p[i + 1] = p[i + 1] * gg / 255; p[i + 2] = p[i + 2] * bl / 255; }
+                    g.putImageData(d, x0, y0);
+                };
+                var writeAnim = function (t, img, an) {
+                    var size = 16 * (t.span || 1), cv = document.createElement('canvas');
+                    cv.width = cv.height = size;
+                    var g2 = cv.getContext('2d', { willReadFrequently: true });
+                    g2.imageSmoothingEnabled = an.fw > size; g2.imageSmoothingQuality = 'high';
+                    var buf = new Uint8Array(an.count * size * size * 4);
+                    for (var k = 0; k < an.count; k++) {
+                        g2.clearRect(0, 0, size, size);
+                        g2.drawImage(img, 0, k * an.fh, an.fw, an.fh, 0, 0, size, size);
+                        if (t.tint != null) tintCanvas(g2, 0, 0, size, size, t.tint);
+                        buf.set(g2.getImageData(0, 0, size, size).data, k * size * size * 4);
+                    }
+                    var path = '/data/web_mods/anim_' + t.cell + '.rgba';
+                    try { FS.mkdirTree('/data/web_mods'); FS.writeFile(path, buf); } catch (e) { return; }
+                    lines.push(['anim', t.cell, t.span || 1, an.ft, an.interp ? 1 : 0, an.order.join(','), path, an.count].join('\t'));
+                };
                 var paint = function (fp, list) {
                     return grow(fp).then(function (c) {
                         var g = c.getContext('2d');
                         return list.reduce(function (pr, t) {
                             return pr.then(function () { return decodeImage(t.data); }).then(function (img) {
-                                var s = Math.min(img.width, img.height), x0 = (t.cell % 16) * 16, y0 = Math.floor(t.cell / 16) * 16;
-                                g.imageSmoothingEnabled = s > 16; g.imageSmoothingQuality = 'high';
-                                g.clearRect(x0, y0, 16, 16);
-                                g.drawImage(img, 0, 0, s, s, x0, y0, 16, 16);
+                                var s = Math.min(img.width, img.height), x0 = (t.cell % 16) * 16, y0 = Math.floor(t.cell / 16) * 16, sz = 16 * (t.span || 1);
+                                g.imageSmoothingEnabled = s > sz; g.imageSmoothingQuality = 'high';
+                                g.clearRect(x0, y0, sz, sz);
+                                g.drawImage(img, 0, 0, s, s, x0, y0, sz, sz);
+                                if (t.tint != null) tintCanvas(g, x0, y0, sz, sz, t.tint);
+                                if (fp.indexOf('terrain') >= 0) autoFog.forEach(function (af) {
+                                    if (af.cell !== t.cell || af.done) return;
+                                    var px = g.getImageData(x0, y0, 16, 16).data, sr = 0, sg = 0, sb = 0, sa = 0;
+                                    for (var q = 0; q < px.length; q += 4) { var al = px[q + 3] / 255; sr += px[q] * al; sg += px[q + 1] * al; sb += px[q + 2] * al; sa += al; }
+                                    if (sa <= 0) return;
+                                    var hx = function (v) { return ('0' + Math.max(0, Math.min(255, Math.round(v / sa * 0.6))).toString(16)).slice(-2); };
+                                    var li = lines.findIndex(function (l) { return l.indexOf('liquid\t' + af.key + '\t') === 0; });
+                                    if (li >= 0) lines[li] = lines[li].replace('\tfog=auto', '\tfog=' + hx(sr) + hx(sg) + hx(sb));
+                                    af.done = true;
+                                });
+                                var an = fp.indexOf('terrain') >= 0 ? animOf(t, img) : null;
+                                if (an) writeAnim(t, img, an);
                             }).catch(function () { bad(t.mod, 'textures/' + (fp.indexOf('items') >= 0 ? 'items' : 'blocks') + '/' + t.name + '.png', "isn't a picture this browser can read (use PNG)"); });
                         }, Promise.resolve());
                     });
@@ -6213,6 +6365,7 @@
                     });
                 });
                 return jobs.then(function () {
+                    lines.forEach(function (l, i) { if (/^liquid\t/.test(l) && l.indexOf('\tfog=auto') >= 0) lines[i] = l.replace('\tfog=auto', ''); });
                     try { FS.mkdirTree('/data/web_mods'); FS.writeFile('/data/web_mods/content.txt', lines.join('\n') + '\n'); } catch (e) { }
                     return warn;
                 });

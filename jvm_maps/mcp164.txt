@@ -2029,10 +2029,13 @@ F	any	b	field_72284_a	random
 F	aoi	a	field_72258_a	chanceToEncourageFire
 F	aoi	b	field_72257_b	abilityToCatchFire
 F	aos	c	field_72192_a	fallInstantly
+F	aow	a	field_94450_a	theIcon
 F	aox	a	field_70417_a	record
+F	apc	a	field_94425_a	theIcon
 F	apx	a	everything	everything
 F	apx	b	mobs	mobs
 F	apx	c	players	players
+F	aqa	b	field_94359_b	theIcon
 F	aqp	b	field_72157_b	modelBlock
 F	aqz	A	field_71979_v	dirt
 F	aqz	B	field_71978_w	cobblestone
@@ -3541,6 +3544,7 @@ F	yw	a	field_77839_a	blockType
 F	yw	b	field_77838_b	soilBlockID
 F	yy	c	field_77866_c	blocksEffectiveAgainst
 F	z	a	field_71533_a	theAdmin
+F	ze	a	field_94593_a	theIcon
 F	zg	a	field_77891_a	isFullBlock
 F	zg	b	field_77889_b	theHalfSlab
 F	zg	c	field_77890_c	doubleSlab
@@ -4606,6 +4610,10 @@ M	apc	f	(Lacf;III)F	func_71870_f	getBlockBrightness
 M	apc	l_	(Labw;III)I	func_72198_f_	getFlowDecay
 M	apc	n	()I	func_71856_s_	getRenderBlockPass
 M	apc	o	()I	func_71933_m	getBlockColor
+M	apd	a	(Labw;III)V	func_71861_g	onBlockAdded
+M	apd	a	(Labw;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	ape	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
+M	ape	a	(Labw;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	aqa	a	(II)Lms;	func_71858_a	getIcon
 M	aqa	a	(Lmt;)V	func_94332_a	registerIcons
 M	aqe	a	(ILjava/util/Random;I)I	func_71885_a	idDropped
@@ -7751,14 +7759,20 @@ R	field_75795_b	displayName
 R	field_75792_g	hardcore
 R	field_94513_g	connectedTracks
 R	field_72294_a	rand
+R	field_94449_b	theIcon
 R	field_72293_a	random
 R	field_72197_a	mushroomType
+R	field_94423_a	theIcon
 R	field_73664_a	x
 R	field_73662_b	y
 R	field_73663_c	z
+R	field_94362_b	theIcon
 R	field_72218_a	blockType
 R	field_72178_a	glowing
 R	field_72166_a	powered
+R	field_94369_b	theIcon
+R	field_94433_b	theIcon
+R	field_94401_cO	theIcon
 R	field_82539_a	types
 R	field_82136_e	levels
 R	field_82354_a	command
@@ -8201,6 +8215,8 @@ R	field_75177_g	theWorld
 R	field_75232_b	thePlayer
 R	field_75234_h	theMerchant
 R	UNKNOWN	UNKNOWN
+R	field_94596_a	theIcon
+R	field_94598_a	theIcon
 R	field_77610_b	recipeItems
 R	values	values
 R	func_77601_c	getExperience
@@ -8505,6 +8521,7 @@ R	func_71920_b	colorMultiplier
 R	func_71933_m	getBlockColor
 R	func_72240_d	getFullSlabName
 R	func_111048_c	getSideIcon
+R	func_72200_l	checkForHarden
 R	func_72216_n	isFlammable
 R	func_72169_f	isPoweredOrRepeater
 R	func_71891_b	onEntityWalking
@@ -9119,6 +9136,7 @@ D	net/minecraft/src/BlockJukeBox	theIcon:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/TileEntityRecordPlayer	record:Lnet/minecraft/src/ItemStack;:
 D	net/minecraft/src/BlockLeaves	LEAF_TYPES:[Ljava/lang/String;:s|field_94396_b:[[Ljava/lang/String;:s|iconType:I:|iconArray:[[Lnet/minecraft/src/Icon;:|adjacentTreeBlocks:[I:
 D	net/minecraft/src/BlockFluid	theIcon:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockFlowing	numAdjacentSources:I:|isOptimalFlowDirection:[Z:|flowCost:[I:
 D	net/minecraft/src/EnumMobType	everything:Lnet/minecraft/src/EnumMobType;:s|mobs:Lnet/minecraft/src/EnumMobType;:s|players:Lnet/minecraft/src/EnumMobType;:s|$VALUES:[Lnet/minecraft/src/EnumMobType;:s
 D	net/minecraft/src/BlockRail	theIcon:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockRotatedPillar	field_111051_a:Lnet/minecraft/src/Icon;:

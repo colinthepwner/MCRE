@@ -11845,6 +11845,7 @@ function installMc152(vm) {
 	if (JVM.installBetaCompat) JVM.installBetaCompat(vm);
 	if (JVM.installGaps) JVM.installGaps(vm);
 	if (JVM.installGapsWorld) JVM.installGapsWorld(vm);
+	if (JVM.installLiquids) JVM.installLiquids(vm);
 	if (JVM.installGapsApis) JVM.installGapsApis(vm);
 	if (JVM.installGapsItems) JVM.installGapsItems(vm);
 	if (JVM.installGapsEntity) JVM.installGapsEntity(vm);
@@ -12373,6 +12374,18 @@ JVM.collectContent = function (vm, modId) {
 			var back = leafy ? JVM.leafGraphics(vm, b, true) : null;
 			try { return hiddenVariants(b); } finally { if (back) back(); }
 		}, []);
+		var liq = JVM.liquidOf ? safe(function () { return JVM.liquidOf(vm, b); }, null) : null;
+		if (liq) {
+			if (liq.skip) return;
+			var lj = safe(function () {
+				return JVM.liquidJson(vm, b, id, {
+					safe: safe, ref: ref, overrides: function (keys) { return overrides(b, keys); },
+					name: langOf(b, 0) || keyName(b) || codeName(b),
+					tex: function (icon) { var t = tex(icon); if (t && !t.vanilla) out.textures['blocks/' + t.name] = t; return t; },
+				});
+			}, null);
+			if (lj) { out.blocks[JVM.contentName(vm, id, 0)] = lj; return; }
+		}
 		JVM.variantsOf(vm, b).forEach(function (meta) {
 			if (leafy) leafEntry(b, id, meta); else blockEntry(b, id, meta);
 			var e = hidden.indexOf(meta) >= 0 && out.blocks[JVM.contentName(vm, id, meta)];
@@ -13207,7 +13220,7 @@ JVM.logAxisOf = function (vm, o) {
 };
 JVM.stateBlockOf = function (vm, mod, name) {
 	var r = reg(vm), id = JVM.contentId(vm, mod, name), o = id != null && r ? r.blocks[id] : null;
-	if (!o || o.$mod !== mod || !JVM.stateShapeOf(vm, o)) return null;
+	if (!o || o.$mod !== mod || !(JVM.stateShapeOf(vm, o) || (JVM.liquidOf && JVM.liquidOf(vm, o)))) return null;
 	return JVM.contentName(vm, id, 0) === name ? o : null;
 };
 JVM.statePlaced = function (vm, blk, world, x, y, z, face) {
@@ -22630,6 +22643,141 @@ function install(vm) {
 	}
 }
 JVM.installFmlLinks = install;
+})();
+
+(function () {
+'use strict';
+var SRC = 'net/minecraft/src/', FL = 'net/minecraftforge/fluids/';
+
+function isA(vm, o, cn) { return !!(o && vm.natives[cn] && vm.isInstance(o, vm.loadClass(cn))); }
+function reg(vm) { return JVM.mc152.reg(vm); }
+
+function install(vm) {
+	var blockAnyInit = function (vm, self, args, desc) { var ai = vm.natives[SRC + 'Block'].anyInit; if (ai) ai(vm, self, args, desc); };
+	if (vm.natives[SRC + 'BlockFluid']) {
+		if (!vm.natives[SRC + 'BlockFlowing']) vm.defineNative(SRC + 'BlockFlowing', { super: SRC + 'BlockFluid', anyInit: blockAnyInit, methods: {} });
+		if (!vm.natives[SRC + 'BlockStationary']) vm.defineNative(SRC + 'BlockStationary', { super: SRC + 'BlockFluid', anyInit: blockAnyInit, methods: {} });
+	}
+	var BFB = FL + 'BlockFluidBase', spec = vm.natives[BFB];
+	if (spec && !spec.$liquidsWrapped) {
+		spec.$liquidsWrapped = true;
+		var after = function (self, fluid) {
+			var v = fluid ? fluid[':viscosity'] : null;
+			self[':tickRate'] = v != null ? Math.floor((v | 0) / 200) : 20;
+			if (self[':renderPass'] == null) self[':renderPass'] = 1;
+			if (self[':canCreateSources'] == null) self[':canCreateSources'] = 0;
+		};
+		Object.keys(vm.natives).forEach(function (n) {
+			var s = vm.natives[n];
+			if (!s || !s.methods) return;
+			var under = n === BFB;
+			for (var x = n, g = 0; !under && x && g < 20; x = vm.natives[x] && vm.natives[x].super, g++) if (x === BFB) under = true;
+			if (!under) return;
+			['<init>(ILnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/Material;)V', '<init>(Lnet/minecraftforge/fluids/Fluid;Lnet/minecraft/src/Material;)V'].forEach(function (k) {
+				var orig = s.methods[k];
+				if (!orig) return;
+				vm.setNativeMethod(n, k, function (vm, self, a) { orig(vm, self, a); after(self, k.indexOf('<init>(I') === 0 ? a[1] : a[0]); });
+			});
+		});
+		vm.setNativeMethod(BFB, 'setRenderPass(I)Lnet/minecraftforge/fluids/BlockFluidBase;', function (vm, self, a) { self[':renderPass'] = a[0] | 0; return self; });
+		vm.setNativeMethod(BFB, 'setTickRate(I)Lnet/minecraftforge/fluids/BlockFluidBase;', function (vm, self, a) { self[':tickRate'] = (a[0] | 0) > 0 ? a[0] | 0 : 20; return self; });
+		vm.setNativeMethod(BFB, 'setQuantaPerBlock(I)Lnet/minecraftforge/fluids/BlockFluidBase;', function (vm, self, a) { var q = a[0] | 0; if (q > 16 || q < 1) q = 8; self[':quantaPerBlock'] = q; self[':quantaPerBlockFloat'] = q; return self; });
+		vm.setNativeMethod(BFB, 'getRenderBlockPass()I', function (vm, self) { return self[':renderPass'] == null ? 1 : self[':renderPass'] | 0; });
+		vm.setNativeMethod(BFB, 'tickRate(Lnet/minecraft/src/World;)I', function (vm, self) { return self[':tickRate'] | 0; });
+		var BFC = FL + 'BlockFluidClassic';
+		if (vm.natives[BFC]) {
+			vm.setNativeMethod(BFC, 'isSourceBlock(Lnet/minecraft/src/IBlockAccess;III)Z', function (vm, self, a) {
+				return vm.callVirtual(a[0], 'getBlockId', '(III)I', [a[1], a[2], a[3]]) === (self[':blockID'] | 0) && vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]) === 0 ? 1 : 0;
+			});
+			vm.setNativeMethod(BFC, 'setCanCreateSources(Z)Lnet/minecraftforge/fluids/BlockFluidClassic;', function (vm, self, a) { self[':canCreateSources'] = a[0] ? 1 : 0; return self; });
+		}
+		vm.setNativeMethod(BFB, 'canCollideCheck(IZ)Z', function (vm, self, a) { return a[1] && (a[0] | 0) === 0 ? 1 : 0; });
+	}
+	if (vm.natives[SRC + 'BlockFluid'] && !(vm.natives[SRC + 'BlockFluid'].methods || {})['getIcon(II)Lnet/minecraft/src/Icon;'])
+		vm.setNativeMethod(SRC + 'BlockFluid', 'getIcon(II)Lnet/minecraft/src/Icon;', function (vm, self, a) {
+			var ic = self[':theIcon'], arr = ic && (ic.a || ic);
+			if (arr && arr.length) return (a[0] === 0 || a[0] === 1 ? arr[0] : arr[1] || arr[0]) || null;
+			return self[':blockIcon'] || null;
+		});
+	if (vm.natives[SRC + 'BlockFluid'] && !(vm.natives[SRC + 'BlockFluid'].methods || {})['canCollideCheck(IZ)Z'])
+		vm.setNativeMethod(SRC + 'BlockFluid', 'canCollideCheck(IZ)Z', function (vm, self, a) { return a[1] && (a[0] | 0) === 0 ? 1 : 0; });
+}
+
+JVM.liquidOf = function (vm, b) {
+	if (!b || typeof b !== 'object') return null;
+	if (b.$liquid !== undefined) return b.$liquid;
+	b.$liquid = null;
+	if (!b.cls || b.$override || b.$vanilla || typeof b[':blockID'] !== 'number' || !b.$mod) return null;
+	if (isA(vm, b, FL + 'BlockFluidBase')) return (b.$liquid = { kind: 'forge', finite: isA(vm, b, FL + 'BlockFluidFinite') });
+	if (!isA(vm, b, SRC + 'BlockFluid')) return null;
+	var r = reg(vm), id = b[':blockID'] | 0;
+	if (isA(vm, b, SRC + 'BlockStationary')) {
+		var f = r.blocks[id - 1];
+		if (f && f.$mod === b.$mod && isA(vm, f, SRC + 'BlockFlowing')) return (b.$liquid = { kind: 'pair', skip: true, main: id - 1 });
+		return (b.$liquid = { kind: 'pair', still: null });
+	}
+	var s = r.blocks[id + 1];
+	return (b.$liquid = { kind: 'pair', still: s && s.$mod === b.$mod && isA(vm, s, SRC + 'BlockStationary') ? id + 1 : null });
+};
+
+JVM.liquidJson = function (vm, b, id, h) {
+	var info = JVM.liquidOf(vm, b);
+	if (!info || info.skip) return null;
+	var mat = b[':blockMaterial'] && b[':blockMaterial'].$name;
+	var lava = mat === 'lava';
+	var L = { like: lava ? 'lava' : 'water', acts: mat === 'water' ? 'water' : lava ? 'lava' : 'none' };
+	var icon = function (fn) { var ic = h.safe(fn, null); return ic ? h.tex(ic) : null; };
+	var still = null, flowing = null;
+	var clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
+	if (info.kind === 'forge') {
+		var fl = b.$fluid || b[':definedFluid'] || null;
+		if (fl) {
+			still = icon(function () { return vm.callVirtual(fl, 'getStillIcon', '()Lnet/minecraft/src/Icon;', []); });
+			flowing = icon(function () { return vm.callVirtual(fl, 'getFlowingIcon', '()Lnet/minecraft/src/Icon;', []); });
+		}
+		var q = b[':quantaPerBlock'] | 0 || 8;
+		L.spread = clamp(q - 1, 1, 7);
+		L.tick_rate = clamp(b[':tickRate'] | 0 || 20, 1, 1200);
+		L.infinite = !!b[':canCreateSources'];
+		L.translucent = (b[':renderPass'] == null ? 1 : b[':renderPass'] | 0) !== 0;
+		var lum = fl ? fl[':luminosity'] | 0 : 0;
+		if (lum > 0) L.light = clamp(lum, 0, 15);
+		if (fl && ((fl[':density'] | 0) < 0 || fl[':isGaseous'])) vm.warnOnce('gas:' + b.$mod + ':' + id, 'the gas ' + (fl[':fluidName'] || id) + ' flows down here (the game\'s liquids only fall)');
+		if (info.finite) L.infinite = false;
+		var fr = reg(vm).fluidReg;
+		var cont = fr && fl ? fr.containers.filter(function (c) { return c.fluid && (c.fluid === fl || c.fluid[':fluidName'] === fl[':fluidName']) && c.empty && c.empty[0] === 325 && c.filled; })[0] : null;
+		if (cont) L.bucket = h.ref(cont.filled[0], cont.filled[1]);
+	} else {
+		L.spread = lava ? 3 : 7;
+		if (lava) L.spread_nether = 7;
+		var tr = h.safe(function () { return vm.callVirtual(b, 'tickRate', '(Lnet/minecraft/src/World;)I', [JVM.mc152.worldObj(vm)]); }, 0) | 0;
+		if (!tr) tr = h.safe(function () { return vm.callVirtual(b, 'tickRate', '()I', []); }, 0) | 0;
+		L.tick_rate = clamp(tr || (lava ? 30 : 5), 1, 1200);
+		L.infinite = mat === 'water';
+		L.translucent = !lava;
+		if (b.$light) L.light = clamp(b.$light | 0, 0, 15);
+		if (lava) {
+			L.mix = [{ with: 'water', source: 'minecraft:obsidian', flowing: 'minecraft:cobblestone' }];
+			L.sets_fire = true;
+		}
+		if (info.still != null) L.aliases = [JVM.contentName(vm, info.still, 0)];
+		var lr = reg(vm).fluidReg;
+		var lc = lr && lr.lcontainers ? lr.lcontainers.filter(function (c) { var li = c.liquid && c.liquid[':itemID'] | 0; return (li === id || (info.still != null && li === info.still)) && c.empty && c.empty[0] === 325 && c.filled; })[0] : null;
+		if (lc) L.bucket = h.ref(lc.filled[0], lc.filled[1]);
+	}
+	if (!still) still = icon(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [1, 0]); });
+	if (!flowing) flowing = icon(function () { return vm.callVirtual(b, 'getIcon', '(II)Lnet/minecraft/src/Icon;', [2, 0]); });
+	if (!flowing) flowing = still;
+	if (!still) still = flowing;
+	if (still) L.still = still.name;
+	if (flowing) L.flowing = flowing.name;
+	L.fog_color = 'auto';
+	var json = { name: h.name || ('Liquid ' + id), texture: L.still || 'water_still', liquid: L, creative: false };
+	if (h.overrides(['onEntityCollidedWithBlock(Lnet/minecraft/src/World;IIILnet/minecraft/src/Entity;)V'])) json.entity_inside = true;
+	return json;
+};
+
+JVM.installLiquids = install;
 })();
 
 (function () {

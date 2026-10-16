@@ -1945,6 +1945,7 @@ R	field_150921_b	dyeIcons
 R	field_150922_c	dyeColors
 R	field_150907_b	cooked
 R	field_150980_f	itemDamage
+R	field_94598_a	theIcon
 R	field_77853_b	healAmount
 R	field_77854_c	saturationModifier
 R	field_77856_bY	isWolfsFavoriteMeat
@@ -2151,6 +2152,7 @@ R	field_77934_f	rarityName
 R	field_150929_a	recordName
 R	field_82809_c	soilId
 R	field_77838_b	soilBlockID
+R	field_94593_a	theIcon
 R	none	none
 R	eat	eat
 R	drink	drink
@@ -6806,6 +6808,7 @@ D	net/minecraft/src/BlockCloth	field_150033_a:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/IRegistry;:s|field_149942_b:Ljava/util/Random;:|field_149944_M:Lnet/minecraft/src/Icon;:|field_149945_N:Lnet/minecraft/src/Icon;:|field_149946_O:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDoor	field_150017_a:[Lnet/minecraft/src/Icon;:|field_150016_b:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockFire	field_149849_a:[I:|field_149848_b:[I:|field_149850_M:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockFlowing	field_149815_a:I:|field_149814_b:[Z:|field_149816_M:[I:
 D	net/minecraft/src/BlockFluid	field_149806_a:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockJukeBox	field_149927_a:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockLeaves	field_150128_a:[I:|field_150127_b:I:|field_150129_M:[[Lnet/minecraft/src/Icon;:

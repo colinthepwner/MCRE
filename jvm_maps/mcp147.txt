@@ -3837,6 +3837,10 @@ M	akx	g	(Lyc;III)V	func_71861_g	onBlockAdded
 M	akx	n	()I	func_71856_s_	getRenderBlockPass
 M	akx	o	()I	func_71933_m	getBlockColor
 M	akx	r_	()I	func_71859_p_	tickRate
+M	aky	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
+M	aky	g	(Lyc;III)V	func_71861_g	onBlockAdded
+M	akz	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
+M	akz	b	(Lyc;IIILjava/util/Random;)V	func_71847_b	updateTick
 M	alr	a	(II)I	func_71858_a	getBlockTextureFromSideAndMetadata
 M	alr	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
 M	alr	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
@@ -7897,6 +7901,7 @@ R	func_71889_f_	getRenderColor
 R	func_71933_m	getBlockColor
 R	func_72240_d	getFullSlabName
 R	func_71910_a	quantityDroppedWithBonus
+R	func_72200_l	checkForHarden
 R	func_72216_n	isFlammable
 R	func_71519_b	canCommandSenderUseCommand
 R	func_73652_a	refreshTrackShape
@@ -8496,6 +8501,7 @@ D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/I
 D	net/minecraft/src/BlockFire	chanceToEncourageFire:[I:|abilityToCatchFire:[I:
 D	net/minecraft/src/BlockSand	fallInstantly:Z:s
 D	net/minecraft/src/BlockLeaves	baseIndexInPNG:I:|LEAF_TYPES:[Ljava/lang/String;:s|adjacentTreeBlocks:[I:
+D	net/minecraft/src/BlockFlowing	numAdjacentSources:I:|isOptimalFlowDirection:[Z:|flowCost:[I:
 D	net/minecraft/src/EnumMobType	everything:Lnet/minecraft/src/EnumMobType;:s|mobs:Lnet/minecraft/src/EnumMobType;:s|players:Lnet/minecraft/src/EnumMobType;:s|$VALUES:[Lnet/minecraft/src/EnumMobType;:s
 D	net/minecraft/src/BlockRail	isPowered:Z:
 D	net/minecraft/src/TileEntityRecordPlayer	record:Lnet/minecraft/src/ItemStack;:
