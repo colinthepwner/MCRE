@@ -2295,6 +2295,7 @@ F	atv	D	field_71425_J	running
 F	atv	E	field_71426_K	debug
 F	atv	N	field_71446_o	renderEngine
 F	atv	O	field_71432_P	theMinecraft
+F	atv	P	field_71431_Q	fullscreen
 F	atv	S	field_71428_T	timer
 F	atv	U	field_71449_j	session
 F	atv	ac	field_110453_aa	proxy
@@ -2312,6 +2313,7 @@ F	atv	p	field_71460_t	entityRenderer
 F	atv	r	field_71456_v	ingameGUI
 F	atv	t	field_71476_x	objectMouseOver
 F	atv	u	field_71474_y	gameSettings
+F	aul	A	field_85185_A	touchscreen
 F	aul	I	field_74351_w	keyBindForward
 F	aul	J	field_74370_x	keyBindLeft
 F	aul	K	field_74368_y	keyBindBack
@@ -2333,11 +2335,13 @@ F	aul	Z	field_74319_N	hideGUI
 F	aul	a	field_74342_a	musicVolume
 F	aul	aa	field_74320_O	thirdPersonView
 F	aul	ab	field_74330_P	showDebugInfo
+F	aul	ae	field_74331_S	noclip
 F	aul	aj	field_74334_X	fovSetting
 F	aul	ak	field_74333_Y	gammaSetting
 F	aul	al	field_74335_Z	guiScale
 F	aul	am	field_74362_aa	particleSetting
 F	aul	an	field_74363_ab	language
+F	aul	as	field_74364_ag	PARTICLES
 F	aul	b	field_74340_b	soundVolume
 F	aul	c	field_74341_c	mouseSensitivity
 F	aul	d	field_74338_d	invertMouse
@@ -2351,6 +2355,8 @@ F	aul	k	field_74348_k	ambientOcclusion
 F	aul	l	field_74345_l	clouds
 F	aul	m	field_74346_m	skin
 F	aul	n	field_74343_n	chatVisibility
+F	aul	s	field_74356_s	serverTextures
+F	aul	z	field_82880_z	showCape
 F	aus	a	field_74286_b	username
 F	aus	b	field_74287_c	sessionId
 F	aut	b	field_73747_a	width
@@ -2581,6 +2587,8 @@ F	bcv	a	field_78783_a	textureOffsetX
 F	bcv	b	field_78782_b	textureOffsetY
 F	bcw	b	field_72558_b	mapStorage
 F	bcw	e	field_72557_e	rand
+F	bcw	f	field_72554_f	disconnected
+F	bcw	g	field_72555_g	netManager
 F	bcw	h	field_72563_h	mc
 F	bdi	a	field_71174_a	sendQueue
 F	beg	aA	field_70555_ap	interpPosZ
@@ -2679,6 +2687,10 @@ F	bil	k	field_110979_l	minU
 F	bil	l	field_110980_m	maxU
 F	bil	m	field_110977_n	minV
 F	bil	n	field_110978_o	maxV
+F	bis	i	field_94239_h	field_94239_h
+F	bis	j	field_94240_i	field_94240_i
+F	bit	i	field_94244_i	currentAngle
+F	bit	j	field_94242_j	angleDelta
 F	bjd	a	field_76963_a	instance
 F	bjd	b	field_76961_b	staticPlayerX
 F	bjd	c	field_76962_c	staticPlayerY
@@ -2697,6 +2709,7 @@ F	bje	b	field_76898_b	tileEntityRenderer
 F	bjy	b	field_110533_b	srResourceLocation
 F	bkc	b	field_135037_b	region
 F	bkc	c	field_135038_c	name
+F	bkz	l	field_71349_l	mc
 F	bl	a	DOWN	DOWN
 F	bl	b	UP	UP
 F	bl	c	NORTH	NORTH
@@ -2786,6 +2799,7 @@ F	jw	c	field_73091_c	gameType
 F	jw	k	field_73098_k	posX
 F	jw	l	field_73095_l	posY
 F	jw	m	field_73096_m	posZ
+F	ka	a	field_72575_b	netManager
 F	ka	c	field_72574_e	playerEntity
 F	ka	d	field_72573_d	mcServer
 F	ka	j	field_72583_k	randomGenerator
@@ -3700,6 +3714,7 @@ M	abw	A	(III)V	func_72969_x	updateAllLightTypes
 M	abw	B	(III)I	func_94577_B	getBlockPowerInput
 M	abw	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
 M	abw	D	(III)I	func_94572_D	getStrongestIndirectPower
+M	abw	E	(III)V	func_72950_A	setSpawnLocation
 M	abw	F	(III)Z	func_72951_B	canLightningStrikeAt
 M	abw	G	()V	func_72906_B	checkSessionLock
 M	abw	H	()J	func_72905_C	getSeed
@@ -4358,11 +4373,15 @@ M	alq	b	()Ljava/io/File;	func_75765_b	getWorldDirectory
 M	alq	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
 M	alq	c	()V	func_75762_c	checkSessionLock
 M	alq	g	()Ljava/lang/String;	func_75760_g	getWorldDirectoryName
+M	als	a	(I)V	func_76058_a	setSpawnX
+M	als	a	(III)V	func_76081_a	setSpawnPosition
 M	als	a	(Lace;)V	func_76060_a	setGameType
 M	als	a	(Z)V	func_76069_a	setThundering
 M	als	b	()J	func_76063_b	getSeed
+M	als	b	(I)V	func_76056_b	setSpawnY
 M	als	b	(Z)V	func_76084_b	setRaining
 M	als	c	()I	func_76079_c	getSpawnX
+M	als	c	(I)V	func_76087_c	setSpawnZ
 M	als	c	(J)V	func_76068_b	setWorldTime
 M	als	d	()I	func_76075_d	getSpawnY
 M	als	e	()I	func_76074_e	getSpawnZ
@@ -4992,7 +5011,9 @@ M	ats	d	()V	func_74505_d	unpressKey
 M	att	a	()V	func_74518_a	disableStandardItemLighting
 M	att	b	()V	func_74519_b	enableStandardItemLighting
 M	att	c	()V	func_74520_c	enableGUIStandardItemLighting
+M	atv	A	()Z	func_71387_A	isIntegratedServerRunning
 M	atv	B	()Z	func_71356_B	isSingleplayer
+M	atv	C	()Lbkz;	func_71401_C	getIntegratedServer
 M	atv	F	()J	func_71386_F	getSystemTime
 M	atv	H	()Laus;	func_110432_I	getSession
 M	atv	J	()Lbim;	func_110434_K	getTextureManager
@@ -5107,6 +5128,7 @@ M	awy	a	(III)V	func_73864_a	mouseClicked
 M	awy	a	(Ljava/lang/String;II)V	func_74190_a	drawCreativeTabHoveringText
 M	awy	a	(Ljava/util/List;II)V	func_102021_a	func_102021_a
 M	awy	a	(Lwe;III)V	func_74191_a	handleMouseClick
+M	awy	a	(Lye;II)V	func_74184_a	drawItemStackTooltip
 M	awy	b	()V	func_73874_b	onGuiClosed
 M	awy	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
 M	awy	b	(III)V	func_73879_b	mouseMovedOrUp
@@ -5197,6 +5219,7 @@ M	bcu	b	(II)Lbcu;	func_78787_b	setTextureSize
 M	bcu	c	(F)V	func_78794_c	postRender
 M	bcw	a	(I)Lnn;	func_72545_a	getEntityByID
 M	bcw	c	(Ley;)V	func_72552_c	addToSendQueue
+M	bcw	e	()V	func_72551_d	processReadPackets
 M	bdi	a	(Lku;I)V	func_71064_a	addStat
 M	bdi	a	(Lnb;F)Z	func_70097_a	attackEntityFrom
 M	bdi	aV	()V	func_71038_i	swingItem
@@ -5205,6 +5228,7 @@ M	bdi	f	(F)V	func_70691_i	heal
 M	bdi	i	()V	func_71053_j	closeScreen
 M	bdi	l_	()V	func_70071_h_	onUpdate
 M	bdi	n	(F)V	func_71150_b	setHealth
+M	bdi	o	()V	func_71016_p	sendPlayerAbilities
 M	bdo	a	(Lbfq;FFFFFF)V	func_70539_a	renderParticle
 M	bdo	b	()I	func_70537_b	getFXLayer
 M	bdp	l_	()V	func_70071_h_	onUpdate
@@ -5497,6 +5521,9 @@ M	bim	a	(Lbjo;Lbio;)Z	func_110579_a	loadTexture
 M	bim	a	(Lbjp;)V	func_110549_a	onResourceManagerReload
 M	bim	a	(Ljava/lang/String;Lbib;)Lbjo;	func_110578_a	getDynamicTextureLocation
 M	bim	d	()V	func_110550_d	tick
+M	bis	j	()V	func_94219_l	updateAnimation
+M	bit	a	(Labw;DDDZZ)V	func_94241_a	updateCompass
+M	bit	j	()V	func_94219_l	updateAnimation
 M	bj	a	(Lbf;Lye;)Lye;	func_82482_a	dispense
 M	bjd	a	()Lavi;	func_76954_a	getFontRenderer
 M	bjd	a	(Labw;)V	func_76955_a	setWorld
@@ -5556,6 +5583,15 @@ M	bkd	a	(Lbkc;)V	func_135045_a	setCurrentLanguage
 M	bkd	b	()Z	func_135044_b	isCurrentLanguageBidirectional
 M	bkd	c	()Lbkc;	func_135041_c	getCurrentLanguage
 M	bkd	d	()Ljava/util/SortedSet;	func_135040_d	getLanguages
+M	bkz	V	()Z	func_71262_S	isDedicatedServer
+M	bkz	a	(Lace;)V	func_71235_a	setGameType
+M	bkz	c	()Z	func_71344_c	getPublic
+M	bkz	d	()Z	func_71197_b	startServer
+M	bkz	g	()Z	func_71225_e	canStructuresSpawn
+M	bkz	h	()Lace;	func_71265_f	getGameType
+M	bkz	i	()I	func_71232_g	getDifficulty
+M	bkz	m	()V	func_71260_j	stopServer
+M	bkz	s	()V	func_71217_p	tick
 M	bl	a	(I)Lbl;	func_82600_a	getFront
 M	bl	c	()I	func_82601_c	getFrontOffsetX
 M	bl	d	()I	func_96559_d	getFrontOffsetY
@@ -5732,7 +5768,15 @@ M	cl	e	()Ljava/lang/String;	func_74740_e	getName
 M	cl	equals	(Ljava/lang/Object;)Z	equals	equals
 M	cl	hashCode	()I	hashCode	hashCode
 M	cl	p	(Ljava/lang/String;)Lcl;	func_74738_o	setName
+M	cm	a	()V	func_74427_a	wakeThreads
 M	cm	a	(Ley;)V	func_74429_a	addToSendQueue
+M	cm	a	(Lez;)V	func_74425_a	setNetHandler
+M	cm	a	(Ljava/lang/String;[Ljava/lang/Object;)V	func_74424_a	networkShutdown
+M	cm	b	()V	func_74428_b	processReadPackets
+M	cm	c	()Ljava/net/SocketAddress;	func_74430_c	getSocketAddress
+M	cm	d	()V	func_74423_d	serverShutdown
+M	cm	e	()I	func_74426_e	packetSize
+M	cm	f	()V	func_74431_f	closeConnections
 M	cv	a	()La;	func_111065_a	getColor
 M	cv	a	(La;)Lcv;	func_111059_a	setColor
 M	cv	a	(Lcv;)Lcv;	func_111073_a	appendComponent
@@ -5857,6 +5901,7 @@ M	jv	f	()F	func_70047_e	getEyeHeight
 M	jv	i	()V	func_71053_j	closeScreen
 M	jv	j	()V	func_71113_k	updateHeldItem
 M	jv	l_	()V	func_70071_h_	onUpdate
+M	jv	o	()V	func_71016_p	sendPlayerAbilities
 M	jw	a	(Lace;)V	func_73076_a	setGameType
 M	jw	a	(Ljs;)V	func_73080_a	setWorld
 M	jw	b	()Lace;	func_73081_b	getGameType
@@ -5865,6 +5910,7 @@ M	jw	d	()Z	func_73083_d	isCreative
 M	ka	a	(DDDFF)V	func_72569_a	setPlayerLocation
 M	ka	b	(Ley;)V	func_72567_b	sendPacketToPlayer
 M	ka	c	(Ljava/lang/String;)V	func_72565_c	kickPlayerFromServer
+M	ka	f	()I	func_72568_e	packetSize
 M	ko	a	()Lko;	func_75986_a	setIndependent
 M	ko	a	(Lkq;)Lko;	func_75988_a	setStatStringFormatter
 M	ko	b	()Lko;	func_75987_b	setSpecial
@@ -7267,6 +7313,7 @@ M	uf	i	()V	func_71053_j	closeScreen
 M	uf	l_	()V	func_70071_h_	onUpdate
 M	uf	m	(F)V	func_110149_m	setAbsorptionAmount
 M	uf	n	(I)Lye;	func_71124_b	getCurrentItemOrArmor
+M	uf	o	()V	func_71016_p	sendPlayerAbilities
 M	uf	o	(I)Lye;	func_82169_q	getCurrentArmor
 M	uf	p	(Lnn;)Z	func_70998_m	interactWith
 M	uf	q	(Lnn;)V	func_71059_n	attackTargetEntityWithCurrentItem
@@ -7775,6 +7822,7 @@ R	field_94433_b	theIcon
 R	field_94401_cO	theIcon
 R	field_82539_a	types
 R	field_82136_e	levels
+R	field_96106_a	succesCount
 R	field_82354_a	command
 R	field_70378_a	tickCount
 R	field_70376_r	rand
@@ -7799,15 +7847,37 @@ R	field_74503_a	mc
 R	field_79002_a	mc
 R	field_74500_a	mc
 R	field_82887_a	mc
+R	SHOW_CAPE	SHOW_CAPE
+R	TOUCHSCREEN	TOUCHSCREEN
+R	CHAT_SCALE	CHAT_SCALE
+R	CHAT_WIDTH	CHAT_WIDTH
+R	CHAT_HEIGHT_FOCUSED	CHAT_HEIGHT_FOCUSED
+R	CHAT_HEIGHT_UNFOCUSED	CHAT_HEIGHT_UNFOCUSED
 R	MUSIC	MUSIC
+R	SOUND	SOUND
 R	INVERT_MOUSE	INVERT_MOUSE
+R	SENSITIVITY	SENSITIVITY
 R	FOV	FOV
 R	GAMMA	GAMMA
 R	RENDER_DISTANCE	RENDER_DISTANCE
 R	VIEW_BOBBING	VIEW_BOBBING
+R	ANAGLYPH	ANAGLYPH
+R	ADVANCED_OPENGL	ADVANCED_OPENGL
+R	FRAMERATE_LIMIT	FRAMERATE_LIMIT
 R	DIFFICULTY	DIFFICULTY
+R	GRAPHICS	GRAPHICS
 R	AMBIENT_OCCLUSION	AMBIENT_OCCLUSION
 R	GUI_SCALE	GUI_SCALE
+R	RENDER_CLOUDS	RENDER_CLOUDS
+R	PARTICLES	PARTICLES
+R	CHAT_VISIBILITY	CHAT_VISIBILITY
+R	CHAT_COLOR	CHAT_COLOR
+R	CHAT_LINKS	CHAT_LINKS
+R	CHAT_OPACITY	CHAT_OPACITY
+R	CHAT_LINKS_PROMPT	CHAT_LINKS_PROMPT
+R	USE_SERVER_TEXTURES	USE_SERVER_TEXTURES
+R	SNOOPER_ENABLED	SNOOPER_ENABLED
+R	USE_FULLSCREEN	USE_FULLSCREEN
 R	ENABLE_VSYNC	ENABLE_VSYNC
 R	field_73725_b	mc
 R	field_73910_c	options
@@ -7915,7 +7985,6 @@ R	field_94191_c	width
 R	field_94188_d	height
 R	field_94187_f	holder
 R	field_110507_c	gson
-R	field_71349_l	mc
 R	field_77527_e	address
 R	field_82476_c	thePlayer
 R	field_82472_g	silent
@@ -7966,6 +8035,7 @@ R	field_73450_b	zPosition
 R	field_73448_d	size
 R	field_73468_a	language
 R	field_73466_b	renderDistance
+R	field_82564_f	showCape
 R	field_73456_b	username
 R	field_73435_a	windowId
 R	field_73434_c	accepted
@@ -8124,6 +8194,7 @@ R	field_76147_d	hash
 R	field_76119_d	lock
 R	field_76480_b	uniqueID
 R	field_76477_g	isRunning
+R	field_76344_a	snooper
 R	field_85080_a	blockID
 R	field_94554_b	fighter
 R	field_85155_a	theEntity
@@ -8244,6 +8315,7 @@ R	func_72844_a	getEntityPathToXYZ
 R	func_94576_a	getEntitiesWithinAABBExcludingEntity
 R	func_72865_a	getPathEntityToEntity
 R	func_72946_b	findClosestStructure
+R	func_72974_f	setSpawnLocation
 R	func_72948_g	getFogColor
 R	func_72870_g	updateEntity
 R	call	call
@@ -8424,10 +8496,14 @@ R	func_75856_a	createEntityPathTo
 R	func_75759_a	flush
 R	func_75763_a	getChunkLoader
 R	accept	accept
+R	func_76058_a	setSpawnX
+R	func_76081_a	setSpawnPosition
 R	func_76069_a	setThundering
 R	func_76063_b	getSeed
+R	func_76056_b	setSpawnY
 R	func_76084_b	setRaining
 R	func_76079_c	getSpawnX
+R	func_76087_c	setSpawnZ
 R	func_76068_b	setWorldTime
 R	func_76075_d	getSpawnY
 R	func_76074_e	getSpawnZ
@@ -8558,10 +8634,14 @@ R	func_70302_i_	getSizeInventory
 R	func_70295_k_	openChest
 R	func_70319_e	getDescriptionPacket
 R	func_94128_d	getSizeInventorySide
+R	func_96102_a	setSignalStrength
 R	func_70003_b	canCommandSenderUseCommand
 R	func_70006_a	sendChatToPlayer
+R	func_82352_b	setCommand
 R	func_82114_b	getPlayerCoordinates
 R	func_70005_c_	getCommandSenderName
+R	func_82353_c	getCommand
+R	func_96103_d	getSignalStrength
 R	func_130014_f_	getEntityWorld
 R	func_70364_a	openChest
 R	func_70365_a	isUseableByPlayer
@@ -8586,6 +8666,11 @@ R	func_71400_g	shutdown
 R	func_74502_a	getType
 R	func_100015_a	isKeyDown
 R	func_74305_a	parseFloat
+R	func_74380_a	getEnumFloat
+R	func_74379_a	getEnumOptions
+R	func_74382_b	getEnumBoolean
+R	func_74381_c	returnEnumOrdinal
+R	func_74378_d	getEnumString
 R	func_73758_b	scroll
 R	func_73866_w_	initGui
 R	func_73863_a	drawScreen
@@ -8626,6 +8711,7 @@ R	func_71111_a	sendSlotContents
 R	func_71110_a	sendContainerAndContentsToPlayer
 R	func_74189_g	drawGuiContainerForegroundLayer
 R	func_74191_a	handleMouseClick
+R	func_74184_a	drawItemStackTooltip
 R	func_73879_b	mouseMovedOrUp
 R	func_74229_i	getInventory
 R	func_75133_b	retrySlotClick
@@ -8679,6 +8765,7 @@ R	func_78471_a	renderWorld
 R	func_78443_a	renderItem
 R	func_72714_a	renderSky
 R	func_72733_a	renderAllRenderLists
+R	func_72718_b	renderClouds
 R	func_78597_b	renderItemIn3d
 R	func_78613_a	renderFaceYNeg
 R	func_78604_a	renderBlockUsingTexture
@@ -8728,7 +8815,6 @@ R	func_110573_f	registerIcons
 R	func_110581_b	getTexture
 R	func_94277_a	bindTexture
 R	func_110550_d	tick
-R	func_94219_l	updateAnimation
 R	func_76894_a	renderTileEntityAt
 R	func_76896_a	onWorldChange
 R	func_76893_a	setTileEntityRenderer
@@ -8747,16 +8833,10 @@ R	func_135027_a	translateKey
 R	func_135023_a	formatMessage
 R	func_110473_c	getFrameCount
 R	func_135018_a	getLanguages
-R	func_71262_S	isDedicatedServer
-R	func_71235_a	setGameType
-R	func_71197_b	startServer
-R	func_71225_e	canStructuresSpawn
-R	func_71265_f	getGameType
-R	func_71232_g	getDifficulty
-R	func_71260_j	stopServer
-R	func_71217_p	tick
+R	func_72415_s	getIntegratedServer
 R	func_76973_a	getType
 R	func_71746_d	getServer
+R	func_71753_e	getIntegratedServer
 R	func_73660_a	update
 R	connect	connect
 R	getInputStream	getInputStream
@@ -8764,7 +8844,15 @@ R	func_74732_a	getId
 R	func_74735_a	load
 R	func_74734_a	write
 R	func_74737_b	copy
+R	func_74427_a	wakeThreads
 R	func_74429_a	addToSendQueue
+R	func_74425_a	setNetHandler
+R	func_74424_a	networkShutdown
+R	func_74428_b	processReadPackets
+R	func_74430_c	getSocketAddress
+R	func_74423_d	serverShutdown
+R	func_74426_e	packetSize
+R	func_74431_f	closeConnections
 R	func_74462_a	isRunning
 R	func_74459_h	sendPacket
 R	func_73284_a	getPacketSize
@@ -8814,7 +8902,12 @@ R	func_71201_j	logSevere
 R	func_71249_w	getMinecraftVersion
 R	func_73667_a	setProperty
 R	func_73671_a	getProperty
+R	func_71262_S	isDedicatedServer
 R	func_71203_ab	getConfigurationManager
+R	func_71197_b	startServer
+R	func_71225_e	canStructuresSpawn
+R	func_71265_f	getGameType
+R	func_71232_g	getDifficulty
 R	func_71255_r	getAllowNether
 R	func_71742_a	getType
 R	func_73074_a	onBlockClicked
@@ -8899,6 +8992,7 @@ R	func_70905_p	getOwnerName
 R	func_75669_b	getObject
 R	func_111112_a	setShouldWatch
 R	func_75638_b	getSpeed
+R	func_75775_b	canUse
 R	func_75250_a	shouldExecute
 R	func_75253_b	continueExecuting
 R	func_75249_e	startExecuting
@@ -8970,6 +9064,7 @@ R	func_70185_h	getGravityVelocity
 R	func_70227_a	onImpact
 R	func_70027_ad	isBurning
 R	func_82341_c	getMotionFactor
+R	func_82342_d	isInvulnerable
 R	func_75130_a	onCraftMatrixChanged
 R	func_75132_a	addCraftingToCrafters
 R	func_75137_b	updateProgressBar
@@ -9282,6 +9377,8 @@ D	net/minecraft/src/DynamicTexture	dynamicTextureData:[I:|width:I:|height:I:
 D	net/minecraft/src/TextureMap	locationBlocksTexture:Lnet/minecraft/src/ResourceLocation;:s|locationItemsTexture:Lnet/minecraft/src/ResourceLocation;:s|listAnimatedSprites:Ljava/util/List;:|mapRegisteredSprites:Ljava/util/Map;:|mapUploadedSprites:Ljava/util/Map;:|textureType:I:|basePath:Ljava/lang/String;:|missingImage:Lnet/minecraft/src/TextureAtlasSprite;:
 D	net/minecraft/src/TextureAtlasSprite	iconName:Ljava/lang/String;:|framesTextureData:Ljava/util/List;:|animationMetadata:Lnet/minecraft/src/AnimationMetadataSection;:|rotated:Z:|originX:I:|originY:I:|width:I:|height:I:|minU:F:|maxU:F:|minV:F:|maxV:F:|frameCounter:I:|tickCounter:I:
 D	net/minecraft/src/TextureManager	mapTextureObjects:Ljava/util/Map;:|mapResourceLocations:Ljava/util/Map;:|listTickables:Ljava/util/List;:|mapTextureCounters:Ljava/util/Map;:|theResourceManager:Lnet/minecraft/src/ResourceManager;:
+D	net/minecraft/src/TextureClock	field_94239_h:D:|field_94240_i:D:
+D	net/minecraft/src/TextureCompass	currentAngle:D:|angleDelta:D:
 D	net/minecraft/src/IBehaviorDispenseItem	itemDispenseBehaviorProvider:Lnet/minecraft/src/IBehaviorDispenseItem;:s
 D	net/minecraft/src/TileEntityRenderer	specialRendererMap:Ljava/util/Map;:|instance:Lnet/minecraft/src/TileEntityRenderer;:s|fontRenderer:Lnet/minecraft/src/FontRenderer;:|staticPlayerX:D:s|staticPlayerY:D:s|staticPlayerZ:D:s|renderEngine:Lnet/minecraft/src/TextureManager;:|worldObj:Lnet/minecraft/src/World;:|entityLivingPlayer:Lnet/minecraft/src/EntityLivingBase;:|playerYaw:F:|playerPitch:F:|playerX:D:|playerY:D:|playerZ:D:
 D	net/minecraft/src/TileEntitySpecialRenderer	tileEntityRenderer:Lnet/minecraft/src/TileEntityRenderer;:
@@ -9292,6 +9389,7 @@ D	net/minecraft/src/SimpleResource	mapMetadataSections:Ljava/util/Map;:|srResour
 D	net/minecraft/src/I18n	i18nLocale:Lnet/minecraft/src/Locale;:s
 D	net/minecraft/src/Language	languageCode:Ljava/lang/String;:|region:Ljava/lang/String;:|name:Ljava/lang/String;:|bidirectional:Z:
 D	net/minecraft/src/LanguageManager	field_135047_b:Lnet/minecraft/src/MetadataSerializer;:|currentLanguage:Ljava/lang/String;:|currentLocale:Lnet/minecraft/src/Locale;:s|languageMap:Ljava/util/Map;:
+D	net/minecraft/src/IntegratedServer	mc:Lnet/minecraft/src/Minecraft;:|theWorldSettings:Lnet/minecraft/src/WorldSettings;:|serverLogAgent:Lnet/minecraft/src/ILogAgent;:|theServerListeningThread:Lnet/minecraft/src/IntegratedServerListenThread;:|isGamePaused:Z:|isPublic:Z:|lanServerPing:Lnet/minecraft/src/ThreadLanServerPing;:
 D	net/minecraft/src/EnumFacing	DOWN:Lnet/minecraft/src/EnumFacing;:s|UP:Lnet/minecraft/src/EnumFacing;:s|NORTH:Lnet/minecraft/src/EnumFacing;:s|SOUTH:Lnet/minecraft/src/EnumFacing;:s|EAST:Lnet/minecraft/src/EnumFacing;:s|WEST:Lnet/minecraft/src/EnumFacing;:s|order_a:I:|order_b:I:|frontOffsetX:I:|frontOffsetY:I:|frontOffsetZ:I:|faceList:[Lnet/minecraft/src/EnumFacing;:s|$VALUES:[Lnet/minecraft/src/EnumFacing;:s
 D	net/minecraft/src/SoundPoolEntry	soundName:Ljava/lang/String;:|soundUrl:Ljava/net/URL;:
 D	net/minecraft/src/SoundManager	field_130084_a:[Ljava/lang/String;:s|sndSystem:Lpaulscode/sound/SoundSystem;:|loaded:Z:|soundPoolSounds:Lnet/minecraft/src/SoundPool;:|soundPoolStreaming:Lnet/minecraft/src/SoundPool;:|soundPoolMusic:Lnet/minecraft/src/SoundPool;:|latestSoundID:I:|options:Lnet/minecraft/src/GameSettings;:|fileAssets:Ljava/io/File;:|playingSounds:Ljava/util/Set;:|field_92072_h:Ljava/util/List;:|rand:Ljava/util/Random;:|ticksBeforeMusic:I:

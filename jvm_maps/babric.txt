@@ -1171,10 +1171,16 @@ F	net/minecraft/class_135	field_1074	field_1074	ticksInGround
 F	net/minecraft/class_135	field_1075	field_1075	ticksInAir
 F	net/minecraft/class_266	field_1088	field_1088	rand
 F	net/minecraft/class_271	field_1097	field_1097	MUSIC
+F	net/minecraft/class_271	field_1098	field_1098	SOUND
 F	net/minecraft/class_271	field_1099	field_1099	INVERT_MOUSE
+F	net/minecraft/class_271	field_1100	field_1100	SENSITIVITY
 F	net/minecraft/class_271	field_1101	field_1101	RENDER_DISTANCE
 F	net/minecraft/class_271	field_1102	field_1102	VIEW_BOBBING
+F	net/minecraft/class_271	field_1103	field_1103	ANAGLYPH
+F	net/minecraft/class_271	field_1104	field_1104	ADVANCED_OPENGL
+F	net/minecraft/class_271	field_1105	field_1105	FRAMERATE_LIMIT
 F	net/minecraft/class_271	field_1106	field_1106	DIFFICULTY
+F	net/minecraft/class_271	field_1107	field_1107	GRAPHICS
 F	net/minecraft/class_271	field_1108	field_1108	AMBIENT_OCCLUSION
 F	net/minecraft/class_271	field_1109	field_1109	GUI_SCALE
 F	net/minecraft/class_272	field_1114	field_1114	entityId
@@ -1265,6 +1271,9 @@ F	net/minecraft/class_16$class_338	field_1264	field_1264	worldObj
 F	net/minecraft/class_16$class_338	field_1269	field_1269	connectedTracks
 F	net/minecraft/class_340	field_1270	field_1270	message
 F	net/minecraft/class_117	field_1285	field_1285	isRunning
+F	net/minecraft/class_117$1	field_1299	field_1299	netManager
+F	net/minecraft/class_117$3	field_1301	field_1301	netManager
+F	net/minecraft/class_117$4	field_1302	field_1302	netManager
 F	net/minecraft/class_343	field_1303	field_1303	linux
 F	net/minecraft/class_343	field_1304	field_1304	solaris
 F	net/minecraft/class_343	field_1305	field_1305	windows
@@ -1313,6 +1322,10 @@ F	net/minecraft/class_369	field_1409	field_1409	yCoord
 F	net/minecraft/class_369	field_1410	field_1410	zCoord
 F	net/minecraft/class_336	field_1411	field_1411	imageData
 F	net/minecraft/class_336	field_1412	field_1412	iconIndex
+F	net/minecraft/class_336	field_1413	field_1413	anaglyphEnabled
+F	net/minecraft/class_336	field_1414	field_1414	textureId
+F	net/minecraft/class_336	field_1415	field_1415	tileSize
+F	net/minecraft/class_336	field_1416	field_1416	tileImage
 F	net/minecraft/class_373	field_1417	field_1417	xPosition
 F	net/minecraft/class_373	field_1418	field_1418	yPosition
 F	net/minecraft/class_373	field_1419	field_1419	zPosition
@@ -1648,6 +1661,8 @@ F	net/minecraft/class_477	field_1956	field_1956	yPosition
 F	net/minecraft/class_477	field_1960	field_1960	worldObj
 F	net/minecraft/class_477	field_1962	field_1962	running
 F	net/minecraft/class_219	field_1969	field_1969	rand
+F	net/minecraft/class_219	field_1970	field_1970	disconnected
+F	net/minecraft/class_219	field_1971	field_1971	netManager
 F	net/minecraft/class_219	field_1972	field_1972	mc
 F	net/minecraft/class_438	field_1975	field_1975	entityId
 F	net/minecraft/class_27	field_1983	field_1983	typeOfHit
@@ -1898,6 +1913,7 @@ F	net/minecraft/class_635	field_2763	field_2763	options
 F	net/minecraft/client/Minecraft	field_2774	field_2774	running
 F	net/minecraft/client/Minecraft	field_2775	field_2775	debug
 F	net/minecraft/client/Minecraft	field_2779	field_2779	isRaining
+F	net/minecraft/client/Minecraft	field_2781	field_2781	fullscreen
 F	net/minecraft/client/Minecraft	field_2784	field_2784	timer
 F	net/minecraft/client/Minecraft	field_2791	field_2791	theMinecraft
 F	net/minecraft/client/Minecraft	field_2797	field_2797	minecraftDir
@@ -1938,6 +1954,9 @@ M	net/minecraft/class_7	method_23	()Z	method_23	isThundering
 M	net/minecraft/class_7	method_24	()I	method_24	getThunderTime
 M	net/minecraft/class_7	method_25	()Z	method_25	isRaining
 M	net/minecraft/class_7	method_26	()I	method_26	getRainTime
+M	net/minecraft/class_7	method_27	(I)V	method_27	setSpawnX
+M	net/minecraft/class_7	method_29	(I)V	method_29	setSpawnY
+M	net/minecraft/class_7	method_30	(I)V	method_30	setSpawnZ
 M	net/minecraft/class_7	method_32	()Ljava/lang/String;	method_32	getWorldName
 M	net/minecraft/class_13	method_45	(Lnet/minecraft/class_17;DDDDD)V	method_45	renderTorchAtAngle
 M	net/minecraft/class_13	method_46	(Lnet/minecraft/class_17;DDDI)V	method_46	renderBottomFace
@@ -2375,6 +2394,11 @@ M	net/minecraft/class_135	method_956	()I	method_956	catchFish
 M	net/minecraft/class_266	method_958	(Ljava/lang/String;)Lnet/minecraft/class_267;	method_958	getRandomSoundFromSoundPool
 M	net/minecraft/class_266	method_959	(Ljava/lang/String;Ljava/io/File;)Lnet/minecraft/class_267;	method_959	addSound
 M	net/minecraft/class_270	method_963	()Ljava/lang/Object;	method_963	getObject
+M	net/minecraft/class_271	method_966	()Z	method_966	getEnumFloat
+M	net/minecraft/class_271	method_967	(I)Lnet/minecraft/class_271;	method_967	getEnumOptions
+M	net/minecraft/class_271	method_968	()Z	method_968	getEnumBoolean
+M	net/minecraft/class_271	method_969	()I	method_969	returnEnumOrdinal
+M	net/minecraft/class_271	method_970	()Ljava/lang/String;	method_970	getEnumString
 M	net/minecraft/class_285	method_976	(Ljava/lang/String;)Ljava/io/InputStream;	method_976	getResourceAsStream
 M	net/minecraft/class_287	method_981	(DD)I	method_981	getGrassColor
 M	net/minecraft/class_290	method_983	(FF)Lnet/minecraft/class_290;	method_983	setTexturePosition
@@ -2436,6 +2460,7 @@ M	net/minecraft/class_334	method_1080	(DD)I	method_1080	getFoliageColor
 M	net/minecraft/class_334	method_1082	()I	method_1082	getFoliageColorBirch
 M	net/minecraft/class_334	method_1083	()I	method_1083	func_31073_c
 M	net/minecraft/class_76	method_1085	(I)V	method_1085	deleteTexture
+M	net/minecraft/class_76	method_1087	(Lnet/minecraft/class_336;)V	method_1087	registerTextureFX
 M	net/minecraft/class_76	method_1088	(Ljava/awt/image/BufferedImage;)I	method_1088	allocateAndSetupTexture
 M	net/minecraft/class_76	method_1089	(Ljava/awt/image/BufferedImage;I)V	method_1089	setupTexture
 M	net/minecraft/class_76	method_1093	(Ljava/lang/String;Ljava/lang/String;)I	method_1093	getTextureForDownloadableImage
@@ -2445,7 +2470,10 @@ M	net/minecraft/class_76	method_1100	(Ljava/lang/String;)I	method_1100	getTextur
 M	net/minecraft/class_16	method_1107	(I)Z	method_1107	isRailBlock
 M	net/minecraft/class_16	method_1108	()Z	method_1108	getIsPowered
 M	net/minecraft/class_16	method_1109	(Lnet/minecraft/class_18;III)Z	method_1109	isRailBlockAt
+M	net/minecraft/class_117	method_1122	()V	method_1122	wakeThreads
 M	net/minecraft/class_117	method_1123	(Lnet/minecraft/class_169;)V	method_1123	addToSendQueue
+M	net/minecraft/class_117	method_1125	(Ljava/lang/String;[Ljava/lang/Object;)V	method_1125	networkShutdown
+M	net/minecraft/class_117	method_1129	()V	method_1129	processReadPackets
 M	net/minecraft/class_239	method_1142	(Lnet/minecraft/class_18;Ljava/util/Random;III)Z	method_1142	generate
 M	net/minecraft/class_59	method_1150	(IIIIII)V	method_1150	markBlockRangeNeedsUpdate
 M	net/minecraft/class_59	method_1153	(Ljava/lang/String;DDDDDD)V	method_1153	spawnParticle
@@ -2466,6 +2494,7 @@ M	net/minecraft/class_369	method_1199	(DDD)D	method_1199	generateNoise
 M	net/minecraft/class_369	method_1203	(DDD)D	method_1203	lerp
 M	net/minecraft/class_369	method_1204	(DD)D	method_1204	func_801_a
 M	net/minecraft/class_336	method_1205	()V	method_1205	onTick
+M	net/minecraft/class_336	method_1206	(Lnet/minecraft/class_76;)V	method_1206	bindImage
 M	net/minecraft/class_173	method_1209	(Lnet/minecraft/class_127;FFF)V	method_1209	setLivingAnimations
 M	net/minecraft/class_173	method_1210	(FFFFFF)V	method_1210	setRotationAngles
 M	net/minecraft/class_173	method_1211	(FFFFFF)V	method_1211	render
@@ -2682,6 +2711,7 @@ M	net/minecraft/class_451	method_1631	(I)V	method_1631	setSlimeSize
 M	net/minecraft/class_451	method_1632	()I	method_1632	getSlimeSize
 M	net/minecraft/class_477	method_1633	()Ljava/io/File;	method_1633	getMinecraftDir
 M	net/minecraft/class_477	method_1638	(Ljava/lang/String;)Ljava/io/File;	method_1638	getAppDir
+M	net/minecraft/class_219	method_1644	()V	method_1644	processReadPackets
 M	net/minecraft/class_219	method_1645	(I)Lnet/minecraft/class_57;	method_1645	getEntityByID
 M	net/minecraft/class_219	method_1648	(Lnet/minecraft/class_169;)V	method_1648	addToSendQueue
 M	net/minecraft/class_484	method_1656	(DDDFF)V	method_1656	setThrowableHeading

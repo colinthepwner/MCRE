@@ -719,6 +719,7 @@ F	dn	a	field_1729_a	worldObj
 F	dn	c	field_1731_c	renderer
 F	dn	d	field_1730_d	rand
 F	hr	c	field_1661_c	rand
+F	xj	a	field_1085_a	netManager
 F	qh	a	field_965_a	updateCounter
 F	oj	a	field_20029_a	windowId
 F	vf	a	field_1167_a	typeOfHit
@@ -1026,6 +1027,10 @@ F	eb	a	Sky	Sky
 F	eb	b	Block	Block
 F	aw	a	field_1127_a	imageData
 F	aw	b	field_1126_b	iconIndex
+F	aw	c	field_1131_c	anaglyphEnabled
+F	aw	d	field_1130_d	textureId
+F	aw	e	field_1129_e	tileSize
+F	aw	f	field_1128_f	tileImage
 F	yl	e	field_9418_e	fuel
 F	fh	a	field_1286_a	bipedHead
 F	fh	b	field_1285_b	bipedHeadwear
@@ -1146,10 +1151,16 @@ F	bd	k	field_1783_k	xPosition
 F	bd	l	field_1782_l	yPosition
 F	rr	a	field_1343_a	imageData
 F	ht	a	MUSIC	MUSIC
+F	ht	b	SOUND	SOUND
 F	ht	c	INVERT_MOUSE	INVERT_MOUSE
+F	ht	d	SENSITIVITY	SENSITIVITY
 F	ht	e	RENDER_DISTANCE	RENDER_DISTANCE
 F	ht	f	VIEW_BOBBING	VIEW_BOBBING
+F	ht	g	ANAGLYPH	ANAGLYPH
+F	ht	h	ADVANCED_OPENGL	ADVANCED_OPENGL
+F	ht	i	FRAMERATE_LIMIT	FRAMERATE_LIMIT
 F	ht	j	DIFFICULTY	DIFFICULTY
+F	ht	k	GRAPHICS	GRAPHICS
 F	ht	l	AMBIENT_OCCLUSION	AMBIENT_OCCLUSION
 F	ht	m	GUI_SCALE	GUI_SCALE
 F	mm	D	field_1052_A	sendQueue
@@ -1307,6 +1318,8 @@ F	jv	b	field_541_b	yPosition
 F	jv	c	field_545_c	zPosition
 F	jv	d	field_544_d	face
 F	jv	e	field_543_e	status
+F	nb	d	field_1214_c	disconnected
+F	nb	e	field_1213_d	netManager
 F	nb	f	field_1212_e	mc
 F	nb	c	field_1208_b	rand
 F	dq	bk	field_325_aX	blocksEffectiveAgainst
@@ -1449,6 +1462,7 @@ F	yy	a	field_189_a	chunkXPos
 F	wu	a	field_479_a	xPosition
 F	wu	b	field_478_b	zPosition
 F	wu	f	field_480_f	size
+F	xg	a	field_1086_a	netManager
 F	e	a	field_457_a	random
 F	w	e	field_1694_e	instance
 F	jn	a	linux	linux
@@ -1543,6 +1557,7 @@ F	rt	b	mobs	mobs
 F	rt	c	players	players
 F	bm	a	field_20127_a	furnace
 F	bm	c	field_20129_c	burnTime
+F	xl	a	field_1063_a	netManager
 F	at	a	OBJECT	OBJECT
 F	at	b	ARRAY	ARRAY
 F	at	c	STRING	STRING
@@ -1899,6 +1914,7 @@ F	ds	h	field_207_h	modelArmor
 F	vx	i	field_953_h	cancelled
 F	net/minecraft/client/Minecraft	a	field_21900_a	theMinecraft
 F	net/minecraft/client/Minecraft	c	field_6327_b	playerController
+F	net/minecraft/client/Minecraft	Q	field_185_a	fullscreen
 F	net/minecraft/client/Minecraft	d	field_6326_c	displayWidth
 F	net/minecraft/client/Minecraft	e	field_6325_d	displayHeight
 F	net/minecraft/client/Minecraft	T	field_9237_P	timer
@@ -2106,6 +2122,9 @@ M	ei	d	()I	func_22295_d	getSpawnY
 M	ei	e	()I	func_22300_e	getSpawnZ
 M	ei	f	()J	func_22304_f	getWorldTime
 M	ei	i	()I	func_22290_i	getDimension
+M	ei	a	(I)V	func_22294_a	setSpawnX
+M	ei	b	(I)V	func_22308_b	setSpawnY
+M	ei	c	(I)V	func_22298_c	setSpawnZ
 M	ei	a	(J)V	func_22307_a	setWorldTime
 M	ei	j	()Ljava/lang/String;	func_22302_j	getWorldName
 M	ei	m	()Z	func_27396_m	isThundering
@@ -2246,6 +2265,7 @@ M	bw	b	(Lsn;DDDFF)V	func_141_b	doRenderShadowAndFire
 M	bw	a	()Lsj;	func_6329_a	getFontRendererFromRenderManager
 M	wm	b	()Ljava/lang/Object;	func_767_b	getValue
 M	aw	a	()V	func_783_a	onTick
+M	aw	a	(Lji;)V	func_782_a	bindImage
 M	as	a	(Ljava/io/InputStream;)Lnu;	func_1138_a	readCompressed
 M	as	a	(Lnu;Ljava/io/OutputStream;)V	func_1143_a	writeCompressed
 M	ma	b	()Ljava/lang/Object;	func_21158_b	getObject
@@ -2376,6 +2396,11 @@ M	ny	a	(Lgt;)Lny;	func_27092_a	setStatStringFormatter
 M	ny	f	()Z	func_27093_f	getSpecial
 M	bd	a	()Ljava/io/File;	func_1263_a	getMinecraftDir
 M	bd	a	(Ljava/lang/String;)Ljava/io/File;	func_1264_a	getAppDir
+M	ht	a	(I)Lht;	func_20137_a	getEnumOptions
+M	ht	a	()Z	func_20136_a	getEnumFloat
+M	ht	b	()Z	func_20140_b	getEnumBoolean
+M	ht	c	()I	func_20135_c	returnEnumOrdinal
+M	ht	d	()Ljava/lang/String;	func_20138_d	getEnumString
 M	lf	a	(Ld;)Ld;	func_1034_a	addPoint
 M	lf	a	()V	func_1038_a	clearPath
 M	lf	b	()Ld;	func_1036_b	dequeue
@@ -2446,6 +2471,7 @@ M	gb	s	()Z	func_27022_s	getPowered
 M	gb	a_	(F)F	func_440_b	setCreeperFlashTime
 M	gb	v	()I	func_21091_q	getCreeperState
 M	gb	e	(I)V	func_21090_e	setCreeperState
+M	nb	a	()V	func_848_a	processReadPackets
 M	nb	b	(Lki;)V	func_847_a	addToSendQueue
 M	nb	a	(I)Lsn;	func_12246_a	getEntityByID
 M	dw	a	(Lgp;)V	func_20117_a	addSlot
@@ -2684,6 +2710,7 @@ M	ji	a	(Ljava/awt/image/BufferedImage;)I	func_1074_a	allocateAndSetupTexture
 M	ji	a	(Ljava/awt/image/BufferedImage;I)V	func_1068_a	setupTexture
 M	ji	a	(I)V	func_1078_a	deleteTexture
 M	ji	a	(Ljava/lang/String;Ljava/lang/String;)I	func_1071_a	getTextureForDownloadableImage
+M	ji	a	(Law;)V	func_1066_a	registerTextureFX
 M	ji	b	()V	func_1065_b	refreshTextures
 M	ji	b	(I)V	func_1076_b	bindTexture
 M	nw	a	()V	func_982_a	draw
@@ -2738,6 +2765,9 @@ M	xa	f	()Z	func_6477_d	canRespawnHere
 M	xa	a	(Lfd;)V	func_4095_a	registerWorld
 M	fv	a	(Lcl;Lfd;II[B)V	func_867_a	generate
 M	pf	a	(Lki;)V	func_972_a	addToSendQueue
+M	pf	a	()V	func_28139_a	wakeThreads
+M	pf	a	(Ljava/lang/String;[Ljava/lang/Object;)V	func_974_a	networkShutdown
+M	pf	b	()V	func_967_a	processReadPackets
 M	lq	a	(Ljava/lang/String;I)I	func_4067_a	parseIntWithDefault
 M	xv	a	(II)Lkd;	func_4073_a	getBiomeGenAt
 M	xv	b	(II)D	func_4072_b	getTemperature

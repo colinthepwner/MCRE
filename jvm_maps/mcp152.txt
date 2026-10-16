@@ -2214,6 +2214,7 @@ F	ava	b	field_74514_b	hash
 F	ava	c	field_74515_c	keyDescription
 F	ava	d	field_74512_d	keyCode
 F	ava	e	field_74513_e	pressed
+F	avy	A	field_85185_A	touchscreen
 F	avy	I	field_74351_w	keyBindForward
 F	avy	J	field_74370_x	keyBindLeft
 F	avy	K	field_74368_y	keyBindBack
@@ -2235,11 +2236,13 @@ F	avy	Z	field_74319_N	hideGUI
 F	avy	a	field_74342_a	musicVolume
 F	avy	aa	field_74320_O	thirdPersonView
 F	avy	ab	field_74330_P	showDebugInfo
+F	avy	ae	field_74331_S	noclip
 F	avy	aj	field_74334_X	fovSetting
 F	avy	ak	field_74333_Y	gammaSetting
 F	avy	al	field_74335_Z	guiScale
 F	avy	am	field_74362_aa	particleSetting
 F	avy	an	field_74363_ab	language
+F	avy	as	field_74364_ag	PARTICLES
 F	avy	b	field_74340_b	soundVolume
 F	avy	c	field_74341_c	mouseSensitivity
 F	avy	d	field_74338_d	invertMouse
@@ -2253,6 +2256,8 @@ F	avy	k	field_74348_k	ambientOcclusion
 F	avy	l	field_74345_l	clouds
 F	avy	m	field_74346_m	skin
 F	avy	n	field_74343_n	chatVisibility
+F	avy	s	field_74356_s	serverTextures
+F	avy	z	field_82880_z	showCape
 F	awf	a	field_74286_b	username
 F	awf	b	field_74287_c	sessionId
 F	awg	a	field_73747_a	width
@@ -2484,6 +2489,8 @@ F	bdj	a	field_78783_a	textureOffsetX
 F	bdj	b	field_78782_b	textureOffsetY
 F	bdk	b	field_72558_b	mapStorage
 F	bdk	e	field_72557_e	rand
+F	bdk	f	field_72554_f	disconnected
+F	bdk	g	field_72555_g	netManager
 F	bdk	h	field_72563_h	mc
 F	bdv	a	field_71174_a	sendQueue
 F	bet	aA	field_70555_ap	interpPosZ
@@ -2581,6 +2588,11 @@ F	biq	a	field_94271_a	instance
 F	bir	a	field_94255_a	textureType
 F	bir	b	field_94253_b	textureName
 F	bir	c	field_94254_c	basePath
+F	bis	h	field_94239_h	field_94239_h
+F	bis	i	field_94240_i	field_94240_i
+F	bit	h	field_94243_h	compassTexture
+F	bit	i	field_94244_i	currentAngle
+F	bit	j	field_94242_j	angleDelta
 F	bj	a	field_82630_a	x
 F	bj	b	field_82628_b	y
 F	bj	c	field_82629_c	z
@@ -2599,6 +2611,7 @@ F	bjd	l	field_76965_l	playerZ
 F	bjd	m	field_76966_m	specialRendererMap
 F	bjd	n	field_76964_n	fontRenderer
 F	bje	b	field_76898_b	tileEntityRenderer
+F	bjg	k	field_71349_l	mc
 F	bkc	b	field_77379_b	soundPoolSounds
 F	bkc	c	field_77380_c	soundPoolStreaming
 F	bkc	d	field_77377_d	soundPoolMusic
@@ -2674,6 +2687,7 @@ F	jd	c	field_73091_c	gameType
 F	jd	k	field_73098_k	posX
 F	jd	l	field_73095_l	posY
 F	jd	m	field_73096_m	posZ
+F	jh	a	field_72575_b	netManager
 F	jh	c	field_72574_e	playerEntity
 F	jh	d	field_72573_d	mcServer
 F	jh	j	field_72583_k	randomGenerator
@@ -2869,6 +2883,7 @@ F	nc	e	field_70530_e	xpValue
 F	net/minecraft/client/Minecraft	K	field_71425_J	running
 F	net/minecraft/client/Minecraft	L	field_71426_K	debug
 F	net/minecraft/client/Minecraft	R	field_71432_P	theMinecraft
+F	net/minecraft/client/Minecraft	S	field_71431_Q	fullscreen
 F	net/minecraft/client/Minecraft	V	field_71428_T	timer
 F	net/minecraft/client/Minecraft	an	field_71463_am	minecraftDir
 F	net/minecraft/client/Minecraft	b	field_71442_b	playerController
@@ -3536,6 +3551,7 @@ M	aab	A	(III)V	func_72969_x	updateAllLightTypes
 M	aab	B	(III)I	func_94577_B	getBlockPowerInput
 M	aab	C	(III)Z	func_72864_z	isBlockIndirectlyGettingPowered
 M	aab	D	(III)I	func_94572_D	getStrongestIndirectPower
+M	aab	E	(III)V	func_72950_A	setSpawnLocation
 M	aab	F	()V	func_72906_B	checkSessionLock
 M	aab	F	(III)Z	func_72951_B	canLightningStrikeAt
 M	aab	G	()J	func_72905_C	getSeed
@@ -4124,11 +4140,15 @@ M	ajt	b	()Ljava/io/File;	func_75765_b	getWorldDirectory
 M	ajt	b	(Ljava/lang/String;)Ljava/io/File;	func_75758_b	getMapFileFromName
 M	ajt	c	()V	func_75762_c	checkSessionLock
 M	ajt	g	()Ljava/lang/String;	func_75760_g	getWorldDirectoryName
+M	ajv	a	(I)V	func_76058_a	setSpawnX
+M	ajv	a	(III)V	func_76081_a	setSpawnPosition
 M	ajv	a	(Laaj;)V	func_76060_a	setGameType
 M	ajv	a	(Z)V	func_76069_a	setThundering
 M	ajv	b	()J	func_76063_b	getSeed
+M	ajv	b	(I)V	func_76056_b	setSpawnY
 M	ajv	b	(Z)V	func_76084_b	setRaining
 M	ajv	c	()I	func_76079_c	getSpawnX
+M	ajv	c	(I)V	func_76087_c	setSpawnZ
 M	ajv	c	(J)V	func_76068_b	setWorldTime
 M	ajv	d	()I	func_76075_d	getSpawnY
 M	ajv	e	()I	func_76074_e	getSpawnZ
@@ -4848,6 +4868,7 @@ M	ayl	a	(III)V	func_73864_a	mouseClicked
 M	ayl	a	(Ljava/lang/String;II)V	func_74190_a	drawCreativeTabHoveringText
 M	ayl	a	(Ljava/util/List;II)V	func_102021_a	func_102021_a
 M	ayl	a	(Lul;III)V	func_74191_a	handleMouseClick
+M	ayl	a	(Lwm;II)V	func_74184_a	drawItemStackTooltip
 M	ayl	b	()V	func_73874_b	onGuiClosed
 M	ayl	b	(II)V	func_74189_g	drawGuiContainerForegroundLayer
 M	ayl	b	(III)V	func_73879_b	mouseMovedOrUp
@@ -4971,6 +4992,7 @@ M	bdi	b	(II)Lbdi;	func_78787_b	setTextureSize
 M	bdi	c	(F)V	func_78794_c	postRender
 M	bdk	a	(I)Lmp;	func_72545_a	getEntityByID
 M	bdk	c	(Lei;)V	func_72552_c	addToSendQueue
+M	bdk	d	()V	func_72551_d	processReadPackets
 M	bdv	a	(Lka;I)V	func_71064_a	addStat
 M	bdv	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	bdv	bK	()V	func_71038_i	swingItem
@@ -4978,6 +5000,7 @@ M	bdv	d	(Ljava/lang/String;)V	func_71165_d	sendChatMessage
 M	bdv	h	()V	func_71053_j	closeScreen
 M	bdv	j	(I)V	func_70691_i	heal
 M	bdv	l_	()V	func_70071_h_	onUpdate
+M	bdv	n	()V	func_71016_p	sendPlayerAbilities
 M	beb	a	(Lbgd;FFFFFF)V	func_70539_a	renderParticle
 M	beb	b	()I	func_70537_b	getFXLayer
 M	bec	l_	()V	func_70071_h_	onUpdate
@@ -5281,6 +5304,9 @@ M	biq	a	()V	func_94263_a	init
 M	bir	a	(Ljava/lang/String;)Llx;	func_94245_a	registerIcon
 M	bir	b	()V	func_94247_b	refreshTextures
 M	bir	e	()Llx;	func_96455_e	getMissingIcon
+M	bis	l	()V	func_94219_l	updateAnimation
+M	bit	a	(Laab;DDDZZ)V	func_94241_a	updateCompass
+M	bit	l	()V	func_94219_l	updateAnimation
 M	bj	a	()D	func_82615_a	getX
 M	bj	b	()D	func_82617_b	getY
 M	bj	c	()D	func_82616_c	getZ
@@ -5296,6 +5322,15 @@ M	bje	a	(Laqp;DDDF)V	func_76894_a	renderTileEntityAt
 M	bje	a	(Lbjd;)V	func_76893_a	setTileEntityRenderer
 M	bje	a	(Ljava/lang/String;)V	func_76897_a	bindTextureByName
 M	bje	b	()Lawv;	func_76895_b	getFontRenderer
+M	bjg	T	()Z	func_71262_S	isDedicatedServer
+M	bjg	a	(Laaj;)V	func_71235_a	setGameType
+M	bjg	an	()Z	func_71344_c	getPublic
+M	bjg	c	()Z	func_71197_b	startServer
+M	bjg	f	()Z	func_71225_e	canStructuresSpawn
+M	bjg	g	()Laaj;	func_71265_f	getGameType
+M	bjg	h	()I	func_71232_g	getDifficulty
+M	bjg	k	()V	func_71260_j	stopServer
+M	bjg	q	()V	func_71217_p	tick
 M	bk	a	(Ljava/lang/Object;)Ljava/lang/Object;	func_82594_a	getObject
 M	bk	a	(Ljava/lang/Object;Ljava/lang/Object;)V	func_82595_a	putObject
 M	bkc	a	(Ljava/lang/String;FF)V	func_77366_a	playSoundFX
@@ -5465,7 +5500,15 @@ M	cf	e	()Ljava/lang/String;	func_74740_e	getName
 M	cf	equals	(Ljava/lang/Object;)Z	equals	equals
 M	cf	hashCode	()I	hashCode	hashCode
 M	cf	p	(Ljava/lang/String;)Lcf;	func_74738_o	setName
+M	cg	a	()V	func_74427_a	wakeThreads
 M	cg	a	(Lei;)V	func_74429_a	addToSendQueue
+M	cg	a	(Lej;)V	func_74425_a	setNetHandler
+M	cg	a	(Ljava/lang/String;[Ljava/lang/Object;)V	func_74424_a	networkShutdown
+M	cg	b	()V	func_74428_b	processReadPackets
+M	cg	c	()Ljava/net/SocketAddress;	func_74430_c	getSocketAddress
+M	cg	d	()V	func_74423_d	serverShutdown
+M	cg	e	()I	func_74426_e	packetSize
+M	cg	f	()V	func_74431_f	closeConnections
 M	cw	a	()I	func_73284_a	getPacketSize
 M	cw	a	(Lej;)V	func_73279_a	processPacket
 M	cw	a	(Ljava/io/DataInputStream;)V	func_73267_a	readPacketData
@@ -5586,6 +5629,7 @@ M	jc	e	()F	func_70047_e	getEyeHeight
 M	jc	h	()V	func_71053_j	closeScreen
 M	jc	i	()V	func_71113_k	updateHeldItem
 M	jc	l_	()V	func_70071_h_	onUpdate
+M	jc	n	()V	func_71016_p	sendPlayerAbilities
 M	jd	a	(Laaj;)V	func_73076_a	setGameType
 M	jd	a	(Liz;)V	func_73080_a	setWorld
 M	jd	b	()Laaj;	func_73081_b	getGameType
@@ -5594,6 +5638,7 @@ M	jd	d	()Z	func_73083_d	isCreative
 M	jh	a	(DDDFF)V	func_72569_a	setPlayerLocation
 M	jh	b	(Lei;)V	func_72567_b	sendPacketToPlayer
 M	jh	c	(Ljava/lang/String;)V	func_72565_c	kickPlayerFromServer
+M	jh	e	()I	func_72568_e	packetSize
 M	ju	a	()Lju;	func_75986_a	setIndependent
 M	ju	a	(Ljw;)Lju;	func_75988_a	setStatStringFormatter
 M	ju	b	()Lju;	func_75987_b	setSpecial
@@ -5900,7 +5945,9 @@ M	nd	a	(DZ)V	func_70064_a	updateFallState
 M	nd	a	(F)V	func_70069_a	fall
 M	nd	e	(FF)V	func_70612_e	moveEntityWithHeading
 M	nd	g_	()Z	func_70617_f_	isOnLadder
+M	net/minecraft/client/Minecraft	B	()Z	func_71387_A	isIntegratedServerRunning
 M	net/minecraft/client/Minecraft	C	()Z	func_71356_B	isSingleplayer
+M	net/minecraft/client/Minecraft	D	()Lbjg;	func_71401_C	getIntegratedServer
 M	net/minecraft/client/Minecraft	G	()J	func_71386_F	getSystemTime
 M	net/minecraft/client/Minecraft	a	()V	func_71384_a	startGame
 M	net/minecraft/client/Minecraft	a	(Laxr;)V	func_71373_a	displayGuiScreen
@@ -6933,6 +6980,7 @@ M	sq	h	()V	func_71053_j	closeScreen
 M	sq	i	(Z)Z	func_71043_e	canEat
 M	sq	j	(F)V	func_71020_j	addExhaustion
 M	sq	l_	()V	func_70071_h_	onUpdate
+M	sq	n	()V	func_71016_p	sendPlayerAbilities
 M	sq	p	(I)Lwm;	func_71124_b	getCurrentItemOrArmor
 M	sq	p	(Lmp;)Z	func_70998_m	interactWith
 M	sq	q	(I)Lwm;	func_82169_q	getCurrentArmor
@@ -7578,6 +7626,7 @@ R	field_94433_b	theIcon
 R	field_94401_cO	theIcon
 R	field_82539_a	types
 R	field_82136_e	levels
+R	field_96106_a	succesCount
 R	field_82354_a	command
 R	field_70378_a	tickCount
 R	field_70376_r	rand
@@ -7643,15 +7692,37 @@ R	field_74421_a	mc
 R	field_74503_a	mc
 R	field_79002_a	mc
 R	UNKNOWN	UNKNOWN
+R	SHOW_CAPE	SHOW_CAPE
+R	TOUCHSCREEN	TOUCHSCREEN
+R	CHAT_SCALE	CHAT_SCALE
+R	CHAT_WIDTH	CHAT_WIDTH
+R	CHAT_HEIGHT_FOCUSED	CHAT_HEIGHT_FOCUSED
+R	CHAT_HEIGHT_UNFOCUSED	CHAT_HEIGHT_UNFOCUSED
 R	MUSIC	MUSIC
+R	SOUND	SOUND
 R	INVERT_MOUSE	INVERT_MOUSE
+R	SENSITIVITY	SENSITIVITY
 R	FOV	FOV
 R	GAMMA	GAMMA
 R	RENDER_DISTANCE	RENDER_DISTANCE
 R	VIEW_BOBBING	VIEW_BOBBING
+R	ANAGLYPH	ANAGLYPH
+R	ADVANCED_OPENGL	ADVANCED_OPENGL
+R	FRAMERATE_LIMIT	FRAMERATE_LIMIT
 R	DIFFICULTY	DIFFICULTY
+R	GRAPHICS	GRAPHICS
 R	AMBIENT_OCCLUSION	AMBIENT_OCCLUSION
 R	GUI_SCALE	GUI_SCALE
+R	RENDER_CLOUDS	RENDER_CLOUDS
+R	PARTICLES	PARTICLES
+R	CHAT_VISIBILITY	CHAT_VISIBILITY
+R	CHAT_COLOR	CHAT_COLOR
+R	CHAT_LINKS	CHAT_LINKS
+R	CHAT_OPACITY	CHAT_OPACITY
+R	CHAT_LINKS_PROMPT	CHAT_LINKS_PROMPT
+R	USE_SERVER_TEXTURES	USE_SERVER_TEXTURES
+R	SNOOPER_ENABLED	SNOOPER_ENABLED
+R	USE_FULLSCREEN	USE_FULLSCREEN
 R	ENABLE_VSYNC	ENABLE_VSYNC
 R	field_73725_b	mc
 R	field_73910_c	options
@@ -7775,6 +7846,7 @@ R	field_94229_n	minV
 R	field_94230_o	maxV
 R	field_94313_f	maxHeight
 R	field_94320_l	textureName
+R	field_94291_b	textureId
 R	field_94292_c	textureType
 R	field_94289_d	width
 R	field_94290_e	height
@@ -7782,7 +7854,6 @@ R	field_94297_m	textureName
 R	field_94204_c	width
 R	field_94201_d	height
 R	field_94202_e	rotated
-R	field_71349_l	mc
 R	field_77527_e	address
 R	field_77312_b	mc
 R	field_77311_e	availableTexturePacks
@@ -7837,6 +7908,7 @@ R	field_73450_b	zPosition
 R	field_73448_d	size
 R	field_73468_a	language
 R	field_73466_b	renderDistance
+R	field_82564_f	showCape
 R	field_73456_b	username
 R	field_73435_a	windowId
 R	field_73434_c	accepted
@@ -7996,6 +8068,7 @@ R	field_76147_d	hash
 R	field_76119_d	lock
 R	field_76480_b	uniqueID
 R	field_76477_g	isRunning
+R	field_76344_a	snooper
 R	field_94554_b	fighter
 R	field_85155_a	theEntity
 R	field_96564_a	theEntity
@@ -8108,6 +8181,7 @@ R	func_72844_a	getEntityPathToXYZ
 R	func_94576_a	getEntitiesWithinAABBExcludingEntity
 R	func_72865_a	getPathEntityToEntity
 R	func_72946_b	findClosestStructure
+R	func_72974_f	setSpawnLocation
 R	func_72948_g	getFogColor
 R	func_72870_g	updateEntity
 R	call	call
@@ -8281,10 +8355,14 @@ R	func_75856_a	createEntityPathTo
 R	func_75759_a	flush
 R	func_75763_a	getChunkLoader
 R	accept	accept
+R	func_76058_a	setSpawnX
+R	func_76081_a	setSpawnPosition
 R	func_76069_a	setThundering
 R	func_76063_b	getSeed
+R	func_76056_b	setSpawnY
 R	func_76084_b	setRaining
 R	func_76079_c	getSpawnX
+R	func_76087_c	setSpawnZ
 R	func_76068_b	setWorldTime
 R	func_76075_d	getSpawnY
 R	func_76074_e	getSpawnZ
@@ -8414,11 +8492,15 @@ R	func_70316_g	updateEntity
 R	func_70302_i_	getSizeInventory
 R	func_70319_e	getDescriptionPacket
 R	func_94128_d	getSizeInventorySide
+R	func_96102_a	setSignalStrength
 R	func_70003_b	canCommandSenderUseCommand
 R	func_70006_a	sendChatToPlayer
 R	func_70004_a	translateString
 R	func_82114_b	getPlayerCoordinates
+R	func_82352_b	setCommand
+R	func_82353_c	getCommand
 R	func_70005_c_	getCommandSenderName
+R	func_96103_d	getSignalStrength
 R	func_70364_a	openChest
 R	func_70365_a	isUseableByPlayer
 R	func_70366_b	closeChest
@@ -8474,10 +8556,16 @@ R	func_74564_a	read
 R	func_74565_b	read
 R	func_74552_a	parse
 R	func_74573_a	reloadResources
+R	paint	paint
 R	func_74502_a	getType
 R	func_71384_a	startGame
 R	func_100015_a	isKeyDown
 R	func_74305_a	parseFloat
+R	func_74380_a	getEnumFloat
+R	func_74379_a	getEnumOptions
+R	func_74382_b	getEnumBoolean
+R	func_74381_c	returnEnumOrdinal
+R	func_74378_d	getEnumString
 R	func_73758_b	scroll
 R	func_73866_w_	initGui
 R	func_73863_a	drawScreen
@@ -8574,6 +8662,7 @@ R	func_78471_a	renderWorld
 R	func_78443_a	renderItem
 R	func_72714_a	renderSky
 R	func_72733_a	renderAllRenderLists
+R	func_72718_b	renderClouds
 R	func_78343_a	updateDynamicTextures
 R	func_96448_c	getMissingIcon
 R	func_94152_c	refreshTextureMaps
@@ -8630,16 +8719,10 @@ R	func_94246_d	getTexture
 R	func_76894_a	renderTileEntityAt
 R	func_76896_a	onWorldChange
 R	func_76893_a	setTileEntityRenderer
-R	func_71262_S	isDedicatedServer
-R	func_71235_a	setGameType
-R	func_71197_b	startServer
-R	func_71225_e	canStructuresSpawn
-R	func_71265_f	getGameType
-R	func_71232_g	getDifficulty
-R	func_71260_j	stopServer
-R	func_71217_p	tick
+R	func_72415_s	getIntegratedServer
 R	func_76973_a	getType
 R	func_71746_d	getServer
+R	func_71753_e	getIntegratedServer
 R	func_77532_a	getResourceAsStream
 R	func_77306_b	getMinecraft
 R	func_77293_d	availableTexturePacks
@@ -8648,7 +8731,15 @@ R	func_74732_a	getId
 R	func_74735_a	load
 R	func_74734_a	write
 R	func_74737_b	copy
+R	func_74427_a	wakeThreads
 R	func_74429_a	addToSendQueue
+R	func_74425_a	setNetHandler
+R	func_74424_a	networkShutdown
+R	func_74428_b	processReadPackets
+R	func_74430_c	getSocketAddress
+R	func_74423_d	serverShutdown
+R	func_74426_e	packetSize
+R	func_74431_f	closeConnections
 R	func_74462_a	isRunning
 R	func_74459_h	sendPacket
 R	func_73284_a	getPacketSize
@@ -8696,7 +8787,12 @@ R	func_71233_x	getCurrentPlayerCount
 R	func_71275_y	getMaxPlayers
 R	func_73667_a	setProperty
 R	func_73671_a	getProperty
+R	func_71262_S	isDedicatedServer
 R	func_71203_ab	getConfigurationManager
+R	func_71197_b	startServer
+R	func_71225_e	canStructuresSpawn
+R	func_71265_f	getGameType
+R	func_71232_g	getDifficulty
 R	func_71255_r	getAllowNether
 R	func_71742_a	getType
 R	func_73074_a	onBlockClicked
@@ -8775,6 +8871,7 @@ R	func_70684_aJ	isPlayer
 R	func_70641_bl	getMaxSpawnedInChunk
 R	func_70637_d	setJumping
 R	func_75669_b	getObject
+R	func_75775_b	canUse
 R	func_75489_a	setSpeed
 R	func_75474_b	getDistanceSquared
 R	func_75577_a	getCenter
@@ -8824,6 +8921,7 @@ R	func_70185_h	getGravityVelocity
 R	func_70227_a	onImpact
 R	func_70027_ad	isBurning
 R	func_82341_c	getMotionFactor
+R	func_82342_d	isInvulnerable
 R	func_75132_a	addCraftingToCrafters
 R	func_75142_b	detectAndSendChanges
 R	func_75137_b	updateProgressBar
@@ -9128,9 +9226,12 @@ D	net/minecraft/src/RenderWitch	witchModel:Lnet/minecraft/src/ModelWitch;:|field
 D	net/minecraft/src/RenderZombie	field_82434_o:Lnet/minecraft/src/ModelBiped;:|zombieVillagerModel:Lnet/minecraft/src/ModelZombieVillager;:|field_82437_k:Lnet/minecraft/src/ModelBiped;:|field_82435_l:Lnet/minecraft/src/ModelBiped;:|field_82436_m:Lnet/minecraft/src/ModelBiped;:|field_82433_n:Lnet/minecraft/src/ModelBiped;:|field_82431_q:I:
 D	net/minecraft/src/TextureManager	instance:Lnet/minecraft/src/TextureManager;:s|nextTextureID:I:|texturesMap:Ljava/util/HashMap;:|mapNameToId:Ljava/util/HashMap;:
 D	net/minecraft/src/TextureMap	textureType:I:|textureName:Ljava/lang/String;:|basePath:Ljava/lang/String;:|textureExt:Ljava/lang/String;:|mapTexturesStiched:Ljava/util/HashMap;:|missingImage:Ljava/awt/image/BufferedImage;:|missingTextureStiched:Lnet/minecraft/src/TextureStitched;:|atlasTexture:Lnet/minecraft/src/Texture;:|listTextureStiched:Ljava/util/List;:|textureStichedMap:Ljava/util/Map;:
+D	net/minecraft/src/TextureClock	field_94239_h:D:|field_94240_i:D:
+D	net/minecraft/src/TextureCompass	compassTexture:Lnet/minecraft/src/TextureCompass;:s|currentAngle:D:|angleDelta:D:
 D	net/minecraft/src/PositionImpl	x:D:|y:D:|z:D:
 D	net/minecraft/src/TileEntityRenderer	specialRendererMap:Ljava/util/Map;:|instance:Lnet/minecraft/src/TileEntityRenderer;:s|fontRenderer:Lnet/minecraft/src/FontRenderer;:|staticPlayerX:D:s|staticPlayerY:D:s|staticPlayerZ:D:s|renderEngine:Lnet/minecraft/src/RenderEngine;:|worldObj:Lnet/minecraft/src/World;:|entityLivingPlayer:Lnet/minecraft/src/EntityLiving;:|playerYaw:F:|playerPitch:F:|playerX:D:|playerY:D:|playerZ:D:
 D	net/minecraft/src/TileEntitySpecialRenderer	tileEntityRenderer:Lnet/minecraft/src/TileEntityRenderer;:
+D	net/minecraft/src/IntegratedServer	mc:Lnet/minecraft/client/Minecraft;:|theWorldSettings:Lnet/minecraft/src/WorldSettings;:|serverLogAgent:Lnet/minecraft/src/ILogAgent;:|theServerListeningThread:Lnet/minecraft/src/IntegratedServerListenThread;:|isGamePaused:Z:|isPublic:Z:|lanServerPing:Lnet/minecraft/src/ThreadLanServerPing;:
 D	net/minecraft/src/SoundPoolEntry	soundName:Ljava/lang/String;:|soundUrl:Ljava/net/URL;:
 D	net/minecraft/src/SoundManager	sndSystem:Lpaulscode/sound/SoundSystem;:s|soundPoolSounds:Lnet/minecraft/src/SoundPool;:|soundPoolStreaming:Lnet/minecraft/src/SoundPool;:|soundPoolMusic:Lnet/minecraft/src/SoundPool;:|latestSoundID:I:|options:Lnet/minecraft/src/GameSettings;:|playingSounds:Ljava/util/Set;:|field_92072_h:Ljava/util/List;:|loaded:Z:s|rand:Ljava/util/Random;:|ticksBeforeMusic:I:
 D	net/minecraft/src/SoundPool	rand:Ljava/util/Random;:|nameToSoundPoolEntriesMapping:Ljava/util/Map;:|allSoundPoolEntries:Ljava/util/List;:|numberOfSoundPoolEntries:I:|isGetRandomSound:Z:
