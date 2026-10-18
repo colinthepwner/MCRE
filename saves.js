@@ -456,7 +456,7 @@
             disk.down = true;
             if (err && err.status === 409) {
                 console.warn('[saves] saves folder changed under this page; disk sync paused until reload');
-                toast('Saves folder changed - restart the game to sync', 5000);
+                toast('Saves folder changed - restart the game to sync', 5000, true);
                 return false;
             }
             console.warn('[saves] could not write to the saves folder:', err);
@@ -510,7 +510,8 @@
     }
 
     var toastEl = null, toastTimer = null;
-    function toast(text, ms) {
+    function toast(text, ms, always) {
+        if (!always && !(window.Module && Module.mcSaveNotices)) return;
         if (!document.body) return;
         if (!toastEl) {
             toastEl = document.createElement('div');

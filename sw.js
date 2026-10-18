@@ -128,6 +128,21 @@ self.addEventListener('fetch', event => {
     if (url.searchParams.has('mcre-check')) return;
 
     const isolate = needsIsolation(event.request);
+    if (url.origin === self.location.origin && url.searchParams.has('v')) {
+        event.respondWith(
+            caches.open(CACHE_NAME).then(cache => cache.match(event.request).then(hit => {
+                if (hit) return isolate ? withIsolation(hit) : hit;
+                return fetch(event.request).then(response => {
+                    if (response && response.status === 200 && response.type === 'basic') {
+                        const copy = response.clone();
+                        cache.put(event.request, copy).then(() => dropOtherVersions(cache, url)).catch(() => {});
+                    }
+                    return isolate ? withIsolation(response) : response;
+                });
+            })).catch(() => fetch(event.request).then(response => isolate ? withIsolation(response) : response))
+        );
+        return;
+    }
     event.respondWith(
         fetch(revalidating(event.request, url))
             .then(response => {

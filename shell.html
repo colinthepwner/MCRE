@@ -117,6 +117,8 @@
                 var gw = Math.floor(Math.fround(bw * inv)), gh = Math.floor(Math.fround(bh * inv));
                 if (gw < 1 || gh < 1) return;
                 root.style.setProperty('--mc-dirt-size', (32 * W / gw) + 'px ' + (32 * H / gh) + 'px');
+                window.mcGuiUnitCss = W / gw;
+                if (window.mcModPanelResize) window.mcModPanelResize();
             };
             window.mcDirtTile();
             window.addEventListener('resize', window.mcDirtTile);
@@ -1220,6 +1222,89 @@
     </script>
     <script>
         (function () {
+            var STAGES = ['Loading mods', 'Loading classes', 'Initializing mods', 'Building content', 'Building textures', 'Finishing'];
+            var L = Module.mcModLoad = {
+                STAGES: STAGES,
+                active: false,
+                startup: false,
+                stage: 0,
+                of: 1, k: 0,
+                part: 0,
+                name: '',
+                label: '',
+                seq: 0,
+                times: [],
+                total: 0,
+                listeners: [],
+                slice: 12,
+                lastYield: 0
+            };
+            var t0 = 0, tStage = 0;
+            var fire = function () {
+                L.seq++;
+                for (var i = 0; i < L.listeners.length; i++) { try { L.listeners[i](L); } catch (e) { } }
+            };
+            var closeStage = function () { if (L.active && tStage) L.times.push([STAGES[L.stage], Math.round(performance.now() - tStage)]); };
+            L.begin = function (startup) {
+                L.active = true; L.startup = !!startup;
+                L.stage = 0; L.of = 1; L.k = 0; L.part = 0; L.name = ''; L.label = '';
+                L.times = []; t0 = tStage = performance.now(); L.lastYield = t0;
+                fire();
+            };
+            L.enter = function (stage, of, name) {
+                if (!L.active) return;
+                if (stage !== L.stage) { closeStage(); tStage = performance.now(); }
+                L.stage = stage; L.of = Math.max(1, of | 0); L.k = 0; L.part = 0; L.name = name || ''; L.label = '';
+                fire();
+            };
+            L.step = function (k, name, label, part) {
+                if (!L.active) return;
+                L.k = Math.max(0, Math.min(L.of - 1, k | 0)); L.name = name || ''; L.label = label || ''; L.part = Math.max(0, Math.min(1, +part || 0));
+                fire();
+            };
+            L.end = function () {
+                if (!L.active) return;
+                closeStage();
+                L.total = Math.round(performance.now() - t0);
+                L.active = false;
+                console.log('[mods] loaded in ' + L.total + ' ms (' + L.times.map(function (t) { return t[0].toLowerCase() + ' ' + t[1]; }).join(', ') + ')');
+                fire();
+            };
+            L.stageFrac = function () { return Math.min(1, (L.k + L.part) / L.of); };
+            L.overall = function () { return Math.min(1, (L.stage + L.stageFrac()) / STAGES.length); };
+            L.caption = function () { return STAGES[L.stage] || ''; };
+            L.subCaption = function () { return L.label && L.name ? L.label + ': ' + L.name : (L.name || L.label); };
+            L.poll = function () {
+                try {
+                    if (!L.active || L.startup) return '';
+                    var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\r\n]/g, ' '); };
+                    return [L.overall().toFixed(4), clean(L.caption()), (L.stage + 1) + '/' + STAGES.length, clean(L.subCaption()),
+                        L.of > 1 ? (L.k + 1) + '/' + L.of : '', L.stageFrac().toFixed(4)].join('\t');
+                } catch (e) { return ''; }
+            };
+            var ch = null, waiting = [];
+            L.due = function () { return performance.now() - L.lastYield > L.slice; };
+            L.yieldNow = function () {
+                return new Promise(function (res) {
+                    if (!ch && typeof MessageChannel === 'function') {
+                        ch = new MessageChannel();
+                        ch.port1.onmessage = function () {
+                            var w = waiting; waiting = [];
+                            L.lastYield = performance.now();
+                            for (var i = 0; i < w.length; i++) w[i]();
+                        };
+                    }
+                    if (!ch) { setTimeout(function () { L.lastYield = performance.now(); res(); }, 0); return; }
+                    waiting.push(res);
+                    if (waiting.length === 1) ch.port2.postMessage(0);
+                });
+            };
+            L.maybeYield = function () { return L.due() ? L.yieldNow() : Promise.resolve(); };
+            L.pass = function (v) { return L.due() ? L.yieldNow().then(function () { return v; }) : v; };
+        })();
+    </script>
+    <script>
+        (function () {
             var ov = document.createElement('div');
             ov.id = 'mcLoading';
             ov.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;' +
@@ -1256,6 +1341,108 @@
             line.style.display = 'none';
             ov.appendChild(line);
             document.body.appendChild(ov);
+
+            var panel = document.createElement('canvas');
+            panel.style.cssText = 'display:none;image-rendering:pixelated;margin-top:' + (big * 3) + 'px';
+            ov.insertBefore(panel, line);
+            var PW = 256, PH = 40;
+            var font = null, fontTried = false, dirty = false;
+            var loadFont = function () {
+                if (fontTried) return;
+                fontTried = true;
+                try {
+                    var bytes = window.FS && FS.readFile('/data/images/font/default8.png');
+                    if (!bytes || typeof createImageBitmap !== 'function') return;
+                    createImageBitmap(new Blob([bytes], { type: 'image/png' })).then(function (img) {
+                        var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+                        var g = c.getContext('2d'); g.drawImage(img, 0, 0);
+                        var px = g.getImageData(0, 0, c.width, c.height).data, cw = c.width / 16, ch = c.height / 16, widths = [];
+                        for (var i = 0; i < 256; i++) {
+                            var x0 = (i % 16) * cw, y0 = Math.floor(i / 16) * ch, x = 7;
+                            for (; x >= 0; x--) {
+                                var any = false;
+                                for (var y = 0; y < 8 && !any; y++) any = px[((y0 + Math.floor(y * ch / 8)) * c.width + x0 + Math.floor(x * cw / 8)) * 4 + 3] > 0;
+                                if (any) break;
+                            }
+                            widths[i] = i === 32 ? 4 : x + 2;
+                        }
+                        var s = document.createElement('canvas'); s.width = c.width; s.height = c.height;
+                        var sg = s.getContext('2d'); sg.drawImage(c, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = '#3f3f3f'; sg.fillRect(0, 0, s.width, s.height);
+                        var gr = document.createElement('canvas'); gr.width = c.width; gr.height = c.height;
+                        var gg = gr.getContext('2d'); gg.drawImage(c, 0, 0); gg.globalCompositeOperation = 'source-in'; gg.fillStyle = '#a0a0a0'; gg.fillRect(0, 0, gr.width, gr.height);
+                        font = { white: c, shadow: s, grey: gr, cw: cw, ch: ch, w: widths };
+                        dirty = true; paint();
+                    }, function () { });
+                } catch (e) { }
+            };
+            var textW = function (t) {
+                if (!font) return t.length * 6;
+                var n = 0;
+                for (var i = 0; i < t.length; i++) { var cc = t.charCodeAt(i); n += font.w[cc < 256 ? cc : 63]; }
+                return n;
+            };
+            var fit = function (t, w) {
+                if (textW(t) <= w) return t;
+                while (t.length > 1 && textW(t + '...') > w) t = t.slice(0, -1);
+                return t + '...';
+            };
+            var drawText = function (g, t, x, y, f, grey) {
+                if (!font) {
+                    g.font = (8 * f) + 'px monospace'; g.textBaseline = 'top';
+                    g.fillStyle = '#3f3f3f'; g.fillText(t, (x + 1) * f, (y + 1) * f);
+                    g.fillStyle = grey ? '#a0a0a0' : '#ffffff'; g.fillText(t, x * f, y * f);
+                    return;
+                }
+                [[font.shadow, 1], [grey ? font.grey : font.white, 0]].forEach(function (pass) {
+                    var cx = x;
+                    for (var i = 0; i < t.length; i++) {
+                        var cc = t.charCodeAt(i); if (cc >= 256) cc = 63;
+                        g.drawImage(pass[0], (cc % 16) * font.cw, Math.floor(cc / 16) * font.ch, font.cw, font.ch, (cx + pass[1]) * f, (y + pass[1]) * f, 8 * f, 8 * f);
+                        cx += font.w[cc];
+                    }
+                });
+            };
+            var drawBar = function (g, x, y, w, frac, f) {
+                g.fillStyle = '#000000'; g.fillRect((x - 1) * f, (y - 1) * f, (w + 2) * f, 6 * f);
+                g.fillStyle = '#808080'; g.fillRect(x * f, y * f, w * f, 4 * f);
+                g.fillStyle = '#80ff80'; g.fillRect(x * f, y * f, Math.round(w * Math.max(0, Math.min(1, frac)) * f), 4 * f);
+            };
+            var size = function () {
+                var unit = window.mcGuiUnitCss || 2, dpr = window.devicePixelRatio || 1;
+                var gwNow = Math.floor((window.innerWidth || 800) / unit);
+                PW = Math.max(120, Math.min(256, gwNow - 24));
+                var f = Math.max(1, Math.round(unit * dpr));
+                panel.width = PW * f; panel.height = PH * f;
+                panel.style.width = (PW * f / dpr) + 'px'; panel.style.height = (PH * f / dpr) + 'px';
+                panel.$f = f;
+            };
+            window.mcModPanelResize = function () { if (panel.style.display !== 'none') { size(); dirty = true; paint(); } };
+            var paint = function () {
+                var L = Module.mcModLoad;
+                if (!dirty || !L || panel.style.display === 'none') return;
+                dirty = false;
+                var f = panel.$f || 1, g = panel.getContext('2d');
+                g.imageSmoothingEnabled = false;
+                g.clearRect(0, 0, panel.width, panel.height);
+                var cnt1 = (L.stage + 1) + '/' + L.STAGES.length, cnt2 = L.of > 1 ? (L.k + 1) + '/' + L.of : '';
+                drawText(g, fit(L.caption(), PW - textW(cnt1) - 6), 1, 0, f);
+                drawText(g, cnt1, PW - 1 - textW(cnt1), 0, f, true);
+                drawBar(g, 1, 10, PW - 2, L.overall(), f);
+                drawText(g, fit(L.subCaption() || ' ', PW - textW(cnt2) - 6), 1, 20, f);
+                if (cnt2) drawText(g, cnt2, PW - 1 - textW(cnt2), 20, f, true);
+                drawBar(g, 1, 30, PW - 2, L.stageFrac(), f);
+            };
+            if (Module.mcModLoad) Module.mcModLoad.listeners.push(function (L) {
+                if (gone || !L.startup) return;
+                if (L.active && panel.style.display === 'none') {
+                    loadFont();
+                    bar.style.display = 'none';
+                    panel.style.display = '';
+                    size();
+                }
+                if (!dirty) { dirty = true; requestAnimationFrame(paint); }
+                if (!L.active) { dirty = true; paint(); }
+            });
 
             var shown = 0;
             var set = function (frac, text) {
@@ -1993,11 +2180,16 @@
                 return jvmPromise;
             }
             J.loadJvm = loadJvm;
+            var mapLoads = {};
             function loadMap(name) {
                 if (maps[name] !== undefined) return Promise.resolve(maps[name]);
-                return fetch('jvm_maps/' + name + '.txt').then(function (r) { return r.ok ? r.text() : ''; }, function () { return ''; })
-                    .then(function (t) { maps[name] = t; return t; });
+                if (!mapLoads[name]) mapLoads[name] = fetch('jvm_maps/' + name + '.txt' + (typeof MCRE_V === 'string' ? MCRE_V : '')).then(function (r) { return r.ok ? r.text() : ''; }, function () { return ''; })
+                    .then(function (t) { maps[name] = t; delete mapLoads[name]; return t; });
+                return mapLoads[name];
             }
+            J.prefetch = function () {
+                try { loadJvm().catch(function () { }); loadMap('babric'); } catch (e) { }
+            };
             var worldDir = null;
             function safeName(s) { return String(s).replace(/[^\w.-]/g, '_'); }
             function folderFs(modId) {
@@ -2706,7 +2898,7 @@
             }
             J.populate = function (cx, cz, dim, seed) {
                 var r = reg();
-                if (!vm || !r) return;
+                if (!vm || !r || J.defining) return;
                 var gm = dim === 0 || dim === -1 ? genMods(r) : [];
                 var fg = !!(window.JVM.forgeWantsGen && window.JVM.forgeWantsGen(vm));
                 var sg = !!(window.JVM.stationWantsGen && window.JVM.stationWantsGen(vm));
@@ -2945,7 +3137,7 @@
                 return window.JVM.run(vm, function () { return vm.callVirtual(obj, sig.substring(0, p), sig.substring(p), args); });
             }
             J.handle = function (e) {
-                if (!running || !WANTS[e.t]) return;
+                if (!running || !WANTS[e.t] || J.defining) return;
                 tiles = {};
                 var me0 = e.player ? player() : null;
                 actor = e.player && me0 && e.player.id !== me0.id ? e.player : null;
@@ -3748,6 +3940,7 @@
             J.menusSoon = function () {
                 clearTimeout(J.menuTimer);
                 J.menuTimer = setTimeout(function () {
+                    if (J.defining) { J.menusSoon(); return; }
                     if (!Module._mcSetMenuButtons) return;
                     ['title', 'pause'].forEach(function (which) {
                         var labels = [];
@@ -3885,7 +4078,27 @@
                     return (J.pre[modId] = { skip: true });
                 });
             };
-            J.define = function (modId, files, problem) {
+            var FORGE_LABEL = { construct: 'Constructing', preInit: 'Pre-initialization', init: 'Initialization', imc: 'Inter-mod messages', postInit: 'Post-initialization' };
+            function runJavaSteps(list, prog) {
+                var i = 0, ML = Module.mcModLoad;
+                J.defining = true;
+                var next = function () {
+                    while (i < list.length) {
+                        var st = list[i++];
+                        if (st.label && prog) { try { prog(st.label, (i - 1) / list.length); } catch (x) { } }
+                        var more = st.run();
+                        if (Array.isArray(more) && more.length) Array.prototype.splice.apply(list, [i, 0].concat(more));
+                        if (ML && ML.due()) return ML.yieldNow().then(next);
+                    }
+                    J.defining = false;
+                    return Promise.resolve();
+                };
+                var first;
+                try { first = next(); } catch (e) { J.defining = false; return Promise.reject(e); }
+                return first.catch(function (e) { J.defining = false; throw e; });
+            }
+            J.defining = false;
+            J.define = function (modId, files, problem, prog) {
                 J.menusSoon();
                 return J.preload(modId, files, problem).then(function (st) {
                     setTimeout(J.menusSoon, 0);
@@ -3932,28 +4145,50 @@
                         }
                     }
                     if (kind.jarEdit && JVM.jarEditLoad) { try { JVM.jarEditLoad(vm, modId, kind.jarEdit, files); } catch (x) { console.warn('[java] jar edit', x); } }
+                    var steps = [], coremodOnly = false;
                     entry.forEach(function (cn) {
-                        JVM.run(vm, function () {
-                            if (JVM.mlProps) JVM.mlProps(vm, vm.loadClass(cn));
-                            var o = vm.newObject(vm.loadClass(cn));
-                            vm.callVirtual(o, '<init>', '()V', []);
-                            vm.callVirtual(o, 'load', '()V', []);
-                        });
+                        steps.push({ label: 'Initialization', run: function () {
+                            vm.currentMod = modId;
+                            JVM.run(vm, function () {
+                                if (JVM.mlProps) JVM.mlProps(vm, vm.loadClass(cn));
+                                var o = vm.newObject(vm.loadClass(cn));
+                                vm.callVirtual(o, '<init>', '()V', []);
+                                vm.callVirtual(o, 'load', '()V', []);
+                            });
+                        } });
                     });
                     if (forgeMods.length || kind.coremod) {
                         var info = null;
                         try { var mi = files['mcmod.info']; if (mi) info = mcLenientJson(new TextDecoder().decode(mi)); } catch (e) { info = null; }
                         if (info && !Array.isArray(info)) info = info.modList || info.modlist || [info];
-                        if (JVM.forgeLoadJar) JVM.forgeLoadJar(vm, modId, files, classes, info);
-                        else JVM.forgeLoad(vm, forgeMods, classes, info);
-                        if (kind.coremod && JVM.coremodOnlyPatches && JVM.coremodOnlyPatches(vm, modId, classes)) {
-                            J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: JVM.COREMOD_ONLY_CANT });
-                            problem('', "Can't run: " + JVM.COREMOD_ONLY_CANT);
-                            return {};
-                        }
+                        steps.push({ label: 'Constructing', run: function () {
+                            vm.currentMod = modId;
+                            if (JVM.forgeLoadJarSteps) return JVM.forgeLoadJarSteps(vm, modId, files, classes, info).steps.map(function (fs) { return { label: FORGE_LABEL[fs.phase] || '', run: fs.run }; });
+                            if (JVM.forgeLoadJar) JVM.forgeLoadJar(vm, modId, files, classes, info);
+                            else JVM.forgeLoad(vm, forgeMods, classes, info);
+                        } });
+                        steps.push({ label: '', run: function () { coremodOnly = !!(kind.coremod && JVM.coremodOnlyPatches && JVM.coremodOnlyPatches(vm, modId, classes)); } });
                     }
-                    J.genCheck();
-                    var c = JVM.collectContent(vm, modId);
+                    var c = null, gen = null;
+                    var collect = { label: 'Collecting content', run: function () {
+                        if (coremodOnly) return;
+                        vm.currentMod = modId;
+                        if (!gen) {
+                            J.genCheck();
+                            if (!JVM.collectContentSteps) { c = JVM.collectContent(vm, modId); return; }
+                            gen = JVM.collectContentSteps(vm, modId);
+                        }
+                        var st = gen.next();
+                        if (st.done) { c = st.value; return; }
+                        return [collect];
+                    } };
+                    steps.push(collect);
+                    return runJavaSteps(steps, prog).then(function () {
+                    if (coremodOnly) {
+                        J.reports[modId] = JVM.javaReport(vm, modId, { loader: kind.loader, version: kind.version, cant: JVM.COREMOD_ONLY_CANT });
+                        problem('', "Can't run: " + JVM.COREMOD_ONLY_CANT);
+                        return {};
+                    }
                     if (JVM.dungeonExtras && Module._mcDungeonExtras) { try { Module.ccall('mcDungeonExtras', 'number', ['string'], [JVM.dungeonExtras(vm, itemRef)]); } catch (x) { console.warn('[java] dungeon loot', x); } }
                     J.decls[modId] = JVM.javaSettings ? JVM.javaSettings(vm, modId) : [];
                     if (JVM.javaSettings) Object.keys(J.decls).forEach(function (o) {
@@ -4062,7 +4297,9 @@
                     var lang = Object.keys(c.lang).map(function (k) { return k + '=' + c.lang[k]; }).join('\n');
                     if (lang) add['lang/en_us.lang'] = enc.encode(lang + '\n');
                     return Promise.all(cuts).then(function () { return add; });
+                    });
                 }).catch(function (e) {
+                    J.defining = false;
                     problem('', 'Java mod could not run: ' + (e && e.message || e));
                     return {};
                 });
@@ -4123,11 +4360,12 @@
                 if (Module._syncSaves) Module._syncSaves();
             }
 
-            function inflate(data) {
-                return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()
-                    .then(function (ab) { return new Uint8Array(ab); });
-            }
-            function readZip(bytes) {
+            function zipEntries(bytes, MAX_FILES) {
+                var inflate = function (data) {
+                    var ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter();
+                    w.write(data).catch(function () { }); w.close().catch(function () { });
+                    return new Response(ds.readable).arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+                };
                 var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), n = bytes.length, eocd = -1;
                 for (var i = n - 22; i >= Math.max(0, n - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
                 if (eocd < 0) return Promise.reject(new Error("isn't a .zip file"));
@@ -4151,6 +4389,56 @@
                     else return Promise.reject(new Error('uses an unsupported compression'));
                 }
                 return Promise.all(jobs).then(function () { return out; });
+            }
+            function readZip(bytes) { return zipEntries(bytes, MAX_FILES); }
+            var zipWorkers = [], zipJobs = {}, zipSeq = 0, zipWorkerOff = false;
+            var ZIP_WORKERS = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+            function zipWorkerMain(entries) {
+                self.onmessage = function (ev) {
+                    var d = ev.data;
+                    entries(d.bytes, d.max).then(function (out) {
+                        var tr = [], seen = new Set();
+                        Object.keys(out).forEach(function (k) { var b = out[k].buffer; if (!seen.has(b)) { seen.add(b); tr.push(b); } });
+                        self.postMessage({ id: d.id, files: out }, tr);
+                    }, function (e) { self.postMessage({ id: d.id, err: String(e && e.message || e) }); });
+                };
+            }
+            var zipUrl = null;
+            function zipWorkerFor() {
+                if (zipWorkerOff) return null;
+                var best = null;
+                zipWorkers.forEach(function (z) { if (!best || z.busy < best.busy) best = z; });
+                if (best && (best.busy === 0 || zipWorkers.length >= ZIP_WORKERS)) return best;
+                try {
+                    if (!zipUrl) zipUrl = URL.createObjectURL(new Blob(['(' + zipWorkerMain.toString() + ')(' + zipEntries.toString() + ')'], { type: 'text/javascript' }));
+                    var z = { w: new Worker(zipUrl), busy: 0 };
+                    z.w.onmessage = function (ev) {
+                        var j = zipJobs[ev.data.id];
+                        if (!j) return;
+                        delete zipJobs[ev.data.id];
+                        z.busy--;
+                        if (ev.data.err) j.rej(new Error(ev.data.err)); else j.res(ev.data.files);
+                    };
+                    z.w.onerror = function () {
+                        zipWorkerOff = true;
+                        zipWorkers.forEach(function (o) { try { o.w.terminate(); } catch (e) { } });
+                        zipWorkers = [];
+                        var left = zipJobs; zipJobs = {};
+                        Object.keys(left).forEach(function (k) { readZip(left[k].bytes).then(left[k].res, left[k].rej); });
+                    };
+                    zipWorkers.push(z);
+                    return z;
+                } catch (e) { if (!zipWorkers.length) zipWorkerOff = true; return best; }
+            }
+            function readZipOff(bytes) {
+                var z = zipWorkerFor();
+                if (!z) return readZip(bytes);
+                return new Promise(function (res, rej) {
+                    var id = ++zipSeq;
+                    zipJobs[id] = { res: res, rej: rej, bytes: bytes };
+                    try { z.w.postMessage({ id: id, bytes: bytes, max: MAX_FILES }); z.busy++; }
+                    catch (e) { delete zipJobs[id]; readZip(bytes).then(res, rej); }
+                });
             }
 
             function classNameOf(b) {
@@ -4611,15 +4899,28 @@
                 all.forEach(function (p) { out.set(p, o); o += p.length; });
                 return out;
             }
+            var zipMemo = null, memoHolds = 0;
+            function memoHold() { memoHolds++; if (!zipMemo) zipMemo = new Map(); }
+            function memoRelease() { if (memoHolds > 0 && --memoHolds === 0) zipMemo = null; }
             function filesOf(x, ask) {
+                var key = x.dev ? x : x.bytes || null;
+                if (!key && x.file) { try { var st = FS.stat(x.file); key = x.file + '|' + st.size + '|' + (+st.mtime); } catch (e) { key = null; } }
+                if (zipMemo && key && zipMemo.has(key)) return zipMemo.get(key);
+                var p;
                 if (x.dev) {
-                    return devAllowed(x.dev, ask).then(function (ok) {
+                    p = devAllowed(x.dev, ask).then(function (ok) {
                         if (!ok) throw new Error("can't be read until you allow it again: press Reload");
                         return readFolder(x.dev);
                     }).then(function (files) { x.zip = null; return files; });
+                } else p = readZipOff(x.bytes || FS.readFile(x.file));
+                if (zipMemo && key) {
+                    var memo = zipMemo;
+                    memo.set(key, p);
+                    p.catch(function () { memo.delete(key); });
                 }
-                return readZip(x.bytes || FS.readFile(x.file));
+                return p;
             }
+            function nameOf(x) { return String((x.m && x.m.name) || x.id || ''); }
             function zipOf(x) {
                 if (!x.dev) return Promise.resolve(x.bytes || FS.readFile(x.file));
                 if (x.zip) return Promise.resolve(x.zip);
@@ -4654,11 +4955,11 @@
                 return parts.join(', ');
             }
             var loading = Promise.resolve();
-            function load(ask) {
-                loading = loading.then(function () { return loadNow(ask); }, function () { return loadNow(ask); });
+            function load(ask, onListed) {
+                loading = loading.then(function () { return loadNow(ask, onListed); }, function () { return loadNow(ask, onListed); });
                 return loading;
             }
-            function loadNow(ask) {
+            function loadNow(ask, onListed) {
                 var st = null, found = {};
                 var add = function (dir, bundled) {
                     var list = [];
@@ -4687,8 +4988,14 @@
                     var order = (st.order || []).filter(function (id) { return found[id]; });
                     Object.keys(found).sort().forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
                     mods = order.map(function (id) { return found[id]; });
-                    return mods.reduce(function (pr, x) {
+                    if (onListed) onListed();
+                    var ML = Module.mcModLoad, reading = ML && ML.active && ML.stage === 0;
+                    if (reading) ML.enter(0, mods.length);
+                    if (zipMemo) mods.filter(function (x) { return !x.dev; }).sort(function (a, b) { return (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0); })
+                        .forEach(function (x) { filesOf(x, ask).catch(function () { }); });
+                    return mods.reduce(function (pr, x, xi) {
                         return pr.then(function () {
+                            if (reading) ML.step(xi, nameOf(x));
                             return filesOf(x, ask).then(function (files) {
                                 files = normalise(files);
                                 x.m = manifestOf(files, x.dev ? x.dev.name : x.id + '.zip');
@@ -4700,8 +5007,9 @@
                                 x.icon = iconOf(x.contentId || x.id, files, x.m);
                                 x.contents = contentsOf(files);
                                 x.err = '';
+                                if (x.enabled && x.m && x.m.java && Module.mcJava && Module.mcJava.prefetch) Module.mcJava.prefetch();
                             }).catch(function (e) { x.err = 'This mod ' + e.message; if (!x.dev) x.enabled = false; });
-                        });
+                        }).then(ML ? ML.pass : null);
                     }, Promise.resolve()).then(function () { listed = true; });
                 });
             }
@@ -4787,11 +5095,14 @@
                 if (Module.mcJava) Module.mcJava.begin();
                 var javaFiles = {};
                 var rankOf = function (x) { return x.justAdded ? -Infinity : -(x.onAt || 0) * 1000 + mods.indexOf(x); };
-                var javaPick = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x) {
-                    return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
+                var ML = Module.mcModLoad;
+                ML.enter(0, on.length);
+                if (zipMemo) on.forEach(function (x) { if (!x.dev) filesOf(x, ask).catch(function () { }); });
+                var javaPick = !Module.mcJava ? Promise.resolve() : on.reduce(function (pr, x, xi) {
+                    return pr.then(function () { ML.step(xi, nameOf(x)); return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
                         if (Module.mcJava.hasClasses(files)) javaFiles[cid(x)] = { x: x, files: files };
-                    }, function () { });
+                    }, function () { }).then(ML.pass);
                 }, Promise.resolve()).then(function () {
                     var list = Object.keys(javaFiles).map(function (id) { return { id: id, files: javaFiles[id].files, rank: rankOf(javaFiles[id].x) }; });
                     return Module.mcJava.pickTag(list);
@@ -4813,16 +5124,18 @@
                     }
                 });
                 var javaPre = !Module.mcJava ? Promise.resolve() : javaPick.then(function () {
-                    return Object.keys(javaFiles).reduce(function (pr, id) {
-                        return pr.then(function () { return Module.mcJava.preload(id, javaFiles[id].files, function (file, text) { problem(id, file, text, 'load'); }); });
+                    var ids = Object.keys(javaFiles);
+                    ML.enter(1, ids.length);
+                    return ids.reduce(function (pr, id, ii) {
+                        return pr.then(function () { ML.step(ii, nameOf(javaFiles[id].x)); return Module.mcJava.preload(id, javaFiles[id].files, function (file, text) { problem(id, file, text, 'load'); }); }).then(ML.pass);
                     }, Promise.resolve());
-                });
-                return on.reduce(function (pr, x) {
+                }).then(function () { ML.enter(2, on.length); });
+                return on.reduce(function (pr, x, xi) {
                     var id = cid(x);
-                    return pr.then(function () { return filesOf(x, ask); }).then(function (files) {
+                    return pr.then(function () { ML.step(xi, nameOf(x)); return filesOf(x, ask); }).then(function (files) {
                         files = forPlatform(normalise(files));
                         if (!Module.mcJava || !Module.mcJava.hasClasses(files)) return files;
-                        return Module.mcJava.define(id, files, function (file, text) { problem(id, file, text, 'load'); }).then(function (add) {
+                        return Module.mcJava.define(id, files, function (file, text) { problem(id, file, text, 'load'); }, function (label, part) { ML.step(xi, nameOf(x), label, part); }).then(function (add) {
                             Object.keys(add).forEach(function (k) {
                                 if (/^textures[/]/.test(k)) javaOwnTex[id + ':' + k.toLowerCase()] = 1;
                                 if (k === 'lang/en_us.lang' && files[k]) { var a = files[k], b = add[k], m2 = new Uint8Array(a.length + 1 + b.length); m2.set(a); m2[a.length] = 10; m2.set(b, a.length + 1); files[k] = m2; }
@@ -4954,10 +5267,12 @@
                             }
                         });
                         return jobs;
-                    }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); });
+                    }).catch(function (e) { x.err = 'This mod ' + (e && e.message || 'failed'); }).then(ML.pass);
                 }, javaPre).then(function () {
                     scriptList = scripts;
                     modpeInfo = { scripts: [], maps: {} };
+                    ML.enter(3, 3);
+                    if (modpeFiles.length) ML.step(0, 'ModPE scripts');
                     var mp = Module.mcModpe && modpeFiles.length ? Module.mcModpe.define(modpeFiles) : Promise.resolve({});
                     return mp.then(function (defs) {
                         var enc = new TextEncoder();
@@ -4968,13 +5283,16 @@
                             modpeInfo.maps[mod] = c.map;
                         });
                         modpeInfo.scripts = modpeFiles.filter(function (s) { return !s.session; });
-                        return decodeSchematics(schems);
-                    }).then(function (sch) { return buildContent(content, newTex, sheets, lang, sch, schems); });
-                }).then(function (warn) {
+                        if (schems.length) ML.step(1, 'Structures');
+                        return Promise.resolve(ML.pass()).then(function () { return decodeSchematics(schems); });
+                    }).then(ML.pass).then(function (sch) { ML.step(2, 'Blocks, items and recipes'); return buildContent(content, newTex, sheets, lang, sch, schems); });
+                }).then(ML.pass).then(function (warn) {
                     unknown += warn || 0;
-                    return Object.keys(sheets).reduce(function (pr, fp) {
-                        return pr.then(function () { return canvasPng(sheets[fp]); }).then(function (png) { FS.writeFile(fp, png); });
-                    }, Promise.resolve());
+                    var fps = Object.keys(sheets);
+                    ML.enter(4, fps.length + 1);
+                    return fps.reduce(function (pr, fp, fi) {
+                        return pr.then(function () { ML.step(fi, fp.split('/').pop()); return canvasPng(sheets[fp]); }).then(function (png) { FS.writeFile(fp, png); }).then(ML.pass);
+                    }, Promise.resolve()).then(function () { ML.step(fps.length, 'Text and sounds'); });
                 }).then(function () {
                     if (lang.length) {
                         var lp = '/data/lang/en_US.lang';
@@ -6864,7 +7182,14 @@
                 var sameNote = dropSameMods();
                 var keep = status;
                 busy = true; bump('Applying mods...');
+                var ML = Module.mcModLoad, ownLoad = !ML.active;
+                if (ownLoad) ML.begin(false);
+                memoHold();
                 return applyAll(ask).then(function (unknown) {
+                    if (!tell || !Module._mcModsApplied) return unknown;
+                    ML.enter(5, 1); ML.step(0, 'Reloading textures');
+                    return ML.yieldNow().then(function () { return unknown; });
+                }).then(function (unknown) {
                     busy = false;
                     var n = api.problemCount(), note = [sameNote, applyNote].filter(Boolean).join(' ');
                     applyNote = '';
@@ -6880,21 +7205,44 @@
                     console.error('[mods] applying failed', e);
                     bump('Mods: ' + (e && e.message || e));
                     failed = true;
-                });
+                }).then(function () { memoRelease(); if (ownLoad) ML.end(); });
             }
             var failed = false;
             var applied = 0;
 
             api.hasTexture = function (kind, n) { return !!names && cellsFor(kind, String(n || '').toLowerCase()).length > 0; };
             api.cellOf = function (kind, n) { var c = names ? cellsFor(kind, String(n || '').toLowerCase()) : []; return c.length ? c[0] : -1; };
+            var STALL_MS = 30000;
             api.startup = function (done) {
-                var finished = false;
-                var go = function () { if (!finished) { finished = true; done(); } };
-                setTimeout(go, 8000);
+                var finished = false, ML = Module.mcModLoad, dog = null;
+                var go = function () {
+                    if (finished) return;
+                    finished = true;
+                    if (dog) clearInterval(dog);
+                    if (ML.active && ML.startup) { ML.enter(5, 1); ML.step(0, 'Starting the game'); }
+                    try { done(); } finally { if (ML.active && ML.startup) ML.end(); }
+                };
                 try { names = JSON.parse(new TextDecoder().decode(FS.readFile('/data/images/atlas_names.json'))); } catch (e) { names = null; }
                 if (typeof DecompressionStream === 'undefined' || typeof createImageBitmap === 'undefined') { bump('Mods need a newer browser'); go(); return; }
-                var after = function () { if (finished) { if (Module._mcModsApplied) Module._mcModsApplied(); } else go(); };
-                load().then(function () {
+                var lastSeq = -1, lastMove = Date.now();
+                dog = setInterval(function () {
+                    if (ML.seq !== lastSeq || !ML.active) { lastSeq = ML.seq; lastMove = Date.now(); return; }
+                    if (Date.now() - lastMove < STALL_MS) return;
+                    console.warn('[mods] loading made no progress for ' + (STALL_MS / 1000) + ' s - starting the game; the mods finish loading over it');
+                    ML.startup = false;
+                    go();
+                }, 1000);
+                var after = function () {
+                    memoRelease();
+                    if (!finished) { go(); return; }
+                    if (!Module._mcModsApplied) { ML.end(); return; }
+                    ML.enter(5, 1); ML.step(0, 'Reloading textures');
+                    ML.yieldNow().then(function () { try { Module._mcModsApplied(); } finally { ML.end(); } });
+                };
+                memoHold();
+                load(false, function () {
+                    if (mods.some(function (x) { return x.enabled; })) ML.begin(true);
+                }).then(function () {
                     return mods.some(function (x) { return x.enabled && !x.err; }) ? reapply(false) : null;
                 }).then(after, after);
             };
@@ -7300,14 +7648,16 @@
                 failed = false;
                 Object.keys(problems).forEach(function (k) { problems[k] = []; });
                 mods.forEach(function (x) { x.hash = null; x.zip = null; });
-                return load(true).then(function () {
+                var ML = Module.mcModLoad, ownLoad = !ML.active;
+                memoHold();
+                return load(true, function () { if (ownLoad && mods.some(function (x) { return x.enabled; })) ML.begin(false); }).then(function () {
                     var on = mods.filter(function (x) { return x.enabled && !x.err; }).length;
                     return reapply(true, true).then(function () {
                         if (failed) return;
                         var n = api.problemCount();
                         bump('Reloaded ' + on + (on === 1 ? ' mod' : ' mods') + (n ? ' - ' + n + (n === 1 ? ' problem' : ' problems') + ', choose a mod to see them' : ''));
                     });
-                }).catch(function (e) { bump('Reload: ' + (e && e.message || e)); }).then(function () { if (done) done(); });
+                }).catch(function (e) { bump('Reload: ' + (e && e.message || e)); }).then(function () { memoRelease(); if (ownLoad) ML.end(); if (done) done(); });
             };
             api.canFolder = function () { return typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined'; };
             function addFolder() {

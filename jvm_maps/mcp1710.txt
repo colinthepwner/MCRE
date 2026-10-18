@@ -3159,6 +3159,7 @@ R	field_147026_u	logger
 R	field_146473_a	logger
 R	field_146109_a	mc
 R	field_147062_A	searchField
+R	field_148330_a	itemList
 R	field_148338_a	instance
 R	field_148336_b	rand
 R	field_147039_u	logger

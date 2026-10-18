@@ -9615,6 +9615,7 @@ JVM.runtimeLibsFor = function (vm, files) {
 		return names.some(function (k) {
 			var b = files[k];
 			if (!b || b.length < needle.length) return false;
+			if (typeof b !== 'string' && JVM.bytesHave) return JVM.bytesHave(b, needle);
 			var s = typeof b === 'string' ? b : latin1(b);
 			return s.indexOf(needle) >= 0;
 		});
@@ -12442,7 +12443,7 @@ function installWorld(vm, def) {
 	} });
 }
 
-JVM.collectContent = function (vm, modId) {
+function* collectContentSteps(vm, modId) {
 	modId = modId || '';
 	var r = reg(vm), out = { blocks: {}, items: {}, recipes: [], lang: {}, textures: {}, scripted: { blocks: {}, items: {} } };
 	var bc = vm.loadClass(SRC + 'Block'), ic = vm.loadClass(SRC + 'Item');
@@ -12513,7 +12514,9 @@ JVM.collectContent = function (vm, modId) {
 	var SOUND_OF = { stone: 'stone', wood: 'wood', gravel: 'gravel', grass: 'grass', metal: 'metal', glass: 'glass', cloth: 'cloth', sand: 'sand' };
 	var TOOL_OF = { rock: 'pickaxe', iron: 'pickaxe', anvil: 'pickaxe', wood: 'axe', pumpkin: 'axe', ground: 'shovel', grass: 'shovel', sand: 'shovel', clay: 'shovel', snow: 'shovel', craftedSnow: 'shovel' };
 
-	Object.keys(r.blocks).forEach(function (idS) {
+	var blockList = Object.keys(r.blocks);
+	for (var blockI = 0, blockN = blockList.length; blockI < blockN; blockI++) {
+	(function (idS) {
 		var b = r.blocks[idS], id = +idS;
 		if (b.$mod !== modId || b.$override) return;
 		if (stFiles && JVM.stationConnected && safe(function () { return JVM.stationConnected(vm, b, stFiles); }, false)) b.$stConnected = true;
@@ -12543,7 +12546,9 @@ JVM.collectContent = function (vm, modId) {
 				if (/^Block \d/.test(e.name) && base && base.name) e.name = base.name;
 			}
 		});
-	});
+	})(blockList[blockI]);
+	yield 'block';
+	}
 	function jitterAt(x, y, z) {
 		var l = BigInt.asIntN(64, BigInt(Math.imul(x, 3129871)) ^ BigInt.asIntN(64, BigInt(z) * 116129781n) ^ BigInt(y));
 		l = BigInt.asIntN(64, l * l * 42317861n + l * 11n);
@@ -12957,11 +12962,15 @@ JVM.collectContent = function (vm, modId) {
 		}
 		out.blocks[JVM.contentName(vm, id, meta)] = json;
 	}
-	Object.keys(r.items).forEach(function (idS) {
+	var itemList = Object.keys(r.items);
+	for (var itemI = 0, itemN = itemList.length; itemI < itemN; itemI++) {
+	(function (idS) {
 		var it = r.items[idS], id = +idS;
 		if (it.$mod !== modId || it.$override) return;
 		JVM.variantsOf(vm, it).forEach(function (meta) { itemEntry(it, id, meta); });
-	});
+	})(itemList[itemI]);
+	yield 'item';
+	}
 	function foodOwn(it, id, meta, json) {
 		var fp = JVM.foodProbe ? JVM.foodProbe(vm, it, id, meta) : null;
 		if (!fp) return;
@@ -13065,7 +13074,8 @@ JVM.collectContent = function (vm, modId) {
 	});
 	Object.keys(r.lang).forEach(function (k) { out.lang[k] = r.lang[k]; });
 	if (JVM.collectMobs) {
-		var cm = JVM.collectMobs(vm, modId, ref, safe);
+		yield 'mobs';
+		var cm = JVM.collectMobsSteps ? yield* JVM.collectMobsSteps(vm, modId, ref, safe) : JVM.collectMobs(vm, modId, ref, safe);
 		out.mobs = cm.mobs; out.mobFiles = cm.files; out.mobsSkipped = cm.skipped;
 		if (cm.skipped.length) vm.log('out', 'entities left out (not creatures, or nothing to draw them with): ' + cm.skipped.join(', '));
 	}
@@ -13111,6 +13121,12 @@ JVM.collectContent = function (vm, modId) {
 		if (ce.length) out.creative = { entries: ce };
 	}
 	return out;
+}
+JVM.collectContentSteps = collectContentSteps;
+JVM.collectContent = function (vm, modId) {
+	var g = collectContentSteps(vm, modId), r = g.next();
+	while (!r.done) r = g.next();
+	return r.value;
 };
 
 JVM.foodProbe = function (vm, it, id, meta) {
@@ -14115,6 +14131,37 @@ JVM.pose = function (vm, model, entity) {
 	JVM.run(vm, function () { vm.callVirtual(model, 'setRotationAngles', '(FFFFFFLnet/minecraft/src/Entity;)V', [0, 0, 0, 0, 0, 0.0625, e]); });
 	callIfOwn(vm, model, 'setRotationAngles(FFFFFF)V', [0, 0, 0, 0, 0, 0.0625]);
 };
+var fitTables = (function () {
+	var make = function (k, n, step) {
+		var c = new Float64Array(n), s = new Float64Array(n), cc = 0, ss = 0, cs = 0, sc = 0, sn = 0;
+		for (var i = 0; i < n; i++) {
+			var x = i * step, ci = Math.cos(k * x), si = Math.sin(k * x);
+			c[i] = ci; s[i] = si;
+			cc += ci * ci; ss += si * si; cs += ci * si; sc += ci; sn += si;
+		}
+		var det = n * (cc * ss - cs * cs) - sc * (sc * ss - cs * sn) + sn * (sc * cs - cc * sn);
+		return { k: k, c: c, s: s, cc: cc, ss: ss, cs: cs, sc: sc, sn: sn, det: det };
+	};
+	var coarseBy = {}, fineBy = {}, fineCount = 0;
+	return {
+		coarse: function (n, step) {
+			var key = n + '|' + step;
+			if (coarseBy[key]) return coarseBy[key];
+			var out = [];
+			for (var kc = 0.05; kc <= 6; kc += 0.02) out.push(make(kc, n, step));
+			return (coarseBy[key] = out);
+		},
+		fine: function (n, step, k0) {
+			var key = n + '|' + step + '|' + k0;
+			if (fineBy[key]) return fineBy[key];
+			if (fineCount >= 64) { fineBy = {}; fineCount = 0; }
+			var out = [];
+			for (var kf = Math.max(0.05, k0 - 0.03); kf <= Math.min(6, k0 + 0.03); kf += 0.001) out.push(make(kf, n, step));
+			fineCount++;
+			return (fineBy[key] = out);
+		},
+	};
+})();
 JVM.probeAnims = function (vm, model, entity, idOf) {
 	var own = function (k) { var mm = model.cls.findMethod(k); return !!(mm && !mm.cls.native); };
 	var viaRender = own('render(Lnet/minecraft/src/Entity;FFFFFF)V');
@@ -14143,25 +14190,22 @@ JVM.probeAnims = function (vm, model, entity, idOf) {
 		if (hi - lo < 0.03) return null;
 		var best = null, n = y.length, sy = 0;
 		for (var q = 0; q < n; q++) sy += y[q];
-		var tryK = function (k) {
-			var cc = 0, ss = 0, cs = 0, yc = 0, ys = 0, sc = 0, sn = 0;
-			for (var i = 0; i < n; i++) {
-				var x = i * STEP, c = Math.cos(k * x), s = Math.sin(k * x);
-				cc += c * c; ss += s * s; cs += c * s; yc += y[i] * c; ys += y[i] * s; sc += c; sn += s;
-			}
-			var M = [[n, sc, sn], [sc, cc, cs], [sn, cs, ss]], R = [sy, yc, ys];
-			var d3 = function (A3) { return A3[0][0] * (A3[1][1] * A3[2][2] - A3[1][2] * A3[2][1]) - A3[0][1] * (A3[1][0] * A3[2][2] - A3[1][2] * A3[2][0]) + A3[0][2] * (A3[1][0] * A3[2][1] - A3[1][1] * A3[2][0]); };
-			var det = d3(M);
+		var tryK = function (T) {
+			var k = T.k, C = T.c, S = T.s, sc = T.sc, sn = T.sn, cc = T.cc, ss = T.ss, cs = T.cs, yc = 0, ys = 0;
+			for (var i = 0; i < n; i++) { yc += y[i] * C[i]; ys += y[i] * S[i]; }
+			var det = T.det;
 			if (Math.abs(det) < 1e-6) return;
-			var col = function (ci) { return M.map(function (row, ri) { return row.map(function (v, cj) { return cj === ci ? R[ri] : v; }); }); };
-			var m = d3(col(0)) / det, a = d3(col(1)) / det, b = d3(col(2)) / det, res = 0;
-			for (var j = 0; j < n; j++) { var xj = j * STEP, e = y[j] - m - a * Math.cos(k * xj) - b * Math.sin(k * xj); res += e * e; }
+			var m = (sy * (cc * ss - cs * cs) - sc * (yc * ss - cs * ys) + sn * (yc * cs - cc * ys)) / det,
+				a = (n * (yc * ss - cs * ys) - sy * (sc * ss - cs * sn) + sn * (sc * ys - yc * sn)) / det,
+				b = (n * (cc * ys - yc * cs) - sc * (sc * ys - yc * sn) + sy * (sc * cs - cc * sn)) / det, res = 0;
+			for (var j = 0; j < n; j++) { var e = y[j] - m - a * C[j] - b * S[j]; res += e * e; }
 			if (!best || res < best.res) best = { k: k, m: m, a: a, b: b, res: res };
 		};
-		for (var kc = 0.05; kc <= 6; kc += 0.02) tryK(kc);
+		var coarse = fitTables.coarse(n, STEP);
+		for (var ci = 0; ci < coarse.length; ci++) tryK(coarse[ci]);
 		if (!best) return null;
-		var k0 = best.k;
-		for (var kf = Math.max(0.05, k0 - 0.03); kf <= Math.min(6, k0 + 0.03); kf += 0.001) tryK(kf);
+		var fine = fitTables.fine(n, STEP, best.k);
+		for (var fi = 0; fi < fine.length; fi++) tryK(fine[fi]);
 		var A = Math.sqrt(best.a * best.a + best.b * best.b);
 		if (A < 0.02 || Math.sqrt(best.res / n) > 0.12 * A || best.k > 5.99) return null;
 		return [+best.k.toFixed(4), +A.toFixed(4), +Math.atan2(-best.b, best.a).toFixed(4), +best.m.toFixed(4)];
@@ -15347,9 +15391,17 @@ function gatherHandlers(vm, cls) {
 var MOD_SIG = 'Lcpw/mods/fml/common/Mod;';
 function bytesHave(b, s) {
 	var n = s.length, first = s.charCodeAt(0);
-	outer: for (var i = 0, end = b.length - n; i <= end; i++) {
-		if (b[i] !== first) continue;
-		for (var k = 1; k < n; k++) if (b[i + k] !== s.charCodeAt(k)) continue outer;
+	if (b && typeof b.indexOf === 'function') {
+		for (var i = b.indexOf(first), end = b.length - n; i >= 0 && i <= end; i = b.indexOf(first, i + 1)) {
+			var k = 1;
+			while (k < n && b[i + k] === s.charCodeAt(k)) k++;
+			if (k === n) return true;
+		}
+		return false;
+	}
+	outer: for (var i2 = 0, end2 = b.length - n; i2 <= end2; i2++) {
+		if (b[i2] !== first) continue;
+		for (var k2 = 1; k2 < n; k2++) if (b[i2 + k2] !== s.charCodeAt(k2)) continue outer;
 		return true;
 	}
 	return false;
@@ -15367,7 +15419,12 @@ JVM.findForgeMods = function (vm, classes) {
 	});
 };
 JVM.forgeLoad = function (vm, modClasses, allClasses, info, extra) {
-	var f = forge(vm), mods = [];
+	var plan = JVM.forgeLoadSteps(vm, modClasses, allClasses, info, extra);
+	plan.steps.forEach(function (s) { s.run(); });
+	return plan.mods;
+};
+JVM.forgeLoadSteps = function (vm, modClasses, allClasses, info, extra) {
+	var f = forge(vm), mods = [], steps = [];
 	(extra || []).forEach(function (m) { if (f.mods.indexOf(m) < 0) f.mods.push(m); });
 	modClasses.forEach(function (cn) {
 		var cls = vm.loadClass(cn), a = JVM.annotation(vm, cls.cf.annotations, 'cpw/mods/fml/common/Mod');
@@ -15386,59 +15443,69 @@ JVM.forgeLoad = function (vm, modClasses, allClasses, info, extra) {
 		if (!r.ok) vm.log('error', mod.id + ': ' + what + ' failed');
 		return r;
 	};
-	f.state = 'CONSTRUCTING';
+	steps.push({ phase: 'constructing', mod: null, run: function () { f.state = 'CONSTRUCTING'; } });
 	mods.forEach(function (mod) {
-		step(mod, 'construction', function () {
-			vm.initClass(mod.cls);
-			mod.instance = vm.newObject(mod.cls);
-			var ctor = mod.cls.findDeclared('<init>()V');
-			if (ctor) vm.invoke(ctor, mod.instance, []);
-		});
-		allClasses.forEach(function (cn) {
-			var src = vm.sources[cn];
-			if (src && !bytesHave(src.bytes, 'SidedProxy;')) return;
-			var c = vm.loadClass(cn);
-			if (!c.cf) return;
-			Object.keys(c.fields).forEach(function (fn) {
-				var fd = c.fields[fn], sp = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/SidedProxy');
-				if (!sp) return;
-				var forMod = sval(sp, 'modId', '');
-				if (forMod && forMod !== mod.id) return;
-				var target = sval(sp, 'clientSide', '') || sval(sp, 'serverSide', '');
-				if (!target) return;
-				step(mod, '@SidedProxy ' + target, function () {
-					vm.initClass(c);
-					var pc = vm.loadClass(target.replace(/[.]/g, '/'));
-					var o = vm.newObject(pc), k = pc.findDeclared('<init>()V');
-					if (k) vm.invoke(k, o, []);
-					if (fd.static) c.statics[fn] = o;
+		steps.push({ phase: 'construct', mod: mod, run: function () {
+			step(mod, 'construction', function () {
+				vm.initClass(mod.cls);
+				mod.instance = vm.newObject(mod.cls);
+				var ctor = mod.cls.findDeclared('<init>()V');
+				if (ctor) vm.invoke(ctor, mod.instance, []);
+			});
+			allClasses.forEach(function (cn) {
+				var src = vm.sources[cn];
+				if (src && !bytesHave(src.bytes, 'SidedProxy;')) return;
+				var c = vm.loadClass(cn);
+				if (!c.cf) return;
+				Object.keys(c.fields).forEach(function (fn) {
+					var fd = c.fields[fn], sp = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/SidedProxy');
+					if (!sp) return;
+					var forMod = sval(sp, 'modId', '');
+					if (forMod && forMod !== mod.id) return;
+					var target = sval(sp, 'clientSide', '') || sval(sp, 'serverSide', '');
+					if (!target) return;
+					step(mod, '@SidedProxy ' + target, function () {
+						vm.initClass(c);
+						var pc = vm.loadClass(target.replace(/[.]/g, '/'));
+						var o = vm.newObject(pc), k = pc.findDeclared('<init>()V');
+						if (k) vm.invoke(k, o, []);
+						if (fd.static) c.statics[fn] = o;
+					});
 				});
 			});
-		});
-		Object.keys(mod.cls.fields).forEach(function (fn) {
-			var fd = mod.cls.fields[fn];
-			var ia = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Instance');
-			if (ia) {
-				var want = sval(ia, 'value', '');
-				var target = want && want !== mod.id ? modById(vm, want) : mod;
-				var v = target ? target.instance : null;
-				if (fd.static) mod.cls.statics[fn] = v; else if (mod.instance) mod.instance[':' + fn] = v;
-			}
-			if (JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Metadata')) {
-				var md = containerObj(vm, mod).$md;
-				if (fd.static) mod.cls.statics[fn] = md; else if (mod.instance) mod.instance[':' + fn] = md;
-			}
-		});
+			Object.keys(mod.cls.fields).forEach(function (fn) {
+				var fd = mod.cls.fields[fn];
+				var ia = JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Instance');
+				if (ia) {
+					var want = sval(ia, 'value', '');
+					var target = want && want !== mod.id ? modById(vm, want) : mod;
+					var v = target ? target.instance : null;
+					if (fd.static) mod.cls.statics[fn] = v; else if (mod.instance) mod.instance[':' + fn] = v;
+				}
+				if (JVM.annotation(vm, fd.annotations, 'cpw/mods/fml/common/Mod$Metadata')) {
+					var md = containerObj(vm, mod).$md;
+					if (fd.static) mod.cls.statics[fn] = md; else if (mod.instance) mod.instance[':' + fn] = md;
+				}
+			});
+		} });
 	});
-	if (JVM.netScan) JVM.netScan(vm);
-	mods = (extra || []).concat(mods);
+	steps.push({ phase: 'constructed', mod: null, run: function () {
+		if (JVM.netScan) JVM.netScan(vm);
+	} });
+	var all = (extra || []).concat(mods);
 	[['preInit', 'PREINITIALIZATION'], ['init', 'INITIALIZATION'], ['imc', 'INITIALIZATION'], ['postInit', 'POSTINITIALIZATION']].forEach(function (ph) {
-		f.state = ph[1];
-		mods.forEach(function (mod) { if (ph[0] !== 'imc' || (f.imc && f.imc[mod.id] && f.imc[mod.id].length)) JVM.forgePhase(vm, mod, ph[0]); });
+		steps.push({ phase: ph[0] + ':state', mod: null, run: function () { f.state = ph[1]; } });
+		all.forEach(function (mod) {
+			steps.push({ phase: ph[0], mod: mod, run: function () {
+				if (ph[0] !== 'imc' || (f.imc && f.imc[mod.id] && f.imc[mod.id].length)) JVM.forgePhase(vm, mod, ph[0]);
+			} });
+		});
 	});
-	f.state = 'AVAILABLE';
-	JVM.forgePost(vm, FORGE + 'client/event/sound/SoundLoadEvent', function (ev) { ev[':manager'] = JVM.soundManagerObj(vm); });
-	return mods;
+	steps.push({ phase: 'available', mod: null, run: function () {
+		f.state = 'AVAILABLE';
+		JVM.forgePost(vm, FORGE + 'client/event/sound/SoundLoadEvent', function (ev) { ev[':manager'] = JVM.soundManagerObj(vm); });
+	} });
+	return { mods: all, steps: steps };
 };
 JVM.forgeSortMods = function (mods) {
 	var idx = {}, n = mods.length;
@@ -22640,12 +22707,19 @@ JVM.coremodLoad = function (vm, modId, plugins, info) {
 };
 
 JVM.forgeLoadJar = function (vm, modId, files, classes, info) {
+	var plan = JVM.forgeLoadJarSteps(vm, modId, files, classes, info);
+	plan.steps.forEach(function (s) { s.run(); });
+	return plan.mods;
+};
+JVM.forgeLoadJarSteps = function (vm, modId, files, classes, info) {
 	var plugins = JVM.coremodPlugins(files, classes);
 	var core = plugins.length ? JVM.coremodLoad(vm, modId, plugins, info) : { mods: [], transformers: [] };
 	var forgeMods = JVM.findForgeMods(vm, classes);
-	if (!forgeMods.length && !core.mods.length) return [];
+	if (!forgeMods.length && !core.mods.length) return { mods: [], steps: [] };
 	vm.currentMod = modId;
-	return JVM.forgeLoad(vm, forgeMods, classes, info, core.mods);
+	var plan = JVM.forgeLoadSteps(vm, forgeMods, classes, info, core.mods);
+	plan.steps.forEach(function (s) { var run = s.run; s.run = function () { vm.currentMod = modId; return run(); }; });
+	return plan;
 };
 JVM.coremodOnlyPatches = function (vm, modId, classes) {
 	var c = vm.$coreMods && vm.$coreMods[modId];
@@ -24689,7 +24763,7 @@ function jemOf(vm, model, entity, yShift, idOf) {
 		return m;
 	}) };
 }
-JVM.collectMobs = function (vm, modId, ref, safe) {
+function* collectMobsSteps(vm, modId, ref, safe) {
 	var mb = mobs(vm), f = vm.mcReg && vm.mcReg.forge;
 	var out = { mobs: {}, files: {}, skipped: [] };
 	var ents = mb.entities.slice();
@@ -24835,7 +24909,9 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		if (ownUpd && JVM.objectIcon && safe(function () { return JVM.objectIcon(vm, ent, true); }, null)) { (mb.thrownObjects || (mb.thrownObjects = new Set())).add(e.cls); return; }
 		out.skipped.push(e.name + (look.skip ? ' (' + look.skip + ')' : ''));
 	};
-	ents.forEach(function (e) {
+	var entList = ents;
+	for (var entI = 0, entN = entList.length; entI < entN; entI++) {
+	(function (e) {
 		if (!e.cls || (e.mod || '') !== modId) return;
 		if (shotClasses.some(function (c) { return e.cls.isSubclassOf(c); })) return;
 		var key = String(e.name || e.cls.name.split('/').pop()).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
@@ -24984,8 +25060,16 @@ JVM.collectMobs = function (vm, modId, ref, safe) {
 		}
 		out.mobs[key] = json;
 		(mb.keys || (mb.keys = new Map())).set(e.cls, modId + ':' + key);
-	});
+	})(entList[entI]);
+	yield 'ent';
+	}
 	return out;
+}
+JVM.collectMobsSteps = collectMobsSteps;
+JVM.collectMobs = function (vm, modId, ref, safe) {
+	var g = collectMobsSteps(vm, modId, ref, safe), r = g.next();
+	while (!r.done) r = g.next();
+	return r.value;
 };
 
 function renderSetup(vm, rd, ent, quiet) {

@@ -7925,6 +7925,7 @@ R	field_82317_b	commandBlock
 R	field_82250_a	mc
 R	field_74242_o	inventory
 R	field_74237_t	searchField
+R	field_75185_e	itemList
 R	field_78061_a	instance
 R	field_78059_b	rand
 R	field_74207_v	theItemStack
