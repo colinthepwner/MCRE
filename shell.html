@@ -2022,17 +2022,22 @@
                                     var list = Array.isArray(msg.json.list) ? msg.json.list.slice(0, 64) : [];
                                     Module.mcMods.setJoinedMap(typeof msg.json.map === 'string' ? msg.json.map.slice(0, 1000000) : '');
                                     if (!list.length) { enter(); return; }
-                                    net.closePrompt = function () { if (prompt) { prompt.close(); prompt = null; } };
-                                    prompt = Module.mcMods.askJoin(list, function (yes, keep, ui) {
-                                        if (!yes) { prompt = null; fail('declined'); return; }
-                                        Module.mcMods.missing(list).then(function (ids) {
+                                    want = { list: list, keep: false, ids: [] };
+                                    Module.mcMods.missing(list).then(function (ids) {
+                                        if (!ids.length) {
+                                            return Module.mcMods.sameAsMine(list).then(function (same) {
+                                                return Module.mcMods.startSession(list, {}, false, same);
+                                            }).then(enter, function () { fail('mods'); });
+                                        }
+                                        net.closePrompt = function () { if (prompt) { prompt.close(); prompt = null; } };
+                                        prompt = Module.mcMods.askJoin(list.filter(function (o) { return ids.indexOf(o.id) >= 0; }), function (yes, keep, ui) {
+                                            if (!yes) { prompt = null; fail('declined'); return; }
                                             want = { list: list, keep: keep, ids: ids };
-                                            if (!ids.length) return finish();
                                             ui.progress('Downloading ' + ids.length + ' mod(s)...');
                                             sendCtl(c, { t: 'get', ids: ids });
                                             joinTimer = setTimeout(function () { fail('mods'); }, 120000);
-                                        }).catch(function () { fail('mods'); });
-                                    });
+                                        }, list.length - ids.length);
+                                    }).catch(function () { fail('mods'); });
                                 } else if (msg.part && want) {
                                     var p = msg.part, slot = parts[p.id] = parts[p.id] || { n: p.of, have: 0, bits: [] };
                                     if (!slot.bits[p.i]) { slot.bits[p.i] = p.data; slot.have++; }
@@ -3265,7 +3270,10 @@
                     if (e.t === 'place' && JV.stationBlockSet) JV.stationBlockSet(vm, world, x, y, z, bid, bdata);
                     if (!blk || !javaMods[blk.$mod]) { if (JV.hookVanillaBlock) JV.hookVanillaBlock(vm, e.t, bid, bdata, world, x, y, z, e.player ? M.playerObj(vm, null) : null); return; }
                     var pl = M.playerObj(vm, null);
-                    if (e.t === 'use') call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
+                    if (e.t === 'use') {
+                        var took = call(blk, SIG.activated, [world, x, y, z, pl, e.face != null ? e.face | 0 : 1, 0.5, 0.5, 0.5]);
+                        J.lastActivated = { x: x, y: y, z: z, res: took ? 1 : 0, t: Date.now() };
+                    }
                     else if (e.t === 'place') {
                         if (blk.$stStates && JV.stationState) JV.stationState.placed(vm, blk, world, x, y, z, pl, M.heldStack(vm), e.face);
                         if (JV.statePlaced) { forget(x, y, z); JV.statePlaced(vm, blk, world, x, y, z, e.face); forget(x, y, z); }
@@ -7859,18 +7867,31 @@
                     else if (exists('/data/web_mods/joined_map.txt')) FS.unlink('/data/web_mods/joined_map.txt');
                 } catch (e) { }
             };
+            api.sameAsMine = function (list) {
+                return Promise.all(mods.map(hashOf)).then(function () {
+                    if (session) return false;
+                    var mine = mods.filter(function (x) { return x.enabled && !x.err; }).map(function (x) { return x.hash; }).sort();
+                    var theirs = list.map(function (o) { return o.hash; }).sort();
+                    return mine.length === theirs.length && mine.every(function (h, i) { return h === theirs[i]; });
+                });
+            };
             api.missing = function (list) {
                 return Promise.all(mods.map(hashOf)).then(function () {
                     return list.filter(function (o) { return !mods.some(function (x) { return x.hash === o.hash; }); }).map(function (o) { return o.id; });
                 });
             };
-            api.startSession = function (list, got, keep) {
+            api.startSession = function (list, got, keep, same) {
                 return Promise.all(mods.map(hashOf)).then(function () {
                     session = list.map(function (o) {
                         if (got[o.id]) return { id: o.id, bytes: got[o.id] };
                         var mine = mods.filter(function (x) { return x.hash === o.hash; })[0];
                         return mine ? (mine.dev ? { id: o.id, bytes: mine.zip } : { id: o.id, file: mine.file }) : null;
                     }).filter(Boolean);
+                    if (same) {
+                        session.same = true;
+                        bump('Using your ' + session.length + ' mod(s) - the same as the game you joined');
+                        return;
+                    }
                     if (keep) {
                         Object.keys(got).forEach(function (id) {
                             var o = list.filter(function (e) { return e.id === id; })[0];
@@ -7893,14 +7914,16 @@
             };
             api.endSession = function () {
                 if (!session) return;
+                if (session.same) { session = null; bump(''); return; }
                 session = null;
                 bump('');
                 reapply(true);
             };
-            api.askJoin = function (list, done) {
+            api.askJoin = function (list, done, haveAlready) {
                 var total = list.reduce(function (s, o) { return s + (o.size || 0); }, 0);
                 var items = [{ t: 'text', text: 'Joining will download and turn on these mods while you play there. Mods change how the game looks and sounds. ' +
                     '\u00a7eOnly join games from people you trust.', color: 'd0d0d0' }];
+                if (haveAlready) items.push({ t: 'text', text: '(' + haveAlready + ' more of its mods you have already)', color: '999999' });
                 list.forEach(function (o) {
                     items.push({ t: 'text', align: 'left', text: '- ' + o.name + (o.version ? ' \u00a77' + o.version : '') + (o.author ? ' \u00a77by ' + o.author : '') });
                 });
