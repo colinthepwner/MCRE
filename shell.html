@@ -600,12 +600,45 @@
                 });
             }
             window.addEventListener('resize', function () { setTimeout(place, 50); });
+            D._clipQ = [];
+            D._clipDo = function (id, fid, paste) {
+                if (paste) {
+                    var done = function (t) { D._clipQ.push([id, 'p', fid, String(t || '')]); };
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.readText) {
+                            navigator.clipboard.readText().then(done, function () { D._clipQ.push([id, 'p', fid, '']); });
+                            return;
+                        }
+                    } catch (e) { }
+                    done('');
+                    return;
+                }
+                var cur = (D._fieldText || {})[id + ':' + fid];
+                var t = cur ? (cur.sel || cur.text) : '';
+                if (!t) return;
+                var ok = function () { D._clipQ.push([id, 'c', fid, '']); };
+                var did = false;
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = t; ta.setAttribute('readonly', '');
+                    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+                    document.body.appendChild(ta); ta.select();
+                    did = document.execCommand && document.execCommand('copy');
+                    ta.remove();
+                } catch (e) { }
+                if (did) { ok(); return; }
+                try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { }); } catch (e) { }
+            };
             D._rects = function (id, str) {
                 var d = D._byId[id], want = {}, layout = {};
                 String(str || '').split('\n').forEach(function (l) {
                     var f = l.split('\t');
                     if (f.length < 6 || !d) return;
                     layout[f[0] + ':' + f[1]] = [+f[2], +f[3], +f[4], +f[5]];
+                    if (f[0] === 'Y' || f[0] === 'V') {
+                        want[id + ':' + f[0] + ':' + f[1]] = { clip: f[0] === 'V' ? 'paste' : 'copy', fid: f[1], x: +f[2], y: +f[3], w: +f[4], h: +f[5] };
+                        return;
+                    }
                     if (f[0] !== 'B') return;
                     var b = (d.spec.buttons || []).filter(function (x) { return x.id === f[1]; })[0];
                     if (b && (b.file || b.activate)) want[id + ':' + f[1]] = { bid: f[1], x: +f[2], y: +f[3], w: +f[4], h: +f[5] };
@@ -615,7 +648,9 @@
                     if (k.indexOf(id + ':') === 0 && !want[k]) { placed[k].el.remove(); delete placed[k]; }
                 });
                 Object.keys(want).forEach(function (k) {
-                    var w = want[k], b = (d.spec.buttons || []).filter(function (x) { return x.id === w.bid; })[0];
+                    var w = want[k];
+                    var b = w.clip ? { label: w.clip === 'paste' ? 'Paste' : 'Copy', activate: function () { D._clipDo(id, w.fid, w.clip === 'paste'); } }
+                        : (d.spec.buttons || []).filter(function (x) { return x.id === w.bid; })[0];
                     if (!b) return;
                     var p = placed[k];
                     if (!p) {
