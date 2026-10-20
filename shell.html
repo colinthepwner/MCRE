@@ -11306,7 +11306,7 @@
             }
             function botRules() {
                 var b = function (n, d) { var v = rule(n); return (v === undefined ? d : v) ? 1 : 0; };
-                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled && !botMobile(null) ? 1 : 0]);
+                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) ? 1 : 0]);
             }
             function botCmd(fields) {
                 var r = json(cc('mcBotCmd', 'string', ['string'], [fields.map(function (x) { return String(x == null ? '' : x).replace(/[\t\n]/g, ' '); }).join('\t')]));
@@ -11423,7 +11423,7 @@
                 if (rule('botOpsOnly') === true && !sd.op) fail('Only operators may command bots here.');
                 if (joined()) fail('Bots live in the host\'s world.');
                 botRules();
-                if (botConf().enabled === false && !/^(help|settings|ai|ollama)$/i.test(String(a[0] || ''))) fail('Bots are switched off (Settings > Bot).');
+                if (botConf().enabled !== true && !/^(help|settings|ai|ollama)$/i.test(String(a[0] || ''))) fail('Bots are off - switch them on in Options > Bot.');
                 var botName = '';
                 if (a.length && BOT_SUBS.indexOf(lc(a[0])) < 0 && botNamed(a[0])) botName = a.shift();
                 var sub = lc(a.shift() || 'help');
@@ -11512,7 +11512,9 @@
                 'Warm, composed, understated butler charm with a touch of dry wit, always in character. ' +
                 "Never simply repeats the player's words back: interprets their wish and answers as a proper butler would.";
             var BOT_PROVIDERS = ['Ollama (this computer)', 'Claude (Anthropic)', 'ChatGPT (OpenAI)', 'Off - commands only'];
-            var BOT_DEFAULTS = { enabled: true, name: 'Chives', personality: BOT_DEFAULT_PERSONALITY, skin: '', skinName: '', provider: 0,
+            var BOT_DEFAULTS = { enabled: false, name: 'Chives',
+                personality: BOT_DEFAULT_PERSONALITY, skin: '', skinName: '', provider: 3,
+               
                 ollamaHost: 'http://localhost:11434', ollamaModel: '', claudeKey: '', claudeModel: 'claude-haiku-5-5',
                 openaiKey: '', openaiModel: 'gpt-4o-mini', temperature: 0.3 };
             function botConf() {
@@ -11715,8 +11717,8 @@
                 var preview = function () { var p = plainOf(c.personality); return p.length > 90 ? p.slice(0, 88) + '...' : p; };
                 var items = function () {
                     return [
-                        { t: 'toggle', id: 'on', label: 'Bots', value: c.enabled !== false, force: true },
-                        { t: 'text', text: c.enabled !== false ? 'Off: ' + c.name + ' leaves the world (kept for later) and /bot does nothing.' : c.name + ' is away. Switch on to bring them back.', color: '909090' },
+                        { t: 'toggle', id: 'on', label: 'Bots', value: c.enabled === true, force: true },
+                        { t: 'text', text: c.enabled === true ? 'Off: ' + c.name + ' leaves the world (kept for later) and /bot does nothing.' : c.name + ' is away. Switch on to bring them back.', color: '909090' },
                         { t: 'heading', text: 'Character' },
                         { t: 'text', align: 'left', text: 'Name' },
                         { t: 'input', id: 'name', value: c.name, max: 16, filter: 'name', wide: true, force: true },
@@ -11749,7 +11751,7 @@
                     if (!v) return;
                     if (v.on != null) {
                         var en = v.on === '1' || v.on === true;
-                        if (en !== (c.enabled !== false)) { c.enabled = en; botConfSave(c); try { botRules(); } catch (e) { } }
+                        if (en !== (c.enabled === true)) { c.enabled = en; botConfSave(c); try { botRules(); } catch (e) { } }
                     }
                     if (v.name != null) {
                         var was = c.name;
@@ -11801,7 +11803,7 @@
                             d.spec.items = items(); d.update();
                         } else if (act === 'reset') {
                             c = JSON.parse(JSON.stringify(BOT_DEFAULTS)); botConfSave(c); skinChanged();
-                            status.text = 'Back to Chives: his name, voice and skin, and Ollama.'; status.color = 'a0ffa0';
+                            status.text = 'Back to Chives: his name, voice and skin; brain off (commands only).'; status.color = 'a0ffa0';
                             d.spec.items = items(); d.update();
                         } else if (act === 'test') {
                             status.text = 'Asking ' + BOT_PROVIDERS[c.provider] + '...'; status.color = 'a0a0a0'; d.spec.items = items(); d.update();
@@ -11858,7 +11860,7 @@
             }
 
             function botHear(text, guid) {
-                if (joined() || rule('botChat') === false || botConf().enabled === false) return;
+                if (joined() || rule('botChat') === false || botConf().enabled !== true) return;
                 var bs = botList();
                 if (!bs.length) return;
                 var low = lc(text), bot = null;

@@ -93,14 +93,15 @@ and brewing, and the 1.5 redstone blocks, alongside a tabbed creative inventory.
 
 ### Bot
 
-Each world can have one helper bot (on a computer). `/bot spawn`, then tell it what you want -
+Each world can have one helper bot (on a computer). Switch bots on in Options > Bot, then
+`/bot spawn` and tell it what you want -
 `/bot get 64 planks`, `/bot get an iron pickaxe`, `/bot get iron set` - and it gathers, crafts and
 smelts what it needs, mods' items included, and brings it to you. It also comes, follows, defends,
 clears an area, digs tunnels and hands things over (`/bot help` lists everything). It works in
 multiplayer: anyone in the world can command it.
 
-Options > Bot sets its name, skin and personality, and switches it off. With
-[Ollama](https://ollama.com) running (or a Claude / ChatGPT key) you can just talk to it in chat:
+Options > Bot also sets its name, skin and personality. With a brain chosen there -
+[Ollama](https://ollama.com), or a Claude / ChatGPT key - you can just talk to it in chat:
 "chives, chop some wood and make me two axes".
 
 ## Build
