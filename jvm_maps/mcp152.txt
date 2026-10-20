@@ -1568,6 +1568,7 @@ F	aab	e	field_72996_f	loadedEntityList
 F	aab	g	field_73009_h	loadedTileEntityList
 F	aab	h	field_73010_i	playerEntities
 F	aab	i	field_73007_j	weatherEffects
+F	aab	q	field_73016_r	lastLightningBolt
 F	aab	r	field_73013_u	difficultySetting
 F	aab	s	field_73012_v	rand
 F	aab	t	field_73011_w	provider
@@ -2492,6 +2493,8 @@ F	bdk	e	field_72557_e	rand
 F	bdk	f	field_72554_f	disconnected
 F	bdk	g	field_72555_g	netManager
 F	bdk	h	field_72563_h	mc
+F	bds	L	field_73037_M	mc
+F	bds	a	field_73035_a	sendQueue
 F	bdv	a	field_71174_a	sendQueue
 F	bet	aA	field_70555_ap	interpPosZ
 F	bet	au	field_70553_i	particleGreen
@@ -2948,6 +2951,7 @@ F	nn	a	monster	monster
 F	nn	b	creature	creature
 F	nn	c	ambient	ambient
 F	nn	d	waterCreature	waterCreature
+F	nn	f	field_75606_e	maxNumberOfCreature
 F	no	a	UNDEFINED	UNDEFINED
 F	no	b	UNDEAD	UNDEAD
 F	no	c	ARTHROPOD	ARTHROPOD
@@ -4993,6 +4997,13 @@ M	bdi	c	(F)V	func_78794_c	postRender
 M	bdk	a	(I)Lmp;	func_72545_a	getEntityByID
 M	bdk	c	(Lei;)V	func_72552_c	addToSendQueue
 M	bdk	d	()V	func_72551_d	processReadPackets
+M	bds	a	(DDDLjava/lang/String;FFZ)V	func_72980_b	playSound
+M	bds	a	(I)Lmp;	func_73045_a	getEntityByID
+M	bds	a	(Lmp;)V	func_72923_a	obtainEntitySkin
+M	bds	b	()V	func_72835_b	tick
+M	bds	b	(Lmp;)V	func_72847_b	releaseEntitySkin
+M	bds	d	(Lmp;)Z	func_72838_d	spawnEntityInWorld
+M	bds	e	(Lmp;)V	func_72900_e	removeEntity
 M	bdv	a	(Lka;I)V	func_71064_a	addStat
 M	bdv	a	(Lmg;I)Z	func_70097_a	attackEntityFrom
 M	bdv	bK	()V	func_71038_i	swingItem
@@ -5880,6 +5891,7 @@ M	mp	b	(II)Lrh;	func_70025_b	dropItem
 M	mp	b	(Lbs;)V	func_70014_b	writeEntityToNBT
 M	mp	b	(Z)V	func_70095_a	setSneaking
 M	mp	b_	(Lsq;)V	func_70100_b_	onCollideWithPlayer
+M	mp	c	(DDD)Z	func_70038_c	isOffsetPositionInLiquid
 M	mp	c	(F)F	func_70013_c	getBrightness
 M	mp	c	(FF)V	func_70082_c	setAngles
 M	mp	c	(I)V	func_71027_c	travelToDimension
@@ -6106,6 +6118,9 @@ M	ng	p	(I)Lwm;	func_71124_b	getCurrentItemOrArmor
 M	ng	q	(I)Lwm;	func_82169_q	getCurrentArmor
 M	ng	r	(I)V	func_85034_r	setArrowCountInEntity
 M	ng	x	()V	func_70030_z	onEntityUpdate
+M	nn	b	()I	func_75601_b	getMaxNumberOfCreature
+M	nn	d	()Z	func_75599_d	getPeacefulCreature
+M	nn	e	()Z	func_82705_e	getAnimal
 M	nn	values	()[Lnn;	values	values
 M	no	valueOf	(Ljava/lang/String;)Lno;	valueOf	valueOf
 M	no	values	()[Lno;	values	values
@@ -6116,6 +6131,7 @@ M	nr	b	(Lmp;)V	func_70784_b	setTarget
 M	nr	bq	()V	func_70626_be	updateEntityActionState
 M	nr	bv	()Z	func_70601_bi	getCanSpawnHere
 M	nr	h	()Z	func_70780_i	isMovementCeased
+M	nr	i	()V	func_70779_j	updateWanderPath
 M	nr	j	()Lmp;	func_70782_k	findPlayerToAttack
 M	nr	k	()Z	func_70781_l	hasPath
 M	nr	l	()Lmp;	func_70777_m	getEntityToAttack
@@ -7612,6 +7628,7 @@ R	field_94447_a	theIcon
 R	field_72294_a	rand
 R	field_94449_b	theIcon
 R	field_72293_a	random
+R	field_72287_b	isActive
 R	field_72197_a	mushroomType
 R	field_94423_a	theIcon
 R	field_73664_a	x
@@ -7798,8 +7815,6 @@ R	field_78819_b	port
 R	field_73236_b	chunkMapping
 R	field_73235_d	worldObj
 R	field_78776_a	mc
-R	field_73037_M	mc
-R	field_73035_a	sendQueue
 R	field_78831_a	name
 R	field_74260_b	updateCounter
 R	field_78859_a	mc
@@ -8558,6 +8573,7 @@ R	func_74565_b	read
 R	func_74552_a	parse
 R	func_74573_a	reloadResources
 R	paint	paint
+R	isActive	isActive
 R	func_74502_a	getType
 R	func_71384_a	startGame
 R	func_100015_a	isKeyDown
@@ -8635,13 +8651,6 @@ R	func_78746_a	setGameType
 R	func_78764_a	attackEntity
 R	func_78757_d	getBlockReachDistance
 R	func_73029_E	doVoidFogParticles
-R	func_72980_b	playSound
-R	func_73045_a	getEntityByID
-R	func_72923_a	obtainEntitySkin
-R	func_72835_b	tick
-R	func_72847_b	releaseEntitySkin
-R	func_72838_d	spawnEntityInWorld
-R	func_72900_e	removeEntity
 R	func_71150_b	setHealth
 R	func_78862_a	parseIntWithDefault
 R	func_82482_a	dispense
@@ -8980,6 +8989,7 @@ R	func_77326_a	canApplyTogether
 R	func_77505_b	mapEnchantmentData
 R	func_98268_b	setDelayToMin
 R	func_82756_a	getGameRuleStringValue
+R	func_82757_a	setValue
 R	func_82758_b	getGameRuleBooleanValue
 D	net/minecraft/src/EnumChatFormatting	BLACK:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_BLUE:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_GREEN:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_AQUA:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_RED:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_PURPLE:Lnet/minecraft/src/EnumChatFormatting;:s|GOLD:Lnet/minecraft/src/EnumChatFormatting;:s|GRAY:Lnet/minecraft/src/EnumChatFormatting;:s|DARK_GRAY:Lnet/minecraft/src/EnumChatFormatting;:s|BLUE:Lnet/minecraft/src/EnumChatFormatting;:s|GREEN:Lnet/minecraft/src/EnumChatFormatting;:s|AQUA:Lnet/minecraft/src/EnumChatFormatting;:s|RED:Lnet/minecraft/src/EnumChatFormatting;:s|LIGHT_PURPLE:Lnet/minecraft/src/EnumChatFormatting;:s|YELLOW:Lnet/minecraft/src/EnumChatFormatting;:s|WHITE:Lnet/minecraft/src/EnumChatFormatting;:s|OBFUSCATED:Lnet/minecraft/src/EnumChatFormatting;:s|BOLD:Lnet/minecraft/src/EnumChatFormatting;:s|STRIKETHROUGH:Lnet/minecraft/src/EnumChatFormatting;:s|UNDERLINE:Lnet/minecraft/src/EnumChatFormatting;:s|ITALIC:Lnet/minecraft/src/EnumChatFormatting;:s|RESET:Lnet/minecraft/src/EnumChatFormatting;:s|field_96321_w:Ljava/util/Map;:s|field_96331_x:Ljava/util/Map;:s|field_96330_y:Ljava/util/regex/Pattern;:s|field_96329_z:C:|field_96303_A:Z:|field_96304_B:Ljava/lang/String;:|field_96305_C:[Lnet/minecraft/src/EnumChatFormatting;:s
 D	net/minecraft/src/ColorizerGrass	grassBuffer:[I:s
@@ -9178,6 +9188,7 @@ D	net/minecraft/src/ModelBox	vertexPositions:[Lnet/minecraft/src/PositionTexture
 D	net/minecraft/src/ModelRenderer	textureWidth:F:|textureHeight:F:|textureOffsetX:I:|textureOffsetY:I:|rotationPointX:F:|rotationPointY:F:|rotationPointZ:F:|rotateAngleX:F:|rotateAngleY:F:|rotateAngleZ:F:|compiled:Z:|displayList:I:|mirror:Z:|showModel:Z:|isHidden:Z:|cubeList:Ljava/util/List;:|childModels:Ljava/util/List;:|boxName:Ljava/lang/String;:|baseModel:Lnet/minecraft/src/ModelBase;:|offsetX:F:|offsetY:F:|offsetZ:F:
 D	net/minecraft/src/TextureOffset	textureOffsetX:I:|textureOffsetY:I:
 D	net/minecraft/src/NetClientHandler	disconnected:Z:|netManager:Lnet/minecraft/src/INetworkManager;:|field_72560_a:Ljava/lang/String;:|mc:Lnet/minecraft/client/Minecraft;:|worldClient:Lnet/minecraft/src/WorldClient;:|doneLoadingTerrain:Z:|mapStorage:Lnet/minecraft/src/MapStorage;:|playerInfoMap:Ljava/util/Map;:|playerInfoList:Ljava/util/List;:|currentServerMaxPlayers:I:|field_98183_l:Lnet/minecraft/src/GuiScreen;:|rand:Ljava/util/Random;:
+D	net/minecraft/src/WorldClient	sendQueue:Lnet/minecraft/src/NetClientHandler;:|clientChunkProvider:Lnet/minecraft/src/ChunkProviderClient;:|entityHashSet:Lnet/minecraft/src/IntHashMap;:|entityList:Ljava/util/Set;:|entitySpawnQueue:Ljava/util/Set;:|mc:Lnet/minecraft/client/Minecraft;:|previousActiveChunkSet:Ljava/util/Set;:
 D	net/minecraft/src/EntityClientPlayerMP	sendQueue:Lnet/minecraft/src/NetClientHandler;:|oldPosX:D:|oldMinY:D:|oldPosY:D:|oldPosZ:D:|oldRotationYaw:F:|oldRotationPitch:F:|wasOnGround:Z:|shouldStopSneaking:Z:|wasSneaking:Z:|field_71168_co:I:|hasSetHealth:Z:
 D	net/minecraft/src/EntityCritFX	initialParticleScale:F:
 D	net/minecraft/src/EntityDropParticleFX	materialType:Lnet/minecraft/src/Material;:|bobTimer:I:

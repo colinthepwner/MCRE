@@ -1512,6 +1512,7 @@ F	wn	b	field_21122_b	squidTentacles
 F	lk	a	monster	monster
 F	lk	b	creature	creature
 F	lk	c	waterCreature	waterCreature
+F	lk	e	field_4277_d	maxNumberOfCreature
 F	ag	b	field_1412_b	entityHashMap
 F	vq	d	field_27011_d	thePlayer
 F	jl	f	field_25184_e	startGameStat
@@ -1660,6 +1661,7 @@ F	ll	i	field_22268_i	playerPitch
 F	ll	j	field_1545_j	playerX
 F	ll	k	field_1544_k	playerY
 F	ll	l	field_1543_l	playerZ
+F	tc	b	field_456_a	isActive
 F	xa	a	field_4216_a	worldObj
 F	xa	b	field_4215_b	worldChunkMgr
 F	xa	d	field_6479_d	isHellWorld
@@ -2170,6 +2172,7 @@ M	sn	c	(FF)V	func_376_c	setRotation
 M	sn	e	(DDD)V	func_347_a	setPosition
 M	sn	U	()V	func_391_y	onEntityUpdate
 M	sn	ab	()V	func_4034_G	kill
+M	sn	f	(DDD)Z	func_403_b	isOffsetPositionInLiquid
 M	sn	b	(DDD)V	func_349_c	moveEntity
 M	sn	a	(DZ)V	func_9279_a	updateFallState
 M	sn	f	()Leq;	func_372_f_	getBoundingBox
@@ -2357,6 +2360,7 @@ M	ls	N	()Z	func_22051_K	isPlayerSleeping
 M	ls	R	()V	func_424_C	jump
 M	ls	u	()Z	func_25023_u	canDespawn
 M	ls	k	()F	func_6393_h	getSoundVolume
+M	ls	x	()I	func_25026_x	getTalkInterval
 M	ls	q	()V	func_21066_o	dropFewItems
 M	ls	e	()I	func_421_b	getTalkInterval
 M	ls	e	(Lsn;)Z	func_420_c	canEntityBeSeen
@@ -2384,6 +2388,7 @@ M	ii	g_	()Lsn;	func_438_i	findPlayerToAttack
 M	ii	e_	()Z	func_25028_d_	isMovementCeased
 M	ii	a	(Lsn;F)V	func_437_a	attackEntity
 M	ii	a	(III)F	func_439_a	getBlockPathWeight
+M	ii	E	()V	func_31026_E	updateWanderPath
 M	ii	F	()Z	func_25031_E	hasPath
 M	ii	a	(Ldh;)V	func_25029_a	setPathToEntity
 M	ii	G	()Lsn;	func_25030_F	getEntityToAttack
@@ -2401,6 +2406,7 @@ M	ht	a	()Z	func_20136_a	getEnumFloat
 M	ht	b	()Z	func_20140_b	getEnumBoolean
 M	ht	c	()I	func_20135_c	returnEnumOrdinal
 M	ht	d	()Ljava/lang/String;	func_20138_d	getEnumString
+M	mm	b	(I)Lsn;	func_709_b	getEntityByID
 M	lf	a	(Ld;)Ld;	func_1034_a	addPoint
 M	lf	a	()V	func_1038_a	clearPath
 M	lf	b	()Ld;	func_1036_b	dequeue
@@ -2408,6 +2414,7 @@ M	lf	a	(Ld;F)V	func_1035_a	changeDistance
 M	lf	c	()Z	func_1039_c	isPathEmpty
 M	gm	a	(Liz;Lgs;Lfd;IIII)Z	func_192_a	onItemUse
 M	gm	b	()Z	func_4017_a	isFull3D
+M	gm	a	(Liz;IIIILls;)Z	func_25008_a	onBlockDestroyed
 M	gm	a	(Luu;)Z	func_4018_a	canHarvestBlock
 M	gm	a	(Liz;Luu;)F	func_204_a	getStrVsBlock
 M	gm	a	(Liz;Lfd;Lgs;)Liz;	func_193_a	onItemRightClick
@@ -2577,6 +2584,7 @@ M	fd	a	(Lsn;)Z	func_27159_a	addWeatherEffect
 M	fd	a	(Lpm;)V	func_613_a	addWorldAccess
 M	fd	b	(Lpm;)V	func_672_b	removeWorldAccess
 M	fd	a	(Lsn;Leq;)Ljava/util/List;	func_697_a	getCollidingBoundingBoxes
+M	fd	a	(Lsn;F)Lbt;	func_4079_a	getSkyColor
 M	fd	b	(F)F	func_619_c	getCelestialAngle
 M	fd	e	(II)I	func_4083_e	getTopSolidOrLiquidBlock
 M	fd	a	(Leq;)Z	func_604_a	checkNoEntityCollision
@@ -2655,6 +2663,8 @@ M	yq	i	(Lfd;III)I	func_262_i	getChanceOfNeighborsEncouragingFire
 M	yq	c	(Lxp;III)Z	func_261_b	canBlockCatchFire
 M	yq	f	(Lfd;IIII)I	func_265_g	getChanceToEncourageFire
 M	pg	a	(Lfd;Ljava/util/Random;III)Z	func_516_a	generate
+M	lk	b	()I	func_21169_b	getMaxNumberOfCreature
+M	lk	d	()Z	func_21168_d	getPeacefulCreature
 M	yn	a	(DDD)V	func_343_a	setPosition
 M	in	a	(F)F	func_1106_a	sin
 M	in	b	(F)F	func_1114_b	cos

@@ -1573,7 +1573,11 @@
                         var d = defs[name];
                         if (!d) return undefined;
                         if (d.getter) { var gv; try { gv = d.getter(); } catch (e) { gv = undefined; } if (gv !== undefined && gv !== null) return fit(d, gv); }
-                        return name in values ? values[name] : d.value;
+                        return name in values ? values[name] : 'modValue' in d ? d.modValue : d.value;
+                    },
+                    modDefaults: function (o) {
+                        Object.keys(defs).forEach(function (k) { delete defs[k].modValue; });
+                        Object.keys(o || {}).forEach(function (k) { if (defs[k]) defs[k].modValue = fit(defs[k], o[k]); });
                     },
                     set: function (name, v) {
                         var d = defs[String(name)];
@@ -1585,7 +1589,7 @@
                     },
                     list: function () {
                         var o = {};
-                        Object.keys(defs).forEach(function (k) { o[k] = { value: R.get(k), default: defs[k].value, description: defs[k].description }; });
+                        Object.keys(defs).forEach(function (k) { o[k] = { value: R.get(k), default: 'modValue' in defs[k] ? defs[k].modValue : defs[k].value, description: defs[k].description }; });
                         return o;
                     },
                     reset: function () { values = {}; }
@@ -1770,6 +1774,12 @@
             Module.mcGameRules.define('modLiquidFlow', true, "Mods' liquids flow and spread (off: they stay as they are, like still water)");
             Module.mcGameRules.define('modLiquidFire', true, "Mods' lava-like liquids that set fires (\"sets_fire\") set flammable blocks around them alight");
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
+            Module.mcGameRules.define('mobCapMonster', 70, 'How many monsters can be around the players (per 256 chunks of the area round each; Java: 70)', [0, 1000]);
+            Module.mcGameRules.define('mobCapAnimal', 10, 'How many animals can be around the players (per 256 chunks; Java: 10)', [0, 1000]);
+            Module.mcGameRules.define('mobCapWater', 5, 'How many squid and other water creatures can be around the players (per 256 chunks; Java: 5)', [0, 1000]);
+            [['Sheep', 12], ['Pig', 10], ['Chicken', 10], ['Cow', 8], ['Squid', 10], ['Zombie', 12], ['Skeleton', 6], ['Spider', 8], ['Creeper', 4]].forEach(function (m) {
+                Module.mcGameRules.define('spawnWeight' + m[0], m[1], 'How often ' + m[0].toLowerCase() + 's spawn naturally, as a share of the spawn picks (' + m[1] + ' is normal; 0: never; every biome scales its own weight the same way)', [0, 1000]);
+            });
             Module.mcGameRules.define('generateStructures', true, 'Villages, mineshafts, strongholds and temples appear in newly explored parts of the world (saved with the world)');
             Module.mcGameRules.bind('generateStructures', function () {
                 if (!Module.ccall) return undefined;
@@ -2745,6 +2755,7 @@
                 running = false;
                 var r = reg();
                 var hasMod = function (o) { return Object.keys(o || {}).some(function (k) { return o[k] && o[k].$mod; }); };
+                try { if (Module.mcGameRules && Module.mcGameRules.modDefaults) Module.mcGameRules.modDefaults(vm && r && window.JVM && window.JVM.modGameRules ? window.JVM.modGameRules(vm) : null); } catch (x) { }
                 if (!vm || !r || !window.JVM) return null;
                 var stMods = window.JVM.station && window.JVM.station.st(vm).listeners.length;
                 var hookMods = !!(window.JVM.hooksWantTick && (function () { try { return window.JVM.hooksWantTick(vm); } catch (x) { return false; } })());
@@ -8429,6 +8440,8 @@
                             gameRule: function (name) { return ask(mod, ['gamerule', String(name)]).then(function (r) { return r.value; }); },
                             gameRules: function () { return ask(mod, ['gamerules']).then(function (r) { return r.rules || {}; }); },
                             setGameRule: function (name, value) { act(mod, ['setgamerule', String(name), value === undefined ? null : value]); },
+                            bot: function () { return ask(mod, ['botinfo']).then(function (r) { return r.bot || null; }); },
+                            botCommand: function (line) { return ask(mod, ['botcmd', String(line == null ? '' : line)]).then(function (r) { return r; }); },
                             skyColor: function () { return ask(mod, ['skycolor']).then(function (r) { return r.color; }); },
                             setSkyColor: function (c) { act(mod, ['setsky', c === undefined ? null : c]); },
                             setDifficulty: function (d) {
@@ -8804,6 +8817,12 @@
                     return;
                 }
                 if (k === 'gamerule') { deliver(fromGuid, a[1], { value: Module.mcGameRules.get(String(a[2])) }); return; }
+                if (k === 'botinfo') { deliver(fromGuid, a[1], { bot: Module.mcBotPage ? Module.mcBotPage.info() : null }); return; }
+                if (k === 'botcmd') {
+                    if (fromGuid && !isOp(byGuid(fromGuid))) { deliver(fromGuid, a[1], { ok: false, msg: 'Only operators can command the bot from a script' }); return; }
+                    deliver(fromGuid, a[1], Module.mcBotPage ? Module.mcBotPage.script(a[2]) : { ok: false, msg: 'no bots' });
+                    return;
+                }
                 if (k === 'gamerules') { deliver(fromGuid, a[1], { rules: Module.mcGameRules.list() }); return; }
                 if (k === 'setgamerule') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) return;
@@ -10532,6 +10551,7 @@
 
             var pending = {}, nextReq = 1;
             function onPlayer(p, op, args, cb) {
+                if (p.bot) { var rb = Module.mcBotPage ? Module.mcBotPage.target(p, op, args) : null; if (cb) cb(rb); return; }
                 if (p.local) { var r = runLocal(op, args); if (cb) cb(r); return; }
                 if (!net().sendCtlTo || !p.guid) { if (cb) cb(null); return; }
                 var id = cb ? nextReq++ : 0;
@@ -10550,6 +10570,7 @@
                 case 'mode': return cc('mcScriptGameMode', 'number', [], []);
                 case 'info': return local('info');
                 case 'msg': print(a[0]); return 1;
+                case 'botskin': if (Module.mcBotPage) Module.mcBotPage.gotSkin(a[0], a[1]); return 1;
                 case 'clear': {
                     var inv = json(Module._mcInvJson ? UTF8ToString(Module._mcInvJson()) : 'null');
                     if (!inv) return 0;
@@ -11225,6 +11246,7 @@
                 var j = Module.mcJava;
                 if (!joined() && j && j.serverChat) { try { if (j.serverChat(text, guid | 0)) return; } catch (e) { console.warn('[commands] java chat', e); } }
                 if (!guid) cc('mcChatSend', null, ['string'], [text]);
+                if (!joined() && Module.mcBotPage) setTimeout(function () { Module.mcBotPage.hear(text, guid | 0); }, 0);
             }
             C.submitAs = function (text, guid) {
                 text = String(text || '').trim();
@@ -11236,9 +11258,10 @@
                 else broadcast('<' + sd.name + '> ' + text);
             };
             C.serverChatAllowed = function (text, guid) {
-                var j = Module.mcJava;
-                if (j && j.serverChat) { try { return !j.serverChat(text, guid | 0); } catch (e) { return true; } }
-                return true;
+                var j = Module.mcJava, ok = true;
+                if (j && j.serverChat) { try { ok = !j.serverChat(text, guid | 0); } catch (e) { ok = true; } }
+                if (ok && Module.mcBotPage) setTimeout(function () { Module.mcBotPage.hear(text, guid | 0); }, 0);
+                return ok;
             };
 
             if (Module.mcGameRules) Module.mcGameRules.define('commandBlocks', true, 'Command blocks run their commands when powered');
@@ -11271,6 +11294,653 @@
                 try { ok = !!run(String(cmd || ''), sd); } catch (e) { }
                 return { ok: ok, output: String(sd.output || '').replace(new RegExp(SS + '.', 'g'), '') };
             };
+
+            var BOT = Module.mcBotPage = { list: [], hist: {} };
+            if (Module.mcGameRules) {
+                Module.mcGameRules.define('botOpsOnly', false, 'Only operators may command bots');
+                Module.mcGameRules.define('botTeleport', true, 'Bots teleport to whoever they follow over long distances');
+                Module.mcGameRules.define('botBreakBlocks', true, 'Bots may dig through blocks on their way (off: they walk and bridge only)');
+                Module.mcGameRules.define('botFight', true, 'Bots fight monsters that come at them or at whoever they defend');
+                Module.mcGameRules.define('botPickup', true, 'Bots pick up items lying near them');
+                Module.mcGameRules.define('botChat', true, 'Bots answer chat lines that name them');
+            }
+            function botRules() {
+                var b = function (n, d) { var v = rule(n); return (v === undefined ? d : v) ? 1 : 0; };
+                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled && !botMobile(null) ? 1 : 0]);
+            }
+            function botCmd(fields) {
+                var r = json(cc('mcBotCmd', 'string', ['string'], [fields.map(function (x) { return String(x == null ? '' : x).replace(/[\t\n]/g, ' '); }).join('\t')]));
+                return r || { ok: 0, msg: RED + 'The bots are not here (no world?).' };
+            }
+            function botList() { if (joined()) return []; var r = botCmd(['list']); BOT.list = r && r.bots ? r.bots : []; return BOT.list; }
+            function botNamed(n) { n = lc(n); return botList().filter(function (b) { return lc(b.name) === n; })[0] || null; }
+            setInterval(function () { try { if (!joined() && Module._mcBotCmd && Module.mcCurrentWorld !== undefined) botRules(); } catch (e) { } }, 4000);
+
+            Module.mcBotSay = function (to, text) {
+                if (!to) { broadcast(text); return true; }
+                var p = players().filter(function (q) { return q.name === to; })[0];
+                if (!p) return false;
+                tellPlayer(p, text);
+                return true;
+            };
+            Module.mcBotEvent = function (e) {
+                try { if (S() && S().event) S().event(JSON.stringify(Object.assign({ t: 'bot' }, e))); } catch (x) { }
+            };
+
+            var BOT_FILLER = { a: 1, an: 1, the: 1, me: 1, my: 1, some: 1, of: 1, please: 1, pls: 1, us: 1, few: 1, couple: 1, x: 1, more: 1, get: 1, bring: 1, make: 1, craft: 1, and: 1 };
+            var BOT_WORDS = { wood: 'log', woods: 'log', logs: 'log', plank: 'planks', cobble: 'cobblestone', sticks: 'stick', torches: 'torch',
+                pick: 'pickaxe', pickaxes: 'pickaxe', picks: 'pickaxe', axes: 'axe', shovels: 'shovel', swords: 'sword', ingots: 'ingot',
+                wooden: 'wood', golden: 'gold', diamonds: 'diamond', stones: 'stone', blocks: 'block', bricks: 'brick', tables: 'table',
+                furnaces: 'furnace', chests: 'chest', beds: 'bed', boats: 'boat', ladders: 'ladder', doors: 'door', glasses: 'glass' };
+            var BOT_ANY = { 5: 1, 17: 1, 18: 1, 6: 1, 35: 1, 126: 1, 162: 1 };
+            function botTokens(q) {
+                return lc(q).replace(/[^a-z0-9_: ]/g, ' ').split(/\s+/).filter(Boolean).filter(function (t) { return !BOT_FILLER[t]; })
+                    .map(function (t) { return BOT_WORDS[t] || t; });
+            }
+            function botCost(nameTok, q) {
+                if (nameTok === q) return 0;
+                if (q.length >= 3 && nameTok.indexOf(q) === 0) return 1;
+                if (nameTok.length >= 3 && q.indexOf(nameTok) === 0) return 1;
+                var stem = function (s) { var m = /^(.{3,}?)(ing|es|ed|en|s)$/.exec(s); return m ? m[1] : s; };
+                if (stem(nameTok) === stem(q)) return 2;
+                if (q.length >= 4 && nameTok.indexOf(q) >= 0) return 3;
+                return -1;
+            }
+            function botItem(query) {
+                var toks = botTokens(query);
+                if (!toks.length) return null;
+                var joinedQ = toks.join(' '), res = null;
+                var it = itemByName(joinedQ, null);
+                if (it) res = { id: it.id, data: it.data, title: itemTitle(it.ref), exact: true };
+                if (!res) {
+                    var best = null, bestScore = 1e9;
+                    titles().forEach(function (x) {
+                        var words = x.title.split(/[ _]+/), score = 0;
+                        for (var i = 0; i < toks.length; ++i) {
+                            var c = -1;
+                            words.forEach(function (w) { var k = botCost(w, toks[i]); if (k >= 0 && (c < 0 || k < c)) c = k; });
+                            if (c < 0) return;
+                            score += c;
+                        }
+                        score += Math.max(0, words.length - toks.length);
+                        if (/block|brick|stairs|slab|ore|fence|door|pane|wall/.test(x.title) && toks.join(' ').search(/block|brick|stairs|slab|ore|fence|door|pane|wall/) < 0) score += 2;
+                        if (score < bestScore) { bestScore = score; best = x; }
+                    });
+                    if (best) { var r = world('resolve', best.ref); if (r) res = { id: r[0], data: r[1], title: itemTitle(best.ref) }; }
+                }
+                if (!res) return null;
+                if (BOT_ANY[res.id] && toks.length === 1 && lc(res.title).split(' ').length > 1) {
+                    res.data = -1;
+                    res.title = { 5: 'planks', 17: 'wood', 18: 'leaves', 6: 'saplings', 35: 'wool', 126: 'wooden slabs', 162: 'wood' }[res.id] || res.title;
+                }
+                return res;
+            }
+            var BOT_SET_TOOLS = ['pickaxe', 'axe', 'shovel', 'sword', 'hoe'], BOT_SET_ARMOR = ['helmet', 'chestplate', 'leggings', 'boots'];
+            function botParseGet(text) {
+                var toks = lc(text).split(/\s+/).filter(Boolean), count = 0, rest = [];
+                toks.forEach(function (t) {
+                    var n = /^(\d+)x?$/.exec(t) || /^x(\d+)$/.exec(t);
+                    if (n && !count) count = Math.max(1, Math.min(1024, +n[1])); else rest.push(t);
+                });
+                if (!count) count = 1;
+                var q = rest.join(' ');
+                if (/\bset\b/.test(q)) {
+                    var mat = botTokens(q.replace(/\bset\b/, '')).join(' ');
+                    if (!mat) return { error: 'Which set? e.g. /bot get iron set (wooden, stone, iron, gold, diamond, leather, chain).' };
+                    var items = [];
+                    var leather = /leather/.test(mat), chain = /chain/.test(mat);
+                    if (!leather && !chain) BOT_SET_TOOLS.forEach(function (k) { var it = botItem(mat + ' ' + k); if (it) items.push(it); });
+                    BOT_SET_ARMOR.forEach(function (k) { var it = botItem(mat + ' ' + k); if (it) items.push(it); });
+                    var seen = {};
+                    items = items.filter(function (i) { var k = i.id + ':' + i.data; if (seen[k]) return false; seen[k] = 1; return true; });
+                    if (!items.length) return { error: "There's no " + mat + ' set.' };
+                    return { count: count, set: true, items: items, label: (count > 1 ? count + 'x ' : '') + mat + ' set' };
+                }
+                var it = botItem(q);
+                if (!it) return { error: "I don't know what '" + q + "' is." };
+                return { count: count, items: [it], label: count + ' ' + it.title };
+            }
+
+            var BOT_SUBS = ['spawn', 'get', 'drop', 'come', 'follow', 'defend', 'stop', 'status', 'hunt', 'unhunt', 'clear', 'tunnel',
+                'creative', 'verbose', 'despawn', 'list', 'settings', 'help'];
+            function botMobile(sd) {
+                try {
+                    if (Module._mcIsPhoneDevice && Module._mcIsPhoneDevice()) return true;
+                    if (sd && sd.guid && net().presenceOf) { var pr = net().presenceOf(sd.guid); if (pr && pr.device === 2) return true; }
+                } catch (e) { }
+                return false;
+            }
+            function botHelp(sd) {
+                tellTo(sd, SS + 'e/bot spawn [name]' + GREY + ' - a bot that does jobs for you');
+                tellTo(sd, SS + 'e/bot get <what>' + GREY + ' - e.g. 64 planks, an iron pickaxe, iron set: it gathers, crafts, smelts and brings it');
+                tellTo(sd, SS + 'e/bot come | follow | defend | stop | status | drop [all|item]' + GREY);
+                tellTo(sd, SS + 'e/bot clear [WxHxD] | tunnel [length [width height]]' + GREY + ' - dig out where you look / face');
+                tellTo(sd, SS + 'e/bot hunt <player> | unhunt | creative | verbose | despawn | list | settings' + GREY);
+                tellTo(sd, GREY + 'More than one bot: /bot <name> <command>. Or just talk to it in chat: "chives, come here".');
+            }
+            function botRun(sd, args, quiet) {
+                var a = args.slice();
+                if (rule('botOpsOnly') === true && !sd.op) fail('Only operators may command bots here.');
+                if (joined()) fail('Bots live in the host\'s world.');
+                botRules();
+                if (botConf().enabled === false && !/^(help|settings|ai|ollama)$/i.test(String(a[0] || ''))) fail('Bots are switched off (Settings > Bot).');
+                var botName = '';
+                if (a.length && BOT_SUBS.indexOf(lc(a[0])) < 0 && botNamed(a[0])) botName = a.shift();
+                var sub = lc(a.shift() || 'help');
+                var who = sd.name || '';
+                var say = function (r) { if (!quiet || !r.ok) tellTo(sd, r.msg || ''); return !!r.ok; };
+                switch (sub) {
+                case 'help': botHelp(sd); return true;
+                }
+                if (botMobile(sd)) fail('Bots are not available on phones and tablets yet.');
+                switch (sub) {
+                case 'settings': case 'ai': case 'ollama': botSettings(sd); return true;
+                case 'list': {
+                    var l = botList();
+                    tellTo(sd, l.length ? SS + 'e' + l.map(function (b) { return b.name + GREY + ' (' + (b.task || 'idle') + ')' + SS + 'e'; }).join(', ') : GREY + 'No bots here. /bot spawn [name]');
+                    return true;
+                }
+                case 'spawn': {
+                    var nm = a[0] || botConf().name || 'Chives';
+                    var rs = botCmd(['spawn', who, '', nm]);
+                    if (rs.ok) { botList(); setTimeout(function () { applySkin(nm); }, 500); }
+                    return say(rs);
+                }
+                case 'get': {
+                    if (!a.length) fail('Usage: /bot get <what> - e.g. /bot get 64 planks');
+                    var g = botParseGet(a.join(' '));
+                    if (g.error) fail(g.error);
+                    if (g.set) return say(botCmd(['getset', who, botName, g.label, g.count].concat(g.items.map(function (i) { return i.id + ':' + i.data; }))));
+                    return say(botCmd(['get', who, botName, g.items[0].id, g.items[0].data, g.count, g.label]));
+                }
+                case 'drop': case 'give': {
+                    if (!a.length) return say(botCmd(['drop', who, botName]));
+                    if (lc(a[0]) === 'all' || lc(a[0]) === 'everything') return say(botCmd(['drop', who, botName, 'all']));
+                    var d = botParseGet(a.join(' '));
+                    if (d.error) fail(d.error);
+                    var hasCount = /\d/.test(a.join(' '));
+                    return say(botCmd(['drop', who, botName, d.items[0].id, d.items[0].data, d.items[0].title, hasCount ? d.count : 0]));
+                }
+                case 'clear': {
+                    var n = (a.join(' ').match(/\d+/g) || []).map(Number);
+                    return say(botCmd(['clear', who, botName, n[0] || 7, n[1] || 4, n[2] || n[0] || 7]));
+                }
+                case 'tunnel': {
+                    var t = (a.join(' ').match(/\d+/g) || []).map(Number);
+                    if (t.length === 3 && /x/.test(a.join(''))) return say(botCmd(['tunnel', who, botName, t[2], t[0], t[1]]));
+                    return say(botCmd(['tunnel', who, botName, t[0] || 10, t[1] || 1, t[2] || 2]));
+                }
+                case 'hunt': if (!a.length) fail('Usage: /bot hunt <player>'); return say(botCmd([(sd._queue ? '+' : '') + 'hunt', who, botName, a.join(' ')]));
+                case 'creative': case 'verbose': return say(botCmd([sub, who, botName, lc(a[0] || '')]));
+                case 'come': case 'follow': case 'defend': case 'stop': case 'status': case 'unhunt': case 'despawn':
+                    return say(botCmd([(sd._queue && /^(come|follow|defend)$/.test(sub) ? '+' : '') + sub, who, botName]));
+                }
+                fail('Unknown: /bot ' + sub + ' - /bot help lists them.');
+            }
+            def('bot', { aliases: ['chives'], level: 0, usage: '/bot <spawn|get|come|follow|defend|stop|status|drop|clear|tunnel|hunt|despawn|settings|help> ...',
+                args: ['command', 'what...'],
+                run: function (x) { botRun(x.sd, x.args); },
+                complete: function (x, i, p) {
+                    if (i === 0) return filt(p, BOT_SUBS.concat(joined() ? [] : botList().map(function (b) { return b.name; })));
+                    var sub = lc(x.args[0] || '');
+                    if (sub === 'get' || sub === 'drop') return itemNames(p).map(function (n) { return n.replace(/^minecraft:/, ''); });
+                    if (sub === 'hunt') return filt(p, playerNames());
+                    if (sub === 'creative' || sub === 'verbose') return filt(p, ['on', 'off']);
+                    return [];
+                } });
+
+            function botTarget(p, op, args) {
+                switch (op) {
+                case 'give': { var r = world('resolve', String(args[0])); if (!r) return 0; return botCmd(['give', '', p.name, r[0], args[1] | 0, r[1] | 0]).ok ? 1 : 0; }
+                case 'tp': return botCmd(['tp', '', p.name, args[0], args[1], args[2], args[3] == null ? '' : args[3]]).ok ? 1 : 0;
+                case 'kill': return botCmd(['kill', '', p.name]).ok ? 1 : 0;
+                case 'clear': { var c = botCmd(['clearinv', '', p.name]); return c.n | 0; }
+                case 'msg': return 1;
+                }
+                return null;
+            }
+            BOT.target = botTarget;
+            BOT.info = function () { var l = joined() ? [] : botList(); return l[0] || null; };
+            BOT.script = function (line) {
+                var sd = { kind: 'block', name: 'Server', guid: 0, op: true, output: '', pos: { x: 0, y: 64, z: 0, yaw: 0, pitch: 0 } };
+                try { var ok = botRun(sd, tokens(String(line || '').replace(/^\/?bot\s+/i, '')), false); return { ok: !!ok, msg: plainOf(sd.output || '') }; }
+                catch (e) { return { ok: false, msg: e instanceof Err ? e.msg : String(e) }; }
+            };
+
+            var BOT_CONF_KEY = 'mcre-bot-settings';
+            var BOT_DEFAULT_PERSONALITY = "Chives, the player's devoted in-game manservant - a courteous, quick-witted English butler. " +
+                'Warm, composed, understated butler charm with a touch of dry wit, always in character. ' +
+                "Never simply repeats the player's words back: interprets their wish and answers as a proper butler would.";
+            var BOT_PROVIDERS = ['Ollama (this computer)', 'Claude (Anthropic)', 'ChatGPT (OpenAI)', 'Off - commands only'];
+            var BOT_DEFAULTS = { enabled: true, name: 'Chives', personality: BOT_DEFAULT_PERSONALITY, skin: '', skinName: '', provider: 0,
+                ollamaHost: 'http://localhost:11434', ollamaModel: '', claudeKey: '', claudeModel: 'claude-haiku-5-5',
+                openaiKey: '', openaiModel: 'gpt-4o-mini', temperature: 0.3 };
+            function botConf() {
+                var c = {};
+                try { c = JSON.parse(localStorage.getItem(BOT_CONF_KEY) || '{}') || {}; } catch (e) { c = {}; }
+                var o = {};
+                Object.keys(BOT_DEFAULTS).forEach(function (k) { o[k] = c[k] === undefined || c[k] === null ? BOT_DEFAULTS[k] : c[k]; });
+                o.provider = Math.max(0, Math.min(3, o.provider | 0));
+                if (!String(o.name).trim()) o.name = BOT_DEFAULTS.name;
+                return o;
+            }
+            function botConfSave(c) { try { localStorage.setItem(BOT_CONF_KEY, JSON.stringify(c)); } catch (e) { } }
+            BOT.conf = botConf;
+            BOT.ai = { down: 0, models: null };
+            function fetchT(url, opts, ms) {
+                var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                if (ctl) opts.signal = ctl.signal;
+                var t = setTimeout(function () { if (ctl) ctl.abort(); }, ms);
+                return fetch(url, opts).then(function (r) {
+                    clearTimeout(t);
+                    if (!r.ok) return r.text().then(function (x) { throw new Error('HTTP ' + r.status + ' ' + String(x).slice(0, 160)); });
+                    return r;
+                }, function (e) { clearTimeout(t); throw e; });
+            }
+            function ollamaModels(host) {
+                return fetchT(host.replace(/\/+$/, '') + '/api/tags', { method: 'GET' }, 2500).then(function (r) { return r.json(); }).then(function (j) {
+                    var kind = function (x) { var nm = String(x.name || x.model || ''); return /cloud/i.test(nm) || x.remote_host ? 2 : /llava|embed|vision|bakllava/i.test(nm) ? 1 : 0; };
+                    var params = function (x) { var ps = /([\d.]+)\s*([BM])/i.exec(String(x.details && x.details.parameter_size || '')); if (ps) return +ps[1] / (/m/i.test(ps[2]) ? 1000 : 1); return (x.size || 0) / 0.6e9; };
+                    var off = function (x) { var b = params(x); return b > 0 ? Math.abs(Math.log(b / 5)) : 99; };
+                    var m = (j && j.models || []).slice().sort(function (a, b) { return (kind(a) - kind(b)) || (off(a) - off(b)); });
+                    return m.map(function (x) { return x.name || x.model; }).filter(Boolean);
+                });
+            }
+
+            var CHIVES_SKIN = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAMAAACVQ462AAACvlBMVEUAAAAAAAD/AAD///8AAAABAQABAQECAgIDAwMEAwMEBAMEBAQFBAQFBQUGBgYHBgYHBwcICAgJCQgJCQkKCQkKCgoLCgoLCwoLCwsMCwsMDAsMDAwNDAwNDQwNDQ0ODg4PDw8QDw8QEBARERESEhETEhITExMUFBMbGxobGxscHBweHh0eHh4gIB8gICAhISEkIyMkJCQmJiYnJyYnJycpKScqKikqKiorKyssLCosLCwtLCstLS0uLi4vLy8wMDAxMTEzMzIzMzM0NDQ1NTQ1NTU2NTM2NTQ2NTU2NjU2NjY3NjU3NjY3NzY3Nzc4NzU4NzY4ODY4ODg5OTk6OTc6OTg6Ojk6Ojo7Ozo7Ozs8Ozs8PDw9PDs9PT0+Pj4/Pjw/Pz9APz5AQEBBQD5BQD9BQEBBQUBBQUFCQT9CQUBCQUFCQkFCQkJDQkFDQ0NERENERERFREJFRERFRURGRUNGRURGRkRGRkVGRkZHRURHRkVHR0dIR0ZISEhJSEZJSEdJSUhJSUlKSEdKSUhKSkpLSkhLSkpLS0tMS0tMTExNTEtNTExNTUxNTU1OTUtOTk5PTkxPT09SUlKuBAS0AAC1DQ24AAC5CAi6Cwu8BAS8Dw/Cr5TLs5PQ4tjR49nS5NrV5dzV593X5d3Y6+DZ59/c5ODc6OHc7OPd5eDd8ube8uff4eDf5OHf6uTf8efg5OLg6eTg6uTg7eXh4eHh5+Th6uXh7ebh8+nh9+vi5+Ti8Oji8enj4+Pj6ubj8Onj8+rk5OTk6ufk7ujk7unk8enk8erk9ezl5eXl7unl9u3l+O3m7enm+O7n6Ojn7urn8Ovn+e/o6Ojo8ezp6enp7Orp7uvr8+/r+PHt8vDu8e/v9fHw8vHw+fTx8fHx9PLx9vPy+fXz8/Pz9PPz9PTz+PX1+Pb39/f74cH/5sT/8MzaY/LBAAAABHRSTlMAQEBARazlzwAAA2JJREFUSMfFked3FUUYxkf8uTM6zjqbZczCxotGRAUxolEUURALGooalOQS76VYsGwQK1FEUKMxaozB3nvBhr333nvvneW/8MPe5N7L8UtODsf5NPPO+/zO876PEEIIIdavTzc4YpBnyAAxRMC6df83YMgjbLQlpoMXDtrJkAErl5Q6V/elad/q0uO4YuvCWZ2H5U+Y2bQimb2hpq3zzOmtXQuOXzTj8qtE+/yTlp6dpmlfkqRpkvSlaXpFxxGtPYvmzDj90t7zjz6j++RTVy6olC85pGNx0/yO/FGXXHZRoSBOmdfT3FLtemGxs7eQL87rWd594fKeg9tW9Iory/rZoqOrMKcwvem8C9oPOmuuaD6mX5ckSdJ/Pzd/6MWrmpOWZd2H9/7X4KcVju08sWVuvrsolg3o05tvSQcIyeKlR3YVi+3nbPwUhBACn8Baa/vfY1jz9JNf7OhCYpSN3UAfUAnVSujsw6sGEN/+yp+3Gj/0tnM7jPHLdVwVQIkSwHpOVgIi7vj7nt/syHjb+rueGa2pcGCqxtK69KFzVALq+emB+762gXR8+T2jKhx4qhqghKirgQk7BUr7RCgIkHaiuen+D68bsRsoXAhSsgUAW0sdo4iBEkAL7U+aAii0w4c4YrN4X66/4dqrmVkL4AIdE40GGeCDNID0+8fSonFqgCIgDokBCGEy16z99kYOlBInwamQmggLIVqhcs5AOUKjkXg2sGhgPHjkdn/5zrc/ygMentIoYn9LBXEEUgFQJyqzRXsKwMJYByGzorceZi+o8ZyHMpALDbWR9AMAbFzhIDBgDR4EdkJuV2eMgWk8/hWNWbORuGAbR4QPnicBAumXHQRORlZpD2yj3tv4Fodre+e9NlyIxShAEoFns5RiB2FYBsTYbH0+DQewOQBe8MtjAKCycEMJyMjU4SxAVB7Bs9QS4VsD/kgNSjlCfvwDDyDeHsD4GS6HLGFzA4D9J42bOK5h8n7jx+48bZd9GvYktDjj7v4h53AeocMAeniAAUagM1TZQU2poJE+4BGB89XnawC/BrWVVsaRC1994+e/Xnjx408+e+i2Nz94/rX3M/Wmw0SkAHztAMVwk+1gyq/P7RFmiRPVa4j/efa7l755/al3H7n3id8/ffTBtRlg2Cb/Akr2yDANp7oIAAAAAElFTkSuQmCC';
+            BOT.skins = {};
+            var skinSerial = 0;
+            function skinPng(url) {
+                return new Promise(function (res, rej) {
+                    var img = new Image();
+                    img.onload = function () {
+                        var cv = document.createElement('canvas'); cv.width = 64; cv.height = 32;
+                        var g = cv.getContext('2d');
+                        g.imageSmoothingEnabled = false;
+                        g.drawImage(img, 0, 0, img.width, img.width / 2, 0, 0, 64, 32);
+                        cv.toBlob(function (b) { if (!b) return rej(new Error('no png')); b.arrayBuffer().then(function (ab) { res(new Uint8Array(ab)); }, rej); }, 'image/png');
+                    };
+                    img.onerror = function () { rej(new Error('not a picture')); };
+                    img.src = url;
+                });
+            }
+            function skinFor(name) {
+                if (BOT.skins[name]) return BOT.skins[name];
+                if (joined()) return null;
+                var b = botNamed(name);
+                if (!b) return null;
+                return botConf().skin || CHIVES_SKIN;
+            }
+            function applySkin(name) {
+                var s = skinFor(name);
+                if (!s || !Module.mcRemoteSkinQueue) return;
+                skinPng(s).then(function (png) {
+                    try { FS.mkdirTree('/data/images/mob'); } catch (e) { }
+                    var path = 'mob/web_botskin_' + (++skinSerial) + '.png';
+                    FS.writeFile('/data/images/' + path, png);
+                    Module.mcRemoteSkinQueue.push(name + '\n' + path + '\n');
+                }).catch(function (e) { console.warn('[bot] skin', e); });
+            }
+            BOT.gotSkin = function (name, url) { BOT.skins[String(name)] = String(url || CHIVES_SKIN); applySkin(String(name)); };
+            (function hookSkins() {
+                var orig = Module.mcRequestRemoteSkin;
+                if (!orig) { setTimeout(hookSkins, 500); return; }
+                if (orig.__bot) return;
+                var f = function (name) {
+                    if (skinFor(name)) { applySkin(name); return; }
+                    if (joined()) { var self = this, args = arguments; setTimeout(function () { if (skinFor(name)) applySkin(name); else orig.apply(self, args); }, 5000); return; }
+                    return orig.apply(this, arguments);
+                };
+                f.__bot = true;
+                Module.mcRequestRemoteSkin = f;
+            })();
+            var skinSent = {}, skinVer = 1;
+            setInterval(function () {
+                try {
+                    if (joined() || !Module._mcBotCmd || !net().sendCtlTo) return;
+                    var bs = BOT.list && BOT.list.length ? BOT.list : [];
+                    if (!bs.length) return;
+                    var url = botConf().skin || CHIVES_SKIN;
+                    players().forEach(function (p) {
+                        if (p.local || p.bot || !p.guid) return;
+                        bs.forEach(function (b) {
+                            var k = p.guid + '/' + b.name;
+                            if (skinSent[k] === skinVer) return;
+                            skinSent[k] = skinVer;
+                            onPlayer(p, 'botskin', [b.name, url]);
+                        });
+                    });
+                } catch (e) { }
+            }, 3000);
+            function skinChanged() { skinVer++; botList().forEach(function (b) { applySkin(b.name); }); }
+
+            var MC_COLORS = ['000000', '0000AA', '00AA00', '00AAAA', 'AA0000', 'AA00AA', 'FFAA00', 'AAAAAA', '555555', '5555FF', '55FF55', '55FFFF', 'FF5555', 'FF55FF', 'FFFF55', 'FFFFFF'];
+            function codesToHtml(t) {
+                var out = '', open = 0, esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); };
+                var parts = String(t).split(SS);
+                out += esc(parts[0]);
+                for (var i = 1; i < parts.length; ++i) {
+                    var c = parts[i].charAt(0).toLowerCase(), rest = parts[i].slice(1), st = null;
+                    var hx = '0123456789abcdef'.indexOf(c);
+                    if (hx >= 0) st = 'color:#' + MC_COLORS[hx];
+                    else if (c === 'l') st = 'font-weight:bold';
+                    else if (c === 'o') st = 'font-style:italic';
+                    else if (c === 'n') st = 'text-decoration:underline';
+                    else if (c === 'm') st = 'text-decoration:line-through';
+                    else if (c === 'r') { while (open) { out += '</span>'; open--; } }
+                    if (st) { out += '<span style="' + st + '">'; open++; }
+                    out += esc(rest);
+                }
+                while (open--) out += '</span>';
+                return out;
+            }
+            function htmlToCodes(el) {
+                var out = '';
+                var walk = function (n, stack) {
+                    if (n.nodeType === 3) { out += n.nodeValue.replace(/§/g, ''); return; }
+                    if (n.nodeName === 'BR') { out += '\n'; return; }
+                    var add = [];
+                    if (n.nodeType === 1) {
+                        var s = n.style || {}, col = s.color || n.getAttribute('color') || '';
+                        var m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(col);
+                        if (m) { var hx = ((1 << 24) + (+m[1] << 16) + (+m[2] << 8) + +m[3]).toString(16).slice(1).toUpperCase(); var k = MC_COLORS.indexOf(hx); if (k >= 0) add.push('0123456789abcdef'.charAt(k)); }
+                        else if (/^#/.test(col)) { var k2 = MC_COLORS.indexOf(col.slice(1).toUpperCase()); if (k2 >= 0) add.push('0123456789abcdef'.charAt(k2)); }
+                        if (n.nodeName === 'B' || /bold|[6-9]00/.test(s.fontWeight || '')) add.push('l');
+                        if (n.nodeName === 'I' || s.fontStyle === 'italic') add.push('o');
+                        if (n.nodeName === 'U' || /underline/.test(s.textDecoration || '')) add.push('n');
+                        if (n.nodeName === 'S' || n.nodeName === 'STRIKE' || /line-through/.test(s.textDecoration || '')) add.push('m');
+                        if ((n.nodeName === 'DIV' || n.nodeName === 'P') && out && out.slice(-1) !== '\n') out += '\n';
+                    }
+                    var st2 = stack.concat(add);
+                    if (add.length) out += add.map(function (c) { return SS + c; }).join('');
+                    for (var c = n.firstChild; c; c = c.nextSibling) walk(c, st2);
+                    if (add.length) out += SS + 'r' + stack.map(function (c) { return SS + c; }).join('');
+                };
+                for (var c = el.firstChild; c; c = c.nextSibling) walk(c, []);
+                return out.replace(new RegExp('(' + SS + 'r)+$'), '').trim();
+            }
+            function plainOf(t) { return String(t).replace(new RegExp(SS + '.', 'g'), ''); }
+            function editPersonality(start, done) {
+                var root = document.createElement('div');
+                root.setAttribute('style', 'position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-family:"Minecraftia","Press Start 2P",monospace,sans-serif;image-rendering:pixelated');
+                var px = 'border:2px solid #000;box-shadow:inset -3px -3px #555,inset 3px 3px #fff;';
+                root.innerHTML =
+                    '<div style="' + px + 'background:#c6c6c6;padding:12px;width:min(560px,92vw);max-height:92vh;display:flex;flex-direction:column;gap:8px;color:#404040">' +
+                    '<div style="font-size:15px;color:#404040;text-shadow:none">Personality - how the bot talks</div>' +
+                    '<div data-bar style="display:flex;flex-wrap:wrap;gap:3px"></div>' +
+                    '<div data-ed contenteditable="true" spellcheck="false" style="flex:1;min-height:180px;max-height:52vh;overflow:auto;background:#000;border:2px solid #a0a0a0;padding:8px;color:#fff;font-size:14px;line-height:1.5;text-shadow:2px 2px #3f3f3f;outline:none;white-space:pre-wrap;word-break:break-word"></div>' +
+                    '<div style="font-size:11px;color:#555">Describe who the bot is: its voice, manner, quirks. Colours and styles show in its chat lines. It still follows your commands the same way.</div>' +
+                    '<div style="display:flex;gap:8px;justify-content:flex-end"></div></div>';
+                var bar = root.querySelector('[data-bar]'), ed = root.querySelector('[data-ed]'), foot = root.lastChild.lastChild;
+                var btn = function (label, css, fn, title) {
+                    var b = document.createElement('button');
+                    b.textContent = label; if (title) b.title = title;
+                    b.setAttribute('style', 'font:inherit;font-size:12px;min-width:26px;height:26px;cursor:pointer;color:#fff;text-shadow:2px 2px #3f3f3f;background:#6f6f6f;' + px + (css || ''));
+                    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+                    b.addEventListener('click', function (e) { e.preventDefault(); fn(); ed.focus(); });
+                    return b;
+                };
+                MC_COLORS.forEach(function (hx, i) { bar.appendChild(btn('', 'background:#' + hx + ';min-width:22px', function () { document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, '#' + hx); }, SS + '0123456789abcdef'.charAt(i))); });
+                bar.appendChild(btn('B', 'font-weight:bold', function () { document.execCommand('bold'); }, 'Bold'));
+                bar.appendChild(btn('I', 'font-style:italic', function () { document.execCommand('italic'); }, 'Italic'));
+                bar.appendChild(btn('U', 'text-decoration:underline', function () { document.execCommand('underline'); }, 'Underline'));
+                bar.appendChild(btn('S', 'text-decoration:line-through', function () { document.execCommand('strikeThrough'); }, 'Strikethrough'));
+                bar.appendChild(btn('Clear', '', function () { document.execCommand('removeFormat'); }, 'Plain text'));
+                ed.innerHTML = codesToHtml(start);
+                var close = function (save) {
+                    var v = save ? htmlToCodes(ed) : null;
+                    try { root.remove(); } catch (e) { }
+                    try { Module.canvas.focus(); } catch (e) { }
+                    done(v);
+                };
+                foot.appendChild(btn('Chives', 'padding:0 10px', function () { ed.innerHTML = codesToHtml(BOT_DEFAULT_PERSONALITY); }, "Chives' own"));
+                foot.appendChild(btn('Cancel', 'padding:0 14px', function () { close(false); }));
+                foot.appendChild(btn('Done', 'padding:0 14px', function () { close(true); }));
+                ['keydown', 'keyup', 'keypress', 'input', 'wheel', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'contextmenu'].forEach(function (t) {
+                    root.addEventListener(t, function (e) {
+                        e.stopPropagation();
+                        if (t === 'keydown' && e.key === 'Escape') { e.preventDefault(); close(false); }
+                    });
+                });
+                document.body.appendChild(root);
+                setTimeout(function () { ed.focus(); }, 50);
+            }
+
+            function botSettings(sd) {
+                if (botMobile(sd)) { if (sd) tellTo(sd, GREY + 'Bots are not available on phones and tablets yet.'); return; }
+                if (sd && sd.guid) { tellTo(sd, GREY + "Bot settings are the host's (the bot lives in their world)."); return; }
+                if (!Module.mcDialog) return;
+                var c = botConf();
+                var status = { t: 'text', id: 'st', text: '', color: 'a0a0a0' };
+                var preview = function () { var p = plainOf(c.personality); return p.length > 90 ? p.slice(0, 88) + '...' : p; };
+                var items = function () {
+                    return [
+                        { t: 'toggle', id: 'on', label: 'Bots', value: c.enabled !== false, force: true },
+                        { t: 'text', text: c.enabled !== false ? 'Off: ' + c.name + ' leaves the world (kept for later) and /bot does nothing.' : c.name + ' is away. Switch on to bring them back.', color: '909090' },
+                        { t: 'heading', text: 'Character' },
+                        { t: 'text', align: 'left', text: 'Name' },
+                        { t: 'input', id: 'name', value: c.name, max: 16, filter: 'name', wide: true, force: true },
+                        { t: 'row', id: 'pers', title: 'Personality', sub: preview(), button: 'Edit...', enabled: true },
+                        { t: 'row', id: 'skin', title: 'Skin', sub: c.skin ? (c.skinName || 'your picture') : "Chives' own", button: 'Default', enabled: !!c.skin },
+                        { t: 'heading', text: 'Chat brain' },
+                        { t: 'text', align: 'left', text: 'Commands (/bot help) always work. A brain lets the bot understand plain chat that names it ("' + c.name + ', chop some wood and make me two axes") and answer in character.', color: 'c0c0c0' },
+                        { t: 'choice', id: 'prov', label: 'Brain', options: BOT_PROVIDERS, value: c.provider, force: true },
+                        { t: 'heading', text: 'Ollama' },
+                        { t: 'text', align: 'left', text: 'Address' },
+                        { t: 'input', id: 'oh', value: c.ollamaHost, max: 200, wide: true, force: true },
+                        { t: 'text', align: 'left', text: 'Model (empty: the smallest one installed)' },
+                        { t: 'input', id: 'om', value: c.ollamaModel, max: 100, wide: true, hint: 'e.g. gemma3:4b', force: true },
+                        { t: 'text', text: 'Ollama has to allow this page: start it with OLLAMA_ORIGINS=*', color: '808080' },
+                        { t: 'heading', text: 'Claude (Anthropic)' },
+                        { t: 'text', align: 'left', text: 'API key' },
+                        { t: 'input', id: 'ck', value: c.claudeKey, max: 200, wide: true, hint: 'sk-ant-...', force: true },
+                        { t: 'text', align: 'left', text: 'Model' },
+                        { t: 'input', id: 'cm', value: c.claudeModel, max: 100, wide: true, force: true },
+                        { t: 'heading', text: 'ChatGPT (OpenAI)' },
+                        { t: 'text', align: 'left', text: 'API key' },
+                        { t: 'input', id: 'gk', value: c.openaiKey, max: 200, wide: true, hint: 'sk-...', force: true },
+                        { t: 'text', align: 'left', text: 'Model' },
+                        { t: 'input', id: 'gm', value: c.openaiModel, max: 100, wide: true, force: true },
+                        { t: 'text', text: 'Keys stay in this browser and go only to their own provider.', color: '808080' },
+                        status
+                    ];
+                };
+                var read = function (v) {
+                    if (!v) return;
+                    if (v.on != null) {
+                        var en = v.on === '1' || v.on === true;
+                        if (en !== (c.enabled !== false)) { c.enabled = en; botConfSave(c); try { botRules(); } catch (e) { } }
+                    }
+                    if (v.name != null) {
+                        var was = c.name;
+                        c.name = String(v.name).trim() || BOT_DEFAULTS.name;
+                        if (was !== c.name && !joined()) {
+                            var live = botList()[0];
+                            if (live) { var rr = botCmd(['rename', '', live.name, c.name]); if (rr.ok) { botList(); skinChanged(); } else { c.name = live.name; status.text = plainOf(rr.msg || ''); status.color = 'ff8080'; } }
+                        }
+                    }
+                    if (v.prov != null) { var pi = BOT_PROVIDERS.indexOf(String(v.prov)); c.provider = pi >= 0 ? pi : Math.max(0, Math.min(3, v.prov | 0)); }
+                    if (v.oh != null) c.ollamaHost = String(v.oh).trim() || BOT_DEFAULTS.ollamaHost;
+                    if (v.om != null) c.ollamaModel = String(v.om).trim();
+                    if (v.ck != null) c.claudeKey = String(v.ck).trim();
+                    if (v.cm != null) c.claudeModel = String(v.cm).trim() || BOT_DEFAULTS.claudeModel;
+                    if (v.gk != null) c.openaiKey = String(v.gk).trim();
+                    if (v.gm != null) c.openaiModel = String(v.gm).trim() || BOT_DEFAULTS.openaiModel;
+                    botConfSave(c);
+                    BOT.ai.down = 0; BOT.ai.models = null;
+                };
+                var dlg = Module.mcDialog.open({
+                    title: 'Bot',
+                    items: items(),
+                    buttons: [
+                        { id: 'skinpick', label: 'Skin...', keep: true, file: { accept: 'image/png', multiple: false, onFiles: function (files, d) {
+                            var f = files && files[0];
+                            if (!f) return;
+                            var fr = new FileReader();
+                            fr.onload = function () {
+                                skinPng(fr.result).then(function () {
+                                    c.skin = String(fr.result); c.skinName = f.name; botConfSave(c); skinChanged();
+                                    d.spec.items = items(); d.update();
+                                }, function () { status.text = f.name + " isn't a skin picture."; status.color = 'ff8080'; d.spec.items = items(); d.update(); });
+                            };
+                            fr.readAsDataURL(f);
+                        } } },
+                        { id: 'test', label: 'Test brain', keep: true },
+                        { id: 'reset', label: 'Reset', keep: true },
+                        { id: 'ok', label: 'Done', primary: true, cancel: true }
+                    ],
+                    onAction: function (act, v, d) {
+                        read(v);
+                        if (act === 'row:pers') {
+                            editPersonality(c.personality, function (txt) {
+                                if (txt != null) { c.personality = txt.trim() ? txt : BOT_DEFAULT_PERSONALITY; botConfSave(c); }
+                                d.spec.items = items(); d.update();
+                            });
+                        } else if (act === 'row:skin') {
+                            c.skin = ''; c.skinName = ''; botConfSave(c); skinChanged();
+                            d.spec.items = items(); d.update();
+                        } else if (act === 'reset') {
+                            c = JSON.parse(JSON.stringify(BOT_DEFAULTS)); botConfSave(c); skinChanged();
+                            status.text = 'Back to Chives: his name, voice and skin, and Ollama.'; status.color = 'a0ffa0';
+                            d.spec.items = items(); d.update();
+                        } else if (act === 'test') {
+                            status.text = 'Asking ' + BOT_PROVIDERS[c.provider] + '...'; status.color = 'a0a0a0'; d.spec.items = items(); d.update();
+                            if (c.provider === 3) { status.text = 'The brain is off: commands only.'; d.spec.items = items(); d.update(); return; }
+                            askBrain(c, 'Reply ONLY with JSON {"say": "<a one-line greeting in character>", "commands": []}.', [{ role: 'user', content: 'Say hello.' }], 60000).then(function (txt) {
+                                var o = parseReply(txt);
+                                status.text = 'It works: ' + plainOf(o ? o.say : txt).slice(0, 120); status.color = '80ff80'; d.spec.items = items(); d.update();
+                            }, function (e) {
+                                status.text = 'No answer: ' + String(e && e.message || e).slice(0, 140); status.color = 'ff8080'; d.spec.items = items(); d.update();
+                            });
+                        }
+                    },
+                    onClose: function (v) { read(v); }
+                });
+                if (c.provider === 0) ollamaModels(c.ollamaHost).then(function (m) {
+                    status.text = m.length ? 'Ollama is running. Models: ' + m.slice(0, 6).join(', ') : 'Ollama is running but has no models: ollama pull gemma3:4b';
+                    status.color = m.length ? '80ff80' : 'ffff80'; dlg.spec.items = items(); dlg.update();
+                }, function () { status.text = 'No Ollama at ' + c.ollamaHost + ' right now.'; status.color = 'ff9090'; dlg.spec.items = items(); dlg.update(); });
+            }
+            Module.mcBotSettings = function () { try { botSettings(null); } catch (e) { console.warn('[bot] settings', e); } };
+
+            function askBrain(c, system, msgs, ms) {
+                if (c.provider === 0) {
+                    var host = c.ollamaHost.replace(/\/+$/, '');
+                    var mp = c.ollamaModel ? Promise.resolve(c.ollamaModel) : (BOT.ai.models ? Promise.resolve(BOT.ai.models[0]) : ollamaModels(host).then(function (m) { BOT.ai.models = m; if (!m.length) throw new Error('Ollama has no models (ollama pull gemma3:4b)'); return m[0]; }));
+                    return mp.then(function (model) {
+                        return fetchT(host + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: model, messages: [{ role: 'system', content: system }].concat(msgs), stream: false, format: 'json', keep_alive: '30m', options: { temperature: c.temperature } }) }, ms)
+                            .then(function (r) { return r.json(); }).then(function (j) { return j && j.message && j.message.content || ''; });
+                    });
+                }
+                if (c.provider === 1) {
+                    if (!c.claudeKey) return Promise.reject(new Error('no Claude API key in Settings > Bot'));
+                    return fetchT('https://api.anthropic.com/v1/messages', { method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': c.claudeKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+                        body: JSON.stringify({ model: c.claudeModel, max_tokens: 400, temperature: c.temperature, system: system, messages: msgs }) }, ms)
+                        .then(function (r) { return r.json(); }).then(function (j) { return (j && j.content || []).map(function (b) { return b.text || ''; }).join(''); });
+                }
+                if (c.provider === 2) {
+                    if (!c.openaiKey) return Promise.reject(new Error('no OpenAI API key in Settings > Bot'));
+                    return fetchT('https://api.openai.com/v1/chat/completions', { method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + c.openaiKey },
+                        body: JSON.stringify({ model: c.openaiModel, temperature: c.temperature, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }].concat(msgs) }) }, ms)
+                        .then(function (r) { return r.json(); }).then(function (j) { return j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || ''; });
+                }
+                return Promise.reject(new Error('the brain is off'));
+            }
+            function parseReply(content) {
+                var out = null;
+                try { out = JSON.parse(content); } catch (e) { var m = /\{[\s\S]*\}/.exec(String(content)); try { out = m ? JSON.parse(m[0]) : null; } catch (e2) { out = null; } }
+                if (out && typeof out.say !== 'string' && typeof out.reply === 'string') out.say = out.reply;
+                if (out && !Array.isArray(out.commands) && Array.isArray(out.actions)) out.commands = out.actions;
+                return out;
+            }
+
+            function botHear(text, guid) {
+                if (joined() || rule('botChat') === false || botConf().enabled === false) return;
+                var bs = botList();
+                if (!bs.length) return;
+                var low = lc(text), bot = null;
+                bs.forEach(function (b) { if (!bot && new RegExp('(^|[^a-z0-9_])' + lc(b.name).replace(/[^a-z0-9_]/g, '.') + '([^a-z0-9_]|$)').test(low)) bot = b; });
+                if (!bot && /^(hey |ok |okay )?bot\b/.test(low)) bot = bs[0];
+                if (!bot) return;
+                var sd = senderFor(guid | 0);
+                if (!sd || rule('botOpsOnly') === true && !sd.op || botMobile(sd)) return;
+                var c = botConf();
+                if (c.provider !== 3 && Date.now() > BOT.ai.down) brainHear(bot, sd, text, c).catch(function (e) {
+                    console.warn('[bot] brain', e && e.message || e);
+                    BOT.ai.down = Date.now() + 60000;
+                    plainHear(bot, sd, text, true);
+                });
+                else plainHear(bot, sd, text, false);
+            }
+            BOT.hear = botHear;
+            function botSays(bot, text) { if (text) broadcast('<' + bot.name + '> ' + String(text).slice(0, 220)); }
+            function runAs(sd, bot, line) {
+                var args = tokens(String(line).replace(/^\/?(bot|chives)\s+/i, ''));
+                var cur = botList()[0];
+                if (args.length && (lc(args[0]) === lc(bot.name) || (cur && lc(args[0]) === lc(cur.name)))) args.shift();
+                try { botRun(sd, args, true); return true; }
+                catch (e) { if (e instanceof Err) { tellTo(sd, GREY + '(' + bot.name + ': ' + e.msg + ')'); return false; } throw e; }
+            }
+            function plainHear(bot, sd, text, brainFailed) {
+                var t = lc(text).replace(new RegExp(lc(bot.name).replace(/[^a-z0-9_]/g, '.'), 'g'), ' ').replace(/[,.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                var cmd = null, reply = null;
+                if (/\b(stop|halt|cancel|nevermind|never mind|enough)\b/.test(t)) { cmd = 'stop'; reply = 'Very good, stopping.'; }
+                else if (/\b(come|over here|to me)\b/.test(t) && !/\b(get|bring|fetch)\b/.test(t)) { cmd = 'come'; reply = 'On my way.'; }
+                else if (/\b(follow|with me|come along)\b/.test(t)) { cmd = 'follow'; reply = 'Right behind you.'; }
+                else if (/\b(defend|protect|guard)\b/.test(t)) { cmd = 'defend'; reply = 'I shall keep you safe.'; }
+                else if (/\b(status|doing|up to|carrying|inventory)\b/.test(t)) { cmd = 'status'; }
+                else if (/\b(drop|give me (it|that|everything|all)|hand (it )?over)\b/.test(t)) { cmd = /\b(all|everything)\b/.test(t) ? 'drop all' : 'drop'; reply = 'Here you are.'; }
+                else {
+                    var m = /\b(?:get|bring|fetch|gather|collect|mine|chop|make|craft|find)\b(?: me| us)?\s+(.+)$/.exec(t);
+                    if (m) { cmd = 'get ' + m[1].replace(/\b(please|pls|for me|now)\b/g, '').trim(); reply = 'Right away.'; }
+                }
+                if (!cmd) {
+                    botSays(bot, brainFailed ? "I can't reach my brain just now - /bot help has my commands." : 'Try "come", "follow", "stop" or "get 20 logs" - or give me a brain in Settings > Bot.');
+                    return;
+                }
+                if (cmd === 'status') { var st = botCmd(['status', sd.name, bot.name]); botSays(bot, plainOf(st.msg || '').replace(/^[^:]*: /, '')); return; }
+                if (runAs(sd, bot, cmd) && reply) botSays(bot, reply);
+            }
+            var BOT_RULES = [
+                'You act ONLY through commands. Each command is one line exactly like these:',
+                'get <count> <item>   - gather / craft / smelt it and bring it (e.g. "get 64 planks", "get 1 iron pickaxe", "get 20 cobblestone", "get iron set")',
+                'come | follow | defend | stop | status',
+                'drop | drop all | drop <item>   - hand things over',
+                'clear <w>x<h>x<d>   - dig out an area where the player looks;  tunnel <length>   - dig a tunnel the way they face',
+                'hunt <player> | unhunt',
+                'Reply ONLY with JSON: {"say": "<one or two short sentences you say in chat>", "queue": false, "commands": ["<command>", ...]}.',
+                '"say" is the only thing the player sees, so it IS your acknowledgement: a promise of what you are about to do, or an answer - never a claim that a job is already finished (you announce that yourself when it is), never a restatement of the command, never mentioning JSON or command names.',
+                '"commands": the NEW jobs asked for in THIS message, in order (empty for just chatting). Your CURRENT job (in your state below) runs on by itself - never repeat it.',
+                '"queue": true when they want the new jobs AFTER your current work ("after that", "when you are done", "then", "also"); otherwise false and the new jobs replace what you are doing.',
+                'Never invent commands. Use plain item names (planks, logs, stick, torch, iron ingot, cobblestone, wooden pickaxe...).'
+            ].join('\n');
+            function brainHear(bot, sd, text, c) {
+                var b = botNamed(bot.name) || bot;
+                var inv = botCmd(['inventory', sd.name, bot.name]);
+                var carrying = inv && inv.items && inv.items.length ? inv.items.slice(0, 20).map(function (i) { return i.count + ' ' + i.name; }).join(', ') : 'nothing';
+                var state = 'You are ' + (b.task ? 'busy: ' + b.task : 'idle') + '; health ' + b.health + '/20; carrying ' + carrying + '. ' + sd.name + ' is talking to you.';
+                var system = 'You are ' + bot.name + ', a helper bot player in a Minecraft world (Minecraft Pocket Edition with Java-style mods). ' +
+                    'Your personality (stay in character, always): ' + plainOf(c.personality) + '\n\n' + BOT_RULES + '\n\nYOUR STATE: ' + state;
+                var key = lc(bot.name), hist = BOT.hist[key] = BOT.hist[key] || [];
+                var msgs = hist.concat([{ role: 'user', content: sd.name + ': ' + text }]);
+                return askBrain(c, system, msgs, 180000).then(function (content) {
+                    var out = parseReply(content);
+                    if (!out) { botSays(bot, plainOf(content).slice(0, 200)); return; }
+                    hist.push({ role: 'user', content: sd.name + ': ' + text }, { role: 'assistant', content: JSON.stringify(out) });
+                    while (hist.length > 12) hist.shift();
+                    botSays(bot, out.say);
+                    var cmds = (Array.isArray(out.commands) ? out.commands : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 6);
+                    if (cmds.length && !out.queue && b.task && !/^(status|drop)/.test(cmds[0])) runAs(sd, bot, 'stop');
+                    cmds.forEach(function (cmd, i) {
+                        var q = i > 0 || !!out.queue;
+                        var sd2 = Object.assign({}, sd, { _queue: q });
+                        runAs(sd2, bot, cmd.trim());
+                    });
+                });
+            }
 
             C.fromJoiner = function (guid, msg) {
                 try {

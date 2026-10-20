@@ -2248,6 +2248,7 @@ R	field_72996_f	loadedEntityList
 R	field_147482_g	loadedTileEntityList
 R	field_73010_i	playerEntities
 R	field_73007_j	weatherEffects
+R	field_73016_r	lastLightningBolt
 R	field_73013_u	difficultySetting17
 R	field_73012_v	rand
 R	field_73011_w	provider
@@ -4088,6 +4089,7 @@ R	monster	monster
 R	creature	creature
 R	ambient	ambient
 R	waterCreature	waterCreature
+R	field_75606_e	maxNumberOfCreature
 R	UNDEFINED	UNDEFINED
 R	UNDEAD	UNDEAD
 R	ARTHROPOD	ARTHROPOD
@@ -6440,6 +6442,7 @@ R	func_70101_b	setRotation
 R	func_70084_c	addToPlayerScore
 R	func_70095_a	setSneaking
 R	func_70100_b_	onCollideWithPlayer
+R	func_70038_c	isOffsetPositionInLiquid
 R	func_70082_c	setAngles
 R	func_98035_c	writeMountToNBT
 R	func_130002_c	interactFirst
@@ -6568,6 +6571,9 @@ R	func_70639_aQ	getLivingSound
 R	func_70692_ba	canDespawn
 R	func_70623_bb	despawnEntity
 R	func_70646_bf	getVerticalFaceSpeed
+R	func_75601_b	getMaxNumberOfCreature
+R	func_75599_d	getPeacefulCreature
+R	func_82705_e	getAnimal
 R	func_71566_a	isAllowedCharacter
 R	func_71565_a	filerAllowedCharacters
 R	func_70902_q	getOwner
@@ -6578,6 +6584,7 @@ R	func_70785_a	attackEntity
 R	func_110176_b	isWithinHomeDistance
 R	func_70784_b	setTarget
 R	func_70780_i	isMovementCeased
+R	func_70779_j	updateWanderPath
 R	func_70782_k	findPlayerToAttack
 R	func_70781_l	hasPath
 R	func_70777_m	getEntityToAttack
@@ -7298,6 +7305,7 @@ D	net/minecraft/src/WeightedRandomItem	itemWeight:I:
 D	net/minecraft/src/World	scheduledUpdatesAreImmediate:Z:|loadedEntityList:Ljava/util/List;:|unloadedEntityList:Ljava/util/List;:|loadedTileEntityList:Ljava/util/List;:|addedTileEntityList:Ljava/util/List;:|tileEntitiesToBeRemoved:Ljava/util/List;:|playerEntities:Ljava/util/List;:|weatherEffects:Ljava/util/List;:|cloudColour:J:|skylightSubtracted:I:|updateLCG:I:|DIST_HASH_MAGIC:I:|prevRainingStrength:F:|rainingStrength:F:|prevThunderingStrength:F:|thunderingStrength:F:|lastLightningBolt:I:|difficultySetting17:Lnet/minecraft/src/EnumDifficulty;:|rand:Ljava/util/Random;:|provider:Lnet/minecraft/src/WorldProvider;:|worldAccesses:Ljava/util/List;:|chunkProvider:Lnet/minecraft/src/IChunkProvider;:|saveHandler:Lnet/minecraft/src/ISaveHandler;:|worldInfo:Lnet/minecraft/src/WorldInfo;:|findingSpawnPoint:Z:|mapStorage:Lnet/minecraft/src/MapStorage;:|villageCollectionObj:Lnet/minecraft/src/VillageCollection;:|villageSiegeObj:Lnet/minecraft/src/VillageSiege;:|theProfiler:Lnet/minecraft/src/Profiler;:|theCalendar:Ljava/util/Calendar;:|worldScoreboard:Lnet/minecraft/src/Scoreboard;:|isRemote:Z:|activeChunkSet:Ljava/util/Set;:|ambientTickCountdown:I:|spawnHostileMobs:Z:|spawnPeacefulMobs:Z:|collidingBoundingBoxes:Ljava/util/ArrayList;:|processingLoadedTiles:Z:|lightUpdateBlockList:[I:
 D	net/minecraft/src/WorldChunkManager	genBiomes:Lnet/minecraft/src/GenLayer;:|biomeIndexLayer:Lnet/minecraft/src/GenLayer;:|biomeCache:Lnet/minecraft/src/BiomeCache;:|biomesToSpawnIn:Ljava/util/List;:
 D	net/minecraft/src/WorldChunkManagerHell	biomeGenerator:Lnet/minecraft/src/BiomeGenBase;:|rainfall:F:
+D	net/minecraft/src/WorldClient	sendQueue:Lnet/minecraft/src/NetClientHandler;:|clientChunkProvider:Lnet/minecraft/src/ChunkProviderClient;:|entityHashSet:Lnet/minecraft/src/IntHashMap;:|entityList:Ljava/util/Set;:|entitySpawnQueue:Ljava/util/Set;:|mc:Lnet/minecraft/client/Minecraft;:|previousActiveChunkSet:Ljava/util/Set;:
 D	net/minecraft/src/WorldGenBigMushroom	mushroomType:I:
 D	net/minecraft/src/WorldGenBigTree	otherCoordPairs:[B:s|rand:Ljava/util/Random;:|worldObj:Lnet/minecraft/src/World;:|basePos:[I:|heightLimit:I:|height:I:|heightAttenuation:D:|branchDensity:D:|branchSlope:D:|scaleWidth:D:|leafDensity:D:|trunkSize:I:|heightLimitLimit:I:|leafDistanceLimit:I:|leafNodes:[[I:
 D	net/minecraft/src/WorldGenClay	field_150546_a:Lnet/minecraft/src/Block;:|numberOfBlocks:I:
