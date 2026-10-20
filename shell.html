@@ -757,7 +757,7 @@
                     }
                 });
                 Module.mcPlaySound = play;
-                Module.mcHasSound = function (name) { var l = String(name || '').toLowerCase(); return !!((groups[name] && groups[name].length) || (overrides[name] && overrides[name].length) || (groups[l] && groups[l].length) || (overrides[l] && overrides[l].length)); };
+                Module.mcHasSound = function (name) { var l = String(name || '').toLowerCase(); return !!(setList(name) || (groups[name] && groups[name].length) || (overrides[name] && overrides[name].length) || (groups[l] && groups[l].length) || (overrides[l] && overrides[l].length)); };
             }).catch(function (e) { console.warn('[sound] classic sounds unavailable:', e); });
 
             var AC = window.AudioContext || window.webkitAudioContext;
@@ -863,8 +863,66 @@
                 a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = false;
                 a.playbackRate = Math.max(0.25, Math.min(4, pitch || 1));
             }
+            var SETS = ['bta', 'v17'], setMaps = {}, setLoading = {};
+            function curStyle() { return Module.mcSoundStyle === 1 ? 1 : 0; }
+            function loadSet(i) {
+                var dir = SETS[i];
+                if (setMaps[dir] || setLoading[dir]) return;
+                setLoading[dir] = true;
+                fetch('sounds/' + dir + '/sounds.json').then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) {
+                    var m = {};
+                    Object.keys(j).forEach(function (n) { m[n] = j[n].map(function (f) { return url(dir + '/' + f); }); });
+                    setMaps[dir] = m;
+                    if (curStyle() === i) preloadSet(m);
+                }).catch(function (e) { console.warn('[sound] ' + dir + ' set unavailable:', e); }).then(function () { setLoading[dir] = false; });
+            }
+            var V17_ALIAS = {
+                'random.hurt': 'game.player.hurt', 'damage.hurtflesh': 'game.neutral.hurt',
+                'damage.fallbig': 'game.player.hurt.fall.big', 'damage.fallsmall': 'game.player.hurt.fall.small',
+                'random.splash': 'game.player.swim.splash', 'liquid.splash': 'game.player.swim.splash',
+                'mob.slime': 'mob.slime.small', 'mob.slimeattack': 'mob.slime.attack',
+                'mob.villager.default': 'mob.villager.idle', 'mob.villager.defaulthurt': 'mob.villager.hit',
+                'mob.villager.defaultdeath': 'mob.villager.death', 'random.wood click': 'random.wood_click',
+                'mob.chickenplop': 'mob.chicken.plop'
+            };
+            function v17Name(m, n) {
+                if (m[n]) return n;
+                if (V17_ALIAS[n]) return V17_ALIAS[n];
+                if (m[n + '.say']) return n + '.say';
+                var h = /^mob[.]([a-z]+?)(hurt|death)$/.exec(n);
+                if (h) return 'mob.' + h[1] + '.' + h[2];
+                return n;
+            }
+            function setList(name) {
+                var i = curStyle(), dir = SETS[i], m = setMaps[dir];
+                if (!m) { loadSet(i); return null; }
+                var n = i === 1 ? v17Name(m, name) : name;
+                return m[n] || m[String(n).toLowerCase()] || null;
+            }
+            function preloadSet(m) {
+                if (!actx) return;
+                var urls = [];
+                Object.keys(m).forEach(function (n) {
+                    if (/^(step|dig|random|damage|liquid|fire|tile|game)[.]/.test(n) || /[.]step$/.test(n)) urls = urls.concat(m[n]);
+                });
+                (function next() {
+                    var batch = urls.splice(0, 6);
+                    if (!batch.length) return;
+                    batch.forEach(loadBuffer);
+                    setTimeout(next, 150);
+                })();
+            }
+            var lastStyle = null;
+            Module.mcApplySoundStyle = function () {
+                var s = curStyle();
+                loadSet(s);
+                if (setMaps[SETS[s]]) preloadSet(setMaps[SETS[s]]);
+                if (lastStyle !== null && lastStyle !== s) { try { if (Module.mcOnSoundStyle) Module.mcOnSoundStyle(s ? 'new' : 'old'); } catch (e) { } }
+                lastStyle = s;
+            };
+            Module.mcApplySoundStyle();
             function play(name, volume, pitch) {
-                var list = (overrides[name] && overrides[name].length) ? overrides[name] : groups[name]; if ((!list || !list.length) && name) { var lname = String(name).toLowerCase(); list = (overrides[lname] && overrides[lname].length) ? overrides[lname] : groups[lname]; }
+                var list = (overrides[name] && overrides[name].length) ? overrides[name] : (setList(name) || groups[name]); if ((!list || !list.length) && name) { var lname = String(name).toLowerCase(); list = (overrides[lname] && overrides[lname].length) ? overrides[lname] : groups[lname]; }
                 if (!list || !list.length) return false;
                 if (playing.size > 24) {
                     playing.forEach(function (el) { if (el.paused || el.ended || el.error) playing.delete(el); });
@@ -8624,6 +8682,8 @@
                             captureSlots: function (on) { post({ t: 'capture', mod: mod, on: !!on }); },
                             openControls: function () { post({ t: 'controls', mod: mod }); },
                             sound: function (name, v, p) { post({ t: 'csound', name: String(name), v: v == null ? 1 : +v, p: p == null ? 1 : +p }); },
+                            soundStyle: function () { return cask('soundstyle').then(function (r) { return r.style; }); },
+                            setSoundStyle: function (s) { post({ t: 'csoundstyle', style: String(s).toLowerCase() === 'new' || s === 1 ? 1 : 0 }); },
                             message: function (text) { post({ t: 'cmsg', text: String(text) }); },
                             hud: function (id, text) { post({ t: 'hud', mod: mod, id: String(id), text: text == null ? null : String(text) }); },
                             storage: {
@@ -8942,6 +9002,7 @@
                 case 'cask':
                     var ans = {}, ca = Array.isArray(d.args) ? d.args : [];
                     if (d.what === 'screen') ans = screenInfo();
+                    else if (d.what === 'soundstyle') ans.style = Module.mcSoundStyle === 1 ? 'new' : 'old';
                     else if (d.what === 'items') {
                         try { ans.items = JSON.parse(UTF8ToString(Module._mcItemCatalog())).filter(Boolean); } catch (x) { ans.items = []; }
                     } else if (d.what === 'iteminfo') {
@@ -8968,6 +9029,9 @@
                             !!Module.ccall('mcScreenSetHeld', 'number', ['string', 'number', 'number'], [hr || '', hr ? ca[1] | 0 : 0, ca[2] == null ? -1 : ca[2] | 0]);
                     }
                     toWorker(Object.assign({ t: 'reply', req: d.req }, ans));
+                    break;
+                case 'csoundstyle':
+                    if (Module._mcSetSoundStyle) Module.ccall('mcSetSoundStyle', null, ['number'], [d.style | 0]);
                     break;
                 case 'csound':
                     if (Module._mcScriptSound && me) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [d.name, NaN, 0, 0, d.v, d.p]);
@@ -9016,6 +9080,7 @@
                 if (!open) { closeGui(true); return; }
                 showGui(Object.assign({}, spec, { _mod: mod }), function (ev) { toWorker(Object.assign(ev, { t: 'gui', player: me })); });
             }
+            Module.mcOnSoundStyle = function (style) { toWorker({ t: 'soundStyle', client: true, style: style }); };
             function toWorker(e) {
                 if (!worker) return;
                 if (e.player && e.player.id != null) known[e.player.id] = e.player;
@@ -11375,6 +11440,7 @@
                 }
                 return res;
             }
+            var BOT_SET_MAT = { wood: 'wooden', wooden: 'wooden', woods: 'wooden', log: 'wooden', logs: 'wooden', plank: 'wooden', planks: 'wooden', gold: 'golden', golden: 'golden', stones: 'stone', cobble: 'stone', cobblestone: 'stone', diamonds: 'diamond', chainmail: 'chain' };
             var BOT_SET_TOOLS = ['pickaxe', 'axe', 'shovel', 'sword', 'hoe'], BOT_SET_ARMOR = ['helmet', 'chestplate', 'leggings', 'boots'];
             function botParseGet(text) {
                 var toks = lc(text).split(/\s+/).filter(Boolean), count = 0, rest = [];
@@ -11385,7 +11451,8 @@
                 if (!count) count = 1;
                 var q = rest.join(' ');
                 if (/\bset\b/.test(q)) {
-                    var mat = botTokens(q.replace(/\bset\b/, '')).join(' ');
+                    var mat = lc(q.replace(/\bset\b/, '')).replace(/[^a-z0-9_ ]/g, ' ').split(/\s+/).filter(function (t) { return t && !BOT_FILLER[t]; })
+                        .map(function (t) { return BOT_SET_MAT[t] || t; }).join(' ');
                     if (!mat) return { error: 'Which set? e.g. /bot get iron set (wooden, stone, iron, gold, diamond, leather, chain).' };
                     var items = [];
                     var leather = /leather/.test(mat), chain = /chain/.test(mat);

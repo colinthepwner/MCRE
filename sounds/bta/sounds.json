@@ -1,0 +1,506 @@
+{
+"ambient.cave.cave": [
+"ambient/cave/cave1.ogg",
+"ambient/cave/cave10.ogg",
+"ambient/cave/cave11.ogg",
+"ambient/cave/cave12.ogg",
+"ambient/cave/cave13.ogg",
+"ambient/cave/cave2.ogg",
+"ambient/cave/cave3.ogg",
+"ambient/cave/cave4.ogg",
+"ambient/cave/cave5.ogg",
+"ambient/cave/cave6.ogg",
+"ambient/cave/cave7.ogg",
+"ambient/cave/cave8.ogg",
+"ambient/cave/cave9.ogg"
+],
+"ambient.weather.rain": [
+"ambient/weather/rain1.ogg",
+"ambient/weather/rain2.ogg",
+"ambient/weather/rain3.ogg",
+"ambient/weather/rain4.ogg"
+],
+"ambient.weather.thunder": [
+"ambient/weather/thunder1.ogg",
+"ambient/weather/thunder2.ogg",
+"ambient/weather/thunder3.ogg"
+],
+"damage.fallbig": [
+"damage/fallbig1.ogg",
+"damage/fallbig2.ogg"
+],
+"damage.fallsmall": [
+"damage/fallsmall.ogg"
+],
+"damage.hurtflesh": [
+"damage/hurtflesh1.ogg",
+"damage/hurtflesh2.ogg",
+"damage/hurtflesh3.ogg"
+],
+"fire.fire": [
+"fire/fire.ogg"
+],
+"fire.ignite": [
+"fire/ignite.ogg"
+],
+"item.pickup": [
+"random/pop.ogg"
+],
+"liquid.lava": [
+"liquid/lava.ogg"
+],
+"liquid.lavapop": [
+"liquid/lavapop.ogg"
+],
+"liquid.splash": [
+"liquid/splash.ogg"
+],
+"liquid.water": [
+"liquid/water.ogg"
+],
+"mob.chicken": [
+"mob/chicken1.ogg",
+"mob/chicken2.ogg",
+"mob/chicken3.ogg"
+],
+"mob.chickenhurt": [
+"mob/chickenhurt1.ogg",
+"mob/chickenhurt2.ogg"
+],
+"mob.chickenplop": [
+"mob/chickenplop.ogg"
+],
+"mob.cow": [
+"mob/cow1.ogg",
+"mob/cow2.ogg",
+"mob/cow3.ogg",
+"mob/cow4.ogg"
+],
+"mob.cowhurt": [
+"mob/cowhurt1.ogg",
+"mob/cowhurt2.ogg",
+"mob/cowhurt3.ogg"
+],
+"mob.creeper": [
+"mob/creeper1.ogg",
+"mob/creeper2.ogg",
+"mob/creeper3.ogg",
+"mob/creeper4.ogg"
+],
+"mob.creeper.fuse": [
+"random/fuse.ogg"
+],
+"mob.creeperdeath": [
+"mob/creeperdeath.ogg"
+],
+"mob.ghast.affectionate_scream": [
+"mob/ghast/affectionate scream.ogg"
+],
+"mob.ghast.charge": [
+"mob/ghast/charge.ogg"
+],
+"mob.ghast.death": [
+"mob/ghast/death.ogg"
+],
+"mob.ghast.fireball": [
+"mob/ghast/fireball4.ogg"
+],
+"mob.ghast.moan": [
+"mob/ghast/moan1.ogg",
+"mob/ghast/moan2.ogg",
+"mob/ghast/moan3.ogg",
+"mob/ghast/moan4.ogg",
+"mob/ghast/moan5.ogg",
+"mob/ghast/moan6.ogg",
+"mob/ghast/moan7.ogg"
+],
+"mob.ghast.scream": [
+"mob/ghast/scream1.ogg",
+"mob/ghast/scream2.ogg",
+"mob/ghast/scream3.ogg",
+"mob/ghast/scream4.ogg",
+"mob/ghast/scream5.ogg"
+],
+"mob.pig": [
+"mob/pig1.ogg",
+"mob/pig2.ogg",
+"mob/pig3.ogg"
+],
+"mob.pigdeath": [
+"mob/pigdeath.ogg"
+],
+"mob.player.feminine.death": [
+"mob/player/fem_hurt.ogg"
+],
+"mob.player.feminine.hurt": [
+"mob/player/fem_hurt.ogg"
+],
+"mob.player.masculine.death": [
+"mob/player/masc_hurt.ogg"
+],
+"mob.player.masculine.hurt": [
+"mob/player/masc_hurt.ogg"
+],
+"mob.player.neutral.death": [
+"mob/player/neutral_hurt.ogg"
+],
+"mob.player.neutral.hurt": [
+"mob/player/neutral_hurt.ogg"
+],
+"mob.sheep": [
+"mob/sheep1.ogg",
+"mob/sheep2.ogg",
+"mob/sheep3.ogg"
+],
+"mob.skeleton": [
+"mob/skeleton1.ogg",
+"mob/skeleton2.ogg",
+"mob/skeleton3.ogg"
+],
+"mob.skeletondeath": [
+"mob/skeletondeath.ogg"
+],
+"mob.skeletonhurt": [
+"mob/skeletonhurt1.ogg",
+"mob/skeletonhurt2.ogg",
+"mob/skeletonhurt3.ogg",
+"mob/skeletonhurt4.ogg"
+],
+"mob.slime": [
+"mob/slime1.ogg",
+"mob/slime2.ogg",
+"mob/slime3.ogg",
+"mob/slime4.ogg",
+"mob/slime5.ogg"
+],
+"mob.slimeattack": [
+"mob/slimeattack1.ogg",
+"mob/slimeattack2.ogg"
+],
+"mob.spider": [
+"mob/spider1.ogg",
+"mob/spider2.ogg",
+"mob/spider3.ogg",
+"mob/spider4.ogg"
+],
+"mob.spiderdeath": [
+"mob/spiderdeath.ogg"
+],
+"mob.wolf.bark": [
+"mob/wolf/bark1.ogg",
+"mob/wolf/bark2.ogg",
+"mob/wolf/bark3.ogg"
+],
+"mob.wolf.death": [
+"mob/wolf/death.ogg"
+],
+"mob.wolf.growl": [
+"mob/wolf/growl1.ogg",
+"mob/wolf/growl2.ogg",
+"mob/wolf/growl3.ogg"
+],
+"mob.wolf.howl": [
+"mob/wolf/howl1.ogg",
+"mob/wolf/howl2.ogg"
+],
+"mob.wolf.hurt": [
+"mob/wolf/hurt1.ogg",
+"mob/wolf/hurt2.ogg",
+"mob/wolf/hurt3.ogg"
+],
+"mob.wolf.panting": [
+"mob/wolf/panting.ogg"
+],
+"mob.wolf.shake": [
+"mob/wolf/shake.ogg"
+],
+"mob.wolf.whine": [
+"mob/wolf/whine.ogg"
+],
+"mob.zombie": [
+"mob/zombie1.ogg",
+"mob/zombie2.ogg",
+"mob/zombie3.ogg"
+],
+"mob.zombiedeath": [
+"mob/zombiedeath.ogg"
+],
+"mob.zombiehurt": [
+"mob/zombiehurt1.ogg",
+"mob/zombiehurt2.ogg"
+],
+"mob.zombiepig.zpig": [
+"mob/zombiepig/zpig1.ogg",
+"mob/zombiepig/zpig2.ogg",
+"mob/zombiepig/zpig3.ogg",
+"mob/zombiepig/zpig4.ogg"
+],
+"mob.zombiepig.zpigangry": [
+"mob/zombiepig/zpigangry1.ogg",
+"mob/zombiepig/zpigangry2.ogg",
+"mob/zombiepig/zpigangry3.ogg",
+"mob/zombiepig/zpigangry4.ogg"
+],
+"mob.zombiepig.zpigdeath": [
+"mob/zombiepig/zpigdeath.ogg"
+],
+"mob.zombiepig.zpighurt": [
+"mob/zombiepig/zpighurt1.ogg",
+"mob/zombiepig/zpighurt2.ogg"
+],
+"note.bass": [
+"note/bass.ogg"
+],
+"note.bassattack": [
+"note/bassattack.ogg"
+],
+"note.bd": [
+"note/bd.ogg"
+],
+"note.celesta": [
+"note/celesta.ogg"
+],
+"note.chant": [
+"note/chant.ogg"
+],
+"note.chip_triangle": [
+"note/chip_triangle.ogg"
+],
+"note.drum_steel": [
+"note/drum_steel.ogg"
+],
+"note.guitar_electric": [
+"note/guitar_electric.ogg"
+],
+"note.harp": [
+"note/harp.ogg"
+],
+"note.hat": [
+"note/hat.ogg"
+],
+"note.pling": [
+"note/pling.ogg"
+],
+"note.snare": [
+"note/snare.ogg"
+],
+"note.wood_block": [
+"note/wood_block.ogg"
+],
+"portal.portal": [
+"portal/portal.ogg"
+],
+"portal.travel": [
+"portal/travel.ogg"
+],
+"portal.trigger": [
+"portal/trigger.ogg"
+],
+"random.achievement": [
+"random/achievement1.ogg",
+"random/achievement2.ogg"
+],
+"random.bite": [
+"random/bite.ogg"
+],
+"random.bite_extended": [
+"random/bite.ogg"
+],
+"random.bow": [
+"random/bow.ogg"
+],
+"random.breath": [
+"random/breath.ogg"
+],
+"random.click": [
+"random/click.ogg"
+],
+"random.door_close": [
+"random/door_close.ogg"
+],
+"random.door_open": [
+"random/door_open.ogg"
+],
+"random.drr": [
+"random/drr.ogg"
+],
+"random.equip": [
+"random/equip.ogg"
+],
+"random.explode": [
+"random/explode.ogg"
+],
+"random.fizz": [
+"random/fizz.ogg"
+],
+"random.fuse": [
+"random/fuse.ogg"
+],
+"random.glass": [
+"random/glass1.ogg",
+"random/glass2.ogg",
+"random/glass3.ogg"
+],
+"random.hurt": [
+"random/hurt.ogg"
+],
+"random.page": [
+"random/page.ogg"
+],
+"random.pop": [
+"random/pop.ogg"
+],
+"random.skate": [
+"random/fuse.ogg"
+],
+"random.splash": [
+"random/splash.ogg"
+],
+"random.whoose.in": [
+"random/whoosh_in.ogg"
+],
+"random.whoose.out": [
+"random/whoosh_out.ogg"
+],
+"random.wood click": [
+"random/wood click.ogg"
+],
+"step.cloth": [
+"step/cloth1.ogg",
+"step/cloth2.ogg",
+"step/cloth3.ogg",
+"step/cloth4.ogg"
+],
+"step.crystal": [
+"step/crystal_1.ogg",
+"step/crystal_2.ogg",
+"step/crystal_3.ogg",
+"step/crystal_4.ogg",
+"step/crystal_5.ogg",
+"step/crystal_6.ogg"
+],
+"step.grass": [
+"step/grass1.ogg",
+"step/grass2.ogg",
+"step/grass3.ogg",
+"step/grass4.ogg"
+],
+"step.gravel": [
+"step/gravel1.ogg",
+"step/gravel2.ogg",
+"step/gravel3.ogg",
+"step/gravel4.ogg"
+],
+"step.permafrost": [
+"step/permafrost1.ogg",
+"step/permafrost2.ogg",
+"step/permafrost3.ogg",
+"step/permafrost4.ogg"
+],
+"step.sand": [
+"step/sand1.ogg",
+"step/sand2.ogg",
+"step/sand3.ogg",
+"step/sand4.ogg"
+],
+"step.snow": [
+"step/snow1.ogg",
+"step/snow2.ogg",
+"step/snow3.ogg",
+"step/snow4.ogg"
+],
+"step.stone": [
+"step/stone1.ogg",
+"step/stone2.ogg",
+"step/stone3.ogg",
+"step/stone4.ogg"
+],
+"step.wood": [
+"step/wood1.ogg",
+"step/wood2.ogg",
+"step/wood3.ogg",
+"step/wood4.ogg"
+],
+"tile.acidbubble": [
+"tile/bubble_1.ogg",
+"tile/bubble_2.ogg",
+"tile/bubble_3.ogg",
+"tile/bubble_4.ogg"
+],
+"tile.activator.click": [
+"random/click.ogg"
+],
+"tile.activator.use": [
+"random/pop.ogg"
+],
+"tile.crumble": [
+"tile/crumble_1.ogg",
+"tile/crumble_2.ogg"
+],
+"tile.deepboom": [
+"tile/deepboom.ogg"
+],
+"tile.deepcrumble": [
+"tile/deepcrumble.ogg"
+],
+"tile.deepquietboom": [
+"tile/deepquietboom.ogg"
+],
+"tile.dispenser.click": [
+"random/click.ogg"
+],
+"tile.dispenser.eject": [
+"random/click.ogg"
+],
+"tile.dispenser.fire": [
+"random/bow.ogg"
+],
+"tile.mobspawner.spawn": [
+"mob/ghast/fireball4.ogg"
+],
+"tile.piston.attached": [
+"tile/piston/in.ogg"
+],
+"tile.piston.detached": [
+"tile/piston/out.ogg"
+],
+"tile.piston.detached.in": [
+"tile/piston/in.ogg"
+],
+"tile.piston.detached.out": [
+"tile/piston/out.ogg"
+],
+"tile.piston.in": [
+"tile/piston/in.ogg"
+],
+"tile.piston.out": [
+"tile/piston/out.ogg"
+],
+"tile.scrape": [
+"tile/scrape.ogg"
+],
+"tile.sensor_block.sense": [
+"random/breath.ogg"
+],
+"tile.tnt.fuse": [
+"random/fuse.ogg"
+],
+"ui.crafting_fail": [
+"ui/crafting_fail.ogg"
+],
+"ui.crafting_made": [
+"ui/crafting_made.ogg"
+],
+"ui.ui_back": [
+"ui/ui_back.ogg"
+],
+"ui.ui_click": [
+"ui/ui_click.ogg"
+],
+"ui.ui_focus": [
+"ui/ui_focus.ogg"
+],
+"ui.ui_scroll": [
+"ui/ui_scroll.ogg"
+]
+}
