@@ -8755,14 +8755,15 @@
                     var g = x.enabled && !x.err && x.m && x.m.game_mode;
                     if (!g || typeof g !== 'object') return;
                     o[x.id] = { name: String(g.name || x.m.name || x.id).slice(0, 40), description: String(g.description || '').slice(0, 80), cid: cid(x),
-                                          hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes };
+                                          hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes, world_height: g.world_height, tall_world: g.tall_world };
                 });
                 return o;
             };
             api.gameModes = function () {
                 var o = api.modeMods();
                 return Object.keys(o).map(function (k) { var ws = o[k].world_sizes || o[k].sizes; ws = (Array.isArray(ws) ? ws : ws ? [ws] : []).map(function (x) { return String(x).toLowerCase().replace(/[^a-z]/g, ''); }).join(',');
-                    return [k, o[k].name, o[k].description, o[k].hardcore ? 1 : 0, o[k]['default'] ? 1 : 0, o[k].hunger ? 1 : 0, ws].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
+                    var wh = +o[k].world_height || (o[k].tall_world === true ? 256 : o[k].tall_world === false ? 128 : 0);
+                    return [k, o[k].name, o[k].description, o[k].hardcore ? 1 : 0, o[k]['default'] ? 1 : 0, o[k].hunger ? 1 : 0, ws, wh === 128 || wh === 256 ? wh : 0].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
             };
             api.worldMode = '';
             api.offer = function () {
