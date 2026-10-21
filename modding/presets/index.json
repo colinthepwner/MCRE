@@ -131,6 +131,19 @@
         "rules",
         "scripts"
       ]
+    },
+    {
+      "id": "changes_example",
+      "name": "Example Changes",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Changes the game's own things: tougher stone that needs an iron pickaxe, a copper tool tier, weaker apples, stronger zombies, no wooden pickaxe recipe, slower healing - and a script that grows max health with level.",
+      "url": "changes_example.zip",
+      "tags": [
+        "overrides",
+        "scripts"
+      ]
     }
   ]
 }

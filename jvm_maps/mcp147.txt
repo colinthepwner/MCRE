@@ -2688,6 +2688,7 @@ F	nh	e	field_75331_e	field_75331_e
 F	nh	f	field_75329_f	watchedClass
 F	ni	b	field_75335_b	theMerchant
 F	nj	b	field_75450_b	villagerObj
+F	nj	c	field_75451_c	mate
 F	nj	d	field_75448_d	worldObj
 F	nk	a	field_75443_a	worldObj
 F	nk	b	field_75441_b	attacker

@@ -1654,6 +1654,442 @@
                 };
                 return R;
             })();
+            Module.mcOverrides = Module.mcOverrides || (function () {
+                var TOOLS = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears', 'none'];
+                var HANDS = ['drop', 'nodrop', 'never'];
+                var runtime = {};
+                var hostOv = null, hostSurv = null, hostAt = 0;
+                var num = function (v) { return typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && isFinite(+v) ? +v : null); };
+                var clean = function (v) { return String(v).replace(/[\t\n\r;=,*]/g, ' '); };
+                function skillSpec(v) {
+                    var sk = function (s) { return String(s).toLowerCase().trim().replace(/[^a-z0-9_:+|.-]+/g, '_'); };
+                    if (v === null || v === undefined || v === false) return '';
+                    if (!Array.isArray(v)) return sk(v);
+                    return v.map(function (e) { return Array.isArray(e) ? e.map(sk).join('+') : sk(e); }).filter(Boolean).join('|');
+                }
+                Module.mcSkillSpec = skillSpec;
+                function fieldsOf(what, j, ref, bad, tiers, pic) {
+                    var out = [], put = function (k, v) { if (v !== null && v !== undefined) out.push(k + '=' + v); };
+                    var pick = function () { for (var i = 0; i < arguments.length; i++) if (j[arguments[i]] !== undefined) return j[arguments[i]]; return undefined; };
+                    var n = function () { var v = pick.apply(null, arguments); if (v === undefined) return null; var x = num(v); if (x === null) bad('"' + arguments[0] + '" should be a number'); return x; };
+                    if (what === 'items') {
+                        var tierName = pick('tier'), t = tierName !== undefined ? (tiers && tiers[String(tierName).toLowerCase()]) : null;
+                        if (tierName !== undefined && !t) bad('"tier": no tier "' + tierName + '" (tiers/*.json, or wood / stone / iron / diamond / gold)');
+                        if (t) { put('level', t.level); put('speed', t.speed); put('durability', t.uses); }
+                        put('durability', n('durability', 'max_damage', 'uses'));
+                        put('stack', n('stack', 'max_stack', 'stack_size'));
+                        put('damage', n('damage', 'attack_damage'));
+                        var tool = pick('tool');
+                        if (tool !== undefined) { tool = tool === false || tool === null ? 'none' : String(tool).toLowerCase(); if (TOOLS.indexOf(tool) < 0) bad('"tool": one of ' + TOOLS.join(', ')); else put('tool', tool); }
+                        put('level', n('level', 'harvest_level'));
+                        put('speed', n('speed', 'mining_speed'));
+                        put('food', n('food', 'nutrition', 'hunger'));
+                        put('saturation', n('saturation', 'saturation_modifier'));
+                        put('fuel_heat', n('fuel_heat'));
+                        var ql = pick('quality');
+                        if (ql !== undefined) {
+                            var QN = ['', 'wretched', 'poor', 'average', 'fine', 'excellent', 'superb', 'masterwork', 'legendary'];
+                            var qv = typeof ql === 'number' ? ql : QN.indexOf(String(ql).toLowerCase());
+                            if (qv >= 1 && qv <= 8) put('quality_max', qv | 0); else bad('"quality": wretched, poor, average, fine, excellent, superb, masterwork or legendary');
+                        }
+                        var ar = pick('arrow');
+                        if (ar !== undefined && ar !== false) {
+                            put('arrow_damage', ar === true ? 1 : num(typeof ar === 'object' ? ar.damage : ar) || 1);
+                            if (ar && typeof ar === 'object' && ar.texture && pic) { var ap = pic(ar.texture); if (ap) put('arrow_tex', ap); else bad('"arrow": no picture "' + ar.texture + '" in the mod'); }
+                        }
+                        put('smelt_heat', n('smelt_heat'));
+                        var w = pick('wear');
+                        if (w && typeof w === 'object') { put('wear_mine', num(w.mine)); put('wear_hit', num(w.hit)); put('wear_hardness', num(w.per_hardness)); }
+                        put('wear_mine', n('wear_mine')); put('wear_hit', n('wear_hit')); put('wear_hardness', n('wear_per_hardness', 'wear_hardness'));
+                        var nm = pick('name');
+                        if (typeof nm === 'string' && nm.trim()) put('name', clean(nm).trim());
+                        var th = pick('throwable');
+                        if (th) { var to = typeof th === 'object' ? th : {}; put('throw', [Math.max(0.1, num(to.speed) || 1.5), Math.max(0, num(to.gravity) === null ? 0.03 : num(to.gravity)), Math.max(0, num(to.damage) | 0)].join(',')); }
+                        var rg = pick('ranged');
+                        if (rg && typeof rg === 'object') {
+                            if (num(rg.power) !== null) put('ranged_power', Math.max(0.1, num(rg.power)));
+                            if (num(rg.durability) !== null && pick('durability', 'max_damage', 'uses') === undefined) put('durability', Math.max(0, num(rg.durability) | 0));
+                        }
+                        var pl = pick('pull');
+                        if (pl) {
+                            var pm = Array.isArray(pl) ? { '*': pl } : pl, parts = [];
+                            Object.keys(pm).forEach(function (a) {
+                                var rs = (Array.isArray(pm[a]) ? pm[a] : []).map(function (x) { return ref(x); });
+                                if (rs.length !== 3 || rs.some(function (x) { return !x; })) { bad('"pull": three items for each arrow (its looks drawn a little, more, all the way)'); return; }
+                                var ar = a === '*' ? '*' : ref(a);
+                                if (ar) parts.push([ar].concat(rs).join('~'));
+                            });
+                            if (parts.length) put('pull', parts.join('|'));
+                        }
+                        var oref = function (k, as) { var v = pick(k); if (!v) return; var r = ref(v); if (r) put(as, r); };
+                        oref('returns', 'returns'); oref('craft_returns', 'craft_returns'); oref('in_water', 'in_water'); oref('places', 'places');
+                        var fl = pick('fills');
+                        if (fl && typeof fl === 'object' && fl.water) { var fwr = ref(fl.water); if (fwr) put('fills_water', fwr); }
+                        var lq = pick('liquid');
+                        if (lq !== undefined) { if (String(lq).toLowerCase() === 'water') put('water_vessel', 1); else bad('"liquid": only "water" for now'); }
+                        var rch = pick('reach', 'reach_bonus');
+                        if (rch !== undefined) {
+                            var rv = num(rch && typeof rch === 'object' ? rch.bonus : rch);
+                            if (rv === null) bad('"reach" should be a number (or {bonus, applies_to: "all" | "effective"})'); else put('reach', rv);
+                            var rat = rch && typeof rch === 'object' ? rch.applies_to : pick('reach_applies_to');
+                            if (rat !== undefined) put('reach_all', String(rat).toLowerCase() === 'all' ? 1 : 0);
+                        }
+                        put('sugar', n('sugar', 'sugar_content'));
+                        var tl = pick('tills', 'tills_soil');
+                        if (tl !== undefined) put('tills', tl ? 1 : 0);
+                        var cu = pick('cuts');
+                        if (cu !== undefined) {
+                            var cl = (Array.isArray(cu) ? cu : [cu]).map(function (x) { return ref(x); }).filter(Boolean);
+                            if (cl.length) put('cuts', cl.join('|'));
+                        }
+                        put('cut_wear', n('cut_wear'));
+                        var dk = pick('drink', 'drinkable');
+                        if (dk !== undefined) put('drink', dk === 'clears_effects' || dk === 'clear_effects' ? 2 : dk ? 1 : 0);
+                        var se = pick('strips_enchantments', 'disenchants');
+                        if (se !== undefined) put('strips_enchantments', se ? 1 : 0);
+                        put('dim_resist', n('dim_resist', 'dimming_resistance'));
+                        var csk = pick('craft_skills');
+                        if (csk !== undefined) put('craft_skills', skillSpec(csk) || '');
+                        var cif = pick('cooks_in_fire');
+                        if (cif) { var cifr = ref(cif); if (cifr) put('cooks_in_fire', cifr); }
+                        put('smelt_xp', n('smelt_xp', 'smelting_xp'));
+                        var blk = pick('blocks', 'can_block');
+                        if (blk !== undefined) put('blocks', blk ? 1 : 0);
+                        put('block_wear', n('block_wear'));
+                    } else if (what === 'blocks') {
+                        put('hardness', n('hardness', 'destroy_time'));
+                        put('resistance', n('resistance', 'blast_resistance', 'explosion_resistance'));
+                        var bt = pick('tool');
+                        if (bt !== undefined) { bt = bt === false || bt === null ? 'none' : String(bt).toLowerCase(); if (TOOLS.indexOf(bt) < 0) bad('"tool": one of ' + TOOLS.join(', ')); else put('tool', bt); }
+                        put('level', n('level', 'harvest_level'));
+                        var hand = pick('hand');
+                        if (pick('requires_tool') === true && hand === undefined) hand = 'nodrop';
+                        if (pick('requires_tool') === false && hand === undefined) hand = 'drop';
+                        if (hand !== undefined) { hand = String(hand).toLowerCase(); if (HANDS.indexOf(hand) < 0) bad('"hand": one of ' + HANDS.join(', ')); else put('hand', hand); }
+                        var dropList = function (d) {
+                            if (d === null || d === false || d === 'none' || (Array.isArray(d) && !d.length)) return 'none';
+                            var bnames = function (v) { return (Array.isArray(v) ? v : [v]).map(function (x) { return String(x).toLowerCase().replace(/[^a-z0-9_ ]+/g, ' ').trim(); }).filter(Boolean).join('|'); };
+                            var list = (Array.isArray(d) ? d : [d]).map(function (e) {
+                                if (e === 'self') return 'self*1*1';
+                                if (e === 'none') return 'none*1*1';
+                                var o = typeof e === 'object' && e ? e : { item: e };
+                                var raw = String(o.item || o.id || o.block || '');
+                                var r = raw === 'self' || raw === 'none' ? raw : ref(o.item || o.id || o.block);
+                                if (!r) return '';
+                                var ch = num(o.chance), cnt;
+                                if (Array.isArray(o.count) && o.count.length === 2) { var c0 = Math.max(1, num(o.count[0]) | 0), c1 = Math.max(c0, num(o.count[1]) | 0); cnt = c0 === c1 ? '' + c0 : c0 + '-' + c1; }
+                                else { var c = num(o.count); cnt = '' + Math.max(1, Math.round(c === null ? 1 : c)); }
+                                var cs = [];
+                                var flag = function (v, c) { if (v === true) cs.push(c); else if (v === false) cs.push('!' + c); };
+                                flag(o.player_only !== undefined ? o.player_only : o.by_player, 'p');
+                                flag(o.exploded, 'x');
+                                flag(o.raining, 'r');
+                                if (num(o.data_bits)) cs.push('b=' + (num(o.data_bits) | 0));
+                                if (num(o.not_data_bits)) cs.push('!b=' + (num(o.not_data_bits) | 0));
+                                if (o.biomes) cs.push('biome=' + bnames(o.biomes));
+                                if (o.not_biomes) cs.push('!biome=' + bnames(o.not_biomes));
+                                return r + '*' + cnt + '*' + (ch === null ? 1 : Math.max(0, Math.min(1, ch))) + (cs.length ? '*' + cs.join('+') : '');
+                            }).filter(Boolean);
+                            return list.length ? list.join(',') : 'none';
+                        };
+                        var d = pick('drops');
+                        if (d !== undefined) put('drops', dropList(d));
+                        var xd = pick('explosion_drops');
+                        if (xd !== undefined) put('explosion_drops', dropList(xd));
+                        var bnm = function (v) { return (Array.isArray(v) ? v : [v]).map(function (x) { return String(x).toLowerCase().replace(/[^a-z0-9_ ]+/g, ' ').trim(); }).filter(Boolean).join('|'); };
+                        put('cushion', n('cushion', 'cushioning'));
+                        var bol = pick('breaks_on_landing');
+                        if (bol !== undefined) put('breaks_on_landing', bol === 'over_air' ? 2 : bol ? 1 : 0);
+                        var prt = pick('portable');
+                        if (prt !== undefined) put('portable', prt === true ? 4 : prt ? Math.max(0, num(prt) || 0) : 0);
+                        put('grow_chance', n('grow_chance'));
+                        put('grow_light', n('grow_light'));
+                        var grr = pick('grow_needs_rain', 'grow_rain');
+                        if (grr !== undefined) put('grow_rain', grr ? 1 : 0);
+                        var gbm = pick('grow_biomes');
+                        if (gbm) put('grow_biomes', bnm(gbm));
+                        var lbm = pick('biomes');
+                        if (lbm) put('biomes', bnm(lbm));
+                        put('dry_death', n('dry_death'));
+                        var dto = pick('dies_to');
+                        if (dto) { var dtr = ref(dto); if (dtr) put('dies_to', dtr); }
+                        put('light', n('light', 'light_level'));
+                        var grv = pick('gravity', 'falls');
+                        if (grv !== undefined) put('gravity', grv ? 1 : 0);
+                        var spn = pick('spawns');
+                        if (spn && typeof spn === 'object' && (spn.creature || spn.mob)) {
+                            var cr = String(spn.creature || spn.mob).replace(/^minecraft:/, '').replace(/[\t;=,*~]/g, '');
+                            put('spawns', [cr, Math.max(0, Math.min(1, num(spn.chance) === null ? 0.01 : num(spn.chance))), Math.max(1, num(spn.max) === null ? 2 : num(spn.max) | 0),
+                                Math.max(1, num(spn.radius) === null ? 16 : num(spn.radius) | 0), Math.max(0, num(spn.air) | 0)].join('~'));
+                        }
+                        var wf = pick('windfall');
+                        if (wf && typeof wf === 'object' && wf.drops) put('windfall', Math.max(0, Math.min(1, num(wf.chance) || 0)) + '~' + dropList(wf.drops));
+                        var lt = pick('loot', 'loot_table');
+                        if (lt) put('loot', clean(lt).replace(/ /g, ''));
+                        put('furnace_heat', n('furnace_heat'));
+                        var clp = pick('collapses', 'collapse');
+                        if (clp !== undefined) put('collapses', clp ? 1 : 0);
+                        var bl = pick('blight');
+                        if (bl === false || bl === null) put('blight', '0');
+                        else if (bl && typeof bl === 'object') {
+                            var blr = function (a) { return (Array.isArray(a) ? a : a ? [a] : []).map(function (x) { return ref(x); }).filter(Boolean).join('|'); };
+                            var bc = num(bl.chance);
+                            put('blight', [bc === null ? 0.0005 : Math.max(0, Math.min(1, bc)), blr(bl.blighted), blr(bl.dead)].join(','));
+                        }
+                        var stn = pick('station', 'crafting_table');
+                        if (stn !== undefined) put('station', stn === true ? 1 : stn === false ? 0 : Math.max(0, Number(stn) | 0));
+                    } else if (what === 'mobs') {
+                        put('health', n('health', 'max_health'));
+                        put('damage', n('damage', 'attack_damage'));
+                        put('speed', n('speed', 'movement_speed'));
+                        put('armor', n('armor'));
+                        put('xp', n('xp', 'experience'));
+                        put('follow', n('follow', 'follow_range'));
+                        put('back_damage', n('back_damage'));
+                    }
+                    return out.join(';');
+                }
+                var TRAIT_KEYS = ['digs', 'breaks_doors', 'seeks_trees_when_burning', 'puts_out_lights', 'dodges', 'throws', 'sizes', 'split',
+                    'drops_by_size', 'corrodes', 'needs', 'drops_over_time', 'immune_except', 'vulnerable', 'sunlight', 'self_damage', 'natural_defense',
+                    'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful'];
+                var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
+                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1 };
+                Module.mcMobTraits = function (name, j, ref, bad) {
+                    var out = [];
+                    var enc = function (trait, o) {
+                        if (o === true || o === undefined || o === null) o = {};
+                        if (typeof o !== 'object' || Array.isArray(o)) {
+                            if (trait === 'sizes') o = { list: o };
+                            else if (trait === 'immune' || trait === 'immune_except') o = { tags: o };
+                            else if (trait === 'targets') o = { kinds: o };
+                            else if (trait === 'seeks_items') o = { items: o };
+                            else if (trait === 'day_peaceful') o = { on: o ? 1 : 0 };
+                            else if (o === false) return;
+                            else { bad('"' + trait + '": an object of its settings, or true'); return; }
+                        }
+                        var kv = [];
+                        Object.keys(o).forEach(function (k) {
+                            var v = o[k];
+                            if (k === 'frenzy' && v && typeof v === 'object') { kv.push('frenzy_every=' + (v.every | 0), 'frenzy_on=' + (v.on | 0)); return; }
+                            if (k === 'creature') { kv.push('creature=' + mobRef(v)); return; }
+                            var one = function (x) { return TRAIT_REFS[k] ? (ref(x) || '') : String(x); };
+                            if (Array.isArray(v)) v = v.map(function (x) {
+                                if (x && typeof x === 'object') return one(x.item || x.id) + ':' + (x.weight === undefined ? 1 : x.weight | 0);
+                                return one(x);
+                            }).filter(Boolean).join(',');
+                            else if (v && typeof v === 'object') {
+                                var mapRef = k === 'swap' || k === 'eat_to';
+                                v = Object.keys(v).map(function (a) {
+                                    if (mapRef) { var b = v[a] === 'air' ? 'air' : ref(v[a]); return ref(a) && b ? ref(a) + '>' + b : ''; }
+                                    return (k === 'ticks' || k === 'items' ? ref(a) : a) + ':' + v[a];
+                                }).filter(Boolean).join(',');
+                            }
+                            else if (v === true || v === false) v = v ? 1 : 0;
+                            else v = one(v);
+                            if (k === 'vulnerable') return;
+                            kv.push(k + '=' + String(v).replace(/[;\t\n]/g, ''));
+                        });
+                        if (trait === 'vulnerable') kv = Object.keys(o).map(function (t) { return t + '=' + Number(o[t]); });
+                        out.push(['mobtrait', name, trait, kv.join(';')].join('\t'));
+                    };
+                    TRAIT_KEYS.concat(['immune']).forEach(function (t) {
+                        if (j[t] === undefined) return;
+                        if (t === 'targets' && Module.mcIsGoalList && Module.mcIsGoalList(j[t])) return;
+                        if (t === 'immune' && !(j.immune && j.immune.tags)) return;
+                        if (t === 'equipment' || t === 'replaced_by') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
+                        else enc(t, j[t]);
+                    });
+                    return out;
+                };
+                Module.mcIsGoalList = function (v) {
+                    return Array.isArray(v) && v.length > 0 && v.every(function (g) { return g && typeof g === 'object' && !Array.isArray(g) && (g.goal || g.id); });
+                };
+                Module.mcMobGoals = function (name, j, ref, bad) {
+                    var out = [];
+                    var enc = function (list, arr, keep) {
+                        if (!keep) out.push(['mobgoals', name, list, 'replace'].join('\t'));
+                        arr.forEach(function (g) {
+                            var id = String(g.goal || g.id || '').trim();
+                            if (!id || /[\t;|]/.test(id)) { bad('a goal needs "goal": its name (' + list + ')'); return; }
+                            var kv = [];
+                            Object.keys(g).forEach(function (k) {
+                                if (k === 'goal' || k === 'id' || k === 'priority') return;
+                                var v = g[k];
+                                if (k === 'item' || k === 'items') v = (Array.isArray(v) ? v : [v]).map(function (x) { return ref(x) || ''; }).filter(Boolean).join(',');
+                                else if (k === 'entity' || k === 'target' || k === 'watch' || k === 'avoid') v = (Array.isArray(v) ? v : [v]).map(function (x) { return mobRef(x); }).join(',');
+                                else if (k === 'mutex' && Array.isArray(v)) v = v.join(',');
+                                else if (Array.isArray(v)) v = v.join(',');
+                                else if (v === true || v === false) v = v ? 1 : 0;
+                                else if (v && typeof v === 'object') { bad('goal "' + id + '": "' + k + '" can\'t be an object'); return; }
+                                kv.push(k + '=' + String(v).replace(/[;\t\n\r=]/g, ''));
+                            });
+                            out.push(['mobgoal', name, list, Math.round(Number(g.priority) || 0), id, kv.join(';')].join('\t'));
+                        });
+                    };
+                    if (Module.mcIsGoalList(j.goals)) enc('goals', j.goals);
+                    else if (Array.isArray(j.goals) && !j.goals.length) out.push(['mobgoals', name, 'goals', 'replace'].join('\t'));
+                    else if (j.goals !== undefined) bad('"goals": a list of {"goal": name, "priority": n, ...}');
+                    var tg = j.target_goals !== undefined ? j.target_goals : (Module.mcIsGoalList(j.targets) ? j.targets : undefined);
+                    if (Module.mcIsGoalList(tg)) enc('targets', tg);
+                    else if (Array.isArray(tg) && !tg.length) out.push(['mobgoals', name, 'targets', 'replace'].join('\t'));
+                    else if (tg !== undefined) bad('"target_goals": a list of {"goal": name, "priority": n, ...}');
+                    if (Module.mcIsGoalList(j.add_goals)) enc('goals', j.add_goals, true);
+                    if (Module.mcIsGoalList(j.add_targets)) enc('targets', j.add_targets, true);
+                    var kvOf = function (o, keys) {
+                        var kv = [];
+                        Object.keys(o).forEach(function (k) {
+                            var nk = keys[k];
+                            if (!nk) { bad('unknown key "' + k + '" (' + Object.keys(keys).filter(function (x) { return x.indexOf('_') < 0; }).join(', ') + ')'); return; }
+                            var v = o[k];
+                            kv.push(nk + '=' + (v === true ? 1 : v === false ? 0 : String(Number(v))));
+                        });
+                        return kv.join(';');
+                    };
+                    if (j.navigation && typeof j.navigation === 'object') out.push(['mobnav', name, kvOf(j.navigation, { avoidWater: 'avoidWater', avoid_water: 'avoidWater',
+                        breakDoors: 'breakDoors', break_doors: 'breakDoors', enterDoors: 'enterDoors', enter_doors: 'enterDoors', swim: 'swim', canSwim: 'swim',
+                        avoidSun: 'avoidSun', avoid_sun: 'avoidSun' })].join('\t'));
+                    if (j.attributes && typeof j.attributes === 'object') out.push(['mobattr', name, kvOf(j.attributes, { movementSpeed: 'movementSpeed',
+                        movement_speed: 'movementSpeed', followRange: 'followRange', follow_range: 'followRange' })].join('\t'));
+                    return out;
+                };
+                var KIND = { items: 'vitem', blocks: 'vblock', mobs: 'vmob' };
+                var DEF_TIERS = {
+                    wood: { level: 0, speed: 2, uses: 59, damage: 0 }, gold: { level: 0, speed: 12, uses: 32, damage: 0 },
+                    stone: { level: 1, speed: 4, uses: 131, damage: 1 }, iron: { level: 2, speed: 6, uses: 250, damage: 2 },
+                    diamond: { level: 3, speed: 8, uses: 1561, damage: 3 }
+                };
+                var tierTable = {};
+                var SURVIVAL = [
+                    ['naturalRegeneration', true, 'Health comes back from a full food bar'],
+                    ['regenFoodLevel', 18, 'Food level needed for health to come back', [0, 20]],
+                    ['regenTicks', 80, 'Ticks per point of health that comes back', [1, 72000]],
+                    ['regenExhaustion', 0, 'Exhaustion each healed point costs (Java 1.6: 3)', [0, 40]],
+                    ['hungerScale', 1, 'Every hunger cost multiplied by this', [0, 100]],
+                    ['hungerPerTick', 0, 'Exhaustion every tick, even standing still', [0, 4]],
+                    ['starveTicks', 80, 'Ticks per starvation hit at an empty food bar', [1, 72000]],
+                    ['maxFood', 20, 'The top of every food bar (a mod may cap a player lower)', [1, 20]],
+                    ['digSpeedScale', 1, 'How fast blocks break (0.5 = twice as slow)', [0.01, 100]],
+                    ['xpLevelCost', 0, 'Experience points the first level takes (0: the game\'s own curve)', [0, 100000]],
+                    ['xpLevelStep', 0, 'Extra points each level after that takes, with xpLevelCost', [0, 100000]],
+                    ['craftSpeedPerLevel', 0, 'Crafting that takes time goes this much faster per experience level (0.02 = 2%)', [0, 10]],
+                    ['craftSpeedPerStation', 0, 'And this much faster per workbench level above what the recipe needs', [0, 10]],
+                    ['craftQualityLevels', 0, 'Things with a "quality" come out one quality better per this many levels (0: off)', [0, 1000]],
+                    ['craftQualityXp', 0, 'Experience per tick of crafting a better quality costs - right-click the result (0: off)', [0, 100]],
+                    ['fishBiteChance', 500, 'Fishing: a bite 1 in this many ticks in water', [1, 72000]],
+                    ['fishDawnDusk', false, 'Fishing like MITE: fish must live in the water nearby, and bite best at dawn and dusk'],
+                    ['trueDarkness', false, 'Darkness is pitch black: no light at all where there is none (caves, nights indoors)'],
+                    ['villageMinDay', 0, 'Villages appear only in land made on this day of the world or later (0: always)', [0, 100000]],
+                    ['villagesAllowed', true, 'New villages can appear (a mod can keep them away until something happens)'],
+                    ['templeMinSpawnDistance', 0, 'Desert and jungle temples only this many blocks or more from the world spawn', [0, 1000000]],
+                    ['mineshaftTorchMinDay', 0, 'Mineshafts made before this day of the world have no torches', [0, 100000]],
+                    ['sleepAnyTime', false, 'Beds can be lain in at any time of day (the night is still only skipped in the sleep window)'],
+                    ['sleepNeedsRoof', false, 'A bed under the open sky cannot be slept in'],
+                    ['sleepWindowStart', -1, 'The night can only be skipped from this time (Java clock 0-23999, 0 = 06:00; -1: the game\'s night)', [-1, 23999]],
+                    ['sleepWindowEnd', -1, '... until this time (-1: the game\'s night)', [-1, 23999]],
+                    ['sleepSimulate', false, 'Skipping the night runs its hunger and healing tick by tick - the hungry wake up'],
+                    ['sleepMobWakeChance', 0, 'While the night is skipped: 1 in this many ticks a monster near a bed wakes its sleeper (0: never)', [0, 1000000]],
+                    ['bedRegenMultiplier', 1, 'Healing from food runs this many times faster in bed', [1, 100]],
+                    ['sleepClearsEffects', 0, 'A skipped night at least this many ticks long ends the sleepers\' effects (0: never)', [0, 100000]],
+                    ['blockReach', 0, 'How far blocks can be reached (0: the game\'s 5) - held items add their "reach" on blocks they are made for', [0, 32]],
+                    ['attackReach', 0, 'How far creatures can be hit (0: the game\'s) - held items add their "reach"', [0, 32]],
+                    ['interactReach', 0, 'How far creatures can be used / right-clicked (0: the game\'s)', [0, 32]],
+                    ['creativeReach', 0, 'Reach for everything in creative (0: the game\'s)', [0, 64]],
+                    ['craftNeedsFood', false, 'Crafting that takes time stops with an empty food bar'],
+                    ['craftBlockedInWeb', false, 'Crafting that takes time stops while caught in cobweb'],
+                    ['skillsEnabled', false, 'Mods\' skills count: recipes that need a skill can only be made by players who learned it'],
+                    ['skillCostLevels', 5, 'Learning a skill costs this many levels x (skills already known + 1)', [0, 1000]],
+                    ['skillsPerDay', 1, 'Skills that can be learned a day (0: any number)', [0, 1]],
+                    ['groundCollapse', true, 'Blocks that "collapse" fall when the ground under them goes'],
+                    ['screenDimDecay', 0.01, 'Screen dimming (from mods) fades this much a tick', [0, 1]],
+                    ['screenDimMax', 0.9, 'The darkest screen dimming gets (0-1)', [0, 1]],
+                    ['moons', true, 'Mods\' special moons (moons.json) take effect'],
+                    ['mobGriefing', true, 'Creatures may change blocks: dig, break doors, put out torches'],
+                    ['defaultItemStack', 0, 'Stack size of items that don\'t choose one (0: 64)', [0, 64]],
+                    ['defaultBlockStack', 0, 'Stack size of blocks that don\'t choose one (0: 64)', [0, 64]],
+                    ['fallSafeDistance', 3, 'Blocks you can fall without getting hurt', [0, 256]],
+                    ['fallDamageScale', 1, 'Fall damage per block fallen past that', [0, 100]],
+                    ['boneMealGrows', true, 'Bone meal grows crops, saplings, stems and pods at once'],
+                    ['boneMealSpreadsGrass', true, 'Bone meal on grass grows tall grass and flowers'],
+                    ['noFoodWalkScale', 1, 'Walking speed with an empty food bar and no saturation', [0.01, 10]],
+                    ['noFoodDigScale', 1, 'Mining speed with an empty food bar and no saturation', [0.01, 10]],
+                    ['digSpeedPerLevel', 0, 'Extra mining speed per experience level (0.02 = 2%)', [0, 1]],
+                    ['meleePerLevel', 0, 'Extra melee damage per experience level (0.005 = 0.5%)', [0, 1]],
+                    ['lavaOverWaterBlock', 0, 'Block id lava flowing down onto water makes (0: none)', [0, 255]],
+                    ['oreXp', true, 'Ores give experience when mined'],
+                    ['foodSmothersFire', false, 'A pile of food that cooks in fire can put the fire out'],
+                    ['bareHandBackDamage', 0, 'Chance a bare-handed punch at a creature after you hurts you', [0, 1]]
+                ];
+                if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
+                function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
+                var O = {
+                    compile: function (of, ref, bad, pic) {
+                        var lines = [];
+                        if (of.kind === 'tiers') {
+                            var t = of.j, name = String(t.name || of.name).toLowerCase().replace(/[^a-z0-9_:-]+/g, '_');
+                            var lv = num(t.level !== undefined ? t.level : t.harvest_level), sp = num(t.speed !== undefined ? t.speed : t.mining_speed),
+                                us = num(t.durability !== undefined ? t.durability : t.uses), dm = num(t.damage !== undefined ? t.damage : t.attack_damage), en = num(t.enchantability);
+                            if (lv === null || sp === null || us === null) { bad('a tier needs "level", "speed" and "durability" numbers'); return lines; }
+                            tierTable[name] = tierTable[of.mod + ':' + name] = { level: lv, speed: sp, uses: us, damage: dm || 0 };
+                            lines.push(['tier', name, Math.round(lv), sp, Math.round(us), Math.round(dm || 0), Math.round(en || 0)].join('\t'));
+                            if (name.indexOf(':') < 0) lines.push(['tier', of.mod + ':' + name, Math.round(lv), sp, Math.round(us), Math.round(dm || 0), Math.round(en || 0)].join('\t'));
+                            return lines;
+                        }
+                        var what = of.kind.slice(3), j = of.j, entries = [];
+                        var goalTargets = what === 'mobs' && Module.mcIsGoalList(j.targets);
+                        if (j.target !== undefined || (j.targets !== undefined && !goalTargets)) {
+                            var ts = j.targets !== undefined ? j.targets : j.target;
+                            (Array.isArray(ts) ? ts : [ts]).forEach(function (t) { entries.push([t, j]); });
+                        } else if (Object.keys(j).length && Object.keys(j).every(function (k) { return k.indexOf(':') > 0 && j[k] && typeof j[k] === 'object'; })) {
+                            Object.keys(j).forEach(function (k) { entries.push([k, j[k]]); });
+                        } else entries.push(['minecraft:' + of.name, j]);
+                        var tiers = Object.assign({}, DEF_TIERS, tierTable);
+                        entries.forEach(function (e) {
+                            var r = what === 'mobs' ? mobRef(e[0]) : ref(e[0]);
+                            if (!r) return;
+                            var f = fieldsOf(what, e[1], ref, bad, tiers, pic);
+                            if (f) lines.push([KIND[what], r, f].join('\t'));
+                            if (what === 'mobs') Module.mcMobTraits(r, e[1], ref, bad).forEach(function (l) { lines.push(l); });
+                            if (what === 'mobs') Module.mcMobGoals(r, e[1], ref, bad).forEach(function (l) { lines.push(l); });
+                            if (what === 'items' && Array.isArray(e[1].tags)) lines.push(['itemtag', r, e[1].tags.map(function (x) { return String(x).toLowerCase(); }).join(',')].join('\t'));
+                        });
+                        return lines;
+                    },
+                    set: function (what, r, props, bad) {
+                        if (!KIND[what] || !r) return false;
+                        var k = KIND[what] + '\t' + r;
+                        if (props === null) delete runtime[k];
+                        else {
+                            var f = fieldsOf(what, props || {}, function (x) { return x; }, bad || function () {}, Object.assign({}, DEF_TIERS, tierTable));
+                            if (!f) return false;
+                            runtime[k] = runtime[k] ? runtime[k] + ';' + f : f;
+                        }
+                        O.push();
+                        return true;
+                    },
+                    push: function () {
+                        var text = Object.keys(runtime).map(function (k) { return k + '\t' + runtime[k]; }).join('\n');
+                        try { if (Module._mcOverridesRuntime) Module.ccall('mcOverridesRuntime', null, ['string'], [text]); } catch (e) { console.warn('[overrides]', e); }
+                    },
+                    reset: function () { if (Object.keys(runtime).length) { runtime = {}; O.push(); } },
+                    resetTiers: function () { tierTable = {}; },
+                    lines: function () { return Object.keys(runtime).map(function (k) { return k + '\t' + runtime[k]; }); },
+                    tiers: function () { return Object.assign({}, DEF_TIERS, tierTable); },
+                    fromHost: function (ov, surv) {
+                        hostSurv = surv; hostAt = Date.now();
+                        if (ov === hostOv) return;
+                        hostOv = ov;
+                        try { if (Module._mcOverridesRuntime) Module.ccall('mcOverridesRuntime', null, ['string'], [ov]); } catch (e) { console.warn('[overrides]', e); }
+                    },
+                    survival: function () {
+                        if (hostSurv !== null && Module.mcNet && Module.mcNet.state === 'in' && Date.now() - hostAt < 10000) return hostSurv;
+                        if (hostOv !== null && !(Module.mcNet && Module.mcNet.state === 'in')) { hostOv = null; hostSurv = null; O.push(); }
+                        var G = Module.mcGameRules;
+                        if (!G) return '';
+                        return SURVIVAL.map(function (r) { var v = G.get(r[0]); return r[0] + '=' + (typeof v === 'boolean' ? (v ? 1 : 0) : v); }).join(';');
+                    }
+                };
+                return O;
+            })();
             var net = Module.mcNet = { state: 'idle', code: '', error: '', events: [], cur: null };
             var peer = null, conns = new Map(), nextId = 2, server = null, joinTimer = 0;
             function ev(e) { net.events.push(e); }
@@ -1971,6 +2407,7 @@
                 });
                 var rules = { idle: R.idle, kick: R.kick, fade: R.fade, mobs: R.mobs, lost: R.lost, sky: Module.mcSky.script, modSky: !!rule('modSkyColors'),
                               cycle: Module._mcDaylightCycle ? Module._mcDaylightCycle(-1) : 1 };
+                if (Module.mcOverrides) { rules.ov = Module.mcOverrides.lines().join('\n'); rules.surv = Module.mcOverrides.survival(); }
                 conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list, rules: rules }); });
                 applyPresence(list, rules);
             }
@@ -2163,6 +2600,7 @@
                                                            sky: typeof hr.sky === 'number' ? hr.sky : -1, modSky: hr.modSky !== false };
                                     if (hr) Module.mcSky.apply();
                                     if (hr && (hr.cycle === 0 || hr.cycle === 1) && Module._mcDaylightCycle) Module._mcDaylightCycle(hr.cycle);
+                                    if (hr && Module.mcOverrides && typeof hr.surv === 'string') Module.mcOverrides.fromHost(String(hr.ov || ''), hr.surv);
                                     applyPresence(hm.json.list, hr ? pres.rules : null);
                                     return;
                                 }
@@ -2644,6 +3082,19 @@
                     case 'mobtarget': return mp(['mobtarget', a[0] | 0, a[1] | 0].join('\t'));
                     case 'mobwalk': return mp(['mobwalk', a[0] | 0, +a[1], +a[2], +a[3]].join('\t'));
                     case 'mobstop': return mp(['mobstop', a[0] | 0].join('\t'));
+                    case 'mobgoal': {
+                        var gkv = String(a[4] || '').split(';').map(function (p) {
+                            var m = /^jitem=(\d+)(?::(\d+))?$/.exec(p);
+                            return m ? 'item=' + itemRef(m[1] | 0, m[2] | 0) : p;
+                        }).join(';');
+                        return mp(['mobgoal', a[0] | 0, a[1] === 'targets' ? 'targets' : 'goals', a[2] | 0, clean(a[3]), clean(gkv)].join('\t'));
+                    }
+                    case 'mobjgoal': return mp(['mobjgoal', a[0] | 0, a[1] === 'targets' ? 'targets' : 'goals', a[2] | 0, a[3] | 0, clean(a[4]), a[5] | 0, a[6] ? 1 : 0].join('\t'));
+                    case 'mobgoaldel': return mp(['mobgoaldel', a[0] | 0, a[1] === 'targets' ? 'targets' : 'goals', clean(a[2])].join('\t'));
+                    case 'mobgoalstate': return mp(['mobgoalstate', a[0] | 0].join('\t'));
+                    case 'mobgoalfeed': return mp(['mobgoalfeed', a[0] | 0, a[1] | 0, a[2] == null ? '' : a[2] ? 1 : 0, a[3] == null ? '' : a[3] ? 1 : 0, a[4] | 0].join('\t'));
+                    case 'mobgoals': return mp(['mobgoals', a[0] | 0].join('\t'));
+                    case 'mobnav': return mp(['mobnav', a[0] | 0].concat(Array.prototype.slice.call(a, 1).map(function (v) { return clean(v); })).join('\t'));
                     case 'mobhealth': return mp(['sethealth', a[0] | 0, a[1] | 0].join('\t'));
                     case 'entpos': return mp(['setpos', a[0] | 0, +a[1], +a[2], +a[3]].join('\t'));
                     case 'accessories': {
@@ -2714,7 +3165,7 @@
                     }
                 },
             };
-            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javadeath: 1, javahurt: 1, release: 1, using: 1, eaten: 1 };
+            var WANTS = { use: 1, useItem: 1, useItemOn: 1, place: 1, 'break': 1, step: 1, tick: 1, gametick: 1, craft: 1, neighbor: 1, interact: 1, inside: 1, shothit: 1, accessory: 1, javahit: 1, javashoot: 1, javadeath: 1, javahurt: 1, release: 1, using: 1, eaten: 1 };
             J.running = function () { return running; };
             J.vmForTests = function () { return vm; };
             J.dispense = function (json) {
@@ -3364,6 +3815,7 @@
                 }
                 if (e.t === 'shothit') { if (JV.shotHit) JV.shotHit(vm, e); return; }
                 if (e.t === 'javahit') { if (JV.mobHit) JV.mobHit(vm, e); return; }
+                if (e.t === 'javashoot') { if (JV.mobShoot) JV.mobShoot(vm, e); return; }
                 if (e.t === 'javadeath') { if (JV.mobDeath) JV.mobDeath(vm, e); return; }
                 if (e.t === 'javahurt') { if (JV.objHurt) JV.objHurt(vm, e); return; }
                 if (e.t === 'accessory') { if (JV.accessoryChanged) JV.accessoryChanged(vm, e, javaOf); return; }
@@ -4317,6 +4769,7 @@
                     Object.keys(c.blocks).forEach(function (k) { put('blocks/' + k + '.json', c.blocks[k]); });
                     Object.keys(c.items).forEach(function (k) { put('items/' + k + '.json', c.items[k]); });
                     c.recipes.forEach(function (rc, i) { put('recipes/java' + i + '.json', rc); });
+                    if (c.overrides) Object.keys(c.overrides).forEach(function (k) { put(k, c.overrides[k]); });
                     Object.keys(c.mobs || {}).forEach(function (k) { put('mobs/' + k + '.json', c.mobs[k]); });
                     Object.keys(c.biomes || {}).forEach(function (k) { put('biomes/' + k + '.json', c.biomes[k]); });
                     Object.keys(c.worldtypes || {}).forEach(function (k) { put('worldtypes/' + k + '.json', c.worldtypes[k]); });
@@ -4704,6 +5157,7 @@
                 return { id: id, name: str(m.name, 48) || base.slice(0, 48) || id, version: str(m.version, 16), author: str(m.author, 48),
                          description: str(m.description, 4000), notes: notes,
                          deps: depsOf(m, notes), settings: settingsDeclOf(m, notes),
+                         game_mode: m.game_mode && typeof m.game_mode === 'object' && !Array.isArray(m.game_mode) ? m.game_mode : undefined,
                          devices: devicesOf(m, notes, !!files['manifest.json']),
                          sameKeys: sameKeysOf(files, derivedHere ? null : m, id),
                          java: Object.keys(files).some(function (k) { return /[.]class$/i.test(k); }) };
@@ -5344,10 +5798,16 @@
                                 content.push({ mod: id, kind: 'oredict', name: 'oredict', data: data, file: path });
                             } else if (/^creative[.]json$/i.test(path)) {
                                 content.push({ mod: id, kind: 'creative', name: 'creative', data: data, file: path });
+                            } else if (/^(moons|skills)[.]json$/i.test(path)) {
+                                content.push({ mod: id, kind: path.toLowerCase().replace(/[.]json$/, ''), name: 'mech', data: data, file: path });
                             } else if ((m = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions)\/([^\/]+)\.json$/i.exec(path))) {
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
+                            } else if ((m = /^overrides[/](items|blocks|mobs)[/]([^/]+)[.]json$/i.exec(path))) {
+                                content.push({ mod: id, kind: 'ov_' + m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
+                            } else if ((m = /^tiers[/]([^/]+)[.]json$/i.exec(path))) {
+                                content.push({ mod: id, kind: 'tiers', name: m[1].toLowerCase(), data: data, file: path });
                             } else if ((m = /^mobs?[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'mobs', name: m[1].toLowerCase(), data: data, file: path });
                             } else if (/[.](geo[.]json|jem)$/i.test(path) || /^models[/]entity[/].+[.]json$/i.test(path)) {
@@ -5430,7 +5890,7 @@
              'end_portal_frame:120,lit_redstone_lamp:124,double_wooden_slab:125,cocoa:127,tripwire_hook:131,tripwire:132,flower_pot_block:140,carrots:141,' +
              'potatoes:142,skull_block:144').split(',').forEach(function (kv) { var p = kv.split(':'); if (VANILLA[p[0]] === undefined) VANILLA[p[0]] = parseInt(p[1], 10); });
             var SHAPES = {
-                cube: 'cube', full: 'cube', cross: 'cross', plant: 'cross',
+                cube: 'cube', full: 'cube', cross: 'cross', plant: 'cross', crop: 'crop', crops: 'crop',
                 slab: '0,0,0,16,8,16', bottom_slab: '0,0,0,16,8,16', top_slab: '0,8,0,16,16,16',
                 carpet: '0,0,0,16,1,16', layer: '0,0,0,16,2,16', plate: '1,0,1,15,1,15',
                 path: '0,0,0,16,15,16', cactus: '1,0,1,15,16,15', post: '6,0,6,10,16,10',
@@ -5685,7 +6145,8 @@
             var lootKeys = {};
             var RULE_CAUSES = ['any', 'fall', 'fire', 'lava', 'drown', 'explosion', 'attack', 'projectile', 'magic', 'void', 'suffocation', 'other'];
             var RULE_KEYS = { no_break: 1, no_place: 1, no_use: 1, no_damage: 1, pvp: 1, explosions_break_blocks: 1, explosion_proof: 1,
-                              fire_spreads: 1, no_spawn: 1, area: 1, dimension: 1, creative: 1, rules: 1 };
+                              fire_spreads: 1, no_spawn: 1, area: 1, dimension: 1, creative: 1, rules: 1,
+                              no_eat: 1, no_sprint: 1, no_sleep: 1, no_wear: 1, players: 1 };
             function rulesOf(o, mod, report, refFn) {
                 var out = [];
                 if (!o || typeof o !== 'object') { report('rules should be an object { ... }'); return out; }
@@ -5700,7 +6161,8 @@
                 var dim = o.dimension === undefined ? 99 : dims[String(o.dimension).toLowerCase()];
                 if (dim === undefined) { report('unknown "dimension": "' + o.dimension + '"'); dim = 99; }
                 var cr = o.creative ? 1 : 0;
-                var line = function (type, targets, cause) { out.push([type, targets.join(';'), cause || '', area, dim, cr].join('|')); };
+                var pl = o.players === undefined ? '' : (Array.isArray(o.players) ? o.players : [o.players]).map(function (n) { return String(n).replace(/[|;]/g, ''); }).join(';');
+                var line = function (type, targets, cause) { out.push([type, targets.join(';'), cause || '', area, dim, cr].concat(pl ? [pl] : []).join('|')); };
                 var blockList = function (k) {
                     var v = o[k];
                     if (v === undefined) return null;
@@ -5724,6 +6186,9 @@
                         line('no_damage', (Array.isArray(d.entity) ? d.entity : [d.entity || 'minecraft:player']).map(creature), c);
                     });
                 }
+                ['no_eat', 'no_wear'].forEach(function (k) { var l = blockList(k); if (l && l.length) line(k, l); });
+                if (o.no_sprint === true) line('no_sprint', []);
+                if (o.no_sleep === true) line('no_sleep', []);
                 if (o.pvp === false) line('no_pvp', []);
                 if (o.explosions_break_blocks === false) line('no_explosion_blocks', []);
                 if (o.fire_spreads === false) line('no_fire_spread', []);
@@ -5915,14 +6380,28 @@
                     var j;
                     try { j = JSON.parse(dec.decode(c.data)); }
                     catch (e) { bad(c.mod, c.file, "isn't valid JSON: " + e.message); return null; }
-                    if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
+                    if (!j || typeof j !== 'object' || (Array.isArray(j) && c.kind !== 'moons' && c.kind !== 'skills')) { bad(c.mod, c.file, 'should be a JSON object { ... }'); return null; }
                     return j;
                 };
                 var creativeFiles = [];
-                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [], accIcons = [];
+                var lines = [], blocks = {}, items = {}, recipes = [], worldgen = [], loots = [], models = {}, states = {}, mobs = {}, ruleFiles = [], ovFiles = [], biomeFiles = [], enchFiles = [], dimFiles = [], typeFiles = [], oreFiles = [], accIcons = [];
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
+                var curMod = null, modeMods = Module.mcMods && Module.mcMods.modeMods ? Module.mcMods.modeMods() : {};
+                var GAMEPLAY = { vitem: 1, vblock: 1, vmob: 1, vore: 1, unrecipe: 1, shaped: 1, shapeless: 1, smelt: 1, fuel: 1, ore: 1, tree: 1, structure: 1,
+                    plant: 1, mobspawn: 1, rule: 1, biome: 1, biomeremove: 1, worldtype: 1, enchant: 1, dimension: 1, portalto: 1, vportal: 1, dimblocks: 1,
+                    dimshape: 1, portalrule: 1, runegate: 1, dungeon: 1, cavenet: 1 };
+                lines.push = function () {
+                    for (var li = 0; li < arguments.length; li++) {
+                        var ln = arguments[li];
+                        if (curMod && modeMods[curMod] && GAMEPLAY[String(ln).split('\t', 1)[0]]) Array.prototype.push.call(this, 'src\t' + curMod);
+                        Array.prototype.push.call(this, ln);
+                    }
+                    return this.length;
+                };
+                Object.keys(modeMods).forEach(function (id) { Array.prototype.push.call(lines, ['modemode', id].join(String.fromCharCode(9))); });
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
+                if (Module.mcOverrides) Module.mcOverrides.resetTiers();
                 content.forEach(function (c) {
                     var j = parse(c);
                     if (!j) return;
@@ -5930,10 +6409,41 @@
                     if (c.kind === 'model') { models[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'mobs') { mobs[c.mod + ':' + c.name] = { mod: c.mod, name: c.name, j: j, file: c.file }; return; }
                     if (c.kind === 'rules') { ruleFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
+                    if (c.kind === 'tiers') {
+                        curMod = c.mod;
+                        Module.mcOverrides.compile({ mod: c.mod, kind: 'tiers', name: c.name, j: j, file: c.file }, null, function (t) { bad(c.mod, c.file, t); }).forEach(function (l) { lines.push(l); });
+                        return;
+                    }
+                    if (/^ov_/.test(c.kind)) { ovFiles.push({ mod: c.mod, kind: c.kind, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'biomes') { biomeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'worldtypes') { typeFiles.push({ mod: c.mod, name: c.name, j: j, file: c.file }); return; }
                     if (c.kind === 'oredict') { oreFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
                     if (c.kind === 'creative') { creativeFiles.push({ mod: c.mod, j: j, file: c.file }); return; }
+                    if (c.kind === 'moons' || c.kind === 'skills') {
+                        var ents = Array.isArray(j) ? j.map(function (e) { return typeof e === 'string' ? [e, {}] : [e && e.id, e || {}]; })
+                                 : Object.keys(j || {}).map(function (k) { return [k, j[k] && typeof j[k] === 'object' ? j[k] : { name: j[k] }]; });
+                        var tab = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
+                        var col = function (v) {
+                            if (v === undefined || v === null || v === false) return '-';
+                            if (typeof v === 'number') return (v & 0xffffff).toString(16);
+                            var m = /^#?([0-9a-f]{6})$/i.exec(String(v).trim());
+                            if (!m) { bad(c.mod, c.file, 'colours are "#rrggbb"'); return '-'; }
+                            return m[1].toLowerCase();
+                        };
+                        ents.forEach(function (e) {
+                            var mid = String(e[0] || '').toLowerCase().trim().replace(/[^a-z0-9_.-]+/g, '_'), o = e[1];
+                            if (!mid) { bad(c.mod, c.file, 'every entry needs an "id"'); return; }
+                            if (c.kind === 'skills') { lines.push(['skill', mid, tab(o.name || mid), tab(o.description || o.desc || '')].join('\t')); return; }
+                            var per = Number(o.period) | 0;
+                            if (per <= 0) { bad(c.mod, c.file, 'moon "' + mid + '": "period" (days) must be 1 or more'); return; }
+                            var fl = (o.no_sleep ? 's' : '') + (o.no_surface_hostiles ? 'h' : '') + (o.frenzy ? 'f' : '') + (o.storm ? 't' : '');
+                            lines.push(['moon', mid, per, Number(o.offset) | 0, Number(o.priority) | 0,
+                                typeof o.brightness === 'number' ? Math.max(0, Math.min(4, o.brightness)) : '-', col(o.moon_color), col(o.sky_color),
+                                typeof o.sky_strength === 'number' ? Math.max(0, Math.min(1, o.sky_strength)) : 0, fl || '-',
+                                typeof o.lightning === 'number' && o.lightning > 0 ? o.lightning : 1].join('\t'));
+                        });
+                        return;
+                    }
                     if (c.kind === 'accessories') {
                         if (!j || typeof j !== 'object' || Array.isArray(j)) { bad(c.mod, c.file, 'accessories.json is { "ring": 2, "pendant": 1 }'); return; }
                         Object.keys(j).forEach(function (t) {
@@ -5958,6 +6468,7 @@
                 });
                 Module.mcModDims = {};
                 var dimIds = {}, takenDim = {};
+                var pendingRules = [], pendingGates = [];
                 var fnv = function (s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i) & 255; h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; };
                 var TERRAINS = { overworld: 1, nether: 1, end: 1, flat: 1, void: 1, script: 1 };
                 var colourOf = function (v, mod, file, what) {
@@ -5990,13 +6501,66 @@
                                 String(j.entering_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-',
                                 String(j.leaving_message || '').replace(/[\t\r\n]/g, ' ').slice(0, 64) || '-',
                                 Number(j.height) === 256 ? 256 : 128].join('\t'));
+                    if (String(j.vanilla_portal || '').toLowerCase() === 'bedrock') lines.push(['vportal', key, 'bedrock'].join('\t'));
+                    if (j.blocks && typeof j.blocks === 'object') {
+                        var sw = Object.keys(j.blocks).map(function (a) { var ra = ref(a, d.mod, d.file), rb = j.blocks[a] === 'air' || j.blocks[a] === 'minecraft:air' ? 'id:0' : ref(j.blocks[a], d.mod, d.file); return ra && rb ? ra + '=' + rb : ''; }).filter(Boolean);
+                        if (sw.length) lines.push(['dimblocks', key, sw.join(';')].join('\t'));
+                    }
+                    if (j.terrain_y != null || j.fill != null || j.sea != null || j.floor != null || j.roof != null || j.strata != null || j.ultra_warm != null || j.decorate != null) {
+                        var thick = function (v) { var t = v && typeof v === 'object' && !Array.isArray(v) ? v.thickness : null; if (t == null) t = 1; if (!Array.isArray(t)) t = [t, t]; return [Math.max(0, Math.min(64, Math.round(+t[0] || 0))), Math.max(0, Math.min(64, Math.round(+(t[1] != null ? t[1] : t[0]) || 0)))]; };
+                        var blockOf = function (v) { if (v == null || v === false) return '-'; var b = typeof v === 'object' && !Array.isArray(v) ? v.block : v; return b ? (ref(b, d.mod, d.file) || '-') : '-'; };
+                        var ft = thick(j.floor), rt = thick(j.roof);
+                        var strata = (Array.isArray(j.strata) ? j.strata : []).map(function (st) {
+                            if (!st || typeof st !== 'object') return '';
+                            var r = ref(st.block || 'minecraft:bedrock', d.mod, d.file);
+                            if (!r) return '';
+                            return [r, Math.round(num(st.y, 0, 0, 255)), num(st.thickness, 2, 0, 64), (st.grow === 'up' || st.up === true) ? 1 : 0, num(st.bias, 0, -4, 4), num(st.noise_scale, 0.03125, 0.0001, 1)].join('*');
+                        }).filter(Boolean);
+                        var seaBlock = j.sea == null ? '-' : blockOf(j.sea);
+                        lines.push(['dimshape', key, Math.round(num(j.terrain_y, 0, 0, 255)), blockOf(j.fill), seaBlock,
+                                    Math.round(num(j.sea && typeof j.sea === 'object' ? j.sea.below : 32, 32, 0, 256)),
+                                    blockOf(j.floor), ft[0], ft[1], blockOf(j.roof), rt[0], rt[1], strata.join(',') || '-',
+                                    j.decorate == null ? '' : (j.decorate ? 1 : 0), j.ultra_warm == null ? -1 : (j.ultra_warm ? 1 : 0)].join('\t'));
+                    }
+                    if (Array.isArray(j.portal_rules)) pendingRules.push({ d: d, key: key, rules: j.portal_rules });
+                    if (Array.isArray(j.runegates)) pendingGates.push({ d: d, gates: j.runegates });
                 });
                 var dimRef = function (v, mod) { v = String(v || '').toLowerCase(); return dimIds[v] || dimIds[mod + ':' + v] || 0; };
+                var portalDim = function (v, mod, self) {
+                    v = String(v == null ? '' : v).toLowerCase();
+                    if (v === 'overworld' || v === 'minecraft:overworld') return 0;
+                    if (v === 'nether' || v === 'minecraft:nether' || v === 'the_nether') return -1;
+                    if (v === 'spawn') return -100;
+                    if (v === 'this' || v === '') return dimIds[self] || null;
+                    return dimRef(v, mod) || null;
+                };
+                pendingRules.forEach(function (p) {
+                    p.rules.forEach(function (r) {
+                        if (!r || typeof r !== 'object') { bad(p.d.mod, p.d.file, '"portal_rules" are objects { "from", "to", "on" }'); return; }
+                        var from = portalDim(r.from, p.d.mod, p.key), to = portalDim(r.to, p.d.mod, p.key);
+                        if (from === null || from === -100 || to === null) { bad(p.d.mod, p.d.file, 'portal rule: unknown dimension "' + (from === null || from === -100 ? r.from : r.to) + '"'); return; }
+                        var on = r.on == null ? '-' : (ref(r.on, p.d.mod, p.d.file) || null);
+                        if (on === null) return;
+                        lines.push(['portalrule', from, on, Math.round(Number(r.max_y != null ? r.max_y : 8)) || 8, to].join('\t'));
+                    });
+                });
+                pendingGates.forEach(function (p) {
+                    p.gates.forEach(function (g, gi) {
+                        if (!g || typeof g !== 'object' || !Array.isArray(g.corners) || !g.corners.length) { bad(p.d.mod, p.d.file, 'a runegate needs "corners": [blocks]'); return; }
+                        var cs = g.corners.map(function (c) { return ref(c, p.d.mod, p.d.file); });
+                        if (cs.some(function (c) { return !c; })) return;
+                        var av = (Array.isArray(g.avoid_biomes) ? g.avoid_biomes : g.avoid_biomes ? [g.avoid_biomes] : []).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, '').replace(/[\s;\t]+/g, '_'); });
+                        var num = function (v, dflt, lo, hi) { v = Number(v); if (!isFinite(v)) v = dflt; return Math.max(lo, Math.min(hi, v)); };
+                        lines.push(['runegate', String(g.name || (p.d.mod + ':' + p.d.name + '_' + gi)).replace(/[\t;]/g, '_'), Math.round(num(g.radius, 5000, 0, 1e7)),
+                                    num(g.world_fraction, 0, 0, 1), num(g.min_fraction, 0, 0, 0.99), cs.join(';'), av.join(';') || '-',
+                                    String(g.seed_from || 'data').toLowerCase() === 'index' ? 'index' : 'data'].join('\t'));
+                    });
+                });
                 contentKeys = {};
                 Object.keys(blocks).forEach(function (k) { contentKeys[k] = 'block'; });
                 Object.keys(items).forEach(function (k) { contentKeys[k] = 'item'; });
                 var liqAlias = {};
-                Object.keys(blocks).forEach(function (k) {
+                Object.keys(blocks).forEach(function (k) { curMod = blocks[k].mod;
                     var lq = blocks[k].j && blocks[k].j.liquid;
                     if (lq && typeof lq === 'object' && Array.isArray(lq.aliases)) lq.aliases.forEach(function (a) { var ak = blocks[k].mod + ':' + String(a).toLowerCase(); if (!blocks[ak]) { liqAlias[ak] = k; contentKeys[ak] = 'block'; } });
                 });
@@ -6102,19 +6666,19 @@
                             var ks = f[4].split(';').map(function (kv) { var i = kv.indexOf('='); return [kv.slice(0, i), kv.slice(i + 1)]; });
                             if (!ks.some(function (k) { return parent[k[1]]; })) return;
                             combos(ks.map(function (k) { return alts(k[1]).map(function (r) { return k[0] + '=' + r; }); }), 16).forEach(function (c) {
-                                var nl = [f[0], f[1], f[2], f[3], c.join(';')].join('\t');
+                                var nl = [f[0], f[1], f[2], f[3], c.join(';')].concat(f.slice(5)).join('\t');
                                 if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         } else if (f[0] === 'shapeless' && f[3]) {
                             var ing = f[3].split(';');
                             if (!ing.some(function (r) { return parent[r]; })) return;
                             combos(ing.map(alts), 16).forEach(function (c) {
-                                var nl = [f[0], f[1], f[2], c.join(';')].join('\t');
+                                var nl = [f[0], f[1], f[2], c.join(';')].concat(f.slice(4)).join('\t');
                                 if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         } else if (f[0] === 'smelt' && parent[f[1]]) {
                             alts(f[1]).slice(0, 8).forEach(function (r) {
-                                var nl = [f[0], r, f[2], f[3]].join('\t');
+                                var nl = [f[0], r, f[2], f[3]].concat(f.slice(4)).join('\t');
                                 if (!seen[nl]) { seen[nl] = true; if (fresh(nl)) extra.push(nl); }
                             });
                         }
@@ -6228,7 +6792,7 @@
                     if (tint != null) f.push('color=' + ('00000' + (tint & 0xffffff).toString(16)).slice(-6));
                     lines.push(['liquid', key, desc, sc, fc].concat(f).join('\t'));
                 };
-                Object.keys(blocks).forEach(function (key) {
+                Object.keys(blocks).forEach(function (key) { curMod = blocks[key].mod;
                     var b = blocks[key], j = b.j, t = j.texture;
                     if (j.liquid) { liquidLine(b, key, j); return; }
                     if ((!t || (typeof t === 'object' && !Object.keys(t).some(function (k) { return t[k]; }))) && Array.isArray(j.quads) && j.quads[0] && j.quads[0].t) t = j.quads[0].t;
@@ -6258,13 +6822,18 @@
                     lang.push(desc + '.name=' + clean(j.name || pretty(b.name)));
                     var light = j.light === true ? 15 : Math.max(0, Math.min(15, Math.round(+j.light || 0)));
                     var shape = shapeOf(j.shape);
-                    var collide = j.collision === undefined && j.collide === undefined ? ['cross', 'vine', 'torch', 'lever', 'wallbutton'].indexOf(shape) < 0 : !!(j.collision === undefined ? j.collide : j.collision);
+                    var collide = j.collision === undefined && j.collide === undefined ? ['cross', 'crop', 'vine', 'torch', 'lever', 'wallbutton'].indexOf(shape) < 0 : !!(j.collision === undefined ? j.collide : j.collision);
                     var friction = typeof j.friction === 'number' ? Math.max(0.1, Math.min(1.2, j.friction)) : (j.slippery ? 0.98 : 0.6);
                     lines.push(['block', key, desc, tex.join(','), hard, tool, sound, light,
                                 (j.transparent || j.see_through) ? 1 : 0, drop, count,
                                 shape, collide ? 1 : 0, j.gravity ? 1 : 0, friction.toFixed(2), j.flammable ? 1 : 0, j.scripted ? 1 : 0,
                                 j.loot ? lootRef(j.loot, b.mod, b.file) : j.java_drops === true ? '*java' : ''].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, b.mod, b.file);
+                    if (typeof j.shape === 'string' && j.shape.toLowerCase() === 'slab') {
+                        var dbl = j.double ? ref(j.double, b.mod, b.file) : '';
+                        lines.push(['slab', key, dbl || '-'].join('\t'));
+                    }
+                    if (j.spark === true) lines.push(['spark', key].join('\t'));
                     if (j.creative === false) lines.push(['hidden', key].join('\t'));
                     if (j.flat_item === true) lines.push(['flatitem', key].join('\t'));
                     if (typeof j.item_texture === 'string' && j.item_texture) lines.push(['itemtex', key, cellOf('blocks', b.mod, j.item_texture, b.file)].join('\t'));
@@ -6301,6 +6870,8 @@
                         }
                     }
                     if (j.entity_inside === true) lines.push(['inside', key].join('\t'));
+                    var fx = ['ignites', 'burns_touching', 'steams_water'].filter(function (k) { return j[k] === true; });
+                    if (fx.length) lines.push(['blockfx', key, fx.join(',')].join('\t'));
                     if (Array.isArray(j.collision_box) && j.collision_box.length === 6 && j.collision_box.every(function (v) { return isFinite(+v); }))
                         lines.push(['collisionbox', key].concat(j.collision_box.map(function (v) { return Math.max(0, Math.min(16, +v)); })).join('\t'));
                     var st = states[b.mod + ':' + b.name], rot = String(j.rotate || '').toLowerCase();
@@ -6329,7 +6900,7 @@
                         if (qs.length) lines.push(['model', key, rot === 'horizontal' ? 4 : 1, qs.join(';')].join('\t'));
                     } else if (rot) bad(b.mod, b.file, '"rotate" needs a "model" to turn');
                 });
-                Object.keys(items).forEach(function (key) {
+                Object.keys(items).forEach(function (key) { curMod = items[key].mod;
                     var it = items[key], j = it.j;
                     var food = 0, sat = 0.6;
                     if (typeof j.food === 'number') food = j.food;
@@ -6344,6 +6915,7 @@
                     lines.push(['item', key, desc, cellOf('items', it.mod, itex || it.name, it.file),
                                 Math.max(1, Math.min(64, parseInt(j.stack, 10) || (j.record ? 1 : 64))), Math.max(0, Math.min(20, food | 0)), sat, j.scripted === 'air' ? 2 : j.scripted ? 1 : 0, '']
                                 .concat(itemBehaviours(it, key)).join('\t'));
+                    if (Array.isArray(j.tags)) lines.push(['itemtag', 'mod:' + key, j.tags.map(function (x) { return String(x).toLowerCase(); }).join(',')].join('\t'));
                     if (j.fuel !== undefined) fuelLine('mod:' + key, j.fuel, it.mod, it.file);
                     if (j.display_block) {
                         var dbr = ref(j.display_block, it.mod, it.file);
@@ -6375,9 +6947,10 @@
                         var type = String(t.type || '').toLowerCase();
                         if (!TOOL_DAMAGE[type]) say('"tool": unknown type "' + t.type + '" (pickaxe, axe, shovel, hoe, sword or shears)');
                         else {
-                            var tier = TIERS[String(t.tier || 'iron').toLowerCase()];
-                            if (!tier) { say('"tool": unknown tier "' + t.tier + '" (wood, stone, iron, diamond or gold)'); tier = TIERS.iron; }
-                            var lvl = t.level !== undefined ? Math.max(0, Math.min(3, num(t.level, 2) | 0)) : tier[0];
+                            var tn = String(t.tier || 'iron').toLowerCase(), mt = Module.mcOverrides && Module.mcOverrides.tiers();
+                            var tier = TIERS[tn] || (mt && (mt[tn] || mt[it.mod + ':' + tn]) ? (function (o) { return [o.level, o.speed, o.uses, o.damage]; })(mt[tn] || mt[it.mod + ':' + tn]) : null);
+                            if (!tier) { say('"tool": unknown tier "' + t.tier + '" (wood, stone, iron, diamond, gold or a tiers/*.json one)'); tier = TIERS.iron; }
+                            var lvl = t.level !== undefined ? Math.max(0, Math.min(15, num(t.level, 2) | 0)) : tier[0];
                             out.push('tool=' + [type, lvl, num(t.speed, tier[1]), Math.max(0, num(t.durability, tier[2]) | 0),
                                                 Math.max(0, num(t.damage, TOOL_DAMAGE[type] + tier[3]) | 0)].join(','));
                         }
@@ -6423,10 +6996,11 @@
                     }
                     if (j.java_bow === true) out.push('ranged=' + ['*java', 1, Math.max(0, num(j.durability, 0) | 0)].join(','));
                     if (j.java_using === true) out.push('using=1');
+                    if (j.durability !== undefined && !j.tool && !j.armor && !j.ranged && j.java_bow !== true && num(j.durability, 0) > 0) out.push('durability=' + (num(j.durability, 0) | 0));
                     if (j.hidden === true) out.push('hidden=1');
                     else if (j.ranged) {
                         var rg = typeof j.ranged === 'object' ? j.ranged : {};
-                        var ammo = ref(rg.ammo || 'minecraft:arrow', it.mod, it.file);
+                        var ammo = String(rg.ammo || '').toLowerCase() === 'arrows' ? '*arrows' : ref(rg.ammo || 'minecraft:arrow', it.mod, it.file);
                         if (ammo) out.push('ranged=' + [ammo, Math.max(0.1, num(rg.power, 1)), Math.max(0, num(rg.durability, 384) | 0)].join(','));
                     }
                     if (j.damage !== undefined && j.tool === undefined) out.push('damage=' + Math.max(0, num(j.damage, 1) | 0));
@@ -6435,6 +7009,24 @@
                         if (!rs || j.record === true) say('"record": the name of the sound the jukebox plays, like "records.my_song" (sounds/records/my_song.ogg)');
                         else out.push('record=' + rs);
                     }
+                    var iref = function (k) { var r = ref(j[k], it.mod, it.file); return r ? r : ''; };
+                    if (j.returns) { var rr = iref('returns'); if (rr) out.push('returns=' + rr); }
+                    if (j.craft_returns) { var cr = iref('craft_returns'); if (cr) out.push('craftreturns=' + cr); }
+                    if (j.fills !== undefined) {
+                        var fw = j.fills && typeof j.fills === 'object' ? j.fills.water : null;
+                        var fr = fw ? ref(fw, it.mod, it.file) : '';
+                        if (fr) out.push('fillwater=' + fr); else if (!fw) say('"fills": {"water": "<the filled item>"}');
+                    }
+                    if (j.liquid !== undefined) {
+                        if (String(j.liquid).toLowerCase() === 'water') {
+                            if (j.pours === true) say('"pours": true - a vessel that pours a water source is a "bucket" set; this one only puts out fire and wets farmland');
+                            out.push('watervessel=1');
+                        } else say('"liquid": only "water" for now');
+                    }
+                    if (j.drink === true) out.push('drink=1');
+                    if (j.clears_effects === true) out.push('clears=1');
+                    if (j.in_water) { var wr = iref('in_water'); if (wr) out.push('inwater=' + wr); }
+                    if (j.places) { var pr = iref('places'); if (pr) out.push('places=' + pr); }
                     return out;
                 }
                 function findModel(r, mod) {
@@ -6632,6 +7224,14 @@
                 var EFFECT_IDS = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
                     jump_boost: 8, nausea: 9, regeneration: 10, resistance: 11, fire_resistance: 12, water_breathing: 13, invisibility: 14,
                     blindness: 15, night_vision: 16, hunger: 17, weakness: 18, poison: 19, wither: 20 };
+                var ENCH_POWERS = ['draw_speed', 'accuracy', 'arrow_recovery', 'disarm', 'slow_resist', 'crop_yield', 'fertilize', 'fish_speed'];
+                var enchPowers = function (j) {
+                    var out = [], seen = {};
+                    var add = function (k, v) { k = String(k).toLowerCase().replace(/[^a-z0-9_]/g, ''); v = Number(v); if (k && isFinite(v) && v && !seen[k]) { seen[k] = 1; out.push(k + '=' + v); } };
+                    ENCH_POWERS.forEach(function (k) { if (j[k] !== undefined) add(k, j[k]); });
+                    if (j.powers && typeof j.powers === 'object') Object.keys(j.powers).forEach(function (k) { add(k, j.powers[k]); });
+                    return out.join(';') || '-';
+                };
                 var enchUsed = {}, enchIds = {};
                 Object.keys(ENCH_IDS).forEach(function (k) { enchUsed[ENCH_IDS[k]] = true; });
                 enchFiles.sort(function (a, b) { var ka = a.mod + ':' + a.name, kb = b.mod + ':' + b.name; return ka < kb ? -1 : ka > kb ? 1 : 0; });
@@ -6641,7 +7241,7 @@
                     if (!(id >= 1 && id <= 255) || enchUsed[id]) { bad(e.mod, e.file, '"id" ' + e.j.id + ' is one of the game\'s, taken or outside 1-255: one is picked instead'); return; }
                     enchUsed[id] = true; enchIds[e.mod + ':' + e.name] = id;
                 });
-                enchFiles.forEach(function (e) {
+                enchFiles.forEach(function (e) { curMod = e.mod;
                     var key = e.mod + ':' + e.name;
                     if (enchIds[key]) return;
                     var h = 0;
@@ -6660,7 +7260,7 @@
                 };
                 Module.mcModEnchantNames = {};
                 Object.keys(enchIds).forEach(function (k) { Module.mcModEnchantNames[enchIds[k]] = k; });
-                enchFiles.forEach(function (e) {
+                enchFiles.forEach(function (e) { curMod = e.mod;
                     var j = e.j, key = e.mod + ':' + e.name, n = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
                     var type = String(j.type || 'weapon').toLowerCase();
                     if (ENCH_TYPES[type] === undefined) { bad(e.mod, e.file, '"type" is one of ' + Object.keys(ENCH_TYPES).join(', ')); type = 'all'; }
@@ -6681,7 +7281,7 @@
                     lines.push(['enchant', key, enchIds[key], desc, Math.round(n(j.max_level, 1, 1, 10)), Math.round(n(j.rarity !== undefined ? j.rarity : j.weight, 2, 1, 10)),
                                 ENCH_TYPES[type], Math.round(n(j.min_cost, 11, 1, 100)), Math.round(n(j.cost_per_level, 10, 0, 50)), Math.round(n(j.cost_range, 5, 1, 100)),
                                 inc.join(';') || '-', n(j.damage, 0, 0, 100), Math.round(n(j.protection, 0, 0, 25)), Math.round(n(j.knockback, 0, 0, 10)),
-                                Math.round(n(j.fire, 0, 0, 60)), eff, j.treasure ? 1 : 0].join('\t'));
+                                Math.round(n(j.fire, 0, 0, 60)), eff, j.treasure ? 1 : 0, enchPowers(j)].join('\t'));
                 });
                 var REMOVABLE = ['plains', 'desert', 'extreme_hills', 'forest', 'taiga', 'swampland', 'jungle', 'ice_plains', 'ice_mountains',
                     'desert_hills', 'forest_hills', 'taiga_hills', 'jungle_hills', 'extreme_hills_edge'];
@@ -6689,7 +7289,7 @@
                     snowy_tundra: 'ice_plains', tundra: 'ice_plains', snowy_mountains: 'ice_mountains', rainforest: 'jungle', seasonal_forest: 'forest',
                     savanna: 'plains', shrubland: 'extreme_hills', ice_desert: 'ice_plains' };
                 var isDefaultType = function (n) { n = String(n).toLowerCase(); return n === 'default' || n === 'normal'; };
-                typeFiles.forEach(function (t) {
+                typeFiles.forEach(function (t) { curMod = t.mod;
                     var tj = t.j || {}, key = isDefaultType(t.name) ? 'default' : t.mod + ':' + t.name;
                     if (key !== 'default') lines.push(['worldtype', key, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].join('\t'));
                     if (tj.remove_biomes === undefined) return;
@@ -6711,7 +7311,7 @@
                     if (!m) { bad(mod, file, '"' + what + '" is a colour like "#7fb238"'); return -1; }
                     return m[1];
                 };
-                biomeFiles.forEach(function (b) {
+                biomeFiles.forEach(function (b) { curMod = b.mod;
                     var j = b.j, num = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
                     var hosts = [];
                     var hostList = j.hosts === undefined ? [] : Array.isArray(j.hosts) ? j.hosts : [j.hosts];
@@ -6777,16 +7377,17 @@
                     if (!blockRef) { bad(mod, file, 'an ore needs a "block"'); return; }
                     var num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
                     var dim = DIMS[String(o.dimension || 'overworld').toLowerCase()];
-                    if (dim === undefined) { bad(mod, file, 'unknown dimension "' + o.dimension + '" (overworld, nether, end or any)'); return; }
-                    var rep = o.replace === undefined ? REPLACES[dim] : (Array.isArray(o.replace) ? o.replace : [o.replace]).map(function (r) { return ref(r, mod, file); });
+                    if (dim === undefined && typeof dimRef === 'function') dim = dimRef(o.dimension, mod) || undefined;
+                    if (dim === undefined) { bad(mod, file, 'unknown dimension "' + o.dimension + '" (overworld, nether, end, any or a mod\'s dimension)'); return; }
+                    var rep = o.replace === undefined ? (REPLACES[dim] || ['id:1']) : (Array.isArray(o.replace) ? o.replace : [o.replace]).map(function (r) { return ref(r, mod, file); });
                     if (!rep.length || rep.some(function (r) { return !r; })) return;
                     var size = Math.round(num(o.vein_size !== undefined ? o.vein_size : o.size, 8));
                     var veins = num(o.veins_per_chunk !== undefined ? o.veins_per_chunk : (o.veins !== undefined ? o.veins : o.count), 8);
                     var minY = Math.round(num(o.min_y, 1)), maxY = Math.round(num(o.max_y, 64));
                     lines.push(['ore', blockRef, Math.max(1, Math.min(64, size)), Math.max(0, Math.min(64, veins)),
-                                Math.max(1, Math.min(126, minY)), Math.max(1, Math.min(126, maxY)), rep.join(';'), dim, biomeList(o.biomes, mod)].join('\t'));
+                                Math.max(1, Math.min(254, minY)), Math.max(1, Math.min(254, maxY)), rep.join(';'), dim, biomeList(o.biomes, mod)].join('\t'));
                 }
-                Object.keys(blocks).forEach(function (key) {
+                Object.keys(blocks).forEach(function (key) { curMod = blocks[key].mod;
                     var o = blocks[key].j.ore;
                     if (o === undefined || o === false) return;
                     (Array.isArray(o) ? o : [o]).forEach(function (x) { ore(x, 'mod:' + key, blocks[key].mod, blocks[key].file); });
@@ -6868,7 +7469,7 @@
                             }
                     cells = cells.join('');
                     var layersCount = grid.sy;
-                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()];
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
                     var place = { surface: 0, underground: 1, anywhere: 1, sky: 1 }[String(j.placement || 'surface').toLowerCase()];
                     if (dim === undefined) { bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '" (overworld, nether, end or any)'); return; }
                     if (place === undefined) { bad(w.mod, w.file, 'unknown placement "' + j.placement + '" (surface, underground or anywhere)'); return; }
@@ -6902,7 +7503,7 @@
                     if (!SHAPES_T[shape]) { bad(w.mod, w.file, 'unknown tree "shape": "' + j.shape + '" (oak, spruce, round, bush or column)'); shape = 'oak'; }
                     if (shape === 'pine') shape = 'spruce';
                     var h = range(j.height, shape === 'spruce' ? [6, 9] : [4, 6]);
-                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()];
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
                     if (dim === undefined) { bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '"'); return; }
                     var on = j.on === undefined ? [] : (Array.isArray(j.on) ? j.on : [j.on]).map(function (r) { return ref(r, w.mod, w.file); });
                     if (on.some(function (r) { return !r; })) return;
@@ -6914,7 +7515,7 @@
                     if (j.block === undefined) { bad(w.mod, w.file, 'a plant needs a "block"'); return; }
                     var b = ref(j.block, w.mod, w.file);
                     if (!b) return;
-                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()];
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
                     if (dim === undefined) { bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '"'); return; }
                     var on = j.on === undefined ? [] : (Array.isArray(j.on) ? j.on : [j.on]).map(function (r) { return ref(r, w.mod, w.file); });
                     if (on.some(function (r) { return !r; })) return;
@@ -6922,17 +7523,56 @@
                     lines.push(['plant', w.mod + ':' + w.name, b, Math.max(0, Math.min(16, num(j.patches !== undefined ? j.patches : j.per_chunk, 1))),
                                 Math.max(1, Math.min(128, num(j.tries, 24) | 0)), on.join(';'), biomeList(j.biomes, w.mod), dim, h[0], h[1]].join('\t'));
                 }
-                worldgen.forEach(function (w) {
+                var JAVA_MOB = { zombie_pigman: 'PigZombie', magma_cube: 'LavaSlime', mooshroom: 'MushroomCow', iron_golem: 'VillagerGolem', snow_golem: 'SnowMan', ocelot: 'Ozelot', horse: 'EntityHorse', ender_dragon: 'EnderDragon' };
+                var spawnerName = function (c) {
+                    c = String(c || '').trim();
+                    var m = /^(?:minecraft:)?([a-z0-9_]+)$/.exec(c.toLowerCase());
+                    if (!m) return c.toLowerCase();
+                    return JAVA_MOB[m[1]] || m[1].replace(/(^|_)([a-z])/g, function (x, a, b) { return b.toUpperCase(); });
+                };
+                function dungeon(w) {
+                    var j = w.j, num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
+                    if (dim === undefined) { bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '"'); return; }
+                    var wall = ref(j.wall || 'minecraft:cobblestone', w.mod, w.file), floor = ref(j.floor || j.wall || 'minecraft:cobblestone', w.mod, w.file);
+                    var alt = j.floor_alt ? ref(j.floor_alt, w.mod, w.file) : '-';
+                    if (!wall || !floor || !alt) return;
+                    var sp = (Array.isArray(j.spawner) ? j.spawner : j.spawner ? [j.spawner] : []).map(function (e) {
+                        var c = typeof e === 'string' ? e : e && e.creature, wt = typeof e === 'object' && e ? num(e.weight, 1) : 1;
+                        return c && wt > 0 ? spawnerName(c).replace(/[;*\t]/g, '') + '*' + Math.round(wt) : '';
+                    }).filter(Boolean);
+                    var loot = j.loot ? String(j.loot).replace(/[\t]/g, '') : '-';
+                    if (loot !== '-' && loot.indexOf(':') < 0) loot = w.mod + ':' + loot;
+                    lines.push(['dungeon', w.mod + ':' + w.name, Math.max(0, Math.min(64, Math.round(num(j.tries, 8)))), Math.round(num(j.min_y, 5)), Math.round(num(j.max_y, 128)), dim,
+                                wall, floor, alt, Math.max(0, Math.min(1, num(j.floor_alt_chance, 0.75))), sp.join(';') || '-', loot,
+                                Math.max(0, Math.min(8, Math.round(num(j.chests, 2)))), biomeList(j.biomes, w.mod)].join('\t'));
+                }
+                function caveNet(w) {
+                    var j = w.j, num = function (v, d) { v = Number(v); return isFinite(v) ? v : d; };
+                    var dim = DIMS[String(j.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
+                    if (dim === undefined) { bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '"'); return; }
+                    var size = Array.isArray(j.size) && j.size.length === 3 ? j.size : [64, 48, 64];
+                    var fl = j.floor_block ? ref(j.floor_block, w.mod, w.file) : '-';
+                    if (!fl) return;
+                    var av = (j.avoid_biomes === undefined ? ['ocean'] : Array.isArray(j.avoid_biomes) ? j.avoid_biomes : [j.avoid_biomes]).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, '').replace(/[\s;\t]+/g, '_'); });
+                    lines.push(['cavenet', w.mod + ':' + w.name, Math.max(1, Math.round(num(j.chance, 200))), num(j.min_distance, 1000), Math.round(num(size[0], 64)), Math.round(num(size[1], 48)), Math.round(num(size[2], 64)),
+                                Math.round(num(j.y, 8)), fl, Math.max(1, Math.round(num(j.floor_chance, 8))), num(j.floor_min_distance, 1500), dim, av.join(';') || '-'].join('\t'));
+                }
+                worldgen.forEach(function (w) { curMod = w.mod;
                     var type = String(w.j.type || 'ore').toLowerCase();
                     if (type === 'structure') { structure(w); return; }
+                    if (type === 'dungeon') { dungeon(w); return; }
+                    if (type === 'cave_network') { caveNet(w); return; }
                     if (type === 'tree') { tree(w); return; }
                     if (type === 'plant' || type === 'flower') { plant(w); return; }
-                    if (type !== 'ore') { bad(w.mod, w.file, 'unknown "type": "' + w.j.type + '" (ore, structure, tree or plant)'); return; }
+                    if (type !== 'ore') { bad(w.mod, w.file, 'unknown "type": "' + w.j.type + '" (ore, structure, tree, plant, dungeon or cave_network)'); return; }
                     if (w.j.block === undefined) { bad(w.mod, w.file, 'an ore needs a "block"'); return; }
                     var br = ref(w.j.block, w.mod, w.file);
+                    if (br && (w.j.replace_vanilla || w.j.remove_vanilla)) lines.push('vore\t' + br);
+                    if (br && w.j.remove_vanilla && !w.j.replace_vanilla) return;
                     if (br) ore(w.j, br, w.mod, w.file);
                 });
-                recipes.forEach(function (r) {
+                recipes.forEach(function (r) { curMod = r.mod;
                     var j = r.j, type = String(j.type || '').toLowerCase().replace('minecraft:', '').replace('crafting_', '');
                     if (type === 'fuel') {
                         if (j.item === undefined) { bad(r.mod, r.file, 'a fuel needs an "item"'); return; }
@@ -6940,7 +7580,20 @@
                         if (fr) fuelLine(fr, j.burn_time !== undefined ? j.burn_time : j.fuel !== undefined ? j.fuel : true, r.mod, r.file);
                         return;
                     }
+                    if (type === 'remove') {
+                        var rk = String(j.kind || 'all').toLowerCase();
+                        if (['crafting', 'smelting', 'all'].indexOf(rk) < 0) { bad(r.mod, r.file, '"kind": crafting, smelting or all'); return; }
+                        if (j.result === undefined && j.input === undefined) { bad(r.mod, r.file, 'a "remove" needs a "result" or an "input"'); return; }
+                        var rr = j.result === undefined ? '*' : ref(j.result, r.mod, r.file), ri = j.input === undefined ? '*' : ref(j.input, r.mod, r.file);
+                        if (!rr || !ri) return;
+                        lines.push(['unrecipe', rr, rk, ri, '@' + r.mod].join('\t'));
+                        return;
+                    }
                     if (j.result === undefined) { bad(r.mod, r.file, 'a recipe needs a "result"'); return; }
+                    var rq = (j.station !== undefined || j.time !== undefined) ? '~' + Math.max(0, Math.min(1000, Number(j.station) | 0)) + ',' + Math.max(0, Math.min(72000, Number(j.time) | 0)) : '';
+                    var rsk = j.skills !== undefined && Module.mcSkillSpec ? Module.mcSkillSpec(j.skills) : '';
+                    if (rsk) rq = rq ? [rq, '^' + rsk] : ['^' + rsk];
+                    else if (rq) rq = [rq];
                     var res = ref(j.result, r.mod, r.file);
                     var count = (j.result && typeof j.result === 'object' && j.result.count) || j.count || 1;
                     if (!res) return;
@@ -6959,25 +7612,45 @@
                             if (c !== ' ' && !(c in j.key)) { bad(r.mod, r.file, 'the pattern uses "' + c + '", which isn\'t in "key"'); ok = false; }
                         });
                         if (!ok) return;
-                        lines.push(['shaped', res, count, rows.join('|'), keys.join(';')].join('\t'));
+                        lines.push(['shaped', res, count, rows.join('|'), keys.join(';')].concat(rq || [], ['@' + r.mod]).join('\t'));
                     } else if (type === 'shapeless') {
                         if (!Array.isArray(j.ingredients) || !j.ingredients.length) { bad(r.mod, r.file, 'a shapeless recipe needs "ingredients": [ ... ]'); return; }
                         if (j.ingredients.length > 9) bad(r.mod, r.file, 'more than 9 ingredients: the rest are left out');
                         var ing = j.ingredients.slice(0, 9).map(function (i) { return ref(i, r.mod, r.file); });
                         if (ing.some(function (i) { return !i; })) return;
-                        lines.push(['shapeless', res, count, ing.join(';')].join('\t'));
+                        lines.push(['shapeless', res, count, ing.join(';')].concat(rq || [], ['@' + r.mod]).join('\t'));
                     } else if (type === 'smelting' || type === 'smelt') {
                         if (j.input === undefined && j.ingredient === undefined) { bad(r.mod, r.file, 'a smelting recipe needs an "input"'); return; }
                         var inp = ref(j.input || j.ingredient, r.mod, r.file);
                         if (!inp) return;
-                        lines.push(['smelt', inp, res, count].join('\t'));
+                        if (j.heat !== undefined && Number(j.heat) > 0) lines.push(['vitem', inp, 'smelt_heat=' + Math.min(100, Number(j.heat) | 0)].join('\t'));
+                        lines.push(['smelt', inp, res, count, '@' + r.mod].join('\t'));
                     } else bad(r.mod, r.file, 'unknown recipe "type": "' + (j.type || '') + '" (shaped, shapeless, smelting or fuel)');
                 });
                 var BEHAVIOURS = { passive: 0, hostile: 1, neutral: 2, flying: 3, swimming: 4, segment: 5, object: 6 };
-                Object.keys(mobs).forEach(function (key) {
+                Object.keys(mobs).forEach(function (key) { curMod = mobs[key].mod;
                     var mb = mobs[key], j = mb.j, file = mb.file;
                     var mf = mobFiles[mb.mod + ':' + String(j.model || '').replace(/^[/]+/, '')]
                         || mobFiles[mb.mod + ':models/entity/' + String(j.model || mb.name)] || null;
+                    var vmName = /^minecraft:([a-z0-9_]+)$/i.exec(String(j.model || ''));
+                    if (!mf && vmName) {
+                        try {
+                            var vmeta = JSON.parse(FS.readFile('/data/models/vanilla/' + vmName[1].toLowerCase() + '.meta.json', { encoding: 'utf8' }));
+                            var jd = {};
+                            if (vmeta.scale !== undefined) jd.scale = vmeta.scale;
+                            if (vmeta.animations) jd.animations = vmeta.animations;
+                            if (vmeta.layer_model) jd.layer_model = vmeta.layer_model;
+                            var dl = [];
+                            if (vmeta.layers_same_texture) dl.push({ texture: j.texture, blend: vmeta.layers_same_texture });
+                            if (vmeta.eyes && !j.layers) dl.push({ texture: vmeta.eyes, blend: 'add', glow: true });
+                            if (dl.length) jd.layers = dl;
+                            if (j.animations && jd.animations) j = Object.assign({}, j, { animations: Object.assign({}, jd.animations, j.animations) });
+                            if (j.layers && jd.layers && vmeta.layers_same_texture) j = Object.assign({}, j, { layers: [jd.layers[0]].concat(j.layers) });
+                            j = Object.assign({}, jd, j);
+                        } catch (e) { }
+                        try { mf = { path: vmName[1].toLowerCase() + '.jem', data: FS.readFile('/data/models/vanilla/' + vmName[1].toLowerCase() + '.jem') }; }
+                        catch (e) { bad(mb.mod, file, '"model": the game has no creature model "' + vmName[1] + '" (zombie, skeleton, spider, creeper, slime, wolf, bat, pig, cow, sheep, chicken, enderman, silverfish, blaze, ghast, biped, villager, witch, iron_golem, snow_golem, ocelot, squid, magma_cube)'); return; }
+                    }
                     if (!mf) {
                         Object.keys(mobFiles).some(function (k) {
                             if (k.indexOf(mb.mod + ':') !== 0) return false;
@@ -7043,6 +7716,8 @@
                                 (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
                                 egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';')].join('\t'));
+                    if (Module.mcMobTraits) Module.mcMobTraits(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }).forEach(function (l) { lines.push(l); });
+                    if (Module.mcMobGoals) Module.mcMobGoals(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }).forEach(function (l) { lines.push(l); });
                     var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8, leg_a: 2, leg_b: 3, arm_a: 4, arm_b: 5, wing_l: 6, wing_r: 7 };
                     var legs = 0, arms = 0, wings = 0, headDone = false, given = j.animations || {};
                     var isUnder = function (p, re) { for (var q = p.parent, n = 0; q >= 0 && n < 64; q = model.parts[q].parent, n++) if (re.test(model.parts[q].name)) return true; return false; };
@@ -7075,6 +7750,29 @@
                                     p.boxes.map(function (b) { return b.map(function (v) { return numStr(v); }).join(','); }).join(';'),
                                     p.hidden || hiddenNames.indexOf(p.name) >= 0 ? 1 : 0, swingsOf(p)].join('\t'));
                     });
+                    if (Array.isArray(j.layers) && j.layers.length) {
+                        if (j.layer_model) {
+                            var lm = null, lmv = /^minecraft:([a-z0-9_]+)$/i.exec(String(j.layer_model));
+                            if (lmv) { try { lm = { path: lmv[1].toLowerCase() + '.jem', data: FS.readFile('/data/models/vanilla/' + lmv[1].toLowerCase() + '.jem') }; } catch (e) { lm = null; } }
+                            else lm = mobFiles[mb.mod + ':' + String(j.layer_model).replace(/^[/]+/, '')] || null;
+                            var model2 = null;
+                            if (!lm) problem(mb.mod, file, '"layer_model": no model "' + j.layer_model + '"');
+                            else try { var lj = JSON.parse(dec.decode(lm.data)); model2 = /[.]jem$/i.test(lm.path) ? jemModel(lj) : geoModel(lj); } catch (e) { problem(mb.mod, file, '"layer_model" can\'t be read: ' + e.message); }
+                            if (model2) model2.parts.forEach(function (p, i) {
+                                lines.push(['mobpart2', key, i, p.parent, p.pivot.map(numStr).join(','), p.rot.map(function (r) { return numStr(r, 5); }).join(','), p.name, animOf(p),
+                                            p.boxes.map(function (b) { return b.map(function (v) { return numStr(v); }).join(','); }).join(';'), p.hidden ? 1 : 0, ''].join('\t'));
+                            });
+                        }
+                        j.layers.slice(0, 4).forEach(function (L, li) {
+                            L = typeof L === 'string' ? { texture: L } : L || {};
+                            var lf = texFiles[mb.mod + ':' + String(L.texture || '').replace(/^[/]+/, '')], lg = /^minecraft:(.+[.]png)$/i.exec(String(L.texture || ''));
+                            if (!lf && lg && lg[1].indexOf('..') < 0) { try { lf = { data: FS.readFile('/data/images/' + lg[1]) }; } catch (e) { lf = null; } }
+                            if (!lf) { problem(mb.mod, file, '"layers": no picture "' + L.texture + '"'); return; }
+                            var lp = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '__L' + li + '.png';
+                            try { FS.writeFile('/data/images/' + lp, lf.data); } catch (e) { }
+                            lines.push(['moblayer', key, lp, String(L.blend || '').toLowerCase() === 'add' ? 1 : 0, L.glow ? 1 : 0].join('\t'));
+                        });
+                    }
                     if (egg) {
                         var eggKey = key + '_spawn_egg';
                         lang.push('item.mod.' + eggKey + '.name=Spawn ' + clean(j.name || pretty(mb.name)));
@@ -7083,14 +7781,17 @@
                     }
                     (Array.isArray(j.spawn) ? j.spawn : (j.spawn ? [j.spawn] : [])).forEach(function (s) {
                         if (!s || typeof s !== 'object') return;
-                        var dim = DIMS[String(s.dimension || 'overworld').toLowerCase()];
+                        var dim = DIMS[String(s.dimension || 'overworld').toLowerCase()]; if (dim === undefined && typeof dimRef === 'function') dim = dimRef(s.dimension, mb.mod) || undefined;
                         if (dim === undefined && s.dimension) dim = dimRef(s.dimension, mb.mod) || undefined;
                         if (dim === undefined) { bad(mb.mod, file, 'spawn: unknown dimension "' + s.dimension + '"'); return; }
                         var light = range(s.light, beh === 1 ? [0, 7] : [9, 15]), h = range(s.height, [1, 126]), g = range(s.group, [1, beh === 1 ? 1 : 4]);
                         var on = (s.on === undefined ? [] : (Array.isArray(s.on) ? s.on : [s.on])).map(function (r) { return ref(r, mb.mod, file); });
                         if (on.some(function (r) { return !r; })) return;
+                        var stime = { day: 1, night: 2 }[String(s.time || '').toLowerCase()] || 0;
+                        var sdays = s.days && typeof s.days === 'object' ? s.days : null;
                         lines.push(['mobspawn', key, dim, light[0], light[1], h[0], h[1], on.join(';'), num(s.weight, 10, 1, 1000), Math.max(1, g[0]), Math.max(1, g[1]),
-                                    (Array.isArray(s.biomes) ? s.biomes : (s.biomes ? [s.biomes] : [])).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, ''); }).join(';')].join('\t'));
+                                    (Array.isArray(s.biomes) ? s.biomes : (s.biomes ? [s.biomes] : [])).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, ''); }).join(';'),
+                                    stime, sdays ? Math.max(1, num(sdays.every, 1, 1, 100000) | 0) : 0, sdays ? Math.max(0, num(sdays.on, 0, 0, 100000) | 0) : 0].join('\t'));
                     });
                     if (j.segments && typeof j.segments === 'object') {
                         var sgName = String(j.segments.mob || '').replace(/^[a-z0-9_.-]+:/, ''), sgKey = mb.mod + ':' + sgName;
@@ -7098,13 +7799,104 @@
                         else lines.push(['mobseg', key, sgKey, Math.round(num(j.segments.count, 8, 1, 64)), num(j.segments.spacing, 1, 0.25, 8)].join('\t'));
                     }
                 });
-                ruleFiles.forEach(function (rf) {
+                var OWN_ITEM_KEYS = ['blocks', 'can_block', 'block_wear', 'cooks_in_fire', 'smelt_xp', 'reach', 'reach_bonus', 'reach_applies_to', 'sugar', 'sugar_content',
+                    'tills', 'tills_soil', 'cuts', 'cut_wear', 'drinkable', 'strips_enchantments', 'disenchants', 'dim_resist', 'dimming_resistance', 'craft_skills'];
+                var OWN_BLOCK_KEYS = ['cushion', 'breaks_on_landing', 'portable', 'grow_chance', 'grow_light', 'grow_needs_rain', 'grow_rain', 'grow_biomes', 'biomes',
+                    'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses'];
+                var ownOv = [];
+                [[items, OWN_ITEM_KEYS, 'ov_items'], [blocks, OWN_BLOCK_KEYS, 'ov_blocks']].forEach(function (set) {
+                    Object.keys(set[0]).forEach(function (key) {
+                        var it = set[0][key], j = it.j || {}, sub = null;
+                        set[1].forEach(function (k) { if (j[k] !== undefined) { sub = sub || { target: it.mod + ':' + it.name }; sub[k] = j[k]; } });
+                        if (sub) ownOv.push({ mod: it.mod, kind: set[2], name: it.name, j: sub, file: it.file });
+                    });
+                });
+                ovFiles = ownOv.concat(ovFiles);
+                ovFiles.sort(function (a, b) { return (a.kind === 'tiers' ? 0 : 1) - (b.kind === 'tiers' ? 0 : 1); });
+                ovFiles.forEach(function (of) { curMod = of.mod;
+                    Module.mcOverrides.compile(of, function (r) { return ref(r, of.mod, of.file); }, function (text) { bad(of.mod, of.file, text); }, function (p) {
+                        var tf = texFiles[of.mod + ':' + String(p).replace(/^[/]+/, '').toLowerCase()];
+                        if (!tf) return '';
+                        var dp = 'web_mods/ov_' + (of.mod + '_' + String(p)).toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+                        try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + dp, tf.data); } catch (e) { return ''; }
+                        return dp;
+                    }).forEach(function (l) { lines.push(l); });
+                });
+                ruleFiles.forEach(function (rf) { curMod = rf.mod;
                     rulesOf(rf.j, rf.mod, function (text) { bad(rf.mod, rf.file, text); }, ref).forEach(function (l) { lines.push('rule\t' + l); });
                 });
-                Object.keys(blocks).forEach(function (key) {
-                    if (blocks[key].j.explosion_proof) lines.push('rule\texplosion_proof|mod:' + key + '||||0');
+                Object.keys(items).forEach(function (key) {
+                    if (items[key].j.door) { var dr = ref(items[key].j.door, items[key].mod, items[key].file); if (dr) lines.push(['itemdoor', key, dr].join('\t')); }
+                    if (items[key].j.steers === true) lines.push(['steers', key].join('\t'));
+                    var pl = items[key].j.pull;
+                    if (pl) {
+                        var pm = Array.isArray(pl) ? { '*': pl } : pl;
+                        Object.keys(pm).forEach(function (a) {
+                            var rs = (Array.isArray(pm[a]) ? pm[a] : []).map(function (x) { return ref(x, items[key].mod, items[key].file); });
+                            if (rs.length !== 3 || rs.some(function (x) { return !x; })) { bad(items[key].mod, items[key].file, '"pull": three items for each arrow (its looks drawn a little, more, all the way)'); return; }
+                            var ar = a === '*' ? '*' : ref(a, items[key].mod, items[key].file);
+                            if (ar) lines.push(['pull', key, ar, rs.join(',')].join('\t'));
+                        });
+                    }
+                    var fr = items[key].j.fishing_rod;
+                    if (fr) lines.push(['fishing', key, 'rod', fr.cast ? (ref(fr.cast, items[key].mod, items[key].file) || '-') : '-'].join('	'));
+                    if (items[key].j.bait !== undefined) { var bf = Number(items[key].j.bait === true ? 0.5 : items[key].j.bait); if (bf > 0) lines.push(['fishing', key, 'bait', Math.min(1, bf)].join('	')); }
+                    var bk = items[key].j.bucket;
+                    if (bk && typeof bk === 'object') {
+                        var br3 = ['empty', 'water', 'lava', 'milk'].map(function (k) { return bk[k] ? ref(bk[k], items[key].mod, items[key].file) : ''; });
+                        if (br3[0]) lines.push(['bucket', key].concat(br3.map(function (r) { return r || 'none'; })).join('\t'));
+                        else bad(items[key].mod, items[key].file, '"bucket": needs at least its "empty" item');
+                    }
                 });
-                Object.keys(mobs).forEach(function (key) {
+                Object.keys(blocks).forEach(function (key) { curMod = blocks[key].mod;
+                    if (blocks[key].j.explosion_proof) lines.push('rule\texplosion_proof|mod:' + key + '||||0');
+                    var cj = blocks[key].j.crop;
+                    if (cj && typeof cj === 'object') {
+                        var cm = blocks[key].mod, cf = blocks[key].file;
+                        var stg = (Array.isArray(cj.stages) ? cj.stages : []).map(function (s) { return ref(s, cm, cf); });
+                        if (stg.length < 2 || stg.some(function (s) { return !s || s.indexOf('mod:') !== 0; }))
+                            bad(cm, cf, '"crop": "stages" lists 2 or more of the mod\'s blocks, the first one just planted');
+                        else {
+                            var sd = cj.seed ? ref(cj.seed, cm, cf) : '';
+                            var cl = typeof cj.light === 'number' ? Math.max(0, Math.min(15, cj.light | 0)) : 9;
+                            var cs = typeof cj.speed === 'number' && cj.speed > 0 ? cj.speed : 1;
+                            lines.push(['crop', key, sd || '-', stg.join(';'), cl, cs].join('\t'));
+                            if (cj.yield !== undefined) {
+                                var yl = (Array.isArray(cj.yield) ? cj.yield : [cj.yield]).map(function (e) {
+                                    var o = typeof e === 'object' && e ? e : { item: e };
+                                    var r = ref(o.item, cm, cf);
+                                    return r ? r + '*' + Math.max(1, (+o.count || 1) | 0) + '*' + Math.max(0, Math.min(1, o.chance === undefined ? 1 : +o.chance)) : '';
+                                }).filter(Boolean);
+                                if (yl.length) lines.push(['vblock', stg[stg.length - 1], 'drops=' + yl.join(',')].join('\t'));
+                            }
+                            if (cj.blight && typeof cj.blight === 'object') {
+                                var blr2 = function (a) { return (Array.isArray(a) ? a : a ? [a] : []).map(function (x) { return ref(x, cm, cf); }).filter(Boolean).join('|'); };
+                                var bch = typeof cj.blight.chance === 'number' ? Math.max(0, Math.min(1, cj.blight.chance)) : 0.0005;
+                                var bv = [bch, blr2(cj.blight.blighted), blr2(cj.blight.dead)].join(',');
+                                stg.forEach(function (s) { lines.push(['vblock', s, 'blight=' + bv].join('\t')); });
+                            }
+                        }
+                    }
+                    var ct = blocks[key].j.crafting_table;
+                    if (ct) lines.push(['vblock', 'mod:' + key, 'station=' + Math.max(1, ct === true ? 1 : Number(ct) | 0)].join('\t'));
+                    var cnt = String(blocks[key].j.container || '').toLowerCase();
+                    if (cnt === 'anvil') lines.push(['container', key, 'anvil'].join('\t'));
+                    else if (cnt === 'enchanting') {
+                        var ep = typeof blocks[key].j.enchant_power === 'number' && blocks[key].j.enchant_power > 0 ? blocks[key].j.enchant_power : 1;
+                        lines.push(['container', key, 'enchanting', ep].join('\t'));
+                    }
+                    else if (cnt === 'furnace' || cnt === 'chest') {
+                        var ctp = '';
+                        if (cnt === 'chest' && blocks[key].j.chest_texture) {
+                            var ctf = texFiles[blocks[key].mod + ':' + String(blocks[key].j.chest_texture).replace(/^[/]+/, '').toLowerCase()];
+                            if (!ctf) problem(blocks[key].mod, blocks[key].file, '"chest_texture": no picture "' + blocks[key].j.chest_texture + '" in the mod');
+                            else { ctp = 'web_mods/chest_' + key.replace(/[^a-z0-9_.-]/g, '_') + '.png'; try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + ctp, ctf.data); } catch (e) { ctp = ''; } }
+                        }
+                        lines.push(['container', key, cnt].concat(ctp ? [ctp] : []).join('\t'));
+                        if (cnt === 'furnace' && blocks[key].j.lit) { var lr = ref(blocks[key].j.lit, blocks[key].mod, blocks[key].file); if (lr) lines.push(['furnacelit', key, lr].join('\t')); }
+                    } else if (cnt) bad(blocks[key].mod, blocks[key].file, '"container": "furnace", "chest", "anvil" or "enchanting"');
+                });
+                Object.keys(mobs).forEach(function (key) { curMod = mobs[key].mod;
                     var im = mobs[key].j.immune;
                     if (im === undefined) return;
                     (Array.isArray(im) ? im : [im]).forEach(function (c) {
@@ -7409,8 +8201,16 @@
                     return t.slice(1).filter(Boolean).map(function (l) { var p = l.split('\t'); return { id: p[0], name: p[1] || p[0] }; });
                 } catch (e) { return null; }
             }
+            function modeFilter(list, folder) {
+                if (!list) return list;
+                var mm = api.modeMods ? api.modeMods() : {}, mine = '';
+                try { mine = FS.readFile(folder + '/mode.txt', { encoding: 'utf8' }).split('\n')[0].split('\t')[0]; } catch (e) { }
+                var keep = {};
+                Object.keys(mm).forEach(function (k) { keep[mm[k].cid] = k === mine; });
+                return list.filter(function (m) { return !(m.id in keep) || keep[m.id]; });
+            }
             function worldDiff(folder) {
-                var now = modsOn(), was = worldList(folder);
+                var now = modeFilter(modsOn(), folder), was = worldList(folder);
                 if (!now || !was) return null;
                 var has = function (list, id) { return list.some(function (m) { return m.id === id; }); };
                 var on = was.filter(function (m) { return !has(now, m.id); }), off = now.filter(function (m) { return !has(was, m.id); });
@@ -7427,7 +8227,7 @@
                     return ((h * 31 + applied) | 0) & 0x7fffffff;
                 },
                 record: function (folder) {
-                    var now = modsOn();
+                    var now = modeFilter(modsOn(), folder);
                     if (!now) return;
                     var text = 'mcre-mods 1\n' + now.map(function (m) { return m.id + '\t' + m.name; }).join('\n') + '\n';
                     try {
@@ -7949,6 +8749,22 @@
             };
             api.isLoaded = function (r) { r = String(r || ''); return r.indexOf('mod:') !== 0 || !!contentKeys[r.slice(4)]; };
             api.hasEnabled = function () { return mods.some(function (x) { return x.enabled && !x.err; }); };
+            api.modeMods = function () {
+                var o = {};
+                mods.forEach(function (x) {
+                    var g = x.enabled && !x.err && x.m && x.m.game_mode;
+                    if (!g || typeof g !== 'object') return;
+                    o[x.id] = { name: String(g.name || x.m.name || x.id).slice(0, 40), description: String(g.description || '').slice(0, 80), cid: cid(x),
+                                          hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes };
+                });
+                return o;
+            };
+            api.gameModes = function () {
+                var o = api.modeMods();
+                return Object.keys(o).map(function (k) { var ws = o[k].world_sizes || o[k].sizes; ws = (Array.isArray(ws) ? ws : ws ? [ws] : []).map(function (x) { return String(x).toLowerCase().replace(/[^a-z]/g, ''); }).join(',');
+                    return [k, o[k].name, o[k].description, o[k].hardcore ? 1 : 0, o[k]['default'] ? 1 : 0, o[k].hunger ? 1 : 0, ws].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
+            };
+            api.worldMode = '';
             api.offer = function () {
                 var on = mods.filter(function (x) { return x.enabled && !x.err; });
                 return Promise.all(on.map(function (x) {
@@ -8425,6 +9241,68 @@
                     if (s.tag != null && s.tag !== '') f.push('t' + String(typeof s.tag === 'string' ? s.tag : JSON.stringify(s.tag)).replace(/[\x1e\x1f\t\r\n]/g, ' ').slice(0, 2000));
                     return f.length ? '|' + f.join('\x1f') : '';
                 }
+                var goalDefs = {};
+                var goalState = {};
+                var FILTER_WORDS = { player: 1, players: 1, monster: 1, monsters: 1, mob: 1, imob: 1, hostile: 1, animal: 1, animals: 1, living: 1, creature: 1, any: 1, entity: 1, all: 1 };
+                function goalName(mod, n) {
+                    var s = String(n == null ? '' : n).trim();
+                    if (/^\d+$/.test(s)) return s;
+                    return s.indexOf(':') < 0 && goalDefs[mod + ':' + s] ? mod + ':' + s : s;
+                }
+                function goalKv(mod, o) {
+                    var kv = [];
+                    Object.keys(o || {}).forEach(function (k) {
+                        if (k === 'goal' || k === 'id' || k === 'priority') return;
+                        var v = o[k];
+                        if (k === 'entity' || k === 'target' || k === 'watch' || k === 'avoid')
+                            v = (Array.isArray(v) ? v : [v]).map(function (x) { var s = String(x).toLowerCase(); return FILTER_WORDS[s] ? s : typeOf(mod, s); }).join(',');
+                        else if (Array.isArray(v)) v = v.join(',');
+                        else if (v === true || v === false) v = v ? 1 : 0;
+                        else if (v && typeof v === 'object') return;
+                        kv.push(k + '=' + String(v).replace(/[;\t\n\r=|]/g, ''));
+                    });
+                    return kv.join(';');
+                }
+                function addGoalTo(mod, list, id, priority, goal, params) {
+                    return ask(mod, ['goaladd', pid(id) | 0, list, Math.round(Number(priority) || 0), goalName(mod, goal), goalKv(mod, params)]).then(function (r) {
+                        if (!r.handle && r.error) post({ t: 'log', mod: mod, text: 'world.add' + (list === 'targets' ? 'Target' : 'Goal') + ': ' + r.error });
+                        return r.handle | 0;
+                    });
+                }
+                function runGoals(list) {
+                    (list || []).forEach(function (it) {
+                        var g = it.g, def = goalDefs[g.name];
+                        if (!def || !it.mob) return;
+                        var key = it.mob.id + ':' + g.h, st = goalState[key];
+                        if (!st) st = goalState[key] = { params: g.params || {} };
+                        var m = it.mob, mod = def.mod, sp = def.spec;
+                        var mob = Object.assign({}, m, {
+                            moveTo: function (x, y, z, s) { act(mod, ['goalnav', m.id, 'moveto', +x, +y, +z, s == null ? 1 : +s]); },
+                            moveToEntity: function (e, s) { act(mod, ['goalnav', m.id, 'moveent', pid(e) | 0, s == null ? 1 : +s]); },
+                            stop: function () { act(mod, ['goalnav', m.id, 'stop']); },
+                            lookAt: function (x, y, z, ys, ps) {
+                                if (x && typeof x === 'object' || (y == null && z == null)) act(mod, ['goalnav', m.id, 'lookent', pid(x) | 0, ys == null ? 10 : +ys, ps == null ? 40 : +ps]);
+                                else act(mod, ['goalnav', m.id, 'look', +x, +y, +z, ys == null ? 10 : +ys, ps == null ? 40 : +ps]);
+                            },
+                            jump: function () { act(mod, ['goalnav', m.id, 'jump']); },
+                            setTarget: function (e) { act(mod, ['goalnav', m.id, 'target', e == null ? 0 : pid(e) | 0]); }
+                        });
+                        var want = '', cont = '';
+                        try {
+                            var i;
+                            for (i = 0; i < (g.stop | 0); i++) if (sp.stop) sp.stop(mob, st);
+                            for (i = 0; i < (g.start | 0); i++) if (sp.start) sp.start(mob, st);
+                            for (i = 0; i < (g.tick | 0); i++) if (sp.tick) sp.tick(mob, st);
+                            if (g.running) cont = (sp.canContinue ? sp.canContinue(mob, st) : sp.canUse ? sp.canUse(mob, st) : false) ? 1 : 0;
+                            else if (g.asked) want = (sp.canUse ? sp.canUse(mob, st) : false) ? 1 : 0;
+                        } catch (x) {
+                            st.$errors = (st.$errors | 0) + 1;
+                            report(mod, x);
+                            if (st.$errors >= 3) post({ t: 'log', mod: mod, text: 'goal "' + g.name + '" removed from creature ' + m.id + ' after 3 errors' });
+                        }
+                        act(mod, ['goalfeed', m.id, g.h, want, cont, st.$errors | 0]);
+                    });
+                }
                 function apiFor(mod) {
                     function on(list) {
                         return function (type, fn) {
@@ -8474,6 +9352,8 @@
                             worldType: function () { return ask(mod, ['worldtype']).then(function (r) { return r.type || 'default'; }); },
                             height: function () { return ask(mod, ['height']).then(function (r) { return r.height || 128; }); },
                             setTime: function (t) { act(mod, ['settime', t | 0]); },
+                            moon: function () { return ask(mod, ['moon']).then(function (r) { return { moon: r.moon || '', up: r.up || '', night: !!r.night, frenzied: !!r.frenzied, day: r.day | 0 }; }); },
+                            setFertilized: function (x, y, z, on) { act(mod, ['fertilize', x | 0, y | 0, z | 0, on === false ? 0 : 1]); },
                             DAY: 19200,
                             timeOfDay: function () {
                                 return ask(mod, ['time']).then(function (r) {
@@ -8522,6 +9402,9 @@
                                 return ask(mod, ['spawnentity', typeOf(mod, type), +x, +y, +z]).then(function (r) { return r.id | 0; });
                             },
                             setRules: function (id, rules) { act(mod, ['setrules', String(id), rules == null ? null : plain(rules)]); },
+                            setItemProps: function (name, props) { act(mod, ['setprops', 'items', String(name), props == null ? null : plain(props)]); },
+                            setBlockProps: function (name, props) { act(mod, ['setprops', 'blocks', String(name), props == null ? null : plain(props)]); },
+                            setMobProps: function (name, props) { act(mod, ['setprops', 'mobs', String(name), props == null ? null : plain(props)]); },
                             placeStructure: function (name, x, y, z, rotation) {
                                 var n = String(name || '').toLowerCase();
                                 act(mod, ['placestruct', n.indexOf(':') < 0 ? mod + ':' + n : n, x | 0, y | 0, z | 0, rotation == null ? '' : rotation & 3]);
@@ -8565,6 +9448,44 @@
                             removeEffect: function (id, effect) { act(mod, ['enteffect', pid(id) | 0, effect == null ? 0 : effectId(effect, 'world.removeEffect'), 0, 0]); },
                             setTarget: function (id, target) { act(mod, ['enttarget', pid(id) | 0, target == null ? 0 : pid(target) | 0]); },
                             walkTo: function (id, x, y, z) { act(mod, ['entwalk', pid(id) | 0, Math.floor(+x), Math.floor(+y), Math.floor(+z)]); },
+                            addGoal: function (id, priority, goal, params) { return addGoalTo(mod, 'goals', id, priority, goal, params); },
+                            addTarget: function (id, priority, goal, params) { return addGoalTo(mod, 'targets', id, priority, goal, params); },
+                            removeGoal: function (id, which) { act(mod, ['goalremove', pid(id) | 0, 'goals', goalName(mod, which)]); },
+                            removeTarget: function (id, which) { act(mod, ['goalremove', pid(id) | 0, 'targets', goalName(mod, which)]); },
+                            goals: function (id) { return ask(mod, ['goallist', pid(id) | 0]).then(function (r) { return r.goals || null; }); },
+                            setCreatureGoals: function (type, spec) {
+                                spec = spec || {};
+                                var line = function (list, g) { return [list, Math.round(Number(g.priority) || 0), goalName(mod, g.goal || g.id), goalKv(mod, g)].join('|'); };
+                                var gs = Array.isArray(spec.goals) ? spec.goals : null, ts = Array.isArray(spec.targets) ? spec.targets : null;
+                                act(mod, ['setcreaturegoals', typeOf(mod, type), gs ? 1 : 0, ts ? 1 : 0]
+                                    .concat((gs || []).map(function (g) { return line('g', g || {}); })).concat((ts || []).map(function (g) { return line('t', g || {}); })));
+                            },
+                            defineGoal: function (name, spec) {
+                                if (!spec || typeof spec !== 'object') throw new Error('world.defineGoal: (name, {canUse, start, tick, stop, ...})');
+                                var full = goalName(mod, name);
+                                var mx = spec.mutex == null ? 1 : typeof spec.mutex === 'number' ? spec.mutex | 0 :
+                                    (Array.isArray(spec.mutex) ? spec.mutex : [spec.mutex]).reduce(function (m, w) { return m | ({ move: 1, look: 2, jump: 4, swim: 4 }[String(w).toLowerCase()] || 0); }, 0);
+                                goalDefs[full] = { mod: mod, spec: spec };
+                                act(mod, ['goaldefine', full, mx, spec.interruptible === false ? 0 : 1]);
+                                post({ t: 'want', side: 'world', what: '$goals' });
+                                return full;
+                            },
+                            mobMoveTo: function (id, x, y, z, speed) { act(mod, ['goalnav', pid(id) | 0, 'moveto', +x, +y, +z, speed == null ? 1 : +speed]); },
+                            mobMoveToEntity: function (id, target, speed) { act(mod, ['goalnav', pid(id) | 0, 'moveent', pid(target) | 0, speed == null ? 1 : +speed]); },
+                            mobStop: function (id) { act(mod, ['goalnav', pid(id) | 0, 'stop']); },
+                            mobLookAt: function (id, x, y, z, yawSpeed, pitchSpeed) {
+                                if (x && typeof x === 'object' || (y == null && z == null)) act(mod, ['goalnav', pid(id) | 0, 'lookent', pid(x) | 0, yawSpeed == null ? 10 : +yawSpeed, pitchSpeed == null ? 40 : +pitchSpeed]);
+                                else act(mod, ['goalnav', pid(id) | 0, 'look', +x, +y, +z, yawSpeed == null ? 10 : +yawSpeed, pitchSpeed == null ? 40 : +pitchSpeed]);
+                            },
+                            mobJump: function (id) { act(mod, ['goalnav', pid(id) | 0, 'jump']); },
+                            setHome: function (id, x, y, z, radius) { act(mod, ['goalnav', pid(id) | 0, 'home', x | 0, y | 0, z | 0, radius == null ? -1 : radius | 0]); },
+                            setMoveSpeed: function (id, v) { act(mod, ['goalnav', pid(id) | 0, 'speed', +v]); },
+                            setFollowRange: function (id, v) { act(mod, ['goalnav', pid(id) | 0, 'follow', +v]); },
+                            setNavigation: function (id, o) {
+                                o = o || {};
+                                var b = function (v) { return v == null ? -1 : v ? 1 : 0; };
+                                act(mod, ['goalnav', pid(id) | 0, 'navflags', b(o.avoidWater), b(o.breakDoors), b(o.enterDoors), b(o.swim)]);
+                            },
                             particle: function (name, x, y, z, o) {
                                 o = o || {};
                                 var p = PARTICLES[String(name || '').toLowerCase().replace(/^minecraft:/, '')];
@@ -8623,6 +9544,17 @@
                             },
                             teleport: function (p, x, y, z) { act(mod, ['teleport', pid(p), +x, y == null || y === 'surface' ? 'surface' : +y, +z]); },
                             heal: function (p, n) { act(mod, ['heal', pid(p), n | 0]); },
+                            stats: function (p) { return ask(mod, ['stats', pid(p)]).then(function (r) { return r.stats || null; }); },
+                            setStats: function (p, o) {
+                                o = o || {};
+                                var f = ['health', 'maxHealth', 'food', 'maxFood', 'saturation', 'exhaustion', 'xpLevel', 'xp', 'sugarPenalty', 'dim', 'skills']
+                                    .filter(function (k) { return typeof o[k] === 'number' && isFinite(o[k]); }).map(function (k) { return k + '=' + o[k]; });
+                                if (f.length) act(mod, ['setstats', pid(p), f.join(';')]);
+                            },
+                            skills: function (p) { return ask(mod, ['skills', pid(p)]).then(function (r) { return { on: !!r.on, skills: r.skills || [], all: r.all || [] }; }); },
+                            addSkill: function (p, s) { act(mod, ['setskill', pid(p), String(s), 1]); },
+                            removeSkill: function (p, s) { act(mod, ['setskill', pid(p), String(s), 0]); },
+                            learnSkill: function (p, s) { return ask(mod, ['learnskill', pid(p), String(s)]).then(function (r) { return { ok: !!r.ok, message: String(r.message || '') }; }); },
                             inventory: function (p) { return ask(mod, ['inv', pid(p)]).then(function (r) { return r.inv || null; }); },
                             setSlot: function (p, slot, item, n, data) {
                                 act(mod, ['setslot', pid(p), slotNo(slot), itemArg(item), item == null ? 0 : Math.max(0, n == null ? (item.count || 1) : n | 0), data == null ? (item && item.data != null ? item.data : -1) : data | 0]);
@@ -8787,7 +9719,9 @@
                     }
                     if (e.t === 'stop') {
                         Object.keys(saveTimer).forEach(function (k) { if (saveTimer[k]) { clearTimeout(saveTimer[k]); saveTimer[k] = 0; post({ t: 'save', mod: k, data: store[k] || {} }); } });
+                        goalState = {};
                     }
+                    if (e.t === '$goals') { runGoals(e.list); return; }
                     fire(server, e.t, e);
                 };
             }
@@ -8934,6 +9868,11 @@
                     a = a.slice(); a[ti] = tn || 'none';
                 }
                 if (k === 'csetslot') { a = a.slice(); a[5] = a[5] ? named(a[5], 'world.setSlot') : 'none'; }
+                if (k === 'setprops') {
+                    var pw = a[1], pr = pw === 'mobs' ? String(a[2] || '').toLowerCase().replace(/^minecraft:/, '') : named(a[2], 'world.set' + { items: 'Item', blocks: 'Block' }[pw] + 'Props');
+                    if (pr && pr !== 'none' && Module.mcOverrides) Module.mcOverrides.set(pw, pr, a[3], function (t) { if (W() && W().problem) W().problem(mod, 'scripts', 'world.set...Props: ' + t, 'script'); });
+                    return;
+                }
                 if (k === 'setrules') {
                     var rl = a[2] && W() && W().rulesOf ? W().rulesOf(a[2], mod, function (t) { if (W().problem) W().problem(mod, 'scripts', 'world.setRules: ' + t, 'script'); }) : [];
                     a = ['setrules', mod + ':' + a[1]].concat(rl);
@@ -8943,13 +9882,26 @@
                     var pa = a;
                     eachJoiner(function (c) { net().sendCtlTo(c, { t: 'particle', a: pa }); });
                 }
-                if ((k === 'getblock' || k === 'players' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
-                     k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox' || k === 'spawnerinfo') && fromGuid) {
+                if ((k === 'getblock' || k === 'players' || k === 'stats' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
+                     k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox' || k === 'spawnerinfo' || k === 'moon' || k === 'skills' || k === 'learnskill' ||
+                     k === 'goaladd' || k === 'goallist') && fromGuid) {
                     var id = nextRemoteReq++;
                     remoteReq[id] = { guid: fromGuid, req: a[1] };
                     a = a.slice(); a[1] = id;
                 }
                 if (k === 'setblock') a[4] = named(a[4], 'world.setBlock');
+                if (k === 'goaladd' || k === 'setcreaturegoals') {
+                    var gkv = function (s) {
+                        return String(s || '').split(';').map(function (p) {
+                            var q = p.indexOf('='), gk = q < 0 ? p : p.slice(0, q);
+                            if (q < 0 || (gk !== 'item' && gk !== 'items')) return p;
+                            return gk + '=' + p.slice(q + 1).split(',').map(function (n) { return named(n, 'world.addGoal'); }).filter(function (r) { return r && r !== 'none'; }).join(',');
+                        }).join(';');
+                    };
+                    a = a.slice();
+                    if (k === 'goaladd') a[6] = gkv(a[6]);
+                    else for (var gi = 4; gi < a.length; gi++) { var gp = String(a[gi]).split('|'); if (gp.length > 3) { gp[3] = gkv(gp[3]); a[gi] = gp.join('|'); } }
+                }
                 if (k === 'spawnitem') a[4] = named(a[4], 'world.spawnItem');
                 if (k === 'setjukebox' || k === 'playrecord') { a = a.slice(); a[4] = a[4] === 'none' ? 'none' : named(a[4], k === 'setjukebox' ? 'world.setJukebox' : 'world.playRecord'); }
                 if (k === 'give' || k === 'heal') {
@@ -9199,6 +10151,8 @@
                     }
                     if (W() && W().clearProblems) W().clearProblems('script');
                     var scripts = W() && W().scripts ? W().scripts(newSide === 'client') : [];
+                    var modeOf = W() && W().modeMods ? W().modeMods() : {};
+                    scripts = scripts.filter(function (sc) { return !modeOf[sc.mod] || sc.mod === (W().worldMode || ''); });
                     if (!scripts.length) return;
                     side = newSide; folder = e.folder || '';
                     scriptCmds = {};
@@ -9260,6 +10214,7 @@
                 if (worker) { try { worker.terminate(); } catch (x) { } }
                 worker = null; side = ''; actions = []; known = {}; wants = {}; swants = {}; remoteReq = {}; ops = null;
                 if (Module.mcGameRules) Module.mcGameRules.reset();
+                if (Module.mcOverrides) Module.mcOverrides.reset();
                 if (Module.mcSky) { Module.mcSky.script = -1; Module.mcSky.apply(); }
                 closeGui(true);
                 closePanels();
@@ -9387,6 +10342,8 @@
                 var m;
                 try { m = JSON.parse(json); } catch (x) { return; }
                 if (m.t === 'heal') net().sendCtlTo(guid, { t: 'heal', n: m.a | 0 });
+                else if (m.t === 'caps') net().sendCtlTo(guid, { t: 'caps', h: m.a | 0, f: m.b | 0 });
+                else if (m.t === 'mech') net().sendCtlTo(guid, { t: 'mech', k: m.a | 0, a: +m.b || 0 });
                 else if (m.t === 'effect') net().sendCtlTo(guid, { t: 'effect', id: m.a | 0, ticks: m.b | 0, amp: m.c | 0 });
                 else if (m.t === 'push') net().sendCtlTo(guid, { t: 'push', x: +m.a, y: +m.b, z: +m.c });
                 else if (m.t === 'fire') net().sendCtlTo(guid, { t: 'fire', s: m.a | 0 });
@@ -9428,6 +10385,8 @@
                 case 'tp': if (Module._mcScriptTeleport) Module._mcScriptTeleport(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
                 case 'give': if (Module._mcScriptGive) Module.ccall('mcScriptGive', null, ['string', 'number'], [String(msg.ref || ''), msg.n | 0]); break;
                 case 'heal': if (Module._mcScriptHeal) Module._mcScriptHeal(msg.n | 0); break;
+                case 'caps': if (Module._mcScriptCaps) Module._mcScriptCaps(msg.h | 0, msg.f | 0); break;
+                case 'mech': if (Module._mcScriptMech) Module._mcScriptMech(msg.k | 0, +msg.a || 0); break;
                 case 'achievement': if (Module._mcAchievementToast) Module.ccall('mcAchievementToast', null, ['string', 'string', 'string'], ['Achievement get!', String(msg.name || ''), String(msg.icon || '')]); break;
                 case 'chat': chat(msg.text); break;
                 case 'sound': if (Module._mcScriptSound) Module.ccall('mcScriptSound', null, ['string', 'number', 'number', 'number', 'number', 'number'], [String(msg.name || ''), +msg.x, +msg.y, +msg.z, +msg.v || 1, +msg.p || 1]); break;
@@ -11363,6 +12322,7 @@
             var BOT = Module.mcBotPage = { list: [], hist: {} };
             if (Module.mcGameRules) {
                 Module.mcGameRules.define('botOpsOnly', false, 'Only operators may command bots');
+                Module.mcGameRules.define('botsAllowed', true, 'Bots may be used in this world (a mod sets false: /bot is off, any bot here leaves)');
                 Module.mcGameRules.define('botTeleport', true, 'Bots teleport to whoever they follow over long distances');
                 Module.mcGameRules.define('botBreakBlocks', true, 'Bots may dig through blocks on their way (off: they walk and bridge only)');
                 Module.mcGameRules.define('botFight', true, 'Bots fight monsters that come at them or at whoever they defend');
@@ -11371,7 +12331,7 @@
             }
             function botRules() {
                 var b = function (n, d) { var v = rule(n); return (v === undefined ? d : v) ? 1 : 0; };
-                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) ? 1 : 0]);
+                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) && b('botsAllowed', 1) ? 1 : 0]);
             }
             function botCmd(fields) {
                 var r = json(cc('mcBotCmd', 'string', ['string'], [fields.map(function (x) { return String(x == null ? '' : x).replace(/[\t\n]/g, ' '); }).join('\t')]));
@@ -11487,6 +12447,7 @@
             }
             function botRun(sd, args, quiet) {
                 var a = args.slice();
+                if (rule('botsAllowed') === false && !/^(help)$/i.test(String(a[0] || ''))) fail('Bots are not allowed in this world.');
                 if (rule('botOpsOnly') === true && !sd.op) fail('Only operators may command bots here.');
                 if (joined()) fail('Bots live in the host\'s world.');
                 botRules();

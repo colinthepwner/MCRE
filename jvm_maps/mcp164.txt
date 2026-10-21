@@ -3114,6 +3114,7 @@ F	px	e	field_75331_e	field_75331_e
 F	px	f	field_75329_f	watchedClass
 F	py	b	field_75335_b	theMerchant
 F	pz	b	field_75450_b	villagerObj
+F	pz	c	field_75451_c	mate
 F	pz	d	field_75448_d	worldObj
 F	qa	a	field_75443_a	worldObj
 F	qa	b	field_75441_b	attacker
@@ -6825,6 +6826,7 @@ M	rz	i	(Z)V	func_70893_e	setSheared
 M	rz	p	(I)V	func_70891_b	setFleeceColor
 M	rz	r	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	rz	s	()I	func_70633_aT	getDropItemId
+M	sb	a	(Lof;F)V	func_82196_d	attackEntityWithRangedAttack
 M	sb	az	()V	func_110147_ax	applyEntityAttributes
 M	sb	b	(ZI)V	func_70628_a	dropFewItems
 M	sb	bf	()Z	func_70650_aV	isAIEnabled
@@ -7102,6 +7104,7 @@ M	tn	l	(I)V	func_70600_l	dropRareDrop
 M	tn	l_	()V	func_70071_h_	onUpdate
 M	tn	r	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	tn	s	()I	func_70633_aT	getDropItemId
+M	to	a	(Lof;F)V	func_82196_d	attackEntityWithRangedAttack
 M	tq	a	(III)F	func_70783_a	getBlockPathWeight
 M	tq	a	(Lnb;F)Z	func_70097_a	attackEntityFrom
 M	tq	a	(Lnn;F)V	func_70785_a	attackEntity
@@ -7122,6 +7125,7 @@ M	tr	a	()V	func_70088_a	entityInit
 M	tr	a	(I)V	func_82201_a	setSkeletonType
 M	tr	a	(Lby;)V	func_70037_a	readEntityFromNBT
 M	tr	a	(Lnb;)V	func_70645_a	onDeath
+M	tr	a	(Lof;F)V	func_82196_d	attackEntityWithRangedAttack
 M	tr	a	(Loi;)Loi;	func_110161_a	onSpawnWithEgg
 M	tr	aO	()Ljava/lang/String;	func_70621_aR	getHurtSound
 M	tr	aP	()Ljava/lang/String;	func_70673_aS	getDeathSound
@@ -7173,6 +7177,7 @@ M	tt	r	()Ljava/lang/String;	func_70639_aQ	getLivingSound
 M	tt	s	()I	func_70633_aT	getDropItemId
 M	tv	a	()V	func_70088_a	entityInit
 M	tv	a	(B)V	func_70103_a	handleHealthUpdate
+M	tv	a	(Lof;F)V	func_82196_d	attackEntityWithRangedAttack
 M	tv	a	(Z)V	func_82197_f	setAggressive
 M	tv	aO	()Ljava/lang/String;	func_70621_aR	getHurtSound
 M	tv	aP	()Ljava/lang/String;	func_70673_aS	getDeathSound
@@ -9040,13 +9045,13 @@ R	func_110199_f	openGUI
 R	func_70627_aG	getTalkInterval
 R	func_70639_aQ	getLivingSound
 R	func_70633_aT	getDropItemId
-R	func_82196_d	attackEntityWithRangedAttack
 R	func_110143_aJ	getHealth
 R	func_110138_aP	getMaxHealth
 R	func_70041_e_	canTriggerWalking
 R	func_70965_a	attackEntityFromPart
 R	func_70623_bb	despawnEntity
 R	func_70078_a	mountEntity
+R	func_82196_d	attackEntityWithRangedAttack
 R	func_70668_bt	getCreatureAttribute
 R	func_70110_aj	setInWeb
 R	func_70628_a	dropFewItems

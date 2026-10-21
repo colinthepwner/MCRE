@@ -4198,6 +4198,7 @@ R	field_75331_e	field_75331_e
 R	field_75329_f	watchedClass
 R	field_75335_b	theMerchant
 R	field_75450_b	villagerObj
+R	field_75451_c	mate
 R	field_75448_d	worldObj
 R	field_75443_a	worldObj
 R	field_75441_b	attacker

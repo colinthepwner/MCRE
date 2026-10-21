@@ -11466,9 +11466,9 @@ function installMc152(vm) {
 
 	var blockMethods = {
 		'<init>(ILnet/minecraft/src/Material;)V': function (vm, self, a) { initBlock(vm, self, a[0], a[1]); },
-		'setHardness(F)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':blockHardness'] = a[0]; if (self[':blockResistance'] < a[0] * 5) self[':blockResistance'] = a[0] * 5; return self; },
-		'setResistance(F)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':blockResistance'] = a[0] * 3; return self; },
-		'setBlockUnbreakable()Lnet/minecraft/src/Block;': function (vm, self) { self[':blockHardness'] = -1; return self; },
+		'setHardness(F)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':blockHardness'] = a[0]; if (self[':blockResistance'] < a[0] * 5) self[':blockResistance'] = a[0] * 5; JVM.vanillaChanged(vm, self, 'hardness', a[0]); return self; },
+		'setResistance(F)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':blockResistance'] = a[0] * 3; JVM.vanillaChanged(vm, self, 'resistance', a[0]); return self; },
+		'setBlockUnbreakable()Lnet/minecraft/src/Block;': function (vm, self) { self[':blockHardness'] = -1; JVM.vanillaChanged(vm, self, 'hardness', -1); return self; },
 		'setStepSound(Lnet/minecraft/src/StepSound;)Lnet/minecraft/src/Block;': function (vm, self, a) { self[':stepSound'] = a[0]; return self; },
 		'setLightValue(F)Lnet/minecraft/src/Block;': function (vm, self, a) { self.$light = Math.round(15 * a[0]); return self; },
 		'setLightOpacity(I)Lnet/minecraft/src/Block;': function (vm, self, a) { self.$opacity = a[0]; return self; },
@@ -11641,8 +11641,8 @@ function installMc152(vm) {
 
 	var itemMethods = {
 		'<init>(I)V': function (vm, self, a) { initItem(vm, self, 256 + a[0]); },
-		'setMaxStackSize(I)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':maxStackSize'] = a[0]; return self; },
-		'setMaxDamage(I)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':maxDamage'] = a[0]; return self; },
+		'setMaxStackSize(I)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':maxStackSize'] = a[0]; JVM.vanillaChanged(vm, self, 'stack', a[0]); return self; },
+		'setMaxDamage(I)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':maxDamage'] = a[0]; JVM.vanillaChanged(vm, self, 'durability', a[0]); return self; },
 		'setHasSubtypes(Z)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':hasSubtypes'] = a[0]; return self; },
 		'setUnlocalizedName(Ljava/lang/String;)Lnet/minecraft/src/Item;': function (vm, self, a) { self[':unlocalizedName'] = a[0]; return self; },
 		'setCreativeTab(Lnet/minecraft/src/CreativeTabs;)Lnet/minecraft/src/Item;': function (vm, self, a) { self.$tab = a[0]; return self; },
@@ -13130,6 +13130,7 @@ function* collectContentSteps(vm, modId) {
 		});
 		if (ce.length) out.creative = { entries: ce };
 	}
+	if (JVM.collectVanillaChanges) out.overrides = safe(function () { return JVM.collectVanillaChanges(vm, modId); }, null);
 	return out;
 }
 JVM.collectContentSteps = collectContentSteps;
@@ -15626,12 +15627,12 @@ function installForgeCommon(vm, def) {
 		statics: { EVENT_BUS: null, TERRAIN_GEN_BUS: null, ORE_GEN_BUS: null, SEED_ENTRY: null },
 		clinit: function (vm, c) { c.statics.EVENT_BUS = busObj(vm, 'EVENT_BUS'); c.statics.TERRAIN_GEN_BUS = busObj(vm, 'TERRAIN_GEN_BUS'); c.statics.ORE_GEN_BUS = busObj(vm, 'ORE_GEN_BUS'); },
 		staticMethods: {
-			'setBlockHarvestLevel(Lnet/minecraft/src/Block;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) { a[0].$harvest = { tool: a[1], level: a[2] }; } },
-			'setBlockHarvestLevel(Lnet/minecraft/src/Block;ILjava/lang/String;I)V': function (vm, n, a) { if (a[0] && (a[1] === 0 || !a[0].$harvest)) a[0].$harvest = { tool: a[2], level: a[3], meta: a[1] }; },
-			'removeBlockEffectiveness(Lnet/minecraft/src/Block;Ljava/lang/String;)V': function (vm, n, a) { if (a[0]) a[0].$harvest = { tool: 'none', level: 0 }; },
+			'setBlockHarvestLevel(Lnet/minecraft/src/Block;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) { a[0].$harvest = { tool: a[1], level: a[2] }; JVM.vanillaChanged(vm, a[0], 'harvest', { tool: a[1], level: a[2], meta: -1 }); } },
+			'setBlockHarvestLevel(Lnet/minecraft/src/Block;ILjava/lang/String;I)V': function (vm, n, a) { if (a[0] && (a[1] === 0 || !a[0].$harvest)) a[0].$harvest = { tool: a[2], level: a[3], meta: a[1] }; if (a[0]) JVM.vanillaChanged(vm, a[0], 'harvest', { tool: a[2], level: a[3], meta: a[1] }); },
+			'removeBlockEffectiveness(Lnet/minecraft/src/Block;Ljava/lang/String;)V': function (vm, n, a) { if (a[0]) { a[0].$harvest = { tool: 'none', level: 0 }; JVM.vanillaChanged(vm, a[0], 'harvest', { tool: 'none', level: 0, meta: -1 }); } },
 			'removeBlockEffectiveness(Lnet/minecraft/src/Block;ILjava/lang/String;)V': function () {},
 			'getBlockHarvestLevel(Lnet/minecraft/src/Block;ILjava/lang/String;)I': function (vm, n, a) { return a[0] && a[0].$harvest && a[0].$harvest.tool === a[2] ? a[0].$harvest.level : -1; },
-			'setToolClass(Lnet/minecraft/src/Item;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) a[0].$toolClass = { tool: a[1], level: a[2] }; },
+			'setToolClass(Lnet/minecraft/src/Item;Ljava/lang/String;I)V': function (vm, n, a) { if (a[0]) { a[0].$toolClass = { tool: a[1], level: a[2] }; JVM.vanillaChanged(vm, a[0], 'toolclass', { tool: a[1], level: a[2] }); } },
 			'addGrassSeed(Lnet/minecraft/src/ItemStack;I)V': function (vm) { vm.warnOnce('forge:seed', 'MinecraftForge.addGrassSeed is not available here (left unplugged)'); },
 			'addGrassPlant(Lnet/minecraft/src/Block;II)V': function (vm) { vm.warnOnce('forge:plant', 'MinecraftForge.addGrassPlant is not available here (left unplugged)'); },
 			'initialize()V': function () {},
@@ -24241,6 +24242,11 @@ function texResource(vm, tex) {
 	if (ns) return ['assets/' + ns[1] + '/stationapi/' + ns[2], 'assets/' + ns[1] + '/' + ns[2], ns[2]].filter(function (q) { return vm.resources[q]; })[0] || null;
 	return null;
 }
+var VANILLA_PASSES = {
+	RenderSpider: { eyes: 'minecraft:mob/spider_eyes.png' },
+	RenderEnderman: { eyes: 'minecraft:mob/enderman_eyes.png' },
+	RenderSlime: { shell: true, model: 'minecraft:slime_outer' }
+};
 function entityTexture(vm, render, ent, vanilla, safe) {
 	var rlName = function (r) { return r && r.$path ? (r.$domain || 'minecraft') + ':' + r.$path : null; };
 	var cands = [
@@ -24866,7 +24872,36 @@ function* collectMobsSteps(vm, modId, ref, safe) {
 		else if (et.game) texture = et.game;
 		else return { skip: 'no texture ' + et.skip };
 		out.files['models/entity/' + key + '.jem'] = JSON.stringify(jem);
-		return { model: 'models/entity/' + key + '.jem', texture: texture, res: et.res || null, anims: anims };
+		var layers = null, layerModel = null;
+		if (render) safe(function () {
+			var m = render.cls.findMethod('shouldRenderPass(Lnet/minecraft/src/EntityLiving;IF)I');
+			for (var pass = 0; m && !m.cls.native && pass < 4; pass++) {
+				render.$boundTex = null; vm.$lastBlend = null;
+				var pr = JVM.run(vm, function () { return vm.callVirtual(render, 'shouldRenderPass', '(Lnet/minecraft/src/EntityLiving;IF)I', [ent, pass, 0]); });
+				if (!pr || !pr.ok || !(pr.value >= 0) || !render.$boundTex) continue;
+				var lr = texResource(vm, render.$boundTex);
+				var lt = lr ? 'textures/entity/' + key + '__pass' + pass + '.png' : (/^[/]?mob[/]/.test(render.$boundTex) ? 'minecraft:' + render.$boundTex.replace(/^[/]+/, '') : null);
+				if (!lt) continue;
+				if (lr) out.files[lt] = vm.resources[lr];
+				var add = !!(vm.$lastBlend && vm.$lastBlend[1] === 1);
+				(layers = layers || []).push({ texture: lt, blend: add ? 'add' : 'alpha', glow: add });
+			}
+			var pm = render[':renderPassModel'];
+			if (!layers) {
+				for (var rk = render.cls; rk; rk = rk.superClass) {
+					var vl = VANILLA_PASSES[rk.name.substring(rk.name.lastIndexOf('/') + 1)];
+					if (!vl) continue;
+					layers = vl.eyes ? [{ texture: vl.eyes, blend: 'add', glow: true }] : [{ texture: texture, blend: 'alpha' }];
+					if (vl.model) layerModel = vl.model;
+					break;
+				}
+			}
+			if (layers && pm && pm !== model && !layerModel) {
+				var pj = jemOf(vm, pm, ent, shift, null);
+				if (pj) { out.files['models/entity/' + key + '__pass.jem'] = JSON.stringify(pj); layerModel = 'models/entity/' + key + '__pass.jem'; }
+			}
+		});
+		return { model: 'models/entity/' + key + '.jem', texture: texture, res: et.res || null, anims: anims, layers: layers, layerModel: layerModel };
 	};
 	var entityCls = vm.loadClass(SRC + 'Entity');
 	var segmentsOf = function (ent) {
@@ -25035,6 +25070,8 @@ function* collectMobsSteps(vm, modId, ref, safe) {
 		if (look.skip) { out.skipped.push(e.name + ' (' + look.skip + ')'); return; }
 		json.model = look.model; json.texture = look.texture;
 		if (look.anims) json.animations = look.anims;
+		if (look.layers) json.layers = look.layers;
+		if (look.layerModel) json.layer_model = look.layerModel;
 		if (has('EntitySlime')) safe(function () {
 			var rs = null;
 			for (var rk = e.cls; !rs && rk; rk = rk.superClass) rs = renderers.get(rk) || null;
@@ -25076,6 +25113,15 @@ function* collectMobsSteps(vm, modId, ref, safe) {
 	return out;
 }
 JVM.collectMobsSteps = collectMobsSteps;
+JVM.vanillaJem = function (vm, modelClass, ctorArg) {
+	var model = ctorArg === undefined ? vanillaModel(vm, modelClass) : (function () { var c = vm.loadClass(SRC + modelClass), o = vm.newObject(c), m = c.findDeclared('<init>(I)V'); if (m) vm.invoke(m, o, [ctorArg]); return o; })();
+	if (JVM.pose) JVM.pose(vm, model, null);
+	var ids = new Map();
+	var jem = jemOf(vm, model, null, 0, ids);
+	var anims = null;
+	try { anims = JVM.probeAnims ? JVM.probeAnims(vm, model, null, ids) : null; } catch (e) { anims = null; }
+	return { jem: jem, anims: anims };
+};
 JVM.collectMobs = function (vm, modId, ref, safe) {
 	var g = collectMobsSteps(vm, modId, ref, safe), r = g.next();
 	while (!r.done) r = g.next();
@@ -25932,6 +25978,7 @@ function install(vm) {
 	};
 	var aiTasks = function (vm, self) {
 		if (!brainOn(vm, self)) return;
+		if (self.$goalSync && JVM.goalService) { JVM.goalService(vm, self); return; }
 		runTasks(vm, self[':targetTasks'] && self[':targetTasks'].$list);
 		runTasks(vm, self[':tasks'] && self[':tasks'].$list);
 	};
@@ -26464,6 +26511,7 @@ JVM.mobTick = function (vm) {
 		}
 		var o = JVM.liveMob(vm, info);
 		if (!o) return;
+		if (JVM.goalSync) { try { JVM.goalSync(vm, o, info); } catch (x) { console.warn('[java] goal sync', x); } }
 		if ((B.tick + info.id) % 40 === 20) keepCheck(vm, o, info.id);
 		if (o.cls.$brainOff || !brainOf(vm, o)) return;
 		var avg = o.cls.$brainRuns > 4 ? o.cls.$brainMs / o.cls.$brainRuns : 0;
@@ -27248,6 +27296,188 @@ JVM.remoteGuiCloseAll = function (vm) {
 	R.clear();
 };
 JVM.remoteGuiOf = function (vm, guid) { return remotes(vm).get(guid) || null; };
+})();
+
+(function () {
+'use strict';
+
+var SRC = 'net/minecraft/src/';
+function op(vm) { var g = vm.game; return g && g.mode === 'run' && g.op ? g.op.apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
+function simple(c) { var n = (c && c.name) || ''; return n.substring(n.lastIndexOf('/') + 1); }
+function F(t, n) { return t[':' + n]; }
+function num(v, d) { v = Number(v); return isFinite(v) ? v : d; }
+var gid = 0;
+
+function filterOf(vm, clsObj, selector) {
+	var c = clsObj && clsObj.$cls;
+	if (!c) return selector ? 'monster' : 'any';
+	for (var k = c; k; k = k.superClass) {
+		var key = JVM.mobKeyOf ? JVM.mobKeyOf(vm, k) : null;
+		if (key) return key;
+		var n = simple(k);
+		if (n === 'EntityPlayer') return 'player';
+		if (n === 'IMob' || n === 'EntityMob') return 'monster';
+		if (n === 'EntityAnimal') return 'animal';
+		if (n === 'EntityLiving' || n === 'EntityCreature') return selector ? 'monster' : 'living';
+		if (n === 'EntityLivingBase' || n === 'Entity') return selector ? 'monster' : 'any';
+		if (k.native && /^Entity[A-Z]/.test(n)) return n;
+	}
+	return 'living';
+}
+
+var MAP = {
+	EntityAISwimming: function () { return ['swim', {}]; },
+	EntityAIPanic: function (vm, t, sp) { return ['panic', { speed: sp(F(t, 'speed')) }]; },
+	EntityAIMate: function (vm, t, sp) { return ['mate', { speed: sp(F(t, 'moveSpeed')) }]; },
+	EntityAITempt: function (vm, t, sp) { return ['tempt', { speed: sp(F(t, 'field_75282_b')), jitem: F(t, 'breedingFood') | 0, scared: F(t, 'scaredByPlayerMovement') ? 1 : 0 }]; },
+	EntityAIFollowParent: function (vm, t, sp) { return ['follow_parent', { speed: sp(F(t, 'field_75347_c')) }]; },
+	EntityAIWander: function (vm, t, sp) { return ['wander', { speed: sp(F(t, 'speed')) }]; },
+	EntityAIWatchClosest: function (vm, t) { return ['watch', { entity: filterOf(vm, F(t, 'watchedClass')), distance: num(F(t, 'maxDistanceForPlayer'), 8), chance: num(F(t, 'field_75331_e'), 0.02) }]; },
+	EntityAIWatchClosest2: function (vm, t) { return ['watch2', { entity: filterOf(vm, F(t, 'watchedClass')), distance: num(F(t, 'maxDistanceForPlayer'), 8), chance: num(F(t, 'field_75331_e'), 0.02) }]; },
+	EntityAILookIdle: function () { return ['look_idle', {}]; },
+	EntityAIAttackOnCollide: function (vm, t, sp) {
+		var p = { speed: sp(F(t, 'speedTowardsTarget')), longMemory: F(t, 'longMemory') ? 1 : 0 };
+		if (F(t, 'classTarget')) p.entity = filterOf(vm, F(t, 'classTarget'));
+		return ['melee', p];
+	},
+	EntityAIArrowAttack: function (vm, t, sp, o) {
+		var max = num(F(t, 'maxRangedAttackTime'), 60), min = F(t, 'field_96561_g') != null ? num(F(t, 'field_96561_g'), max) : max;
+		var own = ['attackEntityWithRangedAttack(Lnet/minecraft/src/EntityLivingBase;F)V', 'attackEntityWithRangedAttack(Lnet/minecraft/src/EntityLiving;F)V'].some(function (k) { var m = o.cls.findMethod(k); return !!(m && !m.cls.native); });
+		return ['ranged', { speed: sp(F(t, 'entityMoveSpeed')), min: min, max: max, range: num(F(t, 'field_96562_i'), 15), projectile: own ? 'java' : 'arrow' }];
+	},
+	EntityAILeapAtTarget: function (vm, t) { return ['leap', { yd: num(F(t, 'leapMotionY'), 0.4) }]; },
+	EntityAIAvoidEntity: function (vm, t, sp) { return ['avoid', { entity: filterOf(vm, F(t, 'targetEntityClass')), distance: num(F(t, 'distanceFromEntity'), 6), speed: sp(F(t, 'farSpeed')), nearSpeed: sp(F(t, 'nearSpeed')) }]; },
+	EntityAICreeperSwell: function () { return ['creeper_swell', {}]; },
+	EntityAISit: function () { return ['sit', {}]; },
+	EntityAIFollowOwner: function (vm, t, sp) { return ['follow_owner', { speed: sp(F(t, 'field_75336_f')), minDist: num(F(t, 'minDist'), 10), maxDist: num(F(t, 'maxDist'), 2) }]; },
+	EntityAIBeg: function (vm, t) { return ['beg', { distance: num(F(t, 'minPlayerDistance'), 8) }]; },
+	EntityAIEatGrass: function () { return ['eat_grass', {}]; },
+	EntityAIOcelotSit: function (vm, t, sp) { return ['ocelot_sit', { speed: sp(F(t, 'field_75404_b')) }]; },
+	EntityAIOcelotAttack: function () { return ['ocelot_attack', {}]; },
+	EntityAIControlledByPlayer: function (vm, t) { return ['controlled_by_player', { maxSpeed: num(F(t, 'maxSpeed'), 0.3) }]; },
+	EntityAIFleeSun: function (vm, t, sp) { return ['flee_sun', { speed: sp(F(t, 'movementSpeed')) }]; },
+	EntityAIRestrictSun: function () { return ['restrict_sun', {}]; },
+	EntityAIMoveTowardsRestriction: function (vm, t, sp) { return ['move_towards_restriction', { speed: sp(F(t, 'movementSpeed')) }]; },
+	EntityAIMoveTwardsRestriction: function (vm, t, sp) { return ['move_towards_restriction', { speed: sp(F(t, 'movementSpeed')) }]; },
+	EntityAIMoveTowardsTarget: function (vm, t, sp) { return ['move_towards_target', { speed: sp(F(t, 'speed')), distance: num(F(t, 'maxTargetDistance'), 32) }]; },
+	EntityAIBreakDoor: function () { return ['break_door', {}]; },
+	EntityAIOpenDoor: function (vm, t) { return ['open_door', { closeAfter: F(t, 'field_75361_i') ? 1 : 0 }]; },
+	EntityAIRestrictOpenDoor: function () { return ['restrict_open_door', {}]; },
+	EntityAIMoveIndoors: function () { return ['move_indoors', {}]; },
+	EntityAIMoveThroughVillage: function (vm, t, sp) { return ['move_through_village', { speed: sp(F(t, 'movementSpeed')), nocturnal: F(t, 'isNocturnal') ? 1 : 0 }]; },
+	EntityAILookAtTradePlayer: function () { return ['look_at_trade_player', {}]; },
+	EntityAITradePlayer: function () { return ['trade_player', {}]; },
+	EntityAIPlay: function (vm, t, sp) { return ['play', { speed: sp(F(t, 'field_75261_c')) }]; },
+	EntityAIVillagerMate: function () { return ['villager_mate', {}]; },
+	EntityAIFollowGolem: function () { return ['follow_golem', {}]; },
+	EntityAILookAtVillager: function () { return ['look_at_villager', {}]; },
+	EntityAIHurtByTarget: function (vm, t) { return ['hurt_by', { callHelp: F(t, 'entityCallsForHelp') ? 1 : 0 }]; },
+	EntityAINearestAttackableTarget: function (vm, t) {
+		return ['nearest', { entity: filterOf(vm, F(t, 'targetClass'), F(t, 'targetEntitySelector')), chance: F(t, 'targetChance') | 0,
+			sight: F(t, 'shouldCheckSight') ? 1 : 0, nearbyOnly: F(t, 'nearbyOnly') ? 1 : 0 }];
+	},
+	EntityAITargetNonTamed: function (vm, t) {
+		return ['nearest_untamed', { entity: filterOf(vm, F(t, 'targetClass'), null), chance: F(t, 'targetChance') | 0, sight: F(t, 'shouldCheckSight') ? 1 : 0 }];
+	},
+	EntityAIOwnerHurtByTarget: function () { return ['owner_hurt_by', {}]; },
+	EntityAIOwnerHurtTarget: function () { return ['owner_hurt', {}]; },
+	EntityAIDefendVillage: function () { return ['defend_village', {}]; },
+};
+
+function kv(p) {
+	return Object.keys(p).map(function (k) { var v = p[k]; return k + '=' + String(v == null ? '' : v).replace(/[;\t\n=]/g, ''); }).join(';');
+}
+function vanillaOf(t) {
+	var c = t && t.cls;
+	if (!c || !c.native) return null;
+	var n = simple(c);
+	return MAP[n] ? n : null;
+}
+function entriesOf(tasks) {
+	var l = tasks && tasks[':taskEntries'];
+	return (l && l.$list) || [];
+}
+
+JVM.goalSync = function (vm, o, info) {
+	var lists = [['goals', o[':tasks']], ['targets', o[':targetTasks']]];
+	var sig = '';
+	lists.forEach(function (L) {
+		entriesOf(L[1]).forEach(function (e) {
+			var t = e && e[':action'];
+			if (!t) return;
+			if (!t.$gid) t.$gid = ++gid;
+			sig += L[0][0] + (e[':priority'] | 0) + ':' + t.$gid + ',';
+		});
+	});
+	if (o.$goalSig === sig && o.$goalId === info.id) return;
+	o.$goalSig = sig; o.$goalId = info.id;
+	var id = info.id;
+	op(vm, 'mobgoaldel', id, 'goals', '*'); op(vm, 'mobgoaldel', id, 'targets', '*');
+	if (!sig) { o.$goalSync = false; o.$jgoals = []; return; }
+	op(vm, 'mobgoaldel', id, 'goals', 'own'); op(vm, 'mobgoaldel', id, 'targets', 'own');
+	var abs = !(JVM.attrValue && JVM.attrValue(o, 'generic.movementSpeed') != null);
+	var base = +o[':moveSpeed'] || 0.25;
+	var sp = function (v) { v = num(v, 1); return Math.max(0.01, abs ? v / base : v); };
+	var refs = o.$jgoals = [];
+	lists.forEach(function (L) {
+		entriesOf(L[1]).forEach(function (e) {
+			var t = e && e[':action'];
+			if (!t || !t.cls) return;
+			var prio = e[':priority'] | 0, h = 0, vn = vanillaOf(t);
+			if (vn) {
+				var m = null;
+				try { m = MAP[vn](vm, t, sp, o); } catch (x) { m = null; }
+				if (m) h = op(vm, 'mobgoal', id, L[0], prio, m[0], kv(m[1])) | 0;
+			}
+			if (h) return;
+			var mutex = 0, intr = 1;
+			var r1 = JVM.run(vm, function () { mutex = vm.callVirtual(t, 'getMutexBits', '()I', []) | 0; });
+			if (!r1.ok) mutex = t[':mutexBits'] | 0;
+			var r2 = JVM.run(vm, function () { intr = vm.callVirtual(t, 'isInterruptible', '()Z', []) ? 1 : 0; });
+			if (!r2.ok) intr = 1;
+			refs.push(t);
+			op(vm, 'mobjgoal', id, L[0], prio, refs.length, t.cls.name.replace(/[/]/g, '.'), mutex, intr);
+		});
+	});
+	o.$goalSync = true;
+};
+
+JVM.goalService = function (vm, o) {
+	var id = o.$entityId | 0;
+	if (!id || !o.$jgoals || !o.$jgoals.length) return;
+	var st = op(vm, 'mobgoalstate', id);
+	if (!Array.isArray(st)) return;
+	st.forEach(function (g) {
+		var t = o.$jgoals[(g.ref | 0) - 1];
+		if (!t) return;
+		var want = null, cont = null, i;
+		var call = function (n, d) { return vm.callVirtual(t, n, d, []); };
+		try {
+			for (i = 0; i < (g.stop | 0); i++) call('resetTask', '()V');
+			for (i = 0; i < (g.start | 0); i++) call('startExecuting', '()V');
+			for (i = 0; i < (g.tick | 0); i++) call('updateTask', '()V');
+			if (g.running) cont = call('continueExecuting', '()Z') ? 1 : 0;
+			else if (g.asked) want = call('shouldExecute', '()Z') ? 1 : 0;
+		} catch (e) {
+			t.$brainErr = (t.$brainErr | 0) + 1;
+			if (t.$brainErr === 3) vm.log('warn', t.cls.name.replace(/[/]/g, '.') + ': an AI task stopped after repeated errors - its creature carries on without it');
+		}
+		op(vm, 'mobgoalfeed', id, g.h, want, cont, t.$brainErr | 0);
+	});
+};
+
+JVM.mobShoot = function (vm, ev) {
+	var o = JVM.liveMob && JVM.liveMob(vm, ev);
+	if (!o || !ev.target) return;
+	var t = JVM.entityFor(vm, ev.target);
+	if (!t) return;
+	o[':posX'] = +ev.x; o[':posY'] = +ev.y; o[':posZ'] = +ev.z;
+	o[':worldObj'] = JVM.mc152.worldObj(vm);
+	if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
+	var d16 = 'attackEntityWithRangedAttack(Lnet/minecraft/src/EntityLivingBase;F)V';
+	var desc = o.cls.findMethod(d16) ? '(Lnet/minecraft/src/EntityLivingBase;F)V' : '(Lnet/minecraft/src/EntityLiving;F)V';
+	JVM.run(vm, function () { vm.callVirtual(o, 'attackEntityWithRangedAttack', desc, [t, Math.fround(+ev.power || 1)]); });
+};
 })();
 
 (function () {
@@ -28615,7 +28845,7 @@ function installGui(vm) {
 		'glTranslatef(FFF)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; if (vm.$glY) vm.$glY.b += vm.$glY.a * a[1]; },
 		'glTranslated(DDD)V': function (vm, n, a) { var r = R(vm); r.t[0] += a[0]; r.t[1] += a[1]; if (vm.$glY) vm.$glY.b += vm.$glY.a * a[1]; },
 		'glBindTexture(II)V': function (vm, n, a) { R(vm).tex = texName(vm, a[1]); },
-		'glEnable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = false; }, 'glDisable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = true; }, 'glBlendFunc(II)V': function () {}, 'glScalef(FFF)V': function (vm, n, a) { if (vm.$glY) vm.$glY.a *= a[1]; },
+		'glEnable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = false; }, 'glDisable(I)V': function (vm, n, a) { if (a[0] === 3553) R(vm).noTex = true; }, 'glBlendFunc(II)V': function (vm, n, a) { vm.$lastBlend = [a[0], a[1]]; },
 		'glRotatef(FFFF)V': function () {}, 'glDepthMask(Z)V': function () {}, 'glColorMask(ZZZZ)V': function () {}, 'glPolygonOffset(FF)V': function () {},
 		'glNormal3f(FFF)V': function () {}, 'glShadeModel(I)V': function () {}, 'glAlphaFunc(IF)V': function () {}, 'glTexParameteri(III)V': function () {},
 		'glDepthFunc(I)V': function () {}, 'glLineWidth(F)V': function () {}, 'glPointSize(F)V': function () {}, 'glClear(I)V': function () {}, 'glClearColor(FFFF)V': function () {},
@@ -35893,6 +36123,82 @@ JVM.jarEditTick = function (vm) {
 	} finally { vm.$gameTick = prev; }
 	if (JVM.playerStateSync) JVM.playerStateSync(vm);
 };
+})();
+
+(function () {
+'use strict';
+
+var TOOL = { pickaxe: 'pickaxe', axe: 'axe', shovel: 'shovel', spade: 'shovel', hoe: 'hoe', sword: 'sword', shears: 'shears', none: 'none' };
+
+function isVanilla(vm, o) {
+	if (!o || !o.$vanilla) return false;
+	var r = vm.mcReg;
+	return !(r && r.vanilla);
+}
+
+JVM.vanillaChanged = function (vm, o, what, v) {
+	if (!isVanilla(vm, o)) return;
+	var mod = vm.currentMod || '';
+	var ch = vm.$vanillaChanges || (vm.$vanillaChanges = []);
+	ch.push({ mod: mod, o: o, what: what, v: v });
+};
+
+function idOf(vm, o) {
+	var id = o[':blockID'];
+	if (typeof id !== 'number') id = o[':itemID'];
+	if (typeof id !== 'number') id = o[':shiftedIndex'];
+	return typeof id === 'number' ? id : -1;
+}
+
+JVM.collectVanillaChanges = function (vm, modId) {
+	var ch = vm.$vanillaChanges || [];
+	var files = {};
+	ch.forEach(function (c) {
+		if (c.mod !== modId) return;
+		var id = idOf(vm, c.o);
+		if (id < 0) return;
+		var block = id < 256 && c.o.$blockItem !== true && typeof c.o[':blockID'] === 'number';
+		var key = (block ? 'overrides/blocks/java_' : 'overrides/items/java_') + id + (block && c.v && c.v.meta >= 0 ? '_' + c.v.meta : '') + '.json';
+		var j = files[key] || (files[key] = { target: 'minecraft:' + id + (block && c.v && c.v.meta >= 0 ? ':' + c.v.meta : '') });
+		if (c.what === 'hardness') j.hardness = c.v;
+		else if (c.what === 'resistance') j.resistance = c.v;
+		else if (c.what === 'stack') j.stack = c.v;
+		else if (c.what === 'durability') j.durability = c.v;
+		else if (c.what === 'harvest') {
+			var t = TOOL[String(c.v.tool || '').toLowerCase()];
+			if (t) { j.tool = t; j.harvest_level = c.v.level | 0; }
+		} else if (c.what === 'toolclass') {
+			var tc = TOOL[String(c.v.tool || '').toLowerCase()];
+			if (tc && tc !== 'none') { j.tool = tc; j.harvest_level = c.v.level | 0; }
+		}
+	});
+	probeOres(vm, modId, files);
+	return Object.keys(files).length ? files : null;
+};
+
+var ORE_TYPES = { COAL: 16, DIAMOND: 56, DIRT: 3, GOLD: 14, GRAVEL: 13, IRON: 15, LAPIS: 21, REDSTONE: 73, QUARTZ: 153 };
+function probeOres(vm, modId, files) {
+	if (vm.$oresProbed) return;
+	vm.$oresProbed = true;
+	var TG = 'net/minecraftforge/event/terraingen/';
+	var mf;
+	try { mf = vm.loadClass('net/minecraftforge/common/MinecraftForge'); vm.initClass(mf); } catch (e) { return; }
+	var bus = mf.statics && mf.statics.ORE_GEN_BUS;
+	if (!bus || !bus.$listeners || !bus.$listeners.length) return;
+	var ET;
+	try { ET = vm.loadClass(TG + 'OreGenEvent$GenerateMinable$EventType'); vm.initClass(ET); } catch (e) { return; }
+	Object.keys(ORE_TYPES).forEach(function (t) {
+		var allowed = true;
+		try {
+			var r = JVM.run(vm, function () {
+				return vm.callStatic(TG + 'TerrainGen', 'generateOre', '(Lnet/minecraft/src/World;Ljava/util/Random;Lnet/minecraft/src/WorldGenerator;IILnet/minecraftforge/event/terraingen/OreGenEvent$GenerateMinable$EventType;)Z',
+					[null, null, null, 0, 0, ET.statics[t]]);
+			});
+			allowed = !(r && r.ok && r.value === 0);
+		} catch (e) { allowed = true; }
+		if (!allowed) files['worldgen/java_noore_' + ORE_TYPES[t] + '.json'] = { type: 'ore', block: 'minecraft:' + ORE_TYPES[t], remove_vanilla: true };
+	});
+}
 })();
 
 (function () {

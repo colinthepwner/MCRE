@@ -3019,6 +3019,7 @@ F	or	e	field_75331_e	field_75331_e
 F	or	f	field_75329_f	watchedClass
 F	os	b	field_75335_b	theMerchant
 F	ot	b	field_75450_b	villagerObj
+F	ot	c	field_75451_c	mate
 F	ot	d	field_75448_d	worldObj
 F	ou	a	field_75443_a	worldObj
 F	ou	b	field_75441_b	attacker
