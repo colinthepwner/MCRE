@@ -1702,6 +1702,16 @@
                             if (ar && typeof ar === 'object' && ar.texture && pic) { var ap = pic(ar.texture); if (ap) put('arrow_tex', ap); else bad('"arrow": no picture "' + ar.texture + '" in the mod'); }
                         }
                         put('smelt_heat', n('smelt_heat'));
+                        var sbh = pick('smelt_by_heat');
+                        if (sbh !== undefined) {
+                            var sbl = (Array.isArray(sbh) ? sbh : []).map(function (e) {
+                                var rr = e && e.result ? ref(e.result) : null;
+                                if (!rr) { bad('"smelt_by_heat": each entry {"heat": n, "result": item, "count": n}'); return ''; }
+                                return [Math.max(0, num(e.heat) | 0), rr, Math.max(1, num(e.count) | 0 || 1)].join('~');
+                            }).filter(Boolean);
+                            if (sbl.length) put('smelt_by_heat', sbl.join('|'));
+                        }
+                        put('smelt_input_count', n('smelt_input_count'));
                         var w = pick('wear');
                         if (w && typeof w === 'object') { put('wear_mine', num(w.mine)); put('wear_hit', num(w.hit)); put('wear_hardness', num(w.per_hardness)); }
                         put('wear_mine', n('wear_mine')); put('wear_hit', n('wear_hit')); put('wear_hardness', n('wear_per_hardness', 'wear_hardness'));
@@ -1741,6 +1751,25 @@
                             if (rat !== undefined) put('reach_all', String(rat).toLowerCase() === 'all' ? 1 : 0);
                         }
                         put('sugar', n('sugar', 'sugar_content'));
+                        var ed = pick('edible');
+                        if (ed !== undefined) put('edible', ed ? 1 : 0);
+                        var ae = pick('always_edible');
+                        if (ae !== undefined) put('always_edible', ae ? 1 : 0);
+                        var ee = pick('eat_effects');
+                        if (ee !== undefined) {
+                            var EFX = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
+                                jump_boost: 8, nausea: 9, regeneration: 10, resistance: 11, fire_resistance: 12, water_breathing: 13, invisibility: 14,
+                                blindness: 15, night_vision: 16, hunger: 17, weakness: 18, poison: 19, wither: 20 };
+                            var eparts = (Array.isArray(ee) ? ee : ee ? [ee] : []).map(function (e) {
+                                if (typeof e === 'string') e = { effect: e };
+                                var eid = EFX[String(e && e.effect || '').toLowerCase().replace(/^minecraft:/, '')];
+                                if (!eid) { bad('"eat_effects": unknown effect "' + (e && e.effect) + '" (' + Object.keys(EFX).join(', ') + ')'); return ''; }
+                                var sec = num(e.seconds !== undefined ? e.seconds : e.duration), lv = num(e.level), ch = num(e.chance);
+                                return [eid, Math.max(1, Math.round((sec === null ? 30 : sec) * 20)), Math.max(0, Math.min(10, (lv === null ? 1 : lv) - 1)) | 0,
+                                        Math.max(0, Math.min(1, ch === null ? 1 : ch))].join('*');
+                            }).filter(Boolean);
+                            put('eat_effects', eparts.length ? eparts.join('|') : 'none');
+                        }
                         var tl = pick('tills', 'tills_soil');
                         if (tl !== undefined) put('tills', tl ? 1 : 0);
                         var cu = pick('cuts');
@@ -1765,8 +1794,13 @@
                     } else if (what === 'blocks') {
                         put('hardness', n('hardness', 'destroy_time'));
                         put('resistance', n('resistance', 'blast_resistance', 'explosion_resistance'));
-                        var bt = pick('tool');
-                        if (bt !== undefined) { bt = bt === false || bt === null ? 'none' : String(bt).toLowerCase(); if (TOOLS.indexOf(bt) < 0) bad('"tool": one of ' + TOOLS.join(', ')); else put('tool', bt); }
+                        var bt = pick('tool', 'tools');
+                        if (bt !== undefined) {
+                            var bts = bt === false || bt === null ? ['none'] : (Array.isArray(bt) ? bt : String(bt).split('|')).map(function (x) { return String(x).toLowerCase().trim(); });
+                            var btBad = bts.filter(function (x) { return TOOLS.indexOf(x) < 0 && !/^tag:[a-z0-9_:-]+$/.test(x); });
+                            if (btBad.length || !bts.length) bad('"tool": one of ' + TOOLS.join(', ') + ' or "tag:<an item tag>" - or a list of them');
+                            else put('tool', bts.join('|'));
+                        }
                         put('level', n('level', 'harvest_level'));
                         var hand = pick('hand');
                         if (pick('requires_tool') === true && hand === undefined) hand = 'nodrop';
@@ -1815,6 +1849,9 @@
                         if (prt !== undefined) put('portable', prt === true ? 4 : prt ? Math.max(0, num(prt) || 0) : 0);
                         put('grow_chance', n('grow_chance'));
                         put('grow_light', n('grow_light'));
+                        put('grow_warmth', n('grow_warmth'));
+                        var gsk = pick('grow_sky');
+                        if (gsk !== undefined) put('grow_sky', gsk ? 1 : 0);
                         var grr = pick('grow_needs_rain', 'grow_rain');
                         if (grr !== undefined) put('grow_rain', grr ? 1 : 0);
                         var gbm = pick('grow_biomes');
@@ -1865,7 +1902,8 @@
                 var TRAIT_KEYS = ['digs', 'breaks_doors', 'seeks_trees_when_burning', 'puts_out_lights', 'dodges', 'throws', 'sizes', 'split',
                     'drops_by_size', 'corrodes', 'needs', 'drops_over_time', 'immune_except', 'vulnerable', 'sunlight', 'self_damage', 'natural_defense',
                     'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful', 'explodes',
-                    'produces', 'milk', 'tramples', 'flees', 'heals_with_time'];
+                    'produces', 'milk', 'tramples', 'flees', 'heals_with_time',
+                    'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
                     ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1 };
                 var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1 };
@@ -1919,7 +1957,7 @@
                         if (j[t] === undefined) return;
                         if (t === 'targets' && Module.mcIsGoalList && Module.mcIsGoalList(j[t])) return;
                         if (t === 'immune' && !(j.immune && j.immune.tags)) return;
-                        if (t === 'equipment' || t === 'replaced_by' || t === 'produces') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
+                        if (t === 'equipment' || t === 'replaced_by' || t === 'produces' || t === 'on_hit') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
                         else enc(t, j[t]);
                     });
                     return out;
@@ -1939,6 +1977,8 @@
                                 if (k === 'goal' || k === 'id' || k === 'priority') return;
                                 var v = g[k];
                                 if (k === 'item' || k === 'items') v = (Array.isArray(v) ? v : [v]).map(function (x) { return ref(x) || ''; }).filter(Boolean).join(',');
+                                else if (k === 'holding' || k === 'not_holding') v = (Array.isArray(v) ? v : [v]).map(function (x) {
+                                    var w = String(x || '').toLowerCase(); return w === 'ranged' || w === 'none' || w === 'empty' || w === 'any' ? w : (ref(x) || ''); }).filter(Boolean).join(',');
                                 else if (k === 'entity' || k === 'target' || k === 'watch' || k === 'avoid') v = (Array.isArray(v) ? v : [v]).map(function (x) { return mobRef(x); }).join(',');
                                 else if (k === 'mutex' && Array.isArray(v)) v = v.join(',');
                                 else if (Array.isArray(v)) v = v.join(',');
@@ -2075,12 +2115,16 @@
                     ['hungerThrow', 0, 'Exhaustion throwing a mod\'s "throwable" item costs (an action)', [0, 40]],
                     ['hungerDrawTick', 0, 'Exhaustion per tick drawing a bow (an action)', [0, 40]],
                     ['mobRegenTicks', 0, 'Creatures heal by themselves every this many ticks (0: never - the game\'s; MITE 1000)', [0, 1000000]],
+                    ['healParticles', false, 'A heart shows over a creature whenever it heals (sparks over an iron golem)'],
                     ['mobRegenFraction', 0.1, 'The share of its health a creature gets back each time (with mobRegenTicks)', [0, 1]],
+                    ['hostileNearCap', 0, 'No monster spawns near a player who has more than this many within 32 blocks (0: off - MITE 8)', [0, 1000]],
+                    ['hostileNearCapDeep', 0, 'That number grows by this many times itself for every 32 blocks below y 64 (MITE 1)', [0, 100]],
+                    ['hostileNearCapMoon', 1, 'And is multiplied by this at night under a frenzy moon (MITE\'s blood moon 1.5)', [0.01, 100]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
                 var O = {
-                    compile: function (of, ref, bad, pic) {
+                    compile: function (of, ref, bad, pic, dims) {
                         var lines = [];
                         if (of.kind === 'tiers') {
                             var t = of.j, name = String(t.name || of.name).toLowerCase().replace(/[^a-z0-9_:-]+/g, '_');
@@ -2090,6 +2134,44 @@
                             tierTable[name] = tierTable[of.mod + ':' + name] = { level: lv, speed: sp, uses: us, damage: dm || 0 };
                             lines.push(['tier', name, Math.round(lv), sp, Math.round(us), Math.round(dm || 0), Math.round(en || 0)].join('\t'));
                             if (name.indexOf(':') < 0) lines.push(['tier', of.mod + ':' + name, Math.round(lv), sp, Math.round(us), Math.round(dm || 0), Math.round(en || 0)].join('\t'));
+                            return lines;
+                        }
+                        if (of.kind === 'ov_biomes') {
+                            Object.keys(of.j || {}).forEach(function (bn) {
+                                var c = of.j[bn];
+                                if (!c || typeof c !== 'object') { bad('biomes: "' + bn + '" should be {"temperature": n, "rainfall": n}'); return; }
+                                var tv = num(c.temperature), rv = num(c.rainfall !== undefined ? c.rainfall : c.downfall);
+                                if (tv === null && rv === null) { bad('biomes: "' + bn + '" has no "temperature" / "rainfall"'); return; }
+                                lines.push(['vbiomeclimate', String(bn).toLowerCase().replace(/^minecraft:/, ''), tv === null ? '-' : tv, rv === null ? '-' : rv].join('\t'));
+                            });
+                            return lines;
+                        }
+                        if (of.kind === 'ov_spawns') {
+                            var CATS = { monster: 0, monsters: 0, hostile: 0, creature: 1, creatures: 1, animal: 1, animals: 1, water: 2, water_creature: 2 };
+                            Object.keys(of.j || {}).forEach(function (bn) {
+                                var bv = of.j[bn];
+                                if (!bv || typeof bv !== 'object') { bad('spawns: "' + bn + '" should be {"monster": [...], "creature": [...]}'); return; }
+                                var biome = bn === '*' ? '*' : String(bn).toLowerCase().replace(/^minecraft:/, '');
+                                var bdim = 'any';
+                                if (bv.dimension !== undefined) {
+                                    var dd = dims ? dims(bv.dimension) : null;
+                                    if (dd === null || dd === undefined) { bad('spawns: unknown dimension "' + bv.dimension + '"'); return; }
+                                    bdim = dd;
+                                }
+                                Object.keys(bv).forEach(function (cn) {
+                                    if (cn === 'dimension') return;
+                                    var cat = CATS[String(cn).toLowerCase()];
+                                    if (cat === undefined) { bad('spawns: unknown category "' + cn + '" (monster, creature, water)'); return; }
+                                    var cv = bv[cn], list = Array.isArray(cv) ? cv : (cv && Array.isArray(cv.creatures) ? cv.creatures : []);
+                                    if (cv === 'clear' || (cv && cv.clear)) lines.push(['vbspawn', biome, cat, '-', 0, 1, 1, bdim].join('\t'));
+                                    list.forEach(function (e) {
+                                        if (!e || !e.creature) { bad('spawns: an entry needs "creature"'); return; }
+                                        var g = Array.isArray(e.group) ? e.group : [e.group === undefined ? 1 : e.group, e.group === undefined ? 1 : e.group];
+                                        var w = num(e.weight); if (w === null) w = 10;
+                                        lines.push(['vbspawn', biome, cat, mobRef(e.creature), Math.max(0, Math.round(w)), Math.max(1, num(g[0]) | 0), Math.max(1, num(g[1]) | 0), bdim].join('\t'));
+                                    });
+                                });
+                            });
                             return lines;
                         }
                         var what = of.kind.slice(3), j = of.j, entries = [];
@@ -5658,6 +5740,14 @@
                                 } else x.m.id = x.id;
                                 x.icon = iconOf(x.contentId || x.id, files, x.m);
                                 x.contents = contentsOf(files);
+                                x.modeTypeName = '';
+                                var gwt = x.m && x.m.game_mode ? modeTypeKey(x) : '';
+                                if (gwt && gwt.split(':')[0] === cid(x)) {
+                                    var tn = gwt.split(':')[1], tf = null;
+                                    Object.keys(files).forEach(function (k) { if (k.toLowerCase() === 'worldtypes/' + tn + '.json') tf = files[k]; });
+                                    try { var tjn = tf ? JSON.parse(new TextDecoder().decode(tf)) : null; if (tjn && typeof tjn.name === 'string') x.modeTypeName = tjn.name.slice(0, 40); } catch (e) { }
+                                    if (!x.modeTypeName) x.modeTypeName = tn.replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+                                }
                                 x.err = '';
                                 if (x.enabled && x.m && x.m.java && Module.mcJava && Module.mcJava.prefetch) Module.mcJava.prefetch();
                             }).catch(function (e) { x.err = 'This mod ' + e.message; if (!x.dev) x.enabled = false; });
@@ -5667,6 +5757,12 @@
             }
             var listed = false;
             function cid(x) { return x.contentId || x.id; }
+            function modeTypeKey(x) {
+                var g = x && x.m && x.m.game_mode, v = g && (g.world_type || g.worldtype);
+                if (typeof v !== 'string' || !(v = v.trim().toLowerCase())) return '';
+                if (v.indexOf(':') < 0) v = cid(x) + ':' + v;
+                return /^[a-z0-9_.-]{1,48}:[a-z0-9_.-]{1,64}$/.test(v) ? v : '';
+            }
 
             function keepOriginal(p) {
                 if (p in originals) return;
@@ -5890,7 +5986,7 @@
                                 content.push({ mod: id, kind: m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^rules[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'rules', name: m[1].toLowerCase(), data: data, file: path });
-                            } else if ((m = /^overrides[/](items|blocks|mobs)[/]([^/]+)[.]json$/i.exec(path))) {
+                            } else if ((m = /^overrides[/](items|blocks|mobs|spawns|biomes)[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'ov_' + m[1].toLowerCase(), name: m[2].toLowerCase(), data: data, file: path });
                             } else if ((m = /^tiers[/]([^/]+)[.]json$/i.exec(path))) {
                                 content.push({ mod: id, kind: 'tiers', name: m[1].toLowerCase(), data: data, file: path });
@@ -6500,8 +6596,9 @@
                 var numStr = function (v, dp) { var k = Math.pow(10, dp || 3); return String(Math.round(Number(v) * k) / k); };
                 var curMod = null, modeMods = Module.mcMods && Module.mcMods.modeMods ? Module.mcMods.modeMods() : {};
                 var GAMEPLAY = { vitem: 1, vblock: 1, vmob: 1, vore: 1, unrecipe: 1, shaped: 1, shapeless: 1, smelt: 1, fuel: 1, ore: 1, tree: 1, structure: 1,
-                    plant: 1, mobspawn: 1, rule: 1, biome: 1, biomeremove: 1, worldtype: 1, enchant: 1, dimension: 1, portalto: 1, vportal: 1, dimblocks: 1,
-                    dimshape: 1, portalrule: 1, runegate: 1, dungeon: 1, cavenet: 1 };
+                    plant: 1, mobspawn: 1, vbspawn: 1, vbiomeclimate: 1, rule: 1, biome: 1, biomeremove: 1, enchant: 1, dimension: 1, portalto: 1, vportal: 1, dimblocks: 1,
+                    dimshape: 1, portalrule: 1, runegate: 1, dungeon: 1, cavenet: 1,
+                    lakes: 1, cobwebs: 1, decor: 1, vanillaoff: 1, surface: 1, rivers: 1 };
                 lines.push = function () {
                     for (var li = 0; li < arguments.length; li++) {
                         var ln = arguments[li];
@@ -7292,7 +7389,11 @@
                         var r = ref(e.name || e.item, m, file);
                         if (!r) return null;
                         if (data !== null && /^id:\d+$/.test(r)) r += ':' + data;
-                        return r + '*' + w + '*' + Math.max(0, cnt[0]) + '*' + Math.max(0, cnt[1]);
+                        var cond = [];
+                        if (isFinite(+e.min_day) && +e.min_day > 0) cond.push('d' + Math.round(+e.min_day));
+                        if (e.min_y !== undefined && isFinite(+e.min_y)) cond.push('y' + Math.round(+e.min_y));
+                        if (e.max_y !== undefined && isFinite(+e.max_y)) cond.push('Y' + Math.round(+e.max_y));
+                        return r + '*' + w + '*' + Math.max(0, cnt[0]) + '*' + Math.max(0, cnt[1]) + (cond.length ? '*' + cond.join(',') : '');
                     };
                     var addPool = function (rolls, entries) {
                         var es = entries.filter(Boolean);
@@ -7408,7 +7509,15 @@
                 var isDefaultType = function (n) { n = String(n).toLowerCase(); return n === 'default' || n === 'normal'; };
                 typeFiles.forEach(function (t) { curMod = t.mod;
                     var tj = t.j || {}, key = isDefaultType(t.name) ? 'default' : t.mod + ':' + t.name;
-                    if (key !== 'default') lines.push(['worldtype', key, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].join('\t'));
+                    var own = '', mo = tj.mode_only;
+                    Object.keys(modeMods).forEach(function (k) { if (k === t.mod || modeMods[k].cid === t.mod) own = k; });
+                    if (key !== 'default') {
+                        if (typeof mo === 'string' && mo.trim()) mo = mo.trim();
+                        else if (mo === true || own) { mo = own; if (!own) bad(t.mod, t.file, '"mode_only": true - this mod has no "game_mode" in its manifest, so the type is offered with every mode'); }
+                        else mo = '';
+                        if (own && mo !== own) { bad(t.mod, t.file, '"mode_only": "' + mo + '" - a type of a mod with a game mode only works in that mode (its biomes are only there)'); mo = own; }
+                        lines.push(['worldtype', key, clean(tj.name || pretty(t.name)), tj.vanilla_biomes === false ? 0 : 1].concat(mo ? [clean(mo)] : []).join(String.fromCharCode(9)));
+                    }
                     if (tj.remove_biomes === undefined) return;
                     (Array.isArray(tj.remove_biomes) ? tj.remove_biomes : [tj.remove_biomes]).forEach(function (r) {
                         var n = String(r).toLowerCase().replace(/^minecraft:/, '').trim().replace(/[\s-]+/g, '_');
@@ -7501,8 +7610,12 @@
                     var size = Math.round(num(o.vein_size !== undefined ? o.vein_size : o.size, 8));
                     var veins = num(o.veins_per_chunk !== undefined ? o.veins_per_chunk : (o.veins !== undefined ? o.veins : o.count), 8);
                     var minY = Math.round(num(o.min_y, 1)), maxY = Math.round(num(o.max_y, 64));
+                    var bias = String(o.y_bias || 'even').toLowerCase();
+                    if (['even', 'low', 'high', 'middle'].indexOf(bias) < 0) { bad(mod, file, '"y_bias" is even, low, high or middle'); bias = 'even'; }
+                    var dsc = num(o.depth_scale, 0), rsz = o.random_size ? 1 : 0;
                     lines.push(['ore', blockRef, Math.max(1, Math.min(64, size)), Math.max(0, Math.min(64, veins)),
-                                Math.max(1, Math.min(254, minY)), Math.max(1, Math.min(254, maxY)), rep.join(';'), dim, biomeList(o.biomes, mod)].join('\t'));
+                                Math.max(1, Math.min(254, minY)), Math.max(1, Math.min(254, maxY)), rep.join(';'), dim, biomeList(o.biomes, mod) || '-', bias,
+                                Math.max(-2, Math.min(2, dsc)), rsz].join('\t'));
                 }
                 Object.keys(blocks).forEach(function (key) { curMod = blocks[key].mod;
                     var o = blocks[key].j.ore;
@@ -7660,6 +7773,7 @@
                     }).filter(Boolean);
                     var loot = j.loot ? String(j.loot).replace(/[\t]/g, '') : '-';
                     if (loot !== '-' && loot.indexOf(':') < 0) loot = w.mod + ':' + loot;
+                    if (j.replace_vanilla) lines.push(['vanillaoff', dim, 'dungeons'].join('\t'));
                     lines.push(['dungeon', w.mod + ':' + w.name, Math.max(0, Math.min(64, Math.round(num(j.tries, 8)))), Math.round(num(j.min_y, 5)), Math.round(num(j.max_y, 128)), dim,
                                 wall, floor, alt, Math.max(0, Math.min(1, num(j.floor_alt_chance, 0.75))), sp.join(';') || '-', loot,
                                 Math.max(0, Math.min(8, Math.round(num(j.chests, 2)))), biomeList(j.biomes, w.mod)].join('\t'));
@@ -7675,14 +7789,138 @@
                     lines.push(['cavenet', w.mod + ':' + w.name, Math.max(1, Math.round(num(j.chance, 200))), num(j.min_distance, 1000), Math.round(num(size[0], 64)), Math.round(num(size[1], 48)), Math.round(num(size[2], 64)),
                                 Math.round(num(j.y, 8)), fl, Math.max(1, Math.round(num(j.floor_chance, 8))), num(j.floor_min_distance, 1500), dim, av.join(';') || '-'].join('\t'));
                 }
+                var wgBiome = function (n, mod) {
+                    n = String(n).toLowerCase().replace(/^minecraft:/, '').trim().replace(/[\s-]+/g, '_');
+                    if (mod && n.indexOf(':') < 0 && modBiomeNames[mod + ':' + n]) n = mod + ':' + n;
+                    return n.replace(/[;,=@|\t]/g, '');
+                };
+                var wgBiomes = function (b, mod) {
+                    if (b === undefined || b === null) return '-';
+                    var out = [];
+                    (Array.isArray(b) ? b : [b]).forEach(function (x) {
+                        var n = wgBiome(x, mod);
+                        [n, BIOME_ALIAS[n]].forEach(function (v) { if (v && out.indexOf(v) < 0) out.push(v); });
+                    });
+                    return out.join(';') || '-';
+                };
+                var wgMap = function (v, d, lo, hi, mod, w, what) {
+                    var cl = function (x) { x = Number(x); return isFinite(x) ? Math.max(lo, Math.min(hi, x)) : null; };
+                    if (v === undefined || v === null) return String(d);
+                    if (typeof v !== 'object' || Array.isArray(v)) {
+                        var c0 = cl(v);
+                        if (c0 === null) { bad(w.mod, w.file, '"' + what + '" is a number or {"default": n, "<biome>": n}'); return String(d); }
+                        return String(c0);
+                    }
+                    var parts = [], def = null;
+                    Object.keys(v).forEach(function (k) {
+                        var c = cl(v[k]);
+                        if (c === null) { bad(w.mod, w.file, '"' + what + '": "' + k + '" needs a number'); return; }
+                        if (k.toLowerCase() === 'default') { def = c; return; }
+                        var n = wgBiome(k, mod);
+                        [n, BIOME_ALIAS[n]].forEach(function (x) { if (x) parts.push(x + '=' + c); });
+                    });
+                    parts.unshift('default=' + (def === null ? d : def));
+                    return parts.join(',');
+                };
+                var wgDim = function (w) {
+                    var j = w.j, dim = DIMS[String(j.dimension || 'overworld').toLowerCase()];
+                    if (dim === undefined && typeof dimRef === 'function') dim = dimRef(j.dimension, w.mod) || undefined;
+                    if (dim === undefined) bad(w.mod, w.file, 'unknown dimension "' + j.dimension + '"');
+                    return dim;
+                };
+                var wgRefs = function (v, w) {
+                    if (v === undefined || v === null) return '-';
+                    var rs = (Array.isArray(v) ? v : [v]).map(function (r) { return ref(r, w.mod, w.file); }).filter(Boolean);
+                    return rs.join(';') || '-';
+                };
+                var wgNum = function (v, d, lo, hi) { v = Number(v); v = isFinite(v) ? v : d; return Math.max(lo, Math.min(hi, v)); };
+                function lakes(w) {
+                    var j = w.j, dim = wgDim(w);
+                    if (dim === undefined) return;
+                    var water = j.water ? ref(j.water, w.mod, w.file) : 'id:9', lava = j.lava ? ref(j.lava, w.mod, w.file) : 'id:11';
+                    if (!water || !lava) return;
+                    lines.push(['lakes', w.mod + ':' + w.name, dim, Math.round(wgNum(j.tries, 1, 0, 64)), wgNum(j.chance, 0.25, 0, 1),
+                                Math.round(wgNum(j.lower_above, 0, 0, 255)), Math.round(wgNum(j.lava_below, 16, -255, 255)), wgNum(j.lava_spread, 32, 0, 256),
+                                wgNum(j.lava_water_chance, 0, 0, 1), water, lava, wgBiomes(j.no_water_biomes, w.mod), Math.round(wgNum(j.max_y, 127, 1, 254))].join('\t'));
+                }
+                function cobwebs(w) {
+                    var j = w.j, dim = wgDim(w);
+                    if (dim === undefined) return;
+                    var b = ref(j.block || 'minecraft:web', w.mod, w.file);
+                    if (!b) return;
+                    lines.push(['cobwebs', w.mod + ':' + w.name, dim, b, Math.round(wgNum(j.tries, 128, 0, 4096)), Math.round(wgNum(j.min_faces, 4, 0, 6)),
+                                wgRefs(j.touching === undefined ? 'minecraft:stone' : j.touching, w),
+                                wgRefs(j.not_above === undefined ? ['minecraft:lava', 'minecraft:flowing_lava'] : j.not_above, w),
+                                Math.round(wgNum(j.max_per_chunk, 1, 0, 4096)), Math.round(wgNum(j.min_y, 1, 1, 254)), Math.round(wgNum(j.max_y, 126, 1, 254))].join('\t'));
+                }
+                function decoration(w) {
+                    var j = w.j, dim = wgDim(w);
+                    if (dim === undefined) return;
+                    var PASSES = ['flowers', 'mushrooms', 'lakes', 'dungeons'];
+                    (Array.isArray(j.replaces) ? j.replaces : j.replaces ? [j.replaces] : []).forEach(function (p) {
+                        p = String(p).toLowerCase();
+                        if (PASSES.indexOf(p) < 0) { bad(w.mod, w.file, '"replaces": "' + p + '" isn\'t one of ' + PASSES.join(', ')); return; }
+                        lines.push(['vanillaoff', dim, p].join('\t'));
+                    });
+                    var PHASES = ['trees', 'flowers', 'mushrooms', 'plants'], n = 0;
+                    var one = function (f, parent, phase) {
+                        if (!f || typeof f !== 'object') { bad(w.mod, w.file, 'a feature is { ... }'); return; }
+                        var id = w.mod + ':' + w.name + '#' + (n++);
+                        var ph = String(f.phase || phase || 'plants').toLowerCase();
+                        if (PHASES.indexOf(ph) < 0) { bad(w.mod, w.file, '"phase" is one of ' + PHASES.join(', ')); ph = 'plants'; }
+                        var tree = f.tree ? String(f.tree).toLowerCase() : '-';
+                        if (tree !== '-' && tree !== 'big_oak') { bad(w.mod, w.file, '"tree": "big_oak" is the only one'); return; }
+                        var choiceOf = function (c) {
+                            if (typeof c === 'string') c = { block: c };
+                            if (!c || c.block === undefined) { bad(w.mod, w.file, 'a choice needs a "block"'); return ''; }
+                            var b = ref(c.block, w.mod, w.file);
+                            if (!b) return '';
+                            return [b, wgBiomes(c.biomes, w.mod), wgBiomes(c.not_biomes, w.mod), wgRefs(c.on !== undefined ? c.on : f.on, w),
+                                    wgBiomes(c.prefer_biomes, w.mod), wgNum(c.prefer_chance, 0, 0, 1),
+                                    c.patch === undefined ? '-' : wgMap(c.patch, 64, 1, 256, w.mod, w, 'patch')].join('@');
+                        };
+                        var cs = Array.isArray(f.choices) ? f.choices.map(choiceOf).filter(Boolean) : f.block !== undefined ? [choiceOf({ block: f.block })].filter(Boolean) : [];
+                        if (!cs.length && tree === '-') { bad(w.mod, w.file, 'a feature needs a "block", "choices" or "tree"'); return; }
+                        var y = Array.isArray(f.y) ? range(f.y, [0, 127]) : [0, 127], ym = f.y === 'surface' ? 'surface' : 'any';
+                        var sp = Array.isArray(f.spread) ? f.spread : [8, 4];
+                        var h = range(f.height, [10, 14]);
+                        lines.push(['decor', id, parent || '-', dim, ph, cs.join('|') || '-', wgMap(f.tries, 1, 0, 64, w.mod, w, 'tries'),
+                                    wgMap(f.chance, 1, 0, 1, w.mod, w, 'chance'), ym, Math.max(0, y[0]), Math.max(0, y[1]), wgMap(f.patch, 64, 1, 256, w.mod, w, 'patch'),
+                                    Math.round(wgNum(sp[0], 8, 1, 16)), Math.round(wgNum(sp[1], 4, 1, 16)), wgBiomes(f.biomes, w.mod), wgBiomes(f.not_biomes, w.mod),
+                                    Math.round(wgNum(f.max_placed, 0, 0, 256)), wgNum(f.stop_chance, 0, 0, 1), tree, h[0], h[1]].join('\t'));
+                        if (f.then) (Array.isArray(f.then) ? f.then : [f.then]).forEach(function (t) { one(t, id, ph); });
+                    };
+                    (Array.isArray(j.features) ? j.features : []).forEach(function (f) { one(f, null, null); });
+                }
+                function surface(w) {
+                    var j = w.j, dim = wgDim(w);
+                    if (dim === undefined) return;
+                    var st = String(j.style || 'exposed_stone').toLowerCase();
+                    if (st !== 'exposed_stone' && st !== 'vanilla') { bad(w.mod, w.file, '"style" is exposed_stone or vanilla'); return; }
+                    lines.push(['surface', dim, st, wgNum(j.bare_below, 0.25, -10, 10), wgNum(j.patchy_above, 0.7, -10, 10), wgNum(j.soil_above, 0.95, -10, 10)].join('\t'));
+                }
+                var LEGACY_TO_MODERN_WG = { rainforest: 'jungle', swamp: 'swampland', seasonal_forest: 'forest', shrubland: 'extreme_hills', tundra: 'ice_plains' };
+                function rivers(w) {
+                    var j = w.j, ps = [];
+                    Object.keys(j.variants && typeof j.variants === 'object' ? j.variants : {}).forEach(function (land) {
+                        var to = wgBiome(j.variants[land], w.mod), from = wgBiome(land, null);
+                        [from, LEGACY_TO_MODERN_WG[from]].forEach(function (f) { if (f && to) ps.push(f + '=' + to); });
+                    });
+                    lines.push(['rivers', w.mod + ':' + w.name, ps.join(';') || '-', j.mushroom_islands === false ? 0 : 1].join('\t'));
+                }
                 worldgen.forEach(function (w) { curMod = w.mod;
                     var type = String(w.j.type || 'ore').toLowerCase();
                     if (type === 'structure') { structure(w); return; }
+                    if (type === 'lakes') { lakes(w); return; }
+                    if (type === 'cobwebs') { cobwebs(w); return; }
+                    if (type === 'decoration') { decoration(w); return; }
+                    if (type === 'surface') { surface(w); return; }
+                    if (type === 'rivers') { rivers(w); return; }
                     if (type === 'dungeon') { dungeon(w); return; }
                     if (type === 'cave_network') { caveNet(w); return; }
                     if (type === 'tree') { tree(w); return; }
                     if (type === 'plant' || type === 'flower') { plant(w); return; }
-                    if (type !== 'ore') { bad(w.mod, w.file, 'unknown "type": "' + w.j.type + '" (ore, structure, tree, plant, dungeon or cave_network)'); return; }
+                    if (type !== 'ore') { bad(w.mod, w.file, 'unknown "type": "' + w.j.type + '" (ore, structure, tree, plant, dungeon, cave_network, lakes, cobwebs, decoration, surface or rivers)'); return; }
                     if (w.j.block === undefined) { bad(w.mod, w.file, 'an ore needs a "block"'); return; }
                     var br = ref(w.j.block, w.mod, w.file);
                     if (br && (w.j.replace_vanilla || w.j.remove_vanilla)) lines.push('vore\t' + br);
@@ -7841,7 +8079,7 @@
                     lines.push(['mob', key, desc, beh, num(j.health, 10, 1, 1000), num(j.speed, 0.25, 0, 2), num(j.damage, 2, 0, 100),
                                 num(size[0], 0.9, 0.1, 8), num(size[1], 0.9, 0.1, 8), texPath, model.tw, model.th, num(j.scale, 1, 0.1, 8),
                                 (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0) | (j.java_hit ? 8 : 0) | (j.java_drops ? 16 : 0) |
-                                (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0), drops,
+                                (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0) | (j.ignores_webs ? 512 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
                                 egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';'), angryIdx].join('\t'));
                     if (Module.mcMobTraits) Module.mcMobTraits(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }, function (p) {
@@ -7923,19 +8161,61 @@
                         if (on.some(function (r) { return !r; })) return;
                         var stime = { day: 1, night: 2 }[String(s.time || '').toLowerCase()] || 0;
                         var sdays = s.days && typeof s.days === 'object' ? s.days : null;
+                        var sx = [];
+                        if (s.moon) sx.push('moon=' + String(s.moon).toLowerCase().replace(/[^a-z0-9_:.-]/g, ''));
+                        if (s.chance !== undefined) sx.push('chance=' + num(s.chance, 1, 0, 1));
+                        var refList = function (v) { var rs = (Array.isArray(v) ? v : [v]).map(function (r) { return ref(r, mb.mod, file); }); return rs.some(function (r) { return !r; }) ? null : rs.join('|'); };
+                        if (s.under !== undefined) { var ul = refList(s.under); if (ul) sx.push('under=' + ul); }
+                        if (s.sky !== undefined) sx.push('sky=' + (s.sky ? 1 : 0));
+                        if (s.sky_or_under) sx.push('sky_or_under=1');
+                        if (s.near !== undefined) {
+                            var nl = (Array.isArray(s.near) ? s.near : [s.near]).map(function (n) {
+                                if (!n || n.blocks === undefined) { bad(mb.mod, file, 'spawn "near": {"blocks": [...], "radius", "height", "y_offset"}'); return ''; }
+                                var bl = refList(n.blocks); if (!bl) return '';
+                                return [bl, num(n.radius, 4, 0, 16) | 0, num(n.height, 2, 0, 16) | 0, num(n.y_offset, 0, -64, 64) | 0].join('~');
+                            }).filter(Boolean);
+                            if (nl.length) sx.push('near=' + nl.join('/'));
+                        }
                         lines.push(['mobspawn', key, dim, light[0], light[1], h[0], h[1], on.join(';'), num(s.weight, 10, 1, 1000), Math.max(1, g[0]), Math.max(1, g[1]),
                                     (Array.isArray(s.biomes) ? s.biomes : (s.biomes ? [s.biomes] : [])).map(function (b) { return String(b).toLowerCase().replace(/^minecraft:/, ''); }).join(';'),
-                                    stime, sdays ? Math.max(1, num(sdays.every, 1, 1, 100000) | 0) : 0, sdays ? Math.max(0, num(sdays.on, 0, 0, 100000) | 0) : 0].join('\t'));
+                                    stime, sdays ? Math.max(1, num(sdays.every, 1, 1, 100000) | 0) : 0, sdays ? Math.max(0, num(sdays.on, 0, 0, 100000) | 0) : 0, sx.join(';')].join('\t'));
                     });
                     if (j.segments && typeof j.segments === 'object') {
                         var sgName = String(j.segments.mob || '').replace(/^[a-z0-9_.-]+:/, ''), sgKey = mb.mod + ':' + sgName;
                         if (!mobs[sgKey]) problem(mb.mod, file, '"segments": no creature "' + sgName + '" in the mod');
                         else lines.push(['mobseg', key, sgKey, Math.round(num(j.segments.count, 8, 1, 64)), num(j.segments.spacing, 1, 0.25, 8)].join('\t'));
                     }
+                    var mvName = j.movement === undefined ? 'walk' : String(j.movement).toLowerCase();
+                    var mvMode = { walk: 0, hop: 1, slide: 2 }[mvName];
+                    if (mvMode === undefined) { problem(mb.mod, file, 'unknown "movement": "' + j.movement + '" (walk, hop or slide)'); mvMode = 0; }
+                    if (mvMode && beh > 2) { problem(mb.mod, file, '"movement": "' + mvName + '" is for walking creatures (passive, hostile, neutral) - left out'); mvMode = 0; }
+                    if (mvMode || j.climbs) {
+                        var mvJ = j.hop && typeof j.hop === 'object' ? j.hop : {}, hkv = [];
+                        var mvPut = function (k, v) { hkv.push(k + '=' + String(v).replace(/[;\t\n\r=]/g, '')); };
+                        var mvTwo = function (v, lo, hi) { var a = Array.isArray(v) ? v : [v, v]; return [num(a[0], lo, lo, hi), num(a.length > 1 ? a[1] : a[0], lo, lo, hi)]; };
+                        if (mvJ.delay !== undefined) { var dl2 = mvTwo(mvJ.delay, 0, 2400); mvPut('delay', Math.round(dl2[0]) + ',' + Math.round(Math.max(dl2[0], dl2[1]))); }
+                        if (mvJ.target_delay !== undefined) mvPut('target_delay', Math.round(num(mvJ.target_delay, 0, 0, 2400)));
+                        if (mvJ.jump !== undefined) mvPut('jump', num(mvJ.jump, 0.42, 0, 3));
+                        if (mvJ.speed !== undefined) mvPut('speed', num(mvJ.speed, 0.1, 0, 1));
+                        if (mvJ.slide !== undefined) { var sl2 = mvTwo(mvJ.slide, 0, 2); mvPut('slide', sl2[0] + ',' + sl2[1]); }
+                        if (mvJ.squish !== undefined) mvPut('squish', mvJ.squish ? 1 : 0);
+                        if (mvJ.particle_item !== undefined) { var mvRef = ref(mvJ.particle_item, mb.mod, file); if (mvRef) mvPut('particle_item', mvRef); }
+                        if (mvJ.particle !== undefined) mvPut('particle', mvJ.particle === false ? 'none' : String(mvJ.particle));
+                        if (mvJ.sound !== undefined) mvPut('sound', mvJ.sound === false ? 'none' : String(mvJ.sound));
+                        if (mvJ.big_sound !== undefined) mvPut('big_sound', String(mvJ.big_sound));
+                        if (mvJ.volume !== undefined) mvPut('volume', num(mvJ.volume, 0.4, 0, 10));
+                        if (mvJ.volume_per_size !== undefined) mvPut('volume_per_size', mvJ.volume_per_size ? 1 : 0);
+                        if (mvJ.jump_sound_size !== undefined) mvPut('jump_sound_size', Math.round(num(mvJ.jump_sound_size, 1, 0, 64)));
+                        if (mvJ.land_sound_size !== undefined) mvPut('land_sound_size', Math.round(num(mvJ.land_sound_size, 3, 0, 64)));
+                        if (mvJ.ceiling_slide !== undefined) mvPut('ceiling_slide', mvJ.ceiling_slide ? 1 : 0);
+                        if (mvJ.contact !== undefined) mvPut('contact', mvJ.contact ? 1 : 0);
+                        if (mvJ.contact_min_size !== undefined) mvPut('contact_min_size', Math.round(num(mvJ.contact_min_size, 1, 1, 64)));
+                        lines.push(['mobmove', key, mvMode, j.climbs ? 1 : 0, hkv.join(';')].join('\t'));
+                    }
                 });
                 var OWN_ITEM_KEYS = ['blocks', 'can_block', 'block_wear', 'cooks_in_fire', 'smelt_xp', 'reach', 'reach_bonus', 'reach_applies_to', 'sugar', 'sugar_content',
                     'tills', 'tills_soil', 'cuts', 'cut_wear', 'drinkable', 'strips_enchantments', 'disenchants', 'dim_resist', 'dimming_resistance', 'craft_skills'];
-                var OWN_BLOCK_KEYS = ['cushion', 'breaks_on_landing', 'portable', 'grow_chance', 'grow_light', 'grow_needs_rain', 'grow_rain', 'grow_biomes', 'biomes',
+                var OWN_BLOCK_KEYS = ['cushion', 'breaks_on_landing', 'portable', 'grow_chance', 'grow_light', 'grow_needs_rain', 'grow_rain', 'grow_biomes', 'biomes', 'grow_warmth', 'grow_sky',
                     'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses', 'replace_particles'];
                 var ownOv = [];
                 [[items, OWN_ITEM_KEYS, 'ov_items'], [blocks, OWN_BLOCK_KEYS, 'ov_blocks']].forEach(function (set) {
@@ -7954,6 +8234,10 @@
                         var dp = 'web_mods/ov_' + (of.mod + '_' + String(p)).toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
                         try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + dp, tf.data); } catch (e) { return ''; }
                         return dp;
+                    }, function (v) {
+                        var d = { overworld: 0, nether: -1, end: 1 }[String(v).toLowerCase()];
+                        if (d !== undefined) return d;
+                        return typeof dimRef === 'function' ? (dimRef(v, of.mod) || null) : null;
                     }).forEach(function (l) { lines.push(l); });
                 });
                 ruleFiles.forEach(function (rf) { curMod = rf.mod;
@@ -8243,9 +8527,11 @@
                     console.error('[mods] applying failed', e);
                     bump('Mods: ' + (e && e.message || e));
                     failed = true;
+                    failCount++;
                 }).then(function () { memoRelease(); if (ownLoad) ML.end(); });
             }
             var failed = false;
+            var failCount = 0;
             var applied = 0;
 
             api.hasTexture = function (kind, n) { return !!names && cellsFor(kind, String(n || '').toLowerCase()).length > 0; };
@@ -8883,12 +9169,14 @@
             };
             api.isLoaded = function (r) { r = String(r || ''); return r.indexOf('mod:') !== 0 || !!contentKeys[r.slice(4)]; };
             api.hasEnabled = function () { return mods.some(function (x) { return x.enabled && !x.err; }); };
-            api.modeMods = function () {
+            api.modeMods = function (all) {
                 var o = {};
                 mods.forEach(function (x) {
-                    var g = x.enabled && !x.err && x.m && x.m.game_mode;
+                    var g = (x.enabled || (all && !x.versionOff && !x.libUsers)) && !x.err && x.m && x.m.game_mode;
                     if (!g || typeof g !== 'object') return;
                     o[x.id] = { name: String(g.name || x.m.name || x.id).slice(0, 40), description: String(g.description || '').slice(0, 80), cid: cid(x),
+                                          enabled: !!x.enabled, modName: String(x.m.name || x.id).slice(0, 48),
+                                          world_type: modeTypeKey(x), world_type_name: x.modeTypeName || '',
                                           hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes, world_height: g.world_height, tall_world: g.tall_world,
                                           difficulty: (function (d) { if (typeof d === 'string') { var n = ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()); return n >= 0 ? n : /^[0-3]$/.test(d) ? +d : -1; }
                                               return typeof d === 'number' && d >= 0 && d <= 3 ? Math.floor(d) : -1; })(g.difficulty),
@@ -8900,7 +9188,24 @@
                 var o = api.modeMods();
                 return Object.keys(o).map(function (k) { var ws = o[k].world_sizes || o[k].sizes; ws = (Array.isArray(ws) ? ws : ws ? [ws] : []).map(function (x) { return String(x).toLowerCase().replace(/[^a-z]/g, ''); }).join(',');
                     var wh = +o[k].world_height || (o[k].tall_world === true ? 256 : o[k].tall_world === false ? 128 : 0);
-                    return [k, o[k].name, o[k].description, o[k].hardcore ? 1 : 0, o[k]['default'] ? 1 : 0, o[k].hunger ? 1 : 0, ws, wh === 128 || wh === 256 ? wh : 0].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
+                    return [k, o[k].name, o[k].description, o[k].hardcore ? 1 : 0, o[k]['default'] && o[k].enabled ? 1 : 0, o[k].hunger ? 1 : 0, ws, wh === 128 || wh === 256 ? wh : 0,
+                        o[k].enabled ? 1 : 0, o[k].world_type || '', o[k].world_type_name || '', o[k].modName || k].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
+            };
+            api.enableForMode = function (id, flag) {
+                flag = String(flag || 'mcModeEnable');
+                Module[flag] = 0;
+                var i = find(String(id || '')), x = i >= 0 ? mods[i] : null;
+                if (!x || x.err || !(x.m && x.m.game_mode)) { Module[flag] = -1; return; }
+                if (x.enabled && !busy && !again) { Module[flag] = 1; return; }
+                var a0 = applied, f0 = failCount;
+                if (!x.enabled) api.toggle(x.id);
+                if (!x.enabled) { Module[flag] = -1; return; }
+                var dog = setInterval(function () {
+                    if (x.err || !x.enabled) { clearInterval(dog); Module[flag] = -1; return; }
+                    if (busy || again) return;
+                    if (failCount > f0) { clearInterval(dog); Module[flag] = -1; return; }
+                    if (applied > a0) { clearInterval(dog); Module[flag] = 1; }
+                }, 100);
             };
             api.worldMode = '';
             api.offer = function () {
