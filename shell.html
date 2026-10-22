@@ -713,6 +713,10 @@
 
         window.addEventListener('keydown', function (e) {
             if ((e.key === 'F5' || e.keyCode === 116) && Module.mcInWorld === 1 && !e.ctrlKey) e.preventDefault();
+            if ((e.key === 'Tab' || e.keyCode === 9) && Module.mcInWorld === 1) {
+                var t = e.target;
+                if (!t || t === document || t === document.body || t === document.documentElement || t.tagName === 'CANVAS') e.preventDefault();
+            }
         }, true);
 
         (function () {
@@ -1727,6 +1731,8 @@
                         if (fl && typeof fl === 'object' && fl.water) { var fwr = ref(fl.water); if (fwr) put('fills_water', fwr); }
                         var lq = pick('liquid');
                         if (lq !== undefined) { if (String(lq).toLowerCase() === 'water') put('water_vessel', 1); else bad('"liquid": only "water" for now'); }
+                        var lm = n('lava_melt_chance', 'lava_melt');
+                        if (lm !== null) put('lava_melt', Math.max(0, Math.min(1, lm)));
                         var rch = pick('reach', 'reach_bonus');
                         if (rch !== undefined) {
                             var rv = num(rch && typeof rch === 'object' ? rch.bonus : rch);
@@ -1793,6 +1799,11 @@
                             return list.length ? list.join(',') : 'none';
                         };
                         var d = pick('drops');
+                        var dct = num(pick('drop_count'));
+                        if (dct !== null && dct > 1) {
+                            if (typeof d === 'string' && d !== 'none' && d !== 'self') d = { item: d, count: Math.min(64, dct | 0) };
+                            else if (d && typeof d === 'object' && !Array.isArray(d) && d.count === undefined) d = Object.assign({}, d, { count: Math.min(64, dct | 0) });
+                        }
                         if (d !== undefined) put('drops', dropList(d));
                         var xd = pick('explosion_drops');
                         if (xd !== undefined) put('explosion_drops', dropList(xd));
@@ -1829,6 +1840,8 @@
                         put('furnace_heat', n('furnace_heat'));
                         var clp = pick('collapses', 'collapse');
                         if (clp !== undefined) put('collapses', clp ? 1 : 0);
+                        var rpf = pick('replace_particles', 'particles_when_replaced');
+                        if (rpf !== undefined) put('replace_particles', rpf ? 1 : 0);
                         var bl = pick('blight');
                         if (bl === false || bl === null) put('blight', '0');
                         else if (bl && typeof bl === 'object') {
@@ -1851,10 +1864,12 @@
                 }
                 var TRAIT_KEYS = ['digs', 'breaks_doors', 'seeks_trees_when_burning', 'puts_out_lights', 'dodges', 'throws', 'sizes', 'split',
                     'drops_by_size', 'corrodes', 'needs', 'drops_over_time', 'immune_except', 'vulnerable', 'sunlight', 'self_damage', 'natural_defense',
-                    'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful'];
+                    'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful', 'explodes',
+                    'produces', 'milk', 'tramples', 'flees', 'heals_with_time'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
-                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1 };
-                Module.mcMobTraits = function (name, j, ref, bad) {
+                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1 };
+                var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1 };
+                Module.mcMobTraits = function (name, j, ref, bad, pic) {
                     var out = [];
                     var enc = function (trait, o) {
                         if (o === true || o === undefined || o === null) o = {};
@@ -1864,6 +1879,7 @@
                             else if (trait === 'targets') o = { kinds: o };
                             else if (trait === 'seeks_items') o = { items: o };
                             else if (trait === 'day_peaceful') o = { on: o ? 1 : 0 };
+                            else if (trait === 'heals_with_time' && o === false) o = { on: 0 };
                             else if (o === false) return;
                             else { bad('"' + trait + '": an object of its settings, or true'); return; }
                         }
@@ -1872,16 +1888,23 @@
                             var v = o[k];
                             if (k === 'frenzy' && v && typeof v === 'object') { kv.push('frenzy_every=' + (v.every | 0), 'frenzy_on=' + (v.on | 0)); return; }
                             if (k === 'creature') { kv.push('creature=' + mobRef(v)); return; }
+                            if (k === 'sick_texture') {
+                                var gp = /^minecraft:(.+)$/i.exec(String(v || ''));
+                                var sp = gp ? gp[1] : pic ? pic(String(v || '')) : '';
+                                if (!sp) { bad('"sick_texture": no picture "' + v + '" in the mod'); return; }
+                                kv.push('sick_texture=' + String(sp).replace(/[;\t\n]/g, '')); return;
+                            }
                             var one = function (x) { return TRAIT_REFS[k] ? (ref(x) || '') : String(x); };
                             if (Array.isArray(v)) v = v.map(function (x) {
                                 if (x && typeof x === 'object') return one(x.item || x.id) + ':' + (x.weight === undefined ? 1 : x.weight | 0);
                                 return one(x);
                             }).filter(Boolean).join(',');
                             else if (v && typeof v === 'object') {
-                                var mapRef = k === 'swap' || k === 'eat_to';
+                                var mapRef = !!TRAIT_MAP_REFS[k];
                                 v = Object.keys(v).map(function (a) {
-                                    if (mapRef) { var b = v[a] === 'air' ? 'air' : ref(v[a]); return ref(a) && b ? ref(a) + '>' + b : ''; }
-                                    return (k === 'ticks' || k === 'items' ? ref(a) : a) + ':' + v[a];
+                                    if (mapRef) { var b = v[a] === 'air' || v[a] === null || v[a] === '' ? 'air' : ref(v[a]); return ref(a) && b ? ref(a) + '>' + b : ''; }
+                                    var ka = TRAIT_KEY_REFS[k] ? ref(a) : a;
+                                    return ka ? ka + ':' + v[a] : '';
                                 }).filter(Boolean).join(',');
                             }
                             else if (v === true || v === false) v = v ? 1 : 0;
@@ -1896,7 +1919,7 @@
                         if (j[t] === undefined) return;
                         if (t === 'targets' && Module.mcIsGoalList && Module.mcIsGoalList(j[t])) return;
                         if (t === 'immune' && !(j.immune && j.immune.tags)) return;
-                        if (t === 'equipment' || t === 'replaced_by') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
+                        if (t === 'equipment' || t === 'replaced_by' || t === 'produces') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
                         else enc(t, j[t]);
                     });
                     return out;
@@ -1947,7 +1970,11 @@
                     };
                     if (j.navigation && typeof j.navigation === 'object') out.push(['mobnav', name, kvOf(j.navigation, { avoidWater: 'avoidWater', avoid_water: 'avoidWater',
                         breakDoors: 'breakDoors', break_doors: 'breakDoors', enterDoors: 'enterDoors', enter_doors: 'enterDoors', swim: 'swim', canSwim: 'swim',
-                        avoidSun: 'avoidSun', avoid_sun: 'avoidSun' })].join('\t'));
+                        avoidSun: 'avoidSun', avoid_sun: 'avoidSun',
+                        maxDrop: 'maxDrop', max_drop: 'maxDrop', chaseDrop: 'chaseDrop', chase_drop: 'chaseDrop', pathLava: 'pathLava', path_lava: 'pathLava',
+                        avoidCactus: 'avoidCactus', avoid_cactus: 'avoidCactus', openGates: 'openGates', open_gates: 'openGates',
+                        safeShortcuts: 'safeShortcuts', safe_shortcuts: 'safeShortcuts', waterFallback: 'waterFallback', water_fallback: 'waterFallback',
+                        maxRange: 'maxRange', max_range: 'maxRange' })].join('\t'));
                     if (j.attributes && typeof j.attributes === 'object') out.push(['mobattr', name, kvOf(j.attributes, { movementSpeed: 'movementSpeed',
                         movement_speed: 'movementSpeed', followRange: 'followRange', follow_range: 'followRange' })].join('\t'));
                     return out;
@@ -2017,7 +2044,38 @@
                     ['lavaOverWaterBlock', 0, 'Block id lava flowing down onto water makes (0: none)', [0, 255]],
                     ['oreXp', true, 'Ores give experience when mined'],
                     ['foodSmothersFire', false, 'A pile of food that cooks in fire can put the fire out'],
-                    ['bareHandBackDamage', 0, 'Chance a bare-handed punch at a creature after you hurts you', [0, 1]]
+                    ['bareHandBackDamage', 0, 'Chance a bare-handed punch at a creature after you hurts you', [0, 1]],
+                    ['noFoodMeleeScale', 1, 'Melee damage with an empty food bar and no saturation (0: none) - at players too', [0, 10]],
+                    ['craftGhosts', true, 'The crafting grid shows faded items where the rest of a recipe goes, from the items already in it'],
+                    ['blockReachDrop', 0, 'Block reach is measured from this far below the eye (0: the eye)', [0, 2]],
+                    ['blockReachDrop2', -1, '... or from this far below it, whichever is nearer (-1: one point only)', [-1, 2]],
+                    ['blockReachToCenter', false, 'Block reach is measured to the block\'s centre instead of the point looked at'],
+                    ['mobVision', 0, 'How creatures see: 0 the game\'s own, 1 through glass and fences, plants half block the view', [0, 1]],
+                    ['mobPathfinding', 0, 'How creatures find their way: 0 the game\'s own, 1 MITE\'s (long drops while chasing, no cactus, open gates, no short cuts over fire)', [0, 1]],
+                    ['bucketFillTakesSource', 'always', 'Filling a bucket takes the liquid away: "always", or "modifier" - only while sneaking (else the source stays)'],
+                    ['bucketPourSource', 'always', 'Emptying a bucket makes a source block: "always", or "modifier" - only while sneaking with bucketPourSourceXp experience (else a short flow that drains away)'],
+                    ['bucketPourSourceXp', 0, 'With bucketPourSource "modifier": the total experience points a source pour needs', [0, 1000000]],
+                    ['bucketPourSourceXpCost', 0, 'With bucketPourSource "modifier": experience points each source pour costs', [0, 1000000]],
+                    ['bucketPourFlowTicks', 16, 'With bucketPourSource "modifier": ticks a flowing pour lasts before it drains (lava-like liquids 3x)', [1, 72000]],
+                    ['hungerJump', 0.2, 'Exhaustion a jump costs', [0, 40]],
+                    ['hungerSprintJump', 0.8, 'Exhaustion a sprinting jump costs', [0, 40]],
+                    ['hungerWalk', 0.01, 'Exhaustion per block walked', [0, 40]],
+                    ['hungerSprint', 0.1, 'Exhaustion per block sprinted', [0, 40]],
+                    ['hungerSwim', 0.015, 'Exhaustion per block swum', [0, 40]],
+                    ['hungerClimb', 0, 'Exhaustion per block climbed up a ladder or vine', [0, 40]],
+                    ['hungerSwimUp', 0, 'Exhaustion per tick holding jump in water or lava', [0, 40]],
+                    ['hungerRow', 0, 'Exhaustion per tick rowing a boat forward or back', [0, 40]],
+                    ['hungerBreak', 0.025, 'Exhaustion a block broken costs (an action)', [0, 40]],
+                    ['hungerDigTick', 0, 'Exhaustion per tick of hitting a block while it breaks (an action)', [0, 40]],
+                    ['hungerPlaceHardness', 0, 'A block placed costs its hardness times this in exhaustion (an action)', [0, 40]],
+                    ['hungerTillHardness', 0, 'Tilling with a hoe costs the block\'s hardness times this in exhaustion (an action)', [0, 40]],
+                    ['hungerHardnessCap', 20, 'The highest hardness placing and tilling count', [0, 1000000]],
+                    ['hungerAttack', 0.3, 'Exhaustion a melee hit that lands costs (an action)', [0, 40]],
+                    ['hungerHurt', 0.3, 'Exhaustion taking damage from something costs (a creature, an arrow, a blast)', [0, 40]],
+                    ['hungerThrow', 0, 'Exhaustion throwing a mod\'s "throwable" item costs (an action)', [0, 40]],
+                    ['hungerDrawTick', 0, 'Exhaustion per tick drawing a bow (an action)', [0, 40]],
+                    ['mobRegenTicks', 0, 'Creatures heal by themselves every this many ticks (0: never - the game\'s; MITE 1000)', [0, 1000000]],
+                    ['mobRegenFraction', 0.1, 'The share of its health a creature gets back each time (with mobRegenTicks)', [0, 1]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -2048,7 +2106,7 @@
                             if (!r) return;
                             var f = fieldsOf(what, e[1], ref, bad, tiers, pic);
                             if (f) lines.push([KIND[what], r, f].join('\t'));
-                            if (what === 'mobs') Module.mcMobTraits(r, e[1], ref, bad).forEach(function (l) { lines.push(l); });
+                            if (what === 'mobs') Module.mcMobTraits(r, e[1], ref, bad, pic).forEach(function (l) { lines.push(l); });
                             if (what === 'mobs') Module.mcMobGoals(r, e[1], ref, bad).forEach(function (l) { lines.push(l); });
                             if (what === 'items' && Array.isArray(e[1].tags)) lines.push(['itemtag', r, e[1].tags.map(function (x) { return String(x).toLowerCase(); }).join(',')].join('\t'));
                         });
@@ -2121,11 +2179,39 @@
                     .arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
             }
             function sendNow(c, b) {
-                c._sendQ = (c._sendQ || Promise.resolve()).then(function () { return zip(b); }).then(function (x) {
+                (c._wait = c._wait || []).push(b);
+                if (!c._busy) pumpConn(c);
+            }
+            function pumpConn(c) {
+                var list = c._wait || [];
+                if (!list.length || !c.open) { c._busy = false; c._wait = []; return; }
+                var take = [], len = 1, i = 0;
+                for (; i < list.length; i++) {
+                    var m = list[i], parts = [];
+                    if (m[0] === 252) {
+                        var dv = new DataView(m.buffer, m.byteOffset, m.byteLength), o = 1;
+                        while (o + 4 <= m.length) { var n = dv.getUint32(o, true); if (o + 4 + n > m.length) break; parts.push(m.subarray(o + 4, o + 4 + n)); o += 4 + n; }
+                    } else parts.push(m);
+                    var add = 0; parts.forEach(function (x) { add += 4 + x.length; });
+                    if (take.length && len + add > BATCH_MAX) break;
+                    parts.forEach(function (x) { take.push(x); }); len += add;
+                }
+                c._wait = list.slice(i);
+                c._busy = true;
+                var out;
+                if (take.length === 1) out = take[0];
+                else {
+                    out = new Uint8Array(len); var odv = new DataView(out.buffer), oo = 1;
+                    out[0] = 252;
+                    take.forEach(function (x) { odv.setUint32(oo, x.length, true); out.set(x, oo + 4); oo += 4 + x.length; });
+                }
+                var t0 = Date.now(), slow = c._rawUntil && t0 < c._rawUntil;
+                (slow ? Promise.resolve(out) : zip(out)).then(function (x) {
+                    if (!slow && Date.now() - t0 > 120) c._rawUntil = Date.now() + 15000;
                     if (!c.open) return;
                     var ab = (x.byteOffset === 0 && x.byteLength === x.buffer.byteLength) ? x.buffer : x.slice().buffer;
                     try { c.send(ab); } catch (e) { }
-                });
+                }, function () { }).then(function () { pumpConn(c); });
             }
             var BATCH_MAX = 60000;
             function flushConn(c) {
@@ -2224,7 +2310,7 @@
                     flushConn(c);
                     var j = enc.encode(JSON.stringify(obj)), b = new Uint8Array(j.length + 2);
                     b[0] = 253; b[1] = 1; b.set(j, 2);
-                    c._sendQ = (c._sendQ || Promise.resolve()).then(function () { if (c.open) c.send(b.buffer); });
+                    sendNow(c, b);
                 } catch (e) { }
             }
             function sayGoodbyes() {
@@ -6146,7 +6232,8 @@
             var RULE_CAUSES = ['any', 'fall', 'fire', 'lava', 'drown', 'explosion', 'attack', 'projectile', 'magic', 'void', 'suffocation', 'other'];
             var RULE_KEYS = { no_break: 1, no_place: 1, no_use: 1, no_damage: 1, pvp: 1, explosions_break_blocks: 1, explosion_proof: 1,
                               fire_spreads: 1, no_spawn: 1, area: 1, dimension: 1, creative: 1, rules: 1,
-                              no_eat: 1, no_sprint: 1, no_sleep: 1, no_wear: 1, players: 1 };
+                              no_eat: 1, no_sprint: 1, no_sleep: 1, no_wear: 1, players: 1,
+                              no_drink: 1, no_attack: 1, item_wear: 1, max_air: 1, slow_in: 1, craft_time: 1 };
             function rulesOf(o, mod, report, refFn) {
                 var out = [];
                 if (!o || typeof o !== 'object') { report('rules should be an object { ... }'); return out; }
@@ -6162,11 +6249,15 @@
                 if (dim === undefined) { report('unknown "dimension": "' + o.dimension + '"'); dim = 99; }
                 var cr = o.creative ? 1 : 0;
                 var pl = o.players === undefined ? '' : (Array.isArray(o.players) ? o.players : [o.players]).map(function (n) { return String(n).replace(/[|;]/g, ''); }).join(';');
-                var line = function (type, targets, cause) { out.push([type, targets.join(';'), cause || '', area, dim, cr].concat(pl ? [pl] : []).join('|')); };
-                var blockList = function (k) {
-                    var v = o[k];
+                var line = function (type, targets, cause, value) { out.push([type, targets.join(';'), cause || '', area, dim, cr].concat(pl || value !== undefined ? [pl] : []).concat(value !== undefined ? [value] : []).join('|')); };
+                var blockList = function (k, v0) {
+                    var v = v0 !== undefined ? v0 : o[k];
                     if (v === undefined) return null;
-                    var list = (Array.isArray(v) ? v : [v]).map(function (b) { return b === '*' ? '*' : refFn(b, mod); });
+                    var list = (Array.isArray(v) ? v : [v]).map(function (b) {
+                        if (b === '*') return '*';
+                        var neg = typeof b === 'string' && b.charAt(0) === '!', r = refFn(neg ? b.slice(1) : b, mod);
+                        return r ? (neg ? '!' : '') + r : r;
+                    });
                     if (list.some(function (r) { return !r; })) report('"' + k + '": a block that isn\'t there');
                     return list.filter(Boolean);
                 };
@@ -6189,6 +6280,27 @@
                 ['no_eat', 'no_wear'].forEach(function (k) { var l = blockList(k); if (l && l.length) line(k, l); });
                 if (o.no_sprint === true) line('no_sprint', []);
                 if (o.no_sleep === true) line('no_sleep', []);
+                var nm = function (k, v, lo) { var x = +v; if (!isFinite(x) || x < lo) { report('"' + k + '": a number' + (lo > 0 ? ' above ' + lo : '')); return null; } return x; };
+                var dl = blockList('no_drink'); if (dl && dl.length) line('no_drink', dl);
+                if (o.no_attack !== undefined) {
+                    var na = o.no_attack, nac = 1;
+                    if (na && typeof na === 'object' && !Array.isArray(na)) { nac = na.chance === undefined ? 1 : nm('no_attack', na.chance, 0); na = na.creatures || na.entity || na.entities; }
+                    if (nac !== null && na) line('no_attack', (Array.isArray(na) ? na : [na]).map(creature), '', Math.min(1, nac));
+                    else if (!na) report('"no_attack": a list of creatures, or {"creatures": [...], "chance": 0..1}');
+                }
+                if (o.item_wear !== undefined) {
+                    var iw = o.item_wear, iwl = [];
+                    if (iw && typeof iw === 'object') { iwl = iw.items === undefined ? [] : (blockList('item_wear', iw.items) || []); iw = iw.factor; }
+                    iw = nm('item_wear', iw, 0);
+                    if (iw !== null) line('item_wear', iwl, '', iw);
+                }
+                if (o.max_air !== undefined) { var ma = nm('max_air', o.max_air, 0); if (ma !== null) line('max_air', [], '', Math.floor(ma)); }
+                if (o.slow_in !== undefined) {
+                    var si = o.slow_in;
+                    if (!si || typeof si !== 'object' || Array.isArray(si) || !si.blocks) report('"slow_in": {"blocks": [...], "factor": 0..1}');
+                    else { var sil = blockList('slow_in', si.blocks), sif = nm('slow_in', si.factor === undefined ? 0.4 : si.factor, 0); if (sil && sil.length && sif !== null) line('slow_in', sil, '', sif); }
+                }
+                if (o.craft_time !== undefined) { var ct = nm('craft_time', o.craft_time, 0); if (ct !== null) line('craft_time', [], '', ct); }
                 if (o.pvp === false) line('no_pvp', []);
                 if (o.explosions_break_blocks === false) line('no_explosion_blocks', []);
                 if (o.fire_spreads === false) line('no_fire_spread', []);
@@ -6398,7 +6510,8 @@
                     }
                     return this.length;
                 };
-                Object.keys(modeMods).forEach(function (id) { Array.prototype.push.call(lines, ['modemode', id].join(String.fromCharCode(9))); });
+                Object.keys(modeMods).forEach(function (id) { var mm = modeMods[id];
+                    Array.prototype.push.call(lines, ['modemode', id, mm.difficulty == null ? -1 : mm.difficulty, mm.difficulty_locked ? 1 : 0, String(mm.difficulty_name || '').replace(/[\t\n]/g, ' ')].join(String.fromCharCode(9))); });
                 var lootLines = {};
                 var FACE = { down: 0, bottom: 0, up: 1, top: 1, north: 2, south: 3, west: 4, east: 5 };
                 if (Module.mcOverrides) Module.mcOverrides.resetTiers();
@@ -7027,6 +7140,10 @@
                     if (j.clears_effects === true) out.push('clears=1');
                     if (j.in_water) { var wr = iref('in_water'); if (wr) out.push('inwater=' + wr); }
                     if (j.places) { var pr = iref('places'); if (pr) out.push('places=' + pr); }
+                    if (j.lava_melt_chance !== undefined) {
+                        var lmc = Number(j.lava_melt_chance);
+                        if (!isFinite(lmc)) say('"lava_melt_chance" should be a number from 0 to 1'); else out.push('lavamelt=' + Math.max(0, Math.min(1, lmc)));
+                    }
                     return out;
                 }
                 function findModel(r, mod) {
@@ -7224,7 +7341,7 @@
                 var EFFECT_IDS = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
                     jump_boost: 8, nausea: 9, regeneration: 10, resistance: 11, fire_resistance: 12, water_breathing: 13, invisibility: 14,
                     blindness: 15, night_vision: 16, hunger: 17, weakness: 18, poison: 19, wither: 20 };
-                var ENCH_POWERS = ['draw_speed', 'accuracy', 'arrow_recovery', 'disarm', 'slow_resist', 'crop_yield', 'fertilize', 'fish_speed'];
+                var ENCH_POWERS = ['draw_speed', 'accuracy', 'arrow_recovery', 'disarm', 'slow_resist', 'crop_yield', 'fertilize', 'fish_speed', 'hunger_resist'];
                 var enchPowers = function (j) {
                     var out = [], seen = {};
                     var add = function (k, v) { k = String(k).toLowerCase().replace(/[^a-z0-9_]/g, ''); v = Number(v); if (k && isFinite(v) && v && !seen[k]) { seen[k] = 1; out.push(k + '=' + v); } };
@@ -7692,6 +7809,17 @@
                         try { FS.writeFile('/data/images/' + vp, vf.data); } catch (e) { }
                         variants.push(vp);
                     });
+                    var angryIdx = 0;
+                    if (j.angry_texture) {
+                        var af = texFiles[mb.mod + ':' + String(j.angry_texture).replace(/^[/]+/, '')];
+                        if (!af) problem(mb.mod, file, '"angry_texture": no picture "' + j.angry_texture + '" in the mod');
+                        else if (variants.length < 64) {
+                            var ap = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '__angry.png';
+                            try { FS.writeFile('/data/images/' + ap, af.data); } catch (e) { }
+                            variants.push(ap);
+                            angryIdx = variants.length;
+                        }
+                    }
                     var beh = BEHAVIOURS[String(j.behaviour || j.behavior || 'passive').toLowerCase()];
                     if (beh === undefined) { bad(mb.mod, file, 'unknown "behaviour": "' + (j.behaviour || j.behavior) + '" (passive, hostile, neutral, flying, swimming, segment or object)'); beh = 0; }
                     var num = function (v, d, lo, hi) { v = Number(v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
@@ -7715,8 +7843,14 @@
                                 (j.burns_in_daylight ? 1 : 0) | (j.scripted ? 2 : 0) | (j.fire_immune ? 4 : 0) | (j.java_hit ? 8 : 0) | (j.java_drops ? 16 : 0) |
                                 (j.no_fall_damage ? 32 : 0) | (j.no_step_sounds ? 64 : 0) | (j.spawn_on_ground ? 128 : 0) | (j.java_interact ? 256 : 0), drops,
                                 [snd('ambient'), snd('hurt'), snd('death')].join('|'), num(j.xp, beh === 1 ? 5 : 1, 0, 1000),
-                                egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';')].join('\t'));
-                    if (Module.mcMobTraits) Module.mcMobTraits(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }).forEach(function (l) { lines.push(l); });
+                                egg ? colour(egg[0]) + ',' + colour(egg[1]) : '', j.breed ? ref(j.breed, mb.mod, file) : '', variants.join(';'), angryIdx].join('\t'));
+                    if (Module.mcMobTraits) Module.mcMobTraits(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }, function (p) {
+                        var pk = mb.mod + ':' + String(p).replace(/^[/]+/, ''), pf = texFiles[pk] || texFiles[pk.toLowerCase()];
+                        if (!pf) return '';
+                        var pp = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '__t_' + String(p).toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+                        try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + pp, pf.data); } catch (e) { return ''; }
+                        return pp;
+                    }).forEach(function (l) { lines.push(l); });
                     if (Module.mcMobGoals) Module.mcMobGoals(key, j, function (r) { return ref(r, mb.mod, file); }, function (t) { problem(mb.mod, file, t); }).forEach(function (l) { lines.push(l); });
                     var ANIM = { none: 0, head: 1, leg: 2, arm: 4, wing: 6, tail: 8, leg_a: 2, leg_b: 3, arm_a: 4, arm_b: 5, wing_l: 6, wing_r: 7 };
                     var legs = 0, arms = 0, wings = 0, headDone = false, given = j.animations || {};
@@ -7802,7 +7936,7 @@
                 var OWN_ITEM_KEYS = ['blocks', 'can_block', 'block_wear', 'cooks_in_fire', 'smelt_xp', 'reach', 'reach_bonus', 'reach_applies_to', 'sugar', 'sugar_content',
                     'tills', 'tills_soil', 'cuts', 'cut_wear', 'drinkable', 'strips_enchantments', 'disenchants', 'dim_resist', 'dimming_resistance', 'craft_skills'];
                 var OWN_BLOCK_KEYS = ['cushion', 'breaks_on_landing', 'portable', 'grow_chance', 'grow_light', 'grow_needs_rain', 'grow_rain', 'grow_biomes', 'biomes',
-                    'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses'];
+                    'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses', 'replace_particles'];
                 var ownOv = [];
                 [[items, OWN_ITEM_KEYS, 'ov_items'], [blocks, OWN_BLOCK_KEYS, 'ov_blocks']].forEach(function (set) {
                     Object.keys(set[0]).forEach(function (key) {
@@ -8755,7 +8889,10 @@
                     var g = x.enabled && !x.err && x.m && x.m.game_mode;
                     if (!g || typeof g !== 'object') return;
                     o[x.id] = { name: String(g.name || x.m.name || x.id).slice(0, 40), description: String(g.description || '').slice(0, 80), cid: cid(x),
-                                          hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes, world_height: g.world_height, tall_world: g.tall_world };
+                                          hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes, world_height: g.world_height, tall_world: g.tall_world,
+                                          difficulty: (function (d) { if (typeof d === 'string') { var n = ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()); return n >= 0 ? n : /^[0-3]$/.test(d) ? +d : -1; }
+                                              return typeof d === 'number' && d >= 0 && d <= 3 ? Math.floor(d) : -1; })(g.difficulty),
+                                          difficulty_locked: !!(g.difficulty_locked || g.lock_difficulty), difficulty_name: String(g.difficulty_name || '').slice(0, 24) };
                 });
                 return o;
             };
@@ -9107,7 +9244,7 @@
             var known = {};
             var wants = {};
             var swants = {};
-            var FWD = { eat: 1, craft: 1, chat: 1, respawn: 1 };
+            var FWD = { eat: 1, craft: 1, chat: 1, respawn: 1, rule: 1 };
             var remoteReq = {}, nextRemoteReq = 1000000;
             var api = Module.mcScripts = {};
             function W() { return Module.mcMods; }
@@ -11692,9 +11829,11 @@
 
             def('difficulty', { level: 2, usage: '/difficulty <peaceful|easy|normal|hard>', args: ['difficulty'],
                 run: function (x) {
-                    if (!x.args[0]) { var cur = world('difficulty'); tellTo(x.sd, 'The difficulty is ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][cur | 0]); return; }
+                    var di = world('difficultyinfo') || {};
+                    if (!x.args[0]) { tellTo(x.sd, 'The difficulty is ' + (di.name || ['Peaceful', 'Easy', 'Normal', 'Hard'][world('difficulty') | 0]) + (di.locked ? (di.why === 'Hardcore' ? ' (Hardcore)' : ' (locked by the game mode)') : '')); return; }
                     var d = { 0: 0, p: 0, peaceful: 0, 1: 1, e: 1, easy: 1, 2: 2, n: 2, normal: 2, 3: 3, h: 3, hard: 3 }[lc(x.args[0])];
                     if (d == null) usage(this);
+                    if (di.locked) fail('The difficulty can\'t be changed in this game mode - it is always ' + (di.name || 'Hard'));
                     world('difficulty', d);
                     feedback(x.sd, 'Set game difficulty to ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][d]);
                 },

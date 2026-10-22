@@ -365,6 +365,10 @@
             downloads.forEach(function (p) {
                 chain = chain.then(function () {
                     return diskGet(p).then(function (bytes) {
+                        var now = null;
+                        try { var st = fs.stat(MOUNT + '/' + p); now = { m: toMs(st.mtime), s: st.size }; } catch (e) { }
+                        var was = local[p];
+                        if (now && (!was || now.m !== was.m || now.s !== was.s)) return;
                         writeLocal(p, bytes, remote[p].m);
                         base[p] = { m: remote[p].m, s: bytes.length };
                     });
