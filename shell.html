@@ -1755,6 +1755,8 @@
                         if (ed !== undefined) put('edible', ed ? 1 : 0);
                         var ae = pick('always_edible');
                         if (ae !== undefined) put('always_edible', ae ? 1 : 0);
+                        var ef = pick('eat_first');
+                        if (ef !== undefined) put('eat_first', ef ? 1 : 0);
                         var ee = pick('eat_effects');
                         if (ee !== undefined) {
                             var EFX = { speed: 1, slowness: 2, haste: 3, mining_fatigue: 4, strength: 5, instant_health: 6, instant_damage: 7,
@@ -1903,10 +1905,11 @@
                     'drops_by_size', 'corrodes', 'needs', 'drops_over_time', 'immune_except', 'vulnerable', 'sunlight', 'self_damage', 'natural_defense',
                     'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful', 'explodes',
                     'produces', 'milk', 'tramples', 'flees', 'heals_with_time',
-                    'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons'];
+                    'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons',
+                    'blast', 'rider', 'heats', 'body_by_block', 'calls_friends'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
-                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1 };
-                var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1 };
+                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1, spare: 1, melee_item: 1 };
+                var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1, drop_as: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1, blocks: 1 };
                 Module.mcMobTraits = function (name, j, ref, bad, pic) {
                     var out = [];
                     var enc = function (trait, o) {
@@ -1957,7 +1960,7 @@
                         if (j[t] === undefined) return;
                         if (t === 'targets' && Module.mcIsGoalList && Module.mcIsGoalList(j[t])) return;
                         if (t === 'immune' && !(j.immune && j.immune.tags)) return;
-                        if (t === 'equipment' || t === 'replaced_by' || t === 'produces' || t === 'on_hit') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
+                        if (t === 'equipment' || t === 'replaced_by' || t === 'produces' || t === 'on_hit' || t === 'rider') (Array.isArray(j[t]) ? j[t] : [j[t]]).forEach(function (e) { enc(t, e); });
                         else enc(t, j[t]);
                     });
                     return out;
@@ -2115,11 +2118,15 @@
                     ['hungerThrow', 0, 'Exhaustion throwing a mod\'s "throwable" item costs (an action)', [0, 40]],
                     ['hungerDrawTick', 0, 'Exhaustion per tick drawing a bow (an action)', [0, 40]],
                     ['mobRegenTicks', 0, 'Creatures heal by themselves every this many ticks (0: never - the game\'s; MITE 1000)', [0, 1000000]],
+                    ['sprintMinFood', 6, 'Sprinting needs more food than this (-1: any food energy at all)', [-1, 20]],
                     ['healParticles', false, 'A heart shows over a creature whenever it heals (sparks over an iron golem)'],
                     ['mobRegenFraction', 0.1, 'The share of its health a creature gets back each time (with mobRegenTicks)', [0, 1]],
                     ['hostileNearCap', 0, 'No monster spawns near a player who has more than this many within 32 blocks (0: off - MITE 8)', [0, 1000]],
                     ['hostileNearCapDeep', 0, 'That number grows by this many times itself for every 32 blocks below y 64 (MITE 1)', [0, 100]],
                     ['hostileNearCapMoon', 1, 'And is multiplied by this at night under a frenzy moon (MITE\'s blood moon 1.5)', [0.01, 100]],
+                    ['hostileNearCapFullMoon', 1, 'At night under a full moon it is at least the cap times this (MITE 1.25)', [0.01, 100]],
+                    ['itemLavaSmoke', false, 'An item burnt up in lava puffs smoke and hisses (MITE)'],
+                    ['autoHarvestAvailable', false, 'Offer Settings > Auto Harvest (the MITE auto-harvest / auto-use mode)'],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -2168,7 +2175,7 @@
                                         if (!e || !e.creature) { bad('spawns: an entry needs "creature"'); return; }
                                         var g = Array.isArray(e.group) ? e.group : [e.group === undefined ? 1 : e.group, e.group === undefined ? 1 : e.group];
                                         var w = num(e.weight); if (w === null) w = 10;
-                                        lines.push(['vbspawn', biome, cat, mobRef(e.creature), Math.max(0, Math.round(w)), Math.max(1, num(g[0]) | 0), Math.max(1, num(g[1]) | 0), bdim].join('\t'));
+                                        lines.push(['vbspawn', biome, cat, mobRef(e.creature), Math.max(0, Math.round(w)), Math.max(1, num(g[0]) | 0), Math.max(1, num(g[1]) | 0), bdim].concat(e.extra ? ['+'] : []).join('\t'));
                                     });
                                 });
                             });
@@ -7412,6 +7419,13 @@
                         addPool(range(j.rolls, [1, 1]), es);
                     } else { bad(mod, file, 'a loot table needs "pools" (Java\'s format) or "items"'); return; }
                     if (!pools.length) { bad(mod, file, 'this loot table has nothing in it'); return; }
+                    var ar = j.artifacts;
+                    if (ar && typeof ar === 'object' && Array.isArray(ar.items)) {
+                        var ars = ar.items.map(function (x) { return ref(x, mod, file); }).filter(Boolean);
+                        var ach = String(ar.achievement || '').replace(/[,|\t;]/g, '');
+                        if (ach && ach.indexOf(':') < 0) ach = mod + ':' + ach;
+                        if (ars.length) pools.push('A' + (+ar.chance || 0) + ',' + Math.max(0, Math.round(+ar.min_day || 0)) + ',' + ach + '|' + ars.join(';'));
+                    }
                     lootLines[name] = ['loot', name].concat(pools).join('\t');
                 }
                 Object.keys(VANILLA_LOOT).forEach(function (n) { lootLine(n, VANILLA_LOOT[n], 'minecraft', ''); });
@@ -8246,6 +8260,13 @@
                 Object.keys(items).forEach(function (key) {
                     if (items[key].j.door) { var dr = ref(items[key].j.door, items[key].mod, items[key].file); if (dr) lines.push(['itemdoor', key, dr].join('\t')); }
                     if (items[key].j.steers === true) lines.push(['steers', key].join('\t'));
+                    var bk = items[key].j.book;
+                    if (bk && typeof bk === 'object') {
+                        lines.push(['book', key].join('\t'));
+                        Module.mcBooks = Module.mcBooks || {};
+                        Module.mcBooks[key] = { title: String(bk.title || items[key].j.name || key), author: String(bk.author || ''),
+                            pages: (Array.isArray(bk.pages) ? bk.pages : [String(bk.pages || '')]).map(String) };
+                    }
                     var pl = items[key].j.pull;
                     if (pl) {
                         var pm = Array.isArray(pl) ? { '*': pl } : pl;
@@ -10778,8 +10799,29 @@
                     return true;
                 },
                 earned: function (name) { var d = achLoad(); return Object.assign({}, d[String(name)] || {}); },
+                anyEarned: function (id) { var d = achLoad(); id = String(id); return Object.keys(d).some(function (w) { return !!(d[w] && d[w][id]); }); },
             };
             Module.mcAchievements = achievements;
+            Module.mcBookOpen = function (key) {
+                var b = Module.mcBooks && Module.mcBooks[key];
+                if (!b || !Module.mcDialog) return;
+                var page = 0, n = Math.max(1, b.pages.length);
+                var spec = function () {
+                    var items = [{ t: 'text', text: (b.author ? 'by ' + b.author + '   ' : '') + 'Page ' + (page + 1) + ' of ' + n, color: '808080' }];
+                    String(b.pages[page] || '').split('\n').forEach(function (ln) { items.push({ t: 'text', text: ln, align: 'left' }); });
+                    return { title: b.title, items: items, buttons: [
+                        { id: 'prev', label: 'Previous', keep: true, disabled: page <= 0 },
+                        { id: 'next', label: 'Next', keep: true, disabled: page >= n - 1, primary: true },
+                        { id: 'done', label: 'Done', cancel: true }] };
+                };
+                var d = Module.mcDialog.open(spec());
+                d.spec.onAction = function (a) {
+                    if (a === 'prev' && page > 0) page--;
+                    else if (a === 'next' && page < n - 1) page++;
+                    else return;
+                    var ns = spec(); ns.onAction = d.spec.onAction; d.update(ns);
+                };
+            };
             api.toRemote = function (guid, json) {
                 if (side !== 'host' || !net().isOpen || !net().isOpen(guid)) return;
                 var m;
