@@ -1861,6 +1861,32 @@
                         if (gbm) put('grow_biomes', bnm(gbm));
                         var lbm = pick('biomes');
                         if (lbm) put('biomes', bnm(lbm));
+                        var pl = pick('plant', 'plant_rules');
+                        if (pl && typeof pl === 'object' && !Array.isArray(pl)) {
+                            var pbn = function (v) { return (Array.isArray(v) ? v : [v]).map(function (x) { return String(x).toLowerCase().replace(/[^a-z0-9_: ]+/g, ' ').trim(); }).filter(Boolean).join('|'); };
+                            if (pl.on !== undefined) {
+                                var plo = (Array.isArray(pl.on) ? pl.on : [pl.on]).map(function (x) { var r = ref(x); if (!r) bad('"plant": "on" - no block called "' + x + '"'); return r; }).filter(Boolean);
+                                put('plant_on', plo.join('|'));
+                            }
+                            if (pl.light !== undefined) {
+                                var pll = Array.isArray(pl.light) ? pl.light : [pl.light, 15];
+                                var l0 = num(pll[0]), l1 = num(pll[1]);
+                                if (l0 === null || l1 === null) bad('"plant": "light" is [min, max] (0-15)');
+                                else put('plant_light', Math.max(0, Math.min(15, l0 | 0)) + ',' + Math.max(0, Math.min(15, l1 | 0)));
+                            }
+                            if (pl.sky_light_ok !== undefined) put('plant_sky_light_ok', pl.sky_light_ok ? 1 : 0);
+                            if (pl.sky !== undefined) put('plant_sky', pl.sky ? 1 : 0);
+                            if (pl.biomes) put('plant_biomes', pbn(pl.biomes));
+                            if (pl.not_biomes) put('plant_not_biomes', pbn(pl.not_biomes));
+                            if (pl.place_biomes) put('place_biomes', pbn(pl.place_biomes));
+                            if (pl.place_sky !== undefined) put('place_sky', pl.place_sky ? 1 : 0);
+                            if (pl.outdoors !== undefined) put('place_outdoors', pl.outdoors ? 1 : 0);
+                            if (pl.no_open_sides !== undefined) put('place_no_open_sides', pl.no_open_sides ? 1 : 0);
+                            if (pl.vanish !== undefined) put('plant_vanish', pl.vanish ? 1 : 0);
+                            Object.keys(pl).forEach(function (k) {
+                                if (['on', 'light', 'sky_light_ok', 'sky', 'biomes', 'not_biomes', 'place_biomes', 'place_sky', 'outdoors', 'no_open_sides', 'vanish'].indexOf(k) < 0) bad('"plant": unknown key "' + k + '"');
+                            });
+                        } else if (pl !== undefined) bad('"plant" should be an object {"on": [...], "light": [min, max], ...}');
                         put('dry_death', n('dry_death'));
                         var dto = pick('dies_to');
                         if (dto) { var dtr = ref(dto); if (dtr) put('dies_to', dtr); }
@@ -1882,6 +1908,23 @@
                         if (clp !== undefined) put('collapses', clp ? 1 : 0);
                         var rpf = pick('replace_particles', 'particles_when_replaced');
                         if (rpf !== undefined) put('replace_particles', rpf ? 1 : 0);
+                        var dsv = pick('dissolve');
+                        if (dsv && typeof dsv === 'object' && !Array.isArray(dsv)) put('dissolve', Object.keys(dsv).map(function (k) {
+                            var v = dsv[k], tk = v === 'instant' || v === 0 ? 0 : (v === 'never' || v === null || v === false) ? -1 : Math.max(-1, num(v) === null ? -1 : num(v) | 0);
+                            var kk = String(k).toLowerCase().replace(/[^a-z0-9_.:-]/g, '');
+                            return kk ? kk + ':' + tk : '';
+                        }).filter(Boolean).join(','));
+                        else if (dsv !== undefined) bad('"dissolve": an object of {damage type: ticks}');
+                        var dnr = pick('data_near');
+                        if (dnr && typeof dnr === 'object') put('data_near', (Array.isArray(dnr) ? dnr : [dnr]).map(function (d) {
+                            if (!d || typeof d !== 'object') return '';
+                            var nr = (Array.isArray(d.near) ? d.near : [d.near]).map(function (x) { return ref(x); }).filter(Boolean).join('|');
+                            if (!nr) { bad('"data_near": "near" names no block'); return ''; }
+                            var nd = Array.isArray(d.not_dims) ? d.not_dims : d.not_dims ? [d.not_dims] : [];
+                            return [nr, num(d.h) === null ? 3 : num(d.h) | 0, num(d.v) === null ? 3 : num(d.v) | 0, num(d.from) | 0, num(d.to) | 0,
+                                (d.random_tick || d.tick) ? 1 : 0, num(d.player) === null ? 16 : num(d.player),
+                                nd.map(function (x) { return String(x).replace(/[|~^;=\t,]/g, ''); }).join('|')].join('~');
+                        }).filter(Boolean).join('^'));
                         var bl = pick('blight');
                         if (bl === false || bl === null) put('blight', '0');
                         else if (bl && typeof bl === 'object') {
@@ -1908,10 +1951,11 @@
                     'produces', 'milk', 'tramples', 'flees', 'heals_with_time',
                     'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons',
                     'blast', 'rider', 'heats', 'body_by_block', 'calls_friends',
-                    'spawn_effects'];
+                    'spawn_effects',
+                    'preys_on', 'grazes', 'stock', 'dissolves'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
-                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1, spare: 1, melee_item: 1 };
-                var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1, drop_as: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1, blocks: 1 };
+                    ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1, spare: 1, melee_item: 1, douses: 1 };
+                var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1, drop_as: 1, converts: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1, blocks: 1, convert_hurt: 1 };
                 Module.mcMobTraits = function (name, j, ref, bad, pic) {
                     var out = [];
                     var enc = function (trait, o) {
@@ -1920,6 +1964,7 @@
                             if (trait === 'sizes') o = { list: o };
                             else if (trait === 'immune' || trait === 'immune_except') o = { tags: o };
                             else if (trait === 'targets') o = { kinds: o };
+                            else if (trait === 'preys_on') o = { kinds: o };
                             else if (trait === 'seeks_items') o = { items: o };
                             else if (trait === 'day_peaceful') o = { on: o ? 1 : 0 };
                             else if (trait === 'heals_with_time' && o === false) o = { on: 0 };
@@ -2131,7 +2176,10 @@
                     ['autoHarvestAvailable', false, 'Offer Settings > Auto Harvest (the MITE auto-harvest / auto-use mode)'],
                     ['saturationToMaxFood', false, 'Saturation is capped at the food limit, not at the current food level (MITE: satiation and nutrition are separate pools)'],
                     ['eatByFoodPools', false, 'Whether food can be eaten follows the two pools: with saturation room a food that gives saturation is eaten on a full bar too (MITE\'s seeds)'],
+                    ['bucketPourIntoSame', false, 'Pouring a bucket into the liquid it holds only empties the bucket - nothing is placed (MITE)'],
+                    ['bucketCreativeKeepsEmpty', false, 'In creative, filling a bucket takes the liquid but leaves the bucket empty (MITE)'],
                     ['nutritionOnlyHunger', 0, 'This share of hungerPerTick builds up apart; each time it reaches a food unit the next point comes off the food bar even with saturation left (MITE 0.25)', [0, 1]],
+                    ['grassSpreadTries', 1, 'Spots a grass block tries each random tick to spread onto dirt or let trampled grass recover (MITE 4)', [1, 64]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -6341,7 +6389,8 @@
             var RULE_KEYS = { no_break: 1, no_place: 1, no_use: 1, no_damage: 1, pvp: 1, explosions_break_blocks: 1, explosion_proof: 1,
                               fire_spreads: 1, no_spawn: 1, area: 1, dimension: 1, creative: 1, rules: 1,
                               no_eat: 1, no_sprint: 1, no_sleep: 1, no_wear: 1, players: 1,
-                              no_drink: 1, no_attack: 1, item_wear: 1, max_air: 1, slow_in: 1, craft_time: 1 };
+                              no_drink: 1, no_attack: 1, item_wear: 1, max_air: 1, slow_in: 1, craft_time: 1,
+                              craft_levels: 1, always_eat: 1 };
             function rulesOf(o, mod, report, refFn) {
                 var out = [];
                 if (!o || typeof o !== 'object') { report('rules should be an object { ... }'); return out; }
@@ -6409,6 +6458,8 @@
                     else { var sil = blockList('slow_in', si.blocks), sif = nm('slow_in', si.factor === undefined ? 0.4 : si.factor, 0); if (sil && sil.length && sif !== null) line('slow_in', sil, '', sif); }
                 }
                 if (o.craft_time !== undefined) { var ct = nm('craft_time', o.craft_time, 0); if (ct !== null) line('craft_time', [], '', ct); }
+                if (o.craft_levels !== undefined) { var cl = +o.craft_levels; if (!isFinite(cl)) report('"craft_levels": a number'); else line('craft_levels', [], '', Math.round(cl)); }
+                var ae = blockList('always_eat'); if (ae && ae.length) line('always_eat', ae);
                 if (o.pvp === false) line('no_pvp', []);
                 if (o.explosions_break_blocks === false) line('no_explosion_blocks', []);
                 if (o.fire_spreads === false) line('no_fire_spread', []);
@@ -8237,7 +8288,7 @@
                 var OWN_ITEM_KEYS = ['blocks', 'can_block', 'block_wear', 'cooks_in_fire', 'smelt_xp', 'reach', 'reach_bonus', 'reach_applies_to', 'sugar', 'sugar_content',
                     'tills', 'tills_soil', 'cuts', 'cut_wear', 'drinkable', 'strips_enchantments', 'disenchants', 'dim_resist', 'dimming_resistance', 'craft_skills'];
                 var OWN_BLOCK_KEYS = ['cushion', 'breaks_on_landing', 'portable', 'grow_chance', 'grow_light', 'grow_needs_rain', 'grow_rain', 'grow_biomes', 'biomes', 'grow_warmth', 'grow_sky',
-                    'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses', 'replace_particles'];
+                    'dry_death', 'dies_to', 'explosion_drops', 'spawns', 'windfall', 'collapses', 'replace_particles', 'dissolve', 'data_near', 'plant'];
                 var ownOv = [];
                 [[items, OWN_ITEM_KEYS, 'ov_items'], [blocks, OWN_BLOCK_KEYS, 'ov_blocks']].forEach(function (set) {
                     Object.keys(set[0]).forEach(function (key) {
@@ -9808,6 +9859,9 @@
                             setBlock: function (x, y, z, block, data) { act(mod, ['setblock', x | 0, y | 0, z | 0, block, data == null ? '' : data | 0]); },
                             setData: function (x, y, z, data) { act(mod, ['setdata', x | 0, y | 0, z | 0, data | 0]); },
                             getBlock: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return { block: r.block, data: r.data }; }); },
+                            light: function (x, y, z) { return ask(mod, ['light', x | 0, y | 0, z | 0]).then(function (r) {
+                                return { light: r.light | 0, full: r.full | 0, sky: r.sky | 0, block: r.block | 0, seesSky: !!r.seesSky, outdoors: !!r.outdoors,
+                                         biome: String(r.biome || ''), temperature: r.temperature == null ? null : +r.temperature, rains: !!r.rains }; }); },
                             jukebox: function (x, y, z) { return ask(mod, ['jukebox', x | 0, y | 0, z | 0]).then(function (r) { return r.jukebox === undefined ? false : r.jukebox; }); },
                             setJukebox: function (x, y, z, disc, data) { act(mod, ['setjukebox', x | 0, y | 0, z | 0, disc == null || disc === false ? 'none' : itemArg(disc), data == null ? (disc && disc.data != null ? disc.data : '') : data | 0]); },
                             playRecord: function (x, y, z, disc) { act(mod, ['playrecord', x | 0, y | 0, z | 0, disc == null ? 'none' : itemArg(disc)]); },
@@ -10026,6 +10080,7 @@
                             addSkill: function (p, s) { act(mod, ['setskill', pid(p), String(s), 1]); },
                             removeSkill: function (p, s) { act(mod, ['setskill', pid(p), String(s), 0]); },
                             learnSkill: function (p, s) { return ask(mod, ['learnskill', pid(p), String(s)]).then(function (r) { return { ok: !!r.ok, message: String(r.message || '') }; }); },
+                            setStatus: function (p, id, spec) { act(mod, ['setstatus', pid(p), String(id), spec == null ? '' : JSON.stringify(plain(spec))]); },
                             inventory: function (p) { return ask(mod, ['inv', pid(p)]).then(function (r) { return r.inv || null; }); },
                             setSlot: function (p, slot, item, n, data) {
                                 act(mod, ['setslot', pid(p), slotNo(slot), itemArg(item), item == null ? 0 : Math.max(0, n == null ? (item.count || 1) : n | 0), data == null ? (item && item.data != null ? item.data : -1) : data | 0]);
@@ -10255,6 +10310,35 @@
                 var body = invLocal(a);
                 if (asks) deliver(fromGuid, req, body || {});
             }
+            var statusPics = {};
+            function setStatus(mod, id, spec) {
+                if (!Module._mcStatusSet) return;
+                var key = String(mod) + ':' + String(id);
+                var call = function (t, tx, tip, icon, u, v) {
+                    Module.ccall('mcStatusSet', null, ['string', 'string', 'string', 'string', 'string', 'number', 'number'], [key, t, tx, tip, icon, u | 0, v | 0]);
+                };
+                if (!spec || typeof spec !== 'object' || !spec.title) { call('', '', '', '', 0, 0); return; }
+                var tip = Array.isArray(spec.tooltip) ? spec.tooltip.map(String).join('\n') : spec.tooltip == null ? '' : String(spec.tooltip);
+                var icon = '', u = 0, v = 0, ic = spec.icon;
+                if (ic && typeof ic === 'object' && ic.texture) {
+                    var tp = String(ic.texture), pk = mod + '|' + tp;
+                    if (statusPics[pk] === undefined) {
+                        statusPics[pk] = '';
+                        var mf = W() && W().modFile ? W().modFile(mod, tp) || W().modFile(mod, 'textures/' + tp) : null;
+                        if (mf && mf.data) {
+                            var outp = 'web_mods/status_' + (mod + '_' + tp).replace(/[^a-z0-9_.-]+/gi, '_').slice(-80) + (/[.]png$/i.test(tp) ? '' : '.png');
+                            try { FS.mkdirTree('/data/images/web_mods'); FS.writeFile('/data/images/' + outp, mf.data); statusPics[pk] = outp; } catch (x) { }
+                        } else if (W() && W().problem) W().problem(mod, 'scripts', 'players.setStatus: no picture "' + tp + '" in the mod', 'script');
+                    }
+                    icon = statusPics[pk]; u = +ic.u || 0; v = +ic.v || 0;
+                } else if (ic) {
+                    var ir = ref(ic, mod);
+                    if (ir) icon = 'item:' + ir;
+                    else if (W() && W().problem) W().problem(mod, 'scripts', 'players.setStatus: no item called "' + ic + '"', 'script');
+                }
+                call(String(spec.title), spec.text == null ? '' : String(spec.text), tip, icon, u, v);
+            }
+
             function runAct(mod, a, fromGuid) {
                 if (!Array.isArray(a) || typeof a[0] !== 'string') return;
                 var k = a[0];
@@ -10344,6 +10428,13 @@
                     if (pr && pr !== 'none' && Module.mcOverrides) Module.mcOverrides.set(pw, pr, a[3], function (t) { if (W() && W().problem) W().problem(mod, 'scripts', 'world.set...Props: ' + t, 'script'); });
                     return;
                 }
+                if (k === 'setstatus') {
+                    var stp = known[a[1]], stg = remote(stp), sts = null;
+                    try { sts = a[3] ? JSON.parse(a[3]) : null; } catch (x) { sts = null; }
+                    if (stg) net().sendCtlTo(stg, { t: 'status', mod: mod, id: String(a[2]), spec: sts });
+                    else if (!stp || !me || stp.id === me.id) setStatus(mod, String(a[2]), sts);
+                    return;
+                }
                 if (k === 'setrules') {
                     var rl = a[2] && W() && W().rulesOf ? W().rulesOf(a[2], mod, function (t) { if (W().problem) W().problem(mod, 'scripts', 'world.setRules: ' + t, 'script'); }) : [];
                     a = ['setrules', mod + ':' + a[1]].concat(rl);
@@ -10355,7 +10446,7 @@
                 }
                 if ((k === 'getblock' || k === 'players' || k === 'stats' || k === 'time' || k === 'worldtype' || k === 'weather' || k === 'difficulty' || k === 'container' || k === 'rollloot' || k === 'spawnentity' ||
                      k === 'entities' || k === 'entity' || k === 'signtext' || k === 'jukebox' || k === 'spawnerinfo' || k === 'moon' || k === 'skills' || k === 'learnskill' ||
-                     k === 'goaladd' || k === 'goallist') && fromGuid) {
+                     k === 'goaladd' || k === 'goallist' || k === 'light') && fromGuid) {
                     var id = nextRemoteReq++;
                     remoteReq[id] = { guid: fromGuid, req: a[1] };
                     a = a.slice(); a[1] = id;
@@ -10839,6 +10930,7 @@
                 else if (m.t === 'effect') net().sendCtlTo(guid, { t: 'effect', id: m.a | 0, ticks: m.b | 0, amp: m.c | 0 });
                 else if (m.t === 'push') net().sendCtlTo(guid, { t: 'push', x: +m.a, y: +m.b, z: +m.c });
                 else if (m.t === 'fire') net().sendCtlTo(guid, { t: 'fire', s: m.a | 0 });
+                else if (m.t === 'rules') net().sendCtlTo(guid, { t: 'rules', s: String(m.s || '') });
             };
             api.tpRemote = function (guid, x, y, z) {
                 if (side === 'host' && net().isOpen && net().isOpen(guid)) net().sendCtlTo(guid, { t: 'tp', x: x, y: y, z: z });
@@ -10885,6 +10977,8 @@
                 case 'effect': if (Module._mcScriptEffect) Module._mcScriptEffect(msg.id | 0, msg.ticks | 0, msg.amp | 0); break;
                 case 'push': if (Module._mcScriptPush) Module._mcScriptPush(+msg.x || 0, +msg.y || 0, +msg.z || 0); break;
                 case 'fire': if (Module._mcScriptFire) Module._mcScriptFire(msg.s | 0); break;
+                case 'rules': if (Module._mcScriptRules) Module.ccall('mcScriptRules', null, ['string'], [String(msg.s || '')]); break;
+                case 'status': setStatus(String(msg.mod || ''), String(msg.id || ''), msg.spec || null); break;
                 case 'particle':
                     var q = msg.a;
                     if (Array.isArray(q) && Module._mcScriptParticle)
