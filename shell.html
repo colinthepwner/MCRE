@@ -1689,6 +1689,7 @@
                         put('speed', n('speed', 'mining_speed'));
                         put('food', n('food', 'nutrition', 'hunger'));
                         put('saturation', n('saturation', 'saturation_modifier'));
+                        put('satiation', n('satiation'));
                         put('fuel_heat', n('fuel_heat'));
                         var ql = pick('quality');
                         if (ql !== undefined) {
@@ -1906,7 +1907,8 @@
                     'equipment', 'replaced_by', 'death_particles', 'targets', 'seeks_items', 'day_peaceful', 'explodes',
                     'produces', 'milk', 'tramples', 'flees', 'heals_with_time',
                     'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons',
-                    'blast', 'rider', 'heats', 'body_by_block', 'calls_friends'];
+                    'blast', 'rider', 'heats', 'body_by_block', 'calls_friends',
+                    'spawn_effects'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
                     ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1, spare: 1, melee_item: 1 };
                 var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1, drop_as: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1, blocks: 1 };
@@ -2127,6 +2129,9 @@
                     ['hostileNearCapFullMoon', 1, 'At night under a full moon it is at least the cap times this (MITE 1.25)', [0.01, 100]],
                     ['itemLavaSmoke', false, 'An item burnt up in lava puffs smoke and hisses (MITE)'],
                     ['autoHarvestAvailable', false, 'Offer Settings > Auto Harvest (the MITE auto-harvest / auto-use mode)'],
+                    ['saturationToMaxFood', false, 'Saturation is capped at the food limit, not at the current food level (MITE: satiation and nutrition are separate pools)'],
+                    ['eatByFoodPools', false, 'Whether food can be eaten follows the two pools: with saturation room a food that gives saturation is eaten on a full bar too (MITE\'s seeds)'],
+                    ['nutritionOnlyHunger', 0, 'This share of hungerPerTick builds up apart; each time it reaches a food unit the next point comes off the food bar even with saturation left (MITE 0.25)', [0, 1]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -7206,6 +7211,7 @@
                         if (es.length) out.push('effects=' + es.join(';'));
                     }
                     if (j.always_edible || (j.food && j.food.always_edible)) out.push('edible=1');
+                    if (j.food && typeof j.food === 'object' && typeof j.food.satiation === 'number') out.push('satiation=' + Math.max(0, j.food.satiation));
                     if (j.food && j.food.java_eat === true) out.push('javaeat=1');
                     if (j.throwable) {
                         var th = typeof j.throwable === 'object' ? j.throwable : {};
@@ -8156,7 +8162,8 @@
                             if (!lf) { problem(mb.mod, file, '"layers": no picture "' + L.texture + '"'); return; }
                             var lp = 'web_mods/mob_' + key.replace(/[^a-z0-9_.-]/g, '_') + '__L' + li + '.png';
                             try { FS.writeFile('/data/images/' + lp, lf.data); } catch (e) { }
-                            lines.push(['moblayer', key, lp, String(L.blend || '').toLowerCase() === 'add' ? 1 : 0, L.glow ? 1 : 0].join('\t'));
+                            var lv = Array.isArray(L.variants) ? L.variants.map(function (v) { return parseInt(v, 10) || 0; }).join(',') : '';
+                            lines.push(['moblayer', key, lp, String(L.blend || '').toLowerCase() === 'add' ? 1 : 0, L.glow ? 1 : 0, lv].join('\t'));
                         });
                     }
                     if (egg) {
