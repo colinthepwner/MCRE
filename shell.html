@@ -1716,6 +1716,7 @@
                         var w = pick('wear');
                         if (w && typeof w === 'object') { put('wear_mine', num(w.mine)); put('wear_hit', num(w.hit)); put('wear_hardness', num(w.per_hardness)); }
                         put('wear_mine', n('wear_mine')); put('wear_hit', n('wear_hit')); put('wear_hardness', n('wear_per_hardness', 'wear_hardness'));
+                        put('hand_speed', n('hand_speed'));
                         var nm = pick('name');
                         if (typeof nm === 'string' && nm.trim()) put('name', clean(nm).trim());
                         var th = pick('throwable');
