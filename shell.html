@@ -8705,6 +8705,7 @@
                 }
                 return 'any';
             }
+            function guestNow() { return !!(Module.mcAuth && !Module.mcAuth.signedIn()); }
             api.list = function () {
                 var clean = function (s) { return String(s == null ? '' : s).replace(/[\t\n\r]/g, ' '); };
                 var desc = function (s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/\n/g, '\x1f').slice(0, 4000); };
@@ -8713,13 +8714,14 @@
                         .concat(x.enabled ? depProblems(x) : [])
                         .concat((problems[cid(x)] || []).map(function (p) { return (p.file ? p.file + ': ' : '') + p.text; }));
                     return [x.id, x.m.name, x.m.version, x.m.author].map(clean).concat([desc(x.m.description)])
-                        .concat([x.enabled ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
+                        .concat([x.enabled && !guestNow() ? 1 : 0, x.dev ? 2 : x.bundled ? 1 : 0, x.icon, x.err, x.contents || ''].map(clean))
                         .concat([probs.map(clean).join('\x1f'), (x.m.settings && x.m.settings.length) || (settingDecls[cid(x)] && settingDecls[cid(x)].length) ? 1 : 0, devicesFor(x), supportOf(x, probs),
                             clean(x.libUsers ? x.libUsers.map(function (y) { return y.m && y.m.name || y.id; }).join(', ') : '')]).join('\t');
                 }).join('\n');
             };
             function modsOn() {
                 if (!listed) return null;
+                if (guestNow()) return [];
                 return mods.filter(function (x) { return x.enabled && !x.err; })
                     .map(function (x) { return { id: cid(x), name: String(x.m.name || cid(x)).replace(/[\t\r\n]/g, ' ') }; })
                     .sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
@@ -8918,6 +8920,7 @@
             }
             function byContentId(id) { for (var i = 0; i < mods.length; i++) if (cid(mods[i]) === id || mods[i].id === id) return mods[i]; return null; }
             api.toggle = function (id) {
+                if (guestNow()) { if (Module.mcAuth) Module.mcAuth.prompt('Mods'); return; }
                 var i = find(id);
                 if (i < 0 || mods[i].err) return;
                 if (mods[i].libUsers) {
@@ -9281,6 +9284,7 @@
             api.hasEnabled = function () { if (Module.mcAuth && !Module.mcAuth.signedIn()) return false; return mods.some(function (x) { return x.enabled && !x.err; }); };
             api.modeMods = function (all) {
                 var o = {};
+                if (guestNow()) return o;
                 mods.forEach(function (x) {
                     var g = (x.enabled || (all && !x.versionOff && !x.libUsers)) && !x.err && x.m && x.m.game_mode;
                     if (!g || typeof g !== 'object') return;
@@ -9304,6 +9308,7 @@
             api.enableForMode = function (id, flag) {
                 flag = String(flag || 'mcModeEnable');
                 Module[flag] = 0;
+                if (guestNow()) { Module[flag] = -1; return; }
                 var i = find(String(id || '')), x = i >= 0 ? mods[i] : null;
                 if (!x || x.err || !(x.m && x.m.game_mode)) { Module[flag] = -1; return; }
                 if (x.enabled && !busy && !again) { Module[flag] = 1; return; }
@@ -15343,7 +15348,7 @@
     </script>
     <script>
         (function () {
-            var RELAY = 'https://mcre-auth.mcre.workers.dev';
+            var RELAY = 'https://authrelay-vercel.vercel.app';
             var CLIENT_ID = 'e8efb1ff-9804-4260-964b-de466cd050fb';
             var SCOPE = 'XboxLive.signin offline_access';
             var K_REFRESH = 'mcre.msRefresh', K_ACCOUNT = 'mcre.account';
@@ -15429,6 +15434,18 @@
             }
 
             var dlg = null;
+            var linkEl = null;
+            function showLink(url) {
+                hideLink();
+                linkEl = document.createElement('a');
+                linkEl.href = url; linkEl.target = '_blank'; linkEl.rel = 'noopener';
+                linkEl.textContent = 'Tap here to open ' + url.replace(/^https?:[/][/](www[.])?/, '');
+                linkEl.style.cssText = 'position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:10001;' +
+                    'font:16px/1.2 monospace;color:#ffff55;background:rgba(0,0,0,.75);border:2px solid #a0a0a0;' +
+                    'padding:10px 18px;text-decoration:underline;white-space:nowrap';
+                document.body.appendChild(linkEl);
+            }
+            function hideLink() { if (linkEl && linkEl.parentNode) linkEl.parentNode.removeChild(linkEl); linkEl = null; }
             function startSignIn(then) {
                 if (dlg) return;
                 var ST = 1, CODE = 2;
@@ -15444,15 +15461,16 @@
                     onAction: function (a, v, d) {
                         if (a === 'open') { try { window.open(d._url || 'https://www.microsoft.com/link', '_blank', 'noopener'); } catch (e) { } return; }
                         if (a === 'copy') { try { navigator.clipboard.writeText(d._code || ''); } catch (e) { } return; }
-                        cancelled = true; dlg = null;
+                        cancelled = true; dlg = null; hideLink();
                     },
-                    onClose: function () { cancelled = true; dlg = null; }
+                    onClose: function () { cancelled = true; dlg = null; hideLink(); }
                 });
                 var d = dlg;
                 var status = function (t, col) { if (cancelled) return; d.spec.items[ST].text = t; d.spec.items[ST].color = col || null; d.update(); };
                 call('/ms/devicecode', 'POST', form({ client_id: CLIENT_ID, scope: SCOPE }), 'application/x-www-form-urlencoded').then(function (dc) {
                     if (!dc.user_code) throw fail('Microsoft did not give a sign-in code.');
                     d._code = dc.user_code; d._url = dc.verification_uri || 'https://www.microsoft.com/link';
+                    showLink(d._url);
                     d.spec.items[CODE].text = 'Your code:  ' + dc.user_code;
                     status('Go to microsoft.com/link, enter the code below and sign in. This screen continues by itself.');
                     var interval = Math.max(1, dc.interval || 5) * 1000, until = Date.now() + (dc.expires_in || 900) * 1000;
@@ -15474,6 +15492,7 @@
                     });
                 }).then(function (j) {
                     d.spec.items[CODE].text = '';
+                    hideLink();
                     status('Signed in to Microsoft...');
                     return minecraft(j.access_token, j.refresh_token, status);
                 }).then(function (a) {
@@ -15487,6 +15506,7 @@
                 }).catch(function (e) {
                     if (cancelled) return;
                     d.spec.items[CODE].text = '';
+                    hideLink();
                     status(e && e.auth ? e.message : 'Could not reach the sign-in service. Check your connection and try again.', 'ff7070');
                 });
             }
@@ -15544,10 +15564,11 @@
                         'down, please just ask and it will be handled right away.' },
                     { t: 'text', text: 'If you enjoy this, please support the real thing and ' +
                         '\u00a7ebuy Minecraft\u00a7r!' },
-                    { t: 'text', text: ' ' }, { t: 'text', text: ' ' }, { t: 'text', text: ' ' },
+                    { t: 'text', text: ' ' },
+                    window.innerHeight >= 560 ? { t: 'text', text: ' ' } : null, window.innerHeight >= 560 ? { t: 'text', text: ' ' } : null,
                     { t: 'text', text: 'Sign in with the Microsoft account that owns Minecraft to unlock everything. ' +
                         (Module.mcAuth ? Module.mcAuth.lockedText : ''), color: 'c0c0c0' }
-                ],
+                ].filter(function (x) { return x; }),
                 buttons: Module.mcAuth && Module.mcAuth.signedIn() ? [{ id: 'ok', label: 'Got it', primary: true }]
                     : [{ id: 'in', label: 'Sign in with Microsoft', primary: true }, { id: 'ok', label: 'Play without signing in' }],
                 onAction: function (a) {
