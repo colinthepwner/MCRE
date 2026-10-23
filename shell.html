@@ -200,6 +200,32 @@
         Module.mcBuild = MCRE_BUILD;
         var MCRE_V = MCRE_BUILD === 'dev' ? '' : '?v=' + encodeURIComponent(MCRE_BUILD);
         Module.locateFile = function (path, prefix) { return (prefix || '') + path + (/[?]/.test(path) ? '' : MCRE_V); };
+
+        (function () {
+            var SETS = ['cherry_blossom_grove', 'garden', 'orchard'];
+            var set = SETS[Math.floor(Math.random() * SETS.length)];
+            if (!window.fetch || !window.createImageBitmap) return;
+            var faces = [0, 1, 2, 3, 4, 5].map(function (i) {
+                return fetch('title/bg/' + set + '/panorama' + i + '.jpg' + MCRE_V).then(function (r) {
+                    if (!r.ok) throw new Error('panorama ' + r.status);
+                    return r.blob();
+                }).then(createImageBitmap).then(function (bm) {
+                    var c = document.createElement('canvas');
+                    c.width = bm.width; c.height = bm.height;
+                    c.getContext('2d').drawImage(bm, 0, 0);
+                    return new Promise(function (res) { c.toBlob(res, 'image/png'); });
+                }).then(function (b) { return b.arrayBuffer(); });
+            });
+            Promise.all(faces).then(function (bufs) {
+                (function put() {
+                    var up = false; try { up = typeof FS !== 'undefined' && FS.analyzePath('/data/images').exists; } catch (e) { }
+                    if (!up) { setTimeout(put, 250); return; }
+                    try { FS.mkdirTree('/data/images/title/bg'); } catch (e) {   }
+                    for (var i = 0; i < 6; i++) FS.writeFile('/data/images/title/bg/panorama' + i + '.png', new Uint8Array(bufs[i]));
+                    FS.writeFile('/data/images/title/bg/ready', '1');
+                })();
+            }).catch(function (e) { console.warn('[title] no panorama:', e); });
+        })();
         (function checkForUpdate() {
             if (MCRE_BUILD === 'dev' || !window.fetch) return;
             var shown = false, last = 0;
@@ -1305,7 +1331,10 @@
                 });
             }
 
-            Module.mcAskUsername = function () { ask(Module.mcUsernameSet === 1 ? Module.mcUsername : '', true); };
+            Module.mcAskUsername = function () {
+                if (Module.mcAuth) { Module.mcAuth.manage(); return; }
+                ask(Module.mcUsernameSet === 1 ? Module.mcUsername : '', true);
+            };
 
             setInterval(function () {
                 if (Module.mcUsernameSet === 0 && !askedThisLoad && !overlay) {
@@ -5884,6 +5913,7 @@
                 guiFiles = {}; picUrls = {};
                 sdFiles = {};
                 var on = mods.filter(function (x) { return x.enabled && !x.err; }).reverse();
+                if (Module.mcAuth && !Module.mcAuth.signedIn()) on = [];
                 (function () {
                     var out = [], placed = {}, visiting = {};
                     var visit = function (x) {
@@ -9248,7 +9278,7 @@
                 return 'minecraft:' + (byId[m[1]] || m[1]) + (m[2] && m[2] !== '0' ? ':' + m[2] : '');
             };
             api.isLoaded = function (r) { r = String(r || ''); return r.indexOf('mod:') !== 0 || !!contentKeys[r.slice(4)]; };
-            api.hasEnabled = function () { return mods.some(function (x) { return x.enabled && !x.err; }); };
+            api.hasEnabled = function () { if (Module.mcAuth && !Module.mcAuth.signedIn()) return false; return mods.some(function (x) { return x.enabled && !x.err; }); };
             api.modeMods = function (all) {
                 var o = {};
                 mods.forEach(function (x) {
@@ -15313,8 +15343,195 @@
     </script>
     <script>
         (function () {
+            var RELAY = 'https://mcre-auth.mcre.workers.dev';
+            var CLIENT_ID = 'e8efb1ff-9804-4260-964b-de466cd050fb';
+            var SCOPE = 'XboxLive.signin offline_access';
+            var K_REFRESH = 'mcre.msRefresh', K_ACCOUNT = 'mcre.account';
+            var get = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+            var put = function (k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } };
+
+            var account = null;
+            try { account = JSON.parse(get(K_ACCOUNT) || 'null'); } catch (e) { account = null; }
+            if (account && !account.name) account = null;
+            var listeners = [];
+
+            function form(o) { return Object.keys(o).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(o[k]); }).join('&'); }
+            function call(path, method, body, type, bearer) {
+                var h = { 'Accept': 'application/json' };
+                if (type) h['Content-Type'] = type;
+                if (bearer) h['Authorization'] = 'Bearer ' + bearer;
+                return fetch(RELAY + path, { method: method, headers: h, body: body }).then(function (r) {
+                    return r.text().then(function (t) {
+                        var j = {}; try { j = JSON.parse(t); } catch (e) { j = { raw: t }; }
+                        j._status = r.status; return j;
+                    });
+                });
+            }
+            function fail(msg) { var e = new Error(msg); e.auth = true; return e; }
+
+            function minecraft(msToken, refresh, status) {
+                status('Signing in to Xbox Live...');
+                return call('/xbl', 'POST', JSON.stringify({ Properties: { AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: 'd=' + msToken },
+                    RelyingParty: 'http://auth.xboxlive.com', TokenType: 'JWT' }), 'application/json').then(function (xbl) {
+                    var uhs = xbl.DisplayClaims && xbl.DisplayClaims.xui && xbl.DisplayClaims.xui[0] && xbl.DisplayClaims.xui[0].uhs;
+                    if (!xbl.Token || !uhs) throw fail('Xbox Live did not sign in.');
+                    return call('/xsts', 'POST', JSON.stringify({ Properties: { SandboxId: 'RETAIL', UserTokens: [xbl.Token] },
+                        RelyingParty: 'rp://api.minecraftservices.com/', TokenType: 'JWT' }), 'application/json').then(function (x) {
+                        if (!x.Token) {
+                            if (x.XErr === 2148916233) throw fail('This account has no Xbox profile yet - sign in once at xbox.com, then try again.');
+                            if (x.XErr === 2148916238) throw fail('This is a child account: an adult has to add it to a Microsoft family first.');
+                            throw fail('Xbox Live refused the sign-in (' + (x.XErr || x._status) + ').');
+                        }
+                        status('Signing in to Minecraft...');
+                        return call('/mc/login', 'POST', JSON.stringify({ identityToken: 'XBL3.0 x=' + uhs + ';' + x.Token }), 'application/json');
+                    });
+                }).then(function (mc) {
+                    if (!mc.access_token) throw fail('Minecraft did not sign in (' + mc._status + ').');
+                    return call('/mc/profile', 'GET', undefined, null, mc.access_token);
+                }).then(function (p) {
+                    if (!p.name) throw fail('This Microsoft account does not own Minecraft: Java Edition.');
+                    var skin = null;
+                    (p.skins || []).forEach(function (s) { if (!skin || s.state === 'ACTIVE') skin = s.url; });
+                    return { name: p.name, uuid: p.id, skin: skin, refresh: refresh };
+                });
+            }
+
+            function signedInAs(a) {
+                account = { name: a.name, uuid: a.uuid, skin: a.skin || null };
+                put(K_ACCOUNT, JSON.stringify(account));
+                if (a.refresh) put(K_REFRESH, a.refresh);
+                Module.mcSignedIn = 1;
+                Module.mcUsernamePending = account.name;
+                Module.mcUsername = account.name;
+                Module.mcUsernameSet = 1;
+                listeners.forEach(function (f) { try { f(account); } catch (e) { } });
+            }
+            function signOut() {
+                account = null;
+                put(K_ACCOUNT, null); put(K_REFRESH, null);
+                Module.mcSignedIn = 0;
+                listeners.forEach(function (f) { try { f(null); } catch (e) { } });
+                try { if (Module.mcMods && Module.mcMods.reload) Module.mcMods.reload(); } catch (e) { }
+            }
+
+            function refreshNow() {
+                var rt = get(K_REFRESH);
+                if (!rt) return Promise.resolve(account);
+                return call('/ms/token', 'POST', form({ grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: rt, scope: SCOPE }),
+                    'application/x-www-form-urlencoded').then(function (j) {
+                    if (j.error === 'invalid_grant' || j.error === 'interaction_required') { signOut(); return null; }
+                    if (!j.access_token) return account;
+                    return minecraft(j.access_token, j.refresh_token || rt, function () { }).then(function (a) { signedInAs(a); return account; });
+                }).catch(function (e) {
+                    if (e && e.auth && /does not own/.test(e.message)) signOut();
+                    return account;
+                });
+            }
+
+            var dlg = null;
+            function startSignIn(then) {
+                if (dlg) return;
+                var ST = 1, CODE = 2;
+                var cancelled = false;
+                dlg = Module.mcDialog.open({
+                    title: 'Sign in with Microsoft',
+                    items: [{ t: 'text', text: 'Use the Microsoft account that owns Minecraft: Java Edition.', color: 'a0a0a0' },
+                            { t: 'text', text: 'Getting a sign-in code...' },
+                            { t: 'text', text: '', color: 'ffff55' }],
+                    buttons: [{ id: 'open', label: 'Open microsoft.com/link', primary: true, keep: true },
+                              { id: 'copy', label: 'Copy code', keep: true },
+                              { id: 'no', label: 'Cancel', cancel: true }],
+                    onAction: function (a, v, d) {
+                        if (a === 'open') { try { window.open(d._url || 'https://www.microsoft.com/link', '_blank', 'noopener'); } catch (e) { } return; }
+                        if (a === 'copy') { try { navigator.clipboard.writeText(d._code || ''); } catch (e) { } return; }
+                        cancelled = true; dlg = null;
+                    },
+                    onClose: function () { cancelled = true; dlg = null; }
+                });
+                var d = dlg;
+                var status = function (t, col) { if (cancelled) return; d.spec.items[ST].text = t; d.spec.items[ST].color = col || null; d.update(); };
+                call('/ms/devicecode', 'POST', form({ client_id: CLIENT_ID, scope: SCOPE }), 'application/x-www-form-urlencoded').then(function (dc) {
+                    if (!dc.user_code) throw fail('Microsoft did not give a sign-in code.');
+                    d._code = dc.user_code; d._url = dc.verification_uri || 'https://www.microsoft.com/link';
+                    d.spec.items[CODE].text = 'Your code:  ' + dc.user_code;
+                    status('Go to microsoft.com/link, enter the code below and sign in. This screen continues by itself.');
+                    var interval = Math.max(1, dc.interval || 5) * 1000, until = Date.now() + (dc.expires_in || 900) * 1000;
+                    return new Promise(function (res, rej) {
+                        (function poll() {
+                            if (cancelled) return rej(fail('cancelled'));
+                            if (Date.now() > until) return rej(fail('The code expired. Try again.'));
+                            setTimeout(function () {
+                                if (cancelled) return rej(fail('cancelled'));
+                                call('/ms/token', 'POST', form({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: CLIENT_ID, device_code: dc.device_code }),
+                                    'application/x-www-form-urlencoded').then(function (j) {
+                                    if (j.access_token) return res(j);
+                                    if (j.error === 'slow_down') interval += 5000;
+                                    else if (j.error !== 'authorization_pending') return rej(fail('Microsoft sign-in stopped: ' + (j.error || j._status)));
+                                    poll();
+                                }, rej);
+                            }, interval);
+                        })();
+                    });
+                }).then(function (j) {
+                    d.spec.items[CODE].text = '';
+                    status('Signed in to Microsoft...');
+                    return minecraft(j.access_token, j.refresh_token, status);
+                }).then(function (a) {
+                    if (cancelled) return;
+                    signedInAs(a);
+                    d.close(); dlg = null;
+                    Module.mcDialog.open({ title: 'Signed in', items: [{ t: 'text', text: 'Welcome, §e' + a.name + '§r! Everything is unlocked.' }],
+                        buttons: [{ id: 'ok', label: 'Play', primary: true }] });
+                    try { if (Module.mcMods && Module.mcMods.reload) Module.mcMods.reload(); } catch (e) { }
+                    if (then) then(true);
+                }).catch(function (e) {
+                    if (cancelled) return;
+                    d.spec.items[CODE].text = '';
+                    status(e && e.auth ? e.message : 'Could not reach the sign-in service. Check your connection and try again.', 'ff7070');
+                });
+            }
+
+            var LOCKED = 'Without signing in: worlds are §eClassic PE§r only (no Rocket worlds), up to §eNormal§r size, ' +
+                'and the §e404 Challenge§r, §eSkyblock§r, §emods§r and §emultiplayer§r are locked.';
+
+            Module.mcAuth = {
+                signedIn: function () { return !!account; },
+                account: function () { return account; },
+                onChange: function (f) { listeners.push(f); },
+                signIn: startSignIn,
+                signOut: signOut,
+                lockedText: LOCKED,
+                prompt: function (what) {
+                    if (account || dlg) return;
+                    Module.mcDialog.open({
+                        title: 'Sign in to unlock',
+                        items: [{ t: 'text', text: '§e' + (what || 'This') + '§r needs a Minecraft account.' },
+                                { t: 'text', text: LOCKED, color: 'c0c0c0' },
+                                { t: 'text', text: 'MCRE is a free fan project - please support the real thing and §ebuy Minecraft§r!', color: 'a0a0a0' }],
+                        buttons: [{ id: 'in', label: 'Sign in with Microsoft', primary: true }, { id: 'no', label: 'Not now', cancel: true }],
+                        onAction: function (a) { if (a === 'in') setTimeout(function () { startSignIn(); }, 0); }
+                    });
+                },
+                manage: function () {
+                    if (!account) { startSignIn(); return; }
+                    Module.mcDialog.open({
+                        title: 'Account',
+                        items: [{ t: 'text', text: 'Signed in as §e' + account.name + '§r (Microsoft account).' }],
+                        buttons: [{ id: 'ok', label: 'Done', primary: true }, { id: 'out', label: 'Sign out' }],
+                        onAction: function (a) { if (a === 'out') signOut(); }
+                    });
+                }
+            };
+            Module.mcSignedIn = account ? 1 : 0;
+            if (account) { Module.mcUsernamePending = account.name; Module.mcUsername = account.name; Module.mcUsernameSet = 1; }
+            Module.mcAuth.ready = refreshNow();
+        })();
+    </script>
+    <script>
+        (function () {
             var KEY = 'mcre.noticeSeen';
-            try { if (localStorage.getItem(KEY)) return; } catch (e) { }
+            var guest = !!(Module.mcAuth && !Module.mcAuth.signedIn());
+            try { if (localStorage.getItem(KEY) && !guest) return; } catch (e) { }
             Module.mcDialog.open({
                 title: 'Hey there!',
                 items: [
@@ -15326,10 +15543,17 @@
                     { t: 'text', text: 'Mojang and Microsoft: if you would like anything changed or taken ' +
                         'down, please just ask and it will be handled right away.' },
                     { t: 'text', text: 'If you enjoy this, please support the real thing and ' +
-                        '\u00a7ebuy Minecraft\u00a7r!' }
+                        '\u00a7ebuy Minecraft\u00a7r!' },
+                    { t: 'text', text: ' ' }, { t: 'text', text: ' ' }, { t: 'text', text: ' ' },
+                    { t: 'text', text: 'Sign in with the Microsoft account that owns Minecraft to unlock everything. ' +
+                        (Module.mcAuth ? Module.mcAuth.lockedText : ''), color: 'c0c0c0' }
                 ],
-                buttons: [{ id: 'ok', label: 'Got it', primary: true }],
-                onAction: function () { try { localStorage.setItem(KEY, '1'); } catch (e) { } }
+                buttons: Module.mcAuth && Module.mcAuth.signedIn() ? [{ id: 'ok', label: 'Got it', primary: true }]
+                    : [{ id: 'in', label: 'Sign in with Microsoft', primary: true }, { id: 'ok', label: 'Play without signing in' }],
+                onAction: function (a) {
+                    try { localStorage.setItem(KEY, '1'); } catch (e) { }
+                    if (a === 'in' && Module.mcAuth) setTimeout(function () { Module.mcAuth.signIn(); }, 0);
+                }
             });
         })();
     </script>
