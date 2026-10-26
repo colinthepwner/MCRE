@@ -14,6 +14,18 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-180.png">
     <style>
+        /* 2026-10-25: the Minecraft cursor pack the user picked (vsthemes.org "minecraft-cursore", icons/cursors/,
+           source kept in mcre-work/hot/site_cursors) everywhere on the page - the real pointer matches the drawn one
+           in inventories (gui/cursor_pack.png). Inline cursor:pointer / text styles are remapped by the attribute
+           rules; !important because many elements set their cursor inline. */
+        html, body, canvas, * { cursor: url(icons/cursors/normal.cur) 0 0, default; }
+        a, button, select, label, summary, [role="button"], [onclick],
+        [style*="cursor:pointer"], [style*="cursor: pointer"] { cursor: url(icons/cursors/pointer.cur), pointer !important; }
+        input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="password"],
+        input[type="email"], input[type="url"], textarea, [contenteditable="true"] { cursor: url(icons/cursors/text.cur), text !important; }
+        [style*="cursor:grabbing"], [style*="cursor: grabbing"] { cursor: url(icons/cursors/grabbing.cur), grabbing !important; }
+        [disabled], [style*="cursor:not-allowed"], [style*="cursor: not-allowed"] { cursor: url(icons/cursors/not_allowed.cur), not-allowed !important; }
+
         body,
         html {
             margin: 0;
