@@ -331,7 +331,7 @@
         });
     }
 
-    function reconcile() {
+    function reconcile(onStep) {
         return diskList().then(function (listing) {
             if (!listing || !listing.storeId || !listing.files) throw new Error('unexpected listing');
             disk.storeId = listing.storeId;
@@ -365,6 +365,8 @@
             });
 
             var chain = Promise.resolve();
+            var steps = downloads.length + localDeletes.length + uploads.length, done = 0;
+            var step = function () { done++; if (onStep) try { onStep(done, steps); } catch (e) { } };
             downloads.forEach(function (p) {
                 chain = chain.then(function () {
                     return diskGet(p).then(function (bytes) {
@@ -374,14 +376,14 @@
                         if (now && (!was || now.m !== was.m || now.s !== was.s)) return;
                         writeLocal(p, bytes, remote[p].m);
                         base[p] = { m: remote[p].m, s: bytes.length };
-                    });
+                    }).then(step);
                 });
             });
             localDeletes.forEach(function (p) {
-                chain = chain.then(function () { deleteLocal(p); delete base[p]; });
+                chain = chain.then(function () { deleteLocal(p); delete base[p]; step(); });
             });
             uploads.forEach(function (p) {
-                chain = chain.then(function () { return pushFile(p); });
+                chain = chain.then(function () { return pushFile(p); }).then(step);
             });
             return chain.then(function () {
                 disk.enabled = true;
@@ -577,19 +579,24 @@
             if (populate && first) {
                 first = false;
                 patchIdbfs();
+                var progress = function (f) { try { if (Module.mcBootProgress) Module.mcBootProgress(f); } catch (e) { } };
+                progress(0.72);
                 return origSyncfs.call(fs, true, function (err) {
                     if (err) console.warn('[saves] IndexedDB load error:', err);
+                    progress(0.76);
                     loadBig().then(null, function (e) {
                         console.warn('[saves] could not read big files from browser storage:', e);
                     }).then(function () {
+                        progress(0.84);
                         return persistBig(scan());
                     }).then(function () {
-                        return reconcile();
+                        return reconcile(function (done, total) { progress(0.84 + 0.08 * (total ? done / total : 1)); });
                     }).then(function () {
                         return persistIdb();
                     }, function (e) {
                         console.log('[saves] saves folder not available, using browser storage only (' + e.message + ')');
                     }).finally(function () {
+                        progress(0.92);
                         boot(callback, err);
                     });
                 });

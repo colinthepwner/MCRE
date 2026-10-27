@@ -1744,6 +1744,16 @@
             line.style.display = 'none';
             ov.appendChild(line);
             document.body.appendChild(ov);
+            var backNote = document.createElement('div');
+            backNote.id = 'mcBackNote';
+            backNote.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;' +
+                'font:bold ' + (big * 3) + 'px monospace;color:#a0a0a0;text-shadow:2px 2px 0 #2a2a2a;text-align:center;padding:0 12px';
+            var noteText = 'still loading, im sorry lmao';
+            try { backNote.appendChild(window.mcPixel && window.mcPixel.text ? window.mcPixel.text(noteText, { scale: big, colour: '#b4b4b4' }) : document.createTextNode(noteText)); }
+            catch (e) { backNote.textContent = noteText; }
+            var gameCanvas = document.getElementById('canvas');
+            if (gameCanvas && gameCanvas.parentNode) gameCanvas.parentNode.insertBefore(backNote, gameCanvas);
+            else document.body.insertBefore(backNote, document.body.firstChild);
 
             var panel = document.createElement('canvas');
             panel.style.cssText = 'display:none;image-rendering:pixelated;margin-top:' + (big * 3) + 'px';
@@ -1856,14 +1866,14 @@
             var prevStatus = Module.setStatus, maxDeps = 0;
             Module.setStatus = function (text) {
                 var m = /\((\d+(?:\.\d+)?)\/(\d+)\)/.exec(text || '');
-                if (m) set(0.85 * (+m[1] / +m[2]), 'Downloading the game (' + Math.round(100 * +m[1] / +m[2]) + '%)');
+                if (m) set(0.6 * (+m[1] / +m[2]), 'Downloading the game (' + Math.round(100 * +m[1] / +m[2]) + '%)');
                 else if (text) set(shown, /download/i.test(text) ? 'Downloading the game' : 'Getting ready');
                 if (prevStatus) return prevStatus.apply(this, arguments);
             };
             var prevDeps = Module.monitorRunDependencies;
             Module.monitorRunDependencies = function (left) {
                 maxDeps = Math.max(maxDeps, left);
-                if (maxDeps) set(0.85 + 0.1 * (1 - left / maxDeps), left ? 'Preparing the world' : 'Starting');
+                if (maxDeps) set(0.6 + 0.1 * (1 - left / maxDeps), left ? 'Preparing the world' : 'Starting');
                 if (prevDeps) return prevDeps.apply(this, arguments);
             };
             Module.postRun = Module.postRun || [];
@@ -1876,14 +1886,19 @@
                     ov.remove();
                     document.documentElement.classList.remove('mc-loading');
                     try { if (Module.mcRenderScaleOption != null) localStorage.setItem('mcre.renderScale', String(Module.mcRenderScaleOption | 0)); } catch (e) { }
+                    setTimeout(function () { backNote.remove(); }, 3000);
                 }, 400);
             };
-            var armedAt = 0, litFrames = 0, probe = null;
+            var armedAt = 0, litFrames = 0, probe = null, firstFrameAt = 0;
             var reveal = function () { requestAnimationFrame(function () { requestAnimationFrame(hide); }); };
             Module.mcTitleShown = function () { if (!armedAt) armedAt = performance.now(); };
             Module.mcLoadingFrame = function () {
                 if (gone) return 0;
-                if (!armedAt) return 1;
+                if (!armedAt) {
+                    if (!firstFrameAt) firstFrameAt = performance.now();
+                    if (performance.now() - firstFrameAt > 8000) { reveal(); return 0; }
+                    return 1;
+                }
                 var lit = true;
                 try {
                     if (!probe) { var pc = document.createElement('canvas'); pc.width = 16; pc.height = 9; probe = pc.getContext('2d', { willReadFrequently: true }); }
@@ -1897,7 +1912,8 @@
                 if (litFrames >= 2 || performance.now() - armedAt > 4000) { reveal(); return 0; }
                 return 1;
             };
-            Module.postRun.push(function () { set(0.97, 'Starting'); setTimeout(hide, 20000); });
+            Module.postRun.push(function () { set(0.7, 'Starting'); });
+            Module.mcBootProgress = function (f) { if (!gone) set(f); };
             window.mcLoadingFail = function (why) { line.textContent = String(why || 'Something went wrong'); line.style.display = ''; };
         })();
     </script>

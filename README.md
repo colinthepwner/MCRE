@@ -1,114 +1,114 @@
-# MCRE (Minecraft: Rocket Edition)
+# Minecraft: Rocket Edition
 
-Minecraft Pocket Edition 0.6.1 alpha in the browser, with PC-style controls: mouse look, a
-single-screen inventory with click-and-drag item handling, mouse wheel support and PC-strength mobs.
-Touchscreens still get the original Pocket Edition controls.
+MCRE is Minecraft that runs in a browser tab. It started out as old Pocket Edition ported to the web, and
+it's grown a lot since then. These days it plays a lot more like Java Edition, it runs Java mods, and you can
+play with friends.
 
-[**PLAY NOW**](https://colinthepwner.github.io/MCRE/)
+[**Play it here**](https://colinthepwner.github.io/MCRE/). Nothing to install, and it works on a computer
+or a phone.
 
-Based on [MCPEweb](https://github.com/sangraphic/MCPEweb).
+It's built on sangraphic's [MCPEweb](https://github.com/sangraphic/MCPEweb), which got Pocket Edition running
+in the browser in the first place.
 
-> **Disclaimer:** MCRE is an unofficial, non-commercial fan project made out of love for old Pocket
-> Edition. It is not affiliated with, endorsed by, or connected to Mojang Studios or Microsoft.
-> Minecraft is a trademark of Mojang Synergies AB, and the game, its art and its sounds belong to
-> their owners. Nothing here is sold and no money is made from it. Mojang and Microsoft: if you would
-> like anything changed or taken down, please open an issue and it will be handled right away. If you
-> enjoy this, please support the real thing and buy Minecraft!
+> **Disclaimer:** MCRE is an unofficial, non-commercial fan project. It isn't affiliated with, endorsed by, or
+> connected to Mojang Studios or Microsoft. Minecraft is a trademark of Mojang Synergies AB, and the game, its
+> art and its sounds belong to their owners. Nothing here is sold and no money is made from it. Mojang and
+> Microsoft: if you'd like anything changed or taken down, open an issue and I'll deal with it right away. If
+> you enjoy this, please go buy the real game!
 
 
-## Play on Windows
+## What's in it
 
-Double-click **`Launch Game.bat`**. The game opens in its own window (Microsoft Edge or Google Chrome
-is used behind the scenes); closing that window shuts everything down.
+- **Survival the way Java does it.** Hunger, sprinting, the Nether and the End, villages, weather, enchanting,
+  anvils, brewing and redstone, plus the mobs and blocks from Java 1.5 up to 1.7. Mobs use Java's AI, so they
+  actually find their way around things.
+- **Lots of ways to make a world.** Any size up to infinite, Rocket terrain with the 1.7 biomes or the classic
+  Pocket Edition terrain, Indev-style world types and themes, tall 256-block worlds, and your own seed. Skyblock
+  and the 404 Challenge are there too.
+- **Brutal difficulty**, one step past Hard. Monsters dig through dirt and wood to get at you, skeletons back
+  off and keep shooting, creepers go off faster, and everything hits twice as hard. In return, creepers die in
+  one hit and skeletons in two.
+- **The old Xbox 360 tutorial.** Play Tutorial on the title screen loads the Title Update 3 tutorial world
+  with its walkthrough, and I've added steps for sprinting and hunger.
+- **Multiplayer.** Open your world to friends from the pause menu and they join with a short code. You don't
+  need a server or any port forwarding. Chat, commands, operators and command blocks all work.
+- **A helper bot.** Type `/bot spawn` and tell it what you need, like `/bot get 64 planks` or
+  `/bot get iron set`. It gathers, crafts and smelts everything itself (mod items too) and brings it back.
+  It can also follow you, guard you, clear an area or dig a tunnel, and if you hook up a chat AI in
+  Options > Bot you can just talk to it normally.
+- **It feels right on whatever you're using.** On a computer you get Java's title screen, menus, inventory and
+  controls. On a phone or tablet you get touch controls built for it.
 
-To play in a normal browser tab instead, run `Launch Game.bat -Tab`.
+Signing in with a Microsoft account that owns Minecraft unlocks mods, multiplayer, Rocket terrain and the
+bigger worlds. You can play without signing in, just with a smaller set of options.
 
-### Saves
 
-Worlds are kept in the `saves` folder next to the game, so they survive clearing browser data. A
-backup of that folder is made in `backups` every time the game starts (the newest 10 are kept).
-Worlds removed in-game go to `saves\.trash` rather than being deleted.
+## Mods
 
-### Controls (keyboard and mouse)
+Mods load through **Rube**, the mod loader built into the game. It takes:
+
+- **Rube mods.** New blocks, items, creatures, recipes, world generation, structures and scripts, made with
+  JSON and JavaScript.
+- **Java Edition mods.** Forge and ModLoader mods for 1.5.2 through 1.7.10, and Babric mods for Beta 1.7.3,
+  running right in the browser.
+- **ModPE scripts** from old Pocket Edition.
+- **Resource packs.**
+- **Structure files** (`.schematic`, `.schem` and `.nbt`).
+
+There's a list of mods you can add with one click right in the Mods screen, and Minecraft Is Too Easy is
+included as an optional game mode. If you want to make your own, the
+[modding guide](https://colinthepwner.github.io/MCRE/modding.html) has everything, with examples.
+
+
+## Playing on Windows
+
+If you download the repo, double-click **`Launch Game.bat`**. The game opens in its own window (it uses
+Microsoft Edge or Google Chrome for that), and closing the window shuts everything down. To play in a normal
+browser tab instead, run `Launch Game.bat -Tab`.
+
+When you play this way your worlds live in the `saves` folder next to the game, so clearing your browser data
+won't touch them. Every launch makes a backup in `backups` (it keeps the newest 10), and worlds you delete in
+the game go to `saves\.trash` instead of disappearing.
+
+
+## Controls
 
 | Action | Key |
 | --- | --- |
-| Move | W A S D or arrow keys |
+| Move | W A S D |
 | Look | Mouse (click the game to capture the cursor) |
 | Break / attack | Left mouse button |
 | Place / use | Right mouse button |
 | Jump | Space |
-| Fly (Creative) | Double-tap Space; hold Space to rise, Shift to descend |
+| Sprint | Double-tap W, or Tab |
 | Sneak | Shift |
-| Hotbar | 1-9 or mouse wheel |
-| Inventory and crafting | E |
-| Drop item | Q (Ctrl+Q for the whole stack) |
-| Pause and free the cursor | Esc (the pause menu has Options, including FOV) |
+| Fly (Creative) | Double-tap Space, then hold Space to go up and Shift to go down |
+| Hotbar | 1-9 or the mouse wheel |
+| Inventory | E |
+| Drop item | Q (Ctrl+Q drops the whole stack) |
+| Chat / command | T / `/` |
+| Third person | F5 |
+| Zoom | Z |
+| Debug info | F3 |
+| Fullscreen | F11 |
+| Pause | Esc |
 
-The cursor is only captured while playing; menus always use a normal cursor. Mouse sensitivity is in
-the in-game Options.
+You can change most of these in Options > Controls.
 
-### Touchscreen
+In the inventory, the mouse works the way it does in Java: left and right click, drag to spread a stack,
+double-click to gather, shift-click to move things over, and number keys to swap with the hotbar.
 
-Play in landscape. Drag anywhere on the lower left of the screen to walk (flick it forward to sprint); double-tap there to jump (hold a
-second finger to keep jumping, or to fly up and down in creative). Drag elsewhere to look around,
-tap to place or use, and hold to break. Options > Controls switches between this joystick, a D-pad
-with a jump button, or an invisible joystick.
-
-In the inventory: tap an item to select it, then tap where it should go. Hold to select half (or,
-with something selected, to put one down), double-tap to move an item to the other section, and drag
-an item to carry it. Tap a recipe to craft it, hold it to craft all.
-
-### Inventory, chests and furnaces
-
-| Action | Mouse / key |
-| --- | --- |
-| Pick up or put down a stack | Left click |
-| Pick up half / put down one | Right click |
-| Spread a stack evenly | Hold left click and drag over slots |
-| Put one in each slot | Hold right click and drag over slots |
-| Gather matching items | Double-click |
-| Move to the other section | Shift-click (or shift and drag) |
-| Move a single item | Mouse wheel over a slot |
-| Swap with a hotbar slot | 1-9 over a slot |
-| Drop | Q (Shift+Q for the whole stack), or click outside the window |
-| Craft | Put items in the crafting grid (3x3 at a crafting table) and take the result; shift-click the result to craft as many as you can |
-| Scroll lists | Mouse wheel |
+On a touchscreen, play in landscape. Drag on the lower left to walk (flick forward to sprint), drag anywhere
+else to look, tap to place or use, and hold to break. Options > Controls has a D-pad if you'd rather use one.
+In the inventory, tap an item and then tap where it should go.
 
 
-### New worlds
-
-When creating a world you can pick its size (up to Extreme, or Infinite, on a computer), an
-Indev-style world type (Island, Inland, Floating or Flat) and theme (Hell, Paradise or Woods),
-1.5-style biomes or the classic Pocket Edition terrain, and a seed.
-
-Besides Survival and Creative there are two more game modes: the 404 Challenge, and Skyblock - a
-small start island over the void, with islands of every biome to bridge out to.
-
-### From Java 1.5
-
-The Nether, villages, the 1.5 mobs, weather, hunger, maps, enchanting, anvils, experience, potions
-and brewing, and the 1.5 redstone blocks, alongside a tabbed creative inventory.
-
-
-### Bot
-
-Each world can have one helper bot (on a computer). Switch bots on in Options > Bot, then
-`/bot spawn` and tell it what you want -
-`/bot get 64 planks`, `/bot get an iron pickaxe`, `/bot get iron set` - and it gathers, crafts and
-smelts what it needs, mods' items included, and brings it to you. It also comes, follows, defends,
-clears an area, digs tunnels and hands things over (`/bot help` lists everything). It works in
-multiplayer: anyone in the world can command it.
-
-Options > Bot also sets its name, skin and personality. With a brain chosen there -
-[Ollama](https://ollama.com), or a Claude / ChatGPT key - you can just talk to it in chat:
-"chives, chop some wood and make me two axes".
-
-## Build
+## Building it yourself
 
 The source is in `web-build.zip`. From the extracted `web-build` folder:
 
-1. Install dependencies: `.\install_deps.ps1`
+1. Install what it needs: `.\install_deps.ps1`
 2. Build: `.\build.ps1`
 
-Output: `project/emscripten/index.html`, `index.js`, `index.wasm`. Serve that folder to run.
+That puts `index.html`, `index.js` and `index.wasm` in `project/emscripten`. Serve that folder and open it in
+a browser.
