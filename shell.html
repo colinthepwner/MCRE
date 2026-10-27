@@ -2259,7 +2259,8 @@
                     'on_hit', 'wet_damage', 'heals_in', 'burning', 'death_explosion', 'summons',
                     'blast', 'rider', 'heats', 'body_by_block', 'calls_friends',
                     'spawn_effects',
-                    'preys_on', 'grazes', 'stock', 'dissolves'];
+                    'preys_on', 'grazes', 'stock', 'dissolves',
+                    'brutal_hits'];
                 var TRAIT_REFS = { blocks: 1, avoid: 1, harvest_as: 1, frenzy_harvest_as: 1, player_only: 1, swap_drop: 1, item: 1, place: 1,
                     ammo_drop: 1, food: 1, water: 1, well_only: 1, items: 1, graze: 1, plants: 1, no_drop: 1, spare: 1, melee_item: 1, douses: 1 };
                 var TRAIT_MAP_REFS = { swap: 1, eat_to: 1, drinks: 1, fills: 1, drop_as: 1, converts: 1 }, TRAIT_KEY_REFS = { ticks: 1, items: 1, costs: 1, drink_gain: 1, blocks: 1, convert_hurt: 1 };
@@ -2274,6 +2275,7 @@
                             else if (trait === 'preys_on') o = { kinds: o };
                             else if (trait === 'seeks_items') o = { items: o };
                             else if (trait === 'day_peaceful') o = { on: o ? 1 : 0 };
+                            else if (trait === 'brutal_hits') o = typeof o === 'string' ? { like: o.toLowerCase() } : { hits: Number(o) | 0 };
                             else if (trait === 'heals_with_time' && o === false) o = { on: 0 };
                             else if (o === false) return;
                             else { bad('"' + trait + '": an object of its settings, or true'); return; }
@@ -2496,6 +2498,8 @@
                     ['brutalCreeperFuse', 20, 'On Brutal, ticks a lit creeper takes to explode (other difficulties: 30)', [1, 200]],
                     ['brutalDamage', 2, 'On Brutal, creatures\' damage to players is multiplied by this (Hard: 1.5)', [0, 100]],
                     ['brutalArrowSpread', 0, 'On Brutal, how far a skeleton\'s arrows stray (Hard 2, Normal 6, Easy 10)', [0, 50]],
+                    ['brutalCreeperHits', 1, 'On Brutal, the hits from a player that kill a creeper (0: its usual health)', [0, 100]],
+                    ['brutalSkeletonHits', 2, 'On Brutal, the hits from a player that kill a skeleton (0: its usual health)', [0, 100]],
                     ['preloadShare', 30, 'With Pre-load Chunks on, the share of time (percent) making the rest of the world may use while playing (0: paused)', [0, 90]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });

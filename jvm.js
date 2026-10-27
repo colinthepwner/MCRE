@@ -25028,6 +25028,8 @@ function* collectMobsSteps(vm, modId, ref, safe) {
 		if (own('dropFewItems(ZI)V') || own('dropRareDrop(I)V')) json.java_drops = true;
 		if (own('interact(Lnet/minecraft/src/EntityPlayer;)Z')) json.java_interact = true;
 		if (has('EntityZombie') || has('EntitySkeleton')) json.burns_in_daylight = true;
+		if (has('EntityCreeper')) json.brutal_hits = 'creeper';
+		else if (has('EntitySkeleton')) json.brutal_hits = 'skeleton';
 		if (air.noFall) json.no_fall_damage = true;
 		if (air.noStep || behaviour === 'flying') json.no_step_sounds = true;
 		if (groundFlyer) json.spawn_on_ground = true;
