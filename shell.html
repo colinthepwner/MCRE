@@ -55,19 +55,30 @@
             height: 100%;
         }
 
+        /* "Turn your device sideways": the game's menu dirt (as the loading screen has it, see
+           #mcLoading below), a phone that turns, and the game's lettering (mcPixel). */
         #mc-rotate {
             position: fixed;
             inset: 0;
             z-index: 9998;
             display: none;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: #000;
+            gap: 28px;
+            background: #404040 url(icons/dirt.png) 0 0 / 64px 64px repeat;
+            background-blend-mode: multiply;
+            image-rendering: pixelated;
             color: #fff;
             font: 18px/1.4 monospace;
             text-align: center;
             padding: 24px;
         }
+
+        /* The overlays' pixel icons: the mouse's left button blinking ("Click to play"), the phone
+           turning to landscape and back ("Turn your device sideways") */
+        @keyframes mcBlink { 0%, 50% { opacity: 1 } 50.01%, 100% { opacity: 0 } }
+        @keyframes mcTurn { 0%, 20% { transform: rotate(0deg) } 45%, 75% { transform: rotate(-90deg) } 100% { transform: rotate(0deg) } }
 
         /* The menu dirt behind everything until the game has shown its title screen (user
            2026-10-16: "should use the actual minecraft dirt texture"). It is the game's own
@@ -282,6 +293,115 @@
             return dpr * ([1, 1, 0.75, 0.5, 0.35][o] || 1);
         };
 
+        window.mcPixel = (function () {
+            var sheet = new Image(), ready = false, widths = [], cell = 8, waiting = [];
+            sheet.onload = function () {
+                try {
+                    cell = Math.max(1, Math.floor(sheet.width / 16));
+                    var c = document.createElement('canvas');
+                    c.width = sheet.width; c.height = sheet.height;
+                    var g = c.getContext('2d');
+                    g.drawImage(sheet, 0, 0);
+                    var d = g.getImageData(0, 0, c.width, c.height).data;
+                    for (var i = 0; i < 256; i++) {
+                        var cx = (i % 16) * cell, cy = Math.floor(i / 16) * cell, x = cell - 1;
+                        for (; x >= 0; x--) {
+                            var filled = false;
+                            for (var y = 0; y < cell && !filled; y++) if (d[((cy + y) * c.width + cx + x) * 4 + 3] > 0) filled = true;
+                            if (filled) break;
+                        }
+                        widths[i] = i === 32 ? Math.round(cell / 2) : x + 2;
+                    }
+                    ready = true;
+                } catch (e) { return; }
+                waiting.splice(0).forEach(function (f) { try { f(); } catch (e) { } });
+            };
+            sheet.src = 'icons/font.png';
+
+            function glyph(ch) { var k = ch.charCodeAt(0); return k < 256 ? k : 63; }
+            function lineWidth(s) { var w = 0; for (var i = 0; i < s.length; i++) w += widths[glyph(s[i])]; return w; }
+            function wrap(str, maxW) {
+                var out = [], cur = '';
+                str.split(' ').forEach(function (word) {
+                    var t = cur ? cur + ' ' + word : word;
+                    if (cur && lineWidth(t) > maxW) { out.push(cur); cur = word; } else cur = t;
+                });
+                out.push(cur);
+                return out;
+            }
+            function layer(lines, w, h, lineH, colour, ox, oy) {
+                var c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                var g = c.getContext('2d');
+                lines.forEach(function (s, row) {
+                    var x = Math.floor((w - 1 - lineWidth(s)) / 2) + ox, y = row * lineH + oy;
+                    for (var i = 0; i < s.length; i++) {
+                        var k = glyph(s[i]);
+                        g.drawImage(sheet, (k % 16) * cell, Math.floor(k / 16) * cell, cell, cell, x, y, cell, cell);
+                        x += widths[k];
+                    }
+                });
+                g.globalCompositeOperation = 'source-in';
+                g.fillStyle = colour;
+                g.fillRect(0, 0, w, h);
+                return c;
+            }
+            function shade(hex) {
+                var n = parseInt(hex.slice(1), 16);
+                n = (n & 0xfcfcfc) >> 2;
+                return '#' + ('00000' + n.toString(16)).slice(-6);
+            }
+            function drawText(str, scale, colour, maxCss) {
+                var lineH = cell + 2;
+                var lines = wrap(str, maxCss ? Math.max(cell, Math.floor(maxCss / scale)) : 1e9);
+                var w = 1, h = lines.length * lineH;
+                lines.forEach(function (s) { w = Math.max(w, lineWidth(s) + 1); });
+                var c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                var g = c.getContext('2d');
+                g.drawImage(layer(lines, w, h, lineH, shade(colour), 1, 1), 0, 0);
+                g.drawImage(layer(lines, w, h, lineH, colour, 0, 0), 0, 0);
+                c.style.cssText = 'display:block;width:' + w * scale + 'px;height:' + h * scale + 'px;image-rendering:pixelated;image-rendering:crisp-edges';
+                return c;
+            }
+            return {
+                text: function (str, opts) {
+                    opts = opts || {};
+                    var scale = opts.scale || 2, colour = opts.colour || '#ffffff';
+                    var span = document.createElement('span');
+                    span.style.display = 'inline-block';
+                    function fill() {
+                        span.textContent = '';
+                        span.appendChild(drawText(str, scale, colour, opts.maxWidth));
+                    }
+                    if (ready) fill();
+                    else {
+                        span.textContent = str;
+                        span.style.font = (scale * 8) + 'px/1.3 monospace';
+                        span.style.color = colour;
+                        span.style.textShadow = scale + 'px ' + scale + 'px 0 ' + shade(colour);
+                        waiting.push(function () { span.style.font = span.style.color = span.style.textShadow = ''; fill(); });
+                    }
+                    return span;
+                },
+                icon: function (rows, palette, scale) {
+                    var c = document.createElement('canvas');
+                    c.width = rows[0].length; c.height = rows.length;
+                    var g = c.getContext('2d');
+                    rows.forEach(function (r, y) {
+                        for (var x = 0; x < r.length; x++) {
+                            var p = palette[r[x]];
+                            if (!p) continue;
+                            g.fillStyle = p;
+                            g.fillRect(x, y, 1, 1);
+                        }
+                    });
+                    c.style.cssText = 'display:block;width:' + c.width * scale + 'px;height:' + c.height * scale + 'px;image-rendering:pixelated;image-rendering:crisp-edges';
+                    return c;
+                }
+            };
+        })();
+
         (function () {
             var canvas = document.getElementById('canvas');
             var wanted = false;
@@ -340,18 +460,50 @@
                     if (p && p.catch) p.catch(function () {   });
                 } catch (e) {   }
             }
+            var MOUSE = [
+                '.....c.....',
+                '.....c.....',
+                '..#######..',
+                '.#LLL#rrr#.',
+                '#wLLL#rrrd#',
+                '#LLLL#rrrd#',
+                '#LLLL#rrrd#',
+                '###########',
+                '#wllllllld#',
+                '#wllllllld#',
+                '#lllllllld#',
+                '#lllllllld#',
+                '.#llllldd#.',
+                '..#ddddd#..',
+                '...#####...'
+            ];
+            function mouseIcon(s) {
+                var box = document.createElement('div');
+                box.style.cssText = 'position:relative;flex:none';
+                box.appendChild(window.mcPixel.icon(MOUSE, { '#': '#1e1e1e', w: '#ffffff', l: '#c6c6c6', L: '#c6c6c6', r: '#c6c6c6', d: '#8b8b8b', c: '#8b8b8b' }, s));
+                var lit = window.mcPixel.icon(MOUSE.map(function (r) { return r.replace(/[^L]/g, '.'); }), { L: '#ffff55' }, s);
+                lit.style.position = 'absolute';
+                lit.style.left = lit.style.top = '0';
+                lit.style.animation = 'mcBlink 1s steps(1) infinite';
+                box.appendChild(lit);
+                return box;
+            }
             function updateHint() {
                 var waiting = lockAfterEsc || (lockAskedAt && Date.now() - lockAskedAt < 1500);
                 var show = wanted && !locked() && pcMode() && supported() && !waiting;
                 if (show && !hint) {
+                    var s = window.innerWidth >= 900 ? 3 : 2;
                     hint = document.createElement('div');
-                    hint.textContent = 'Click to play';
                     hint.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);' +
-                        'z-index:9997;pointer-events:none;font:16px/1.4 monospace;color:#fff;' +
-                        'background:rgba(0,0,0,.55);padding:8px 16px;border-radius:3px';
+                        'z-index:9997;pointer-events:none;display:flex;align-items:center;gap:' + 6 * s + 'px;' +
+                        'padding:' + 4 * s + 'px ' + 6 * s + 'px;background:rgba(16,0,16,.94);' +
+                        'border:' + s + 'px solid transparent;border-image:linear-gradient(rgba(80,0,255,.31),rgba(40,0,127,.31)) 1;' +
+                        'box-shadow:0 0 0 ' + s + 'px rgba(16,0,16,.94)';
+                    hint.appendChild(mouseIcon(s));
+                    hint.appendChild(window.mcPixel.text('Click to play', { scale: s }));
                     document.body.appendChild(hint);
                 }
-                if (hint) hint.style.display = show ? 'block' : 'none';
+                if (hint) hint.style.display = show ? 'flex' : 'none';
             }
 
             Module.mcEscToGame = function () {
@@ -369,6 +521,34 @@
                     try { canvas.focus(); } catch (x) { }
                 }
             };
+            var centerAskedAt = 0;
+            var launcherPing = null;
+            function launcherHere() {
+                if (!launcherPing) {
+                    launcherPing = fetch('api/ping', { cache: 'no-store' })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (j) { return !!(j && j.app === 'mcpe-web-saves'); })
+                        .catch(function () { return false; });
+                }
+                return launcherPing;
+            }
+            Module.mcCenterCursorOnRelease = function () {
+                centerAskedAt = Date.now();
+                launcherHere();
+            };
+            function centerCursor() {
+                if (!pcMode() || locked() || !document.hasFocus()) return;
+                var b = canvas.getBoundingClientRect();
+                if (!b.width || !b.height) return;
+                var q = 'cx=' + (b.left + b.width / 2).toFixed(1) + '&cy=' + (b.top + b.height / 2).toFixed(1) +
+                    '&vw=' + window.innerWidth + '&vh=' + window.innerHeight + '&t=' + Date.now();
+                launcherHere().then(function (yes) {
+                    if (!yes) return;
+                    fetch('api/cursor?' + q, { method: 'POST', headers: { 'X-MC-Save': '1' }, cache: 'no-store' })
+                        .catch(function () { });
+                });
+            }
+
             Module.mcPointerWanted = function (on) {
                 if (on) Module.mcReclaimFocus();
                 wanted = !!on;
@@ -420,6 +600,7 @@
                     unlockFlagged = !exitAsked && unlockedAt - escDownAt > 500;
                     lockAskedAt = 0;
                     if (unlockFlagged) Module.mcLockLostByPlayer = 1;
+                    if (exitAsked && unlockedAt - centerAskedAt < 1500) { centerAskedAt = 0; setTimeout(centerCursor, 30); }
                     exitAsked = false;
                 }
                 updateHint();
@@ -471,7 +652,33 @@
 
             var overlay = document.createElement('div');
             overlay.id = 'mc-rotate';
-            overlay.textContent = 'Turn your device sideways to play';
+            var PHONE = [
+                '.########.',
+                '#dddddddd#',
+                '#dssssssd#',
+                '#dssssssd#',
+                '#dssssssd#',
+                '#dssssssd#',
+                '#dssssssd#',
+                '#dssssssd#',
+                '#dggggggd#',
+                '#dbbbbbbd#',
+                '#dbbbbbbd#',
+                '#dbbbbbbd#',
+                '#dddddddd#',
+                '#ddd##ddd#',
+                '#dddddddd#',
+                '.########.'
+            ];
+            var px = 6;
+            var turnBox = document.createElement('div');
+            turnBox.style.cssText = 'width:' + 16 * px + 'px;height:' + 16 * px + 'px;display:flex;align-items:center;justify-content:center;flex:none';
+            var phone = window.mcPixel.icon(PHONE, { '#': '#1e1e1e', d: '#3c3c3c', s: '#78a7ff', g: '#5d9a35', b: '#866043' }, px);
+            phone.style.animation = 'mcTurn 2.6s ease-in-out infinite';
+            turnBox.appendChild(phone);
+            overlay.appendChild(turnBox);
+            var narrow = Math.min(window.innerWidth, window.innerHeight);
+            overlay.appendChild(window.mcPixel.text('Turn your device sideways to play', { scale: narrow >= 360 ? 3 : 2, maxWidth: Math.round(narrow * 0.85) }));
             document.body.appendChild(overlay);
 
             function portrait() { return window.innerHeight > window.innerWidth; }

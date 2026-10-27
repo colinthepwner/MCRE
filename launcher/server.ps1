@@ -9,7 +9,17 @@ $ErrorActionPreference = 'Stop'
 Add-Type -Namespace McpeWeb -Name Win32 -MemberDefinition @'
 [DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
 [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);
+[StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+[StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint pid);
+[DllImport("user32.dll")] public static extern bool GetClientRect(System.IntPtr hWnd, out RECT r);
+[DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr hWnd, ref POINT p);
+[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(System.IntPtr value);
 '@
+try { [void][McpeWeb.Win32]::SetProcessDpiAwarenessContext([IntPtr](-4)) } catch { try { [void][McpeWeb.Win32]::SetProcessDPIAware() } catch { } }
 function Show-Console { [void][McpeWeb.Win32]::ShowWindow([McpeWeb.Win32]::GetConsoleWindow(), 5) }
 function Show-Error([string]$text) {
     Add-Type -AssemblyName System.Windows.Forms
@@ -149,6 +159,30 @@ function Remove-EmptyParents([string]$dir) {
     }
 }
 
+$CursorBrowsers = @('msedge', 'chrome', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium')
+
+function Move-CursorToGame([double]$cx, [double]$cy, [double]$vw, [double]$vh, [bool]$dry) {
+    $hwnd = [McpeWeb.Win32]::GetForegroundWindow()
+    if ($hwnd -eq [IntPtr]::Zero) { return @{ ok = $false; why = 'no foreground window' } }
+    [uint32]$procId = 0
+    [void][McpeWeb.Win32]::GetWindowThreadProcessId($hwnd, [ref]$procId)
+    $name = (Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName
+    if (-not $name -or $CursorBrowsers -notcontains $name.ToLowerInvariant()) { return @{ ok = $false; why = 'not a browser window'; name = $name } }
+    $rc = New-Object McpeWeb.Win32+RECT
+    if (-not [McpeWeb.Win32]::GetClientRect($hwnd, [ref]$rc)) { return @{ ok = $false; why = 'no client rect' } }
+    $pt = New-Object McpeWeb.Win32+POINT
+    if (-not [McpeWeb.Win32]::ClientToScreen($hwnd, [ref]$pt)) { return @{ ok = $false; why = 'no client origin' } }
+    $cw = $rc.Right - $rc.Left
+    $ch = $rc.Bottom - $rc.Top
+    if ($cw -le 0 -or $ch -le 0) { return @{ ok = $false; why = 'empty client area' } }
+    $scale = $cw / $vw
+    $x = [int][Math]::Round($pt.X + $cx * $scale)
+    $y = [int][Math]::Round($pt.Y + $ch - ($vh - $cy) * $scale)
+    if ($x -lt $pt.X -or $x -ge $pt.X + $cw -or $y -lt $pt.Y -or $y -ge $pt.Y + $ch) { return @{ ok = $false; why = 'outside the window'; x = $x; y = $y } }
+    if (-not $dry) { [void][McpeWeb.Win32]::SetCursorPos($x, $y) }
+    return @{ ok = $true; x = $x; y = $y; scale = [Math]::Round($scale, 3); client = @($pt.X, $pt.Y, $cw, $ch); name = $name; dry = $dry }
+}
+
 $TrashStamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
 
 function Invoke-Api($ctx) {
@@ -168,6 +202,22 @@ function Invoke-Api($ctx) {
 
     if ($path -eq '/api/ping') {
         Send-Json $ctx 200 @{ ok = $true; app = $AppTag; storeId = $StoreId }
+        return
+    }
+
+    if ($path -eq '/api/cursor' -and $method -eq 'POST') {
+        $q = $req.QueryString
+        $inv = [Globalization.CultureInfo]::InvariantCulture
+        $flt = [Globalization.NumberStyles]::Float
+        $cx = 0.0; $cy = 0.0; $vw = 0.0; $vh = 0.0; $t = 0L
+        if (-not ([double]::TryParse($q['cx'], $flt, $inv, [ref]$cx) -and [double]::TryParse($q['cy'], $flt, $inv, [ref]$cy) -and
+                  [double]::TryParse($q['vw'], $flt, $inv, [ref]$vw) -and [double]::TryParse($q['vh'], $flt, $inv, [ref]$vh)) -or $vw -le 0 -or $vh -le 0) {
+            Send-Text $ctx 400 'bad numbers'; return
+        }
+        if ([long]::TryParse($q['t'], [ref]$t) -and ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - $t) -gt 600) {
+            Send-Json $ctx 200 @{ ok = $false; why = 'too late' }; return
+        }
+        Send-Json $ctx 200 (Move-CursorToGame $cx $cy $vw $vh ($q['dry'] -eq '1'))
         return
     }
 
