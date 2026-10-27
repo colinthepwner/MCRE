@@ -13478,16 +13478,23 @@
                
                 ollamaHost: 'http://localhost:11434', ollamaModel: '', claudeKey: '', claudeModel: 'claude-haiku-5-5',
                 openaiKey: '', openaiModel: 'gpt-4o-mini', temperature: 0.3 };
+            var botGuestConf = null;
+            var botSignedIn = function () { try { return !Module.mcAuth || Module.mcAuth.signedIn(); } catch (e) { return true; } };
             function botConf() {
                 var c = {};
                 try { c = JSON.parse(localStorage.getItem(BOT_CONF_KEY) || '{}') || {}; } catch (e) { c = {}; }
+                if (botGuestConf && !botSignedIn()) c = botGuestConf;
                 var o = {};
                 Object.keys(BOT_DEFAULTS).forEach(function (k) { o[k] = c[k] === undefined || c[k] === null ? BOT_DEFAULTS[k] : c[k]; });
                 o.provider = Math.max(0, Math.min(3, o.provider | 0));
                 if (!String(o.name).trim()) o.name = BOT_DEFAULTS.name;
                 return o;
             }
-            function botConfSave(c) { try { localStorage.setItem(BOT_CONF_KEY, JSON.stringify(c)); } catch (e) { } }
+            function botConfSave(c) {
+                if (!botSignedIn()) { botGuestConf = JSON.parse(JSON.stringify(c || {})); return; }
+                botGuestConf = null;
+                try { localStorage.setItem(BOT_CONF_KEY, JSON.stringify(c)); } catch (e) { }
+            }
             BOT.conf = botConf;
             BOT.ai = { down: 0, models: null };
             function fetchT(url, opts, ms) {
