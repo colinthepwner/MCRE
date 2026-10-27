@@ -6,6 +6,7 @@
     var API = 'api/';
     var LARGE_FILE_BYTES = 1024 * 1024;
     function isBig(path, size) { return size >= LARGE_FILE_BYTES || path.indexOf('region/') >= 0; }
+    function isScratch(path) { return /(^|\/)minecraftWorlds\/_tutorial(\/|$)/.test(path); }
     var SMALL_CHANGE_DEBOUNCE_MS = 4000;
     var LARGE_FILE_INTERVAL_MS = 60000;
     var BLOCK_BYTES = 64 * 1024;
@@ -80,6 +81,7 @@
                 if (name === '.' || name === '..') continue;
                 var full = dir + '/' + name;
                 var r = rel ? rel + '/' + name : name;
+                if (isScratch(r)) continue;
                 var st;
                 try { st = fs.stat(full); } catch (e) { continue; }
                 if (fs.isDir(st.mode)) walk(full, r);
@@ -147,6 +149,7 @@
             return orig.call(IDBFS, mount, function (err, set) {
                 if (!err && set && set.entries) {
                     Object.keys(set.entries).forEach(function (path) {
+                        if (isScratch(path)) { delete set.entries[path]; return; }
                         try {
                             var st = fs.stat(path);
                             if (fs.isFile(st.mode) && isBig(path, st.size)) delete set.entries[path];

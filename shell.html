@@ -18,13 +18,17 @@
            source kept in mcre-work/hot/site_cursors) everywhere on the page - the real pointer matches the drawn one
            in inventories (gui/cursor_pack.png). Inline cursor:pointer / text styles are remapped by the attribute
            rules; !important because many elements set their cursor inline. */
-        html, body, canvas, * { cursor: url(icons/cursors/normal.cur) 0 0, default; }
-        a, button, select, label, summary, [role="button"], [onclick],
-        [style*="cursor:pointer"], [style*="cursor: pointer"] { cursor: url(icons/cursors/pointer.cur), pointer !important; }
-        input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="password"],
-        input[type="email"], input[type="url"], textarea, [contenteditable="true"] { cursor: url(icons/cursors/text.cur), text !important; }
-        [style*="cursor:grabbing"], [style*="cursor: grabbing"] { cursor: url(icons/cursors/grabbing.cur), grabbing !important; }
-        [disabled], [style*="cursor:not-allowed"], [style*="cursor: not-allowed"] { cursor: url(icons/cursors/not_allowed.cur), not-allowed !important; }
+        /* TEMPORARILY OFF (user 2026-10-27: "some buttons still use the fake cursor like the skin... button", after
+           asking for the real mouse in inventories): every rule needs html.mc-cursors, which nothing sets now, so
+           the system's own pointers show everywhere. To bring the pack back, add the class at the first script
+           (document.documentElement.classList.add('mc-cursors')) - and main_emscripten.cpp kDrawnPopupCursor. */
+        html.mc-cursors, html.mc-cursors body, html.mc-cursors canvas, html.mc-cursors * { cursor: url(icons/cursors/normal.cur) 0 0, default; }
+        html.mc-cursors :is(a, button, select, label, summary, [role="button"], [onclick],
+        [style*="cursor:pointer"], [style*="cursor: pointer"]) { cursor: url(icons/cursors/pointer.cur), pointer !important; }
+        html.mc-cursors :is(input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="password"],
+        input[type="email"], input[type="url"], textarea, [contenteditable="true"]) { cursor: url(icons/cursors/text.cur), text !important; }
+        html.mc-cursors :is([style*="cursor:grabbing"], [style*="cursor: grabbing"]) { cursor: url(icons/cursors/grabbing.cur), grabbing !important; }
+        html.mc-cursors :is([disabled], [style*="cursor:not-allowed"], [style*="cursor: not-allowed"]) { cursor: url(icons/cursors/not_allowed.cur), not-allowed !important; }
 
         body,
         html {
@@ -451,6 +455,16 @@
             function locked() {
                 return document.pointerLockElement === canvas;
             }
+            var retryTimer = 0, retriedFor = -1, lastGestureAt = -1e9;
+            ['mousedown', 'pointerdown', 'touchend'].forEach(function (t) {
+                window.addEventListener(t, function () { lastGestureAt = Date.now(); }, true);
+            });
+            window.addEventListener('keydown', function (e) { if (e.key !== 'Escape') lastGestureAt = Date.now(); }, true);
+            function activationFresh() {
+                var ua = navigator.userActivation;
+                if (ua && typeof ua.isActive === 'boolean') return ua.isActive;
+                return Date.now() - lastGestureAt < 4500;
+            }
             function tryLock() {
                 if (!wanted || locked() || !pcMode() || !supported()) return;
                 if (escHeld) { lockAfterEsc = true; return; }
@@ -489,7 +503,7 @@
                 return box;
             }
             function updateHint() {
-                var waiting = lockAfterEsc || (lockAskedAt && Date.now() - lockAskedAt < 1500);
+                var waiting = lockAfterEsc || retryTimer !== 0 || (lockAskedAt && Date.now() - lockAskedAt < 1500);
                 var show = wanted && !locked() && pcMode() && supported() && !waiting;
                 if (show && !hint) {
                     var s = window.innerWidth >= 900 ? 3 : 2;
@@ -608,6 +622,15 @@
             document.addEventListener('pointerlockerror', function () {
                 lockAskedAt = 0;
                 var now = Date.now();
+                if (wanted && pcMode() && supported() && retriedFor !== unlockedAt
+                        && now - unlockedAt < 1500 && activationFresh()) {
+                    retriedFor = unlockedAt;
+                    clearTimeout(retryTimer);
+                    retryTimer = setTimeout(function () { retryTimer = 0; tryLock(); updateHint(); },
+                        Math.max(50, unlockedAt + 1300 - now));
+                    updateHint();
+                    return;
+                }
                 if (now - clickAttemptAt < 1000) {
                     if (failures++ === 0) firstFailureAt = now;
                     if (failures >= 3 && now - firstFailureAt > 2000) {
@@ -616,6 +639,27 @@
                     }
                 }
                 updateHint();
+            });
+            window.addEventListener('keydown', function (e) {
+                if (e.key !== 'F11' || e.repeat || !pcMode()) return;
+                var el = document.documentElement, kb = navigator.keyboard;
+                if (!el.requestFullscreen || !kb || !kb.lock) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (document.fullscreenElement) {
+                    try { document.exitFullscreen().catch(function () { }); } catch (x) { }
+                    return;
+                }
+                try {
+                    el.requestFullscreen({ navigationUI: 'hide' })
+                        .then(function () { return kb.lock(['Escape']); })
+                        .catch(function (x) { console.warn('full screen / keyboard lock refused:', x); });
+                } catch (x) { }
+            }, true);
+            document.addEventListener('fullscreenchange', function () {
+                if (!document.fullscreenElement && navigator.keyboard && navigator.keyboard.unlock) {
+                    try { navigator.keyboard.unlock(); } catch (x) { }
+                }
             });
             setInterval(updateHint, 500);
         })();
@@ -722,9 +766,23 @@
             setInterval(sync, 1000);
             updateOverlay();
         })();
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden || !Module._mcPageHidden || typeof MainLoop === 'undefined' || !MainLoop.func) return;
+            try { if (Module._mcPageHidden()) { MainLoop.pause(); MainLoop.resume(); } } catch (e) { console.warn('[page] hidden', e); }
+        });
 
-        Module.mcInstallWorld = function (src, dst, flagKey) {
+        Module.mcInstallWorld = function (src, dst, flagKey, wipe) {
             Module[flagKey] = 0;
+            if (wipe) (function rm(p) {
+                var st;
+                try { st = FS.stat(p); } catch (e) { return; }
+                if (FS.isDir(st.mode)) {
+                    FS.readdir(p).forEach(function (n) { if (n !== '.' && n !== '..') rm(p + '/' + n); });
+                    try { FS.rmdir(p); } catch (e) { }
+                } else {
+                    try { FS.unlink(p); } catch (e) { }
+                }
+            })(dst);
             fetch(src + 'files.json', { cache: 'no-cache' }).then(function (r) {
                 if (!r.ok) throw new Error('files.json ' + r.status);
                 return r.json();
@@ -2432,6 +2490,13 @@
                     ['tutorialHints', true, 'Tutorial worlds show the console tutorial\'s walkthrough and hints'],
                     ['tutorialAreaGate', true, 'In a tutorial world the walled spawn area can\'t be left before the main tutorial is done or skipped'],
                     ['tutorialHunger', true, 'Tutorial worlds have hunger and sprinting, and the walkthrough teaches them (off: the original TU3 rules, neither)'],
+                    ['brutalDigging', true, 'On Brutal, monsters hunting a player break the blocks in their way that a bare hand can break (dirt, sand, gravel, wood, leaves...)'],
+                    ['brutalDigTime', 60, 'On Brutal, ticks a monster takes per point of a block\'s hardness to break it (a player\'s bare hand: 30)', [1, 10000]],
+                    ['brutalSkeletonRetreat', 6, 'On Brutal, a skeleton backs away from a player closer than this many blocks, still shooting (0: never)', [0, 32]],
+                    ['brutalCreeperFuse', 20, 'On Brutal, ticks a lit creeper takes to explode (other difficulties: 30)', [1, 200]],
+                    ['brutalDamage', 2, 'On Brutal, creatures\' damage to players is multiplied by this (Hard: 1.5)', [0, 100]],
+                    ['brutalArrowSpread', 0, 'On Brutal, how far a skeleton\'s arrows stray (Hard 2, Normal 6, Easy 10)', [0, 50]],
+                    ['preloadShare', 30, 'With Pre-load Chunks on, the share of time (percent) making the rest of the world may use while playing (0: paused)', [0, 90]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -2886,7 +2951,8 @@
                     list.push({ id: id, device: p.device, afk: ms });
                 });
                 var rules = { idle: R.idle, kick: R.kick, fade: R.fade, mobs: R.mobs, lost: R.lost, sky: Module.mcSky.script, modSky: !!rule('modSkyColors'),
-                              cycle: Module._mcDaylightCycle ? Module._mcDaylightCycle(-1) : 1 };
+                              cycle: Module._mcDaylightCycle ? Module._mcDaylightCycle(-1) : 1,
+                              diff: Module._mcHostDifficulty ? Module._mcHostDifficulty(-1) : -1 };
                 if (Module.mcOverrides) { rules.ov = Module.mcOverrides.lines().join('\n'); rules.surv = Module.mcOverrides.survival(); }
                 conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'presence', list: list, rules: rules }); });
                 applyPresence(list, rules);
@@ -3080,6 +3146,7 @@
                                                            sky: typeof hr.sky === 'number' ? hr.sky : -1, modSky: hr.modSky !== false };
                                     if (hr) Module.mcSky.apply();
                                     if (hr && (hr.cycle === 0 || hr.cycle === 1) && Module._mcDaylightCycle) Module._mcDaylightCycle(hr.cycle);
+                                    if (hr && typeof hr.diff === 'number' && hr.diff >= 0 && Module._mcHostDifficulty) Module._mcHostDifficulty(hr.diff | 0);
                                     if (hr && Module.mcOverrides && typeof hr.surv === 'string') Module.mcOverrides.fromHost(String(hr.ov || ''), hr.surv);
                                     applyPresence(hm.json.list, hr ? pres.rules : null);
                                     return;
@@ -9516,8 +9583,8 @@
                                           enabled: !!x.enabled, modName: String(x.m.name || x.id).slice(0, 48),
                                           world_type: modeTypeKey(x), world_type_name: x.modeTypeName || '',
                                           hardcore: !!g.hardcore, 'default': !!g['default'], hunger: !!g.hunger, world_sizes: g.world_sizes || g.sizes, world_height: g.world_height, tall_world: g.tall_world,
-                                          difficulty: (function (d) { if (typeof d === 'string') { var n = ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()); return n >= 0 ? n : /^[0-3]$/.test(d) ? +d : -1; }
-                                              return typeof d === 'number' && d >= 0 && d <= 3 ? Math.floor(d) : -1; })(g.difficulty),
+                                          difficulty: (function (d) { if (typeof d === 'string') { var n = ['peaceful', 'easy', 'normal', 'hard', 'brutal'].indexOf(d.toLowerCase()); return n >= 0 ? n : /^[0-4]$/.test(d) ? +d : -1; }
+                                              return typeof d === 'number' && d >= 0 && d <= 4 ? Math.floor(d) : -1; })(g.difficulty),
                                           difficulty_locked: !!(g.difficulty_locked || g.lock_difficulty), difficulty_name: String(g.difficulty_name || '').slice(0, 24) };
                 });
                 return o;
@@ -10170,8 +10237,8 @@
                             skyColor: function () { return ask(mod, ['skycolor']).then(function (r) { return r.color; }); },
                             setSkyColor: function (c) { act(mod, ['setsky', c === undefined ? null : c]); },
                             setDifficulty: function (d) {
-                                var n = typeof d === 'string' ? ['peaceful', 'easy', 'normal', 'hard'].indexOf(d.toLowerCase()) : d | 0;
-                                if (n >= 0 && n <= 3) act(mod, ['setdifficulty', n]);
+                                var n = typeof d === 'string' ? ['peaceful', 'easy', 'normal', 'hard', 'brutal'].indexOf(d.toLowerCase()) : d | 0;
+                                if (n >= 0 && n <= 4) act(mod, ['setdifficulty', n]);
                             },
                             setWeather: function (kind, seconds) {
                                 var k = String(kind || 'clear').toLowerCase();
@@ -12548,17 +12615,17 @@
                 },
                 complete: function (x, i, p) { return i === 0 ? filt(p, ['survival', 'creative']) : []; } });
 
-            def('difficulty', { level: 2, usage: '/difficulty <peaceful|easy|normal|hard>', args: ['difficulty'],
+            def('difficulty', { level: 2, usage: '/difficulty <peaceful|easy|normal|hard|brutal>', args: ['difficulty'],
                 run: function (x) {
                     var di = world('difficultyinfo') || {};
-                    if (!x.args[0]) { tellTo(x.sd, 'The difficulty is ' + (di.name || ['Peaceful', 'Easy', 'Normal', 'Hard'][world('difficulty') | 0]) + (di.locked ? (di.why === 'Hardcore' ? ' (Hardcore)' : ' (locked by the game mode)') : '')); return; }
-                    var d = { 0: 0, p: 0, peaceful: 0, 1: 1, e: 1, easy: 1, 2: 2, n: 2, normal: 2, 3: 3, h: 3, hard: 3 }[lc(x.args[0])];
+                    if (!x.args[0]) { tellTo(x.sd, 'The difficulty is ' + (di.name || ['Peaceful', 'Easy', 'Normal', 'Hard', 'Brutal'][world('difficulty') | 0]) + (di.locked ? (di.why === 'Hardcore' ? ' (Hardcore)' : ' (locked by the game mode)') : '')); return; }
+                    var d = { 0: 0, p: 0, peaceful: 0, 1: 1, e: 1, easy: 1, 2: 2, n: 2, normal: 2, 3: 3, h: 3, hard: 3, 4: 4, b: 4, brutal: 4 }[lc(x.args[0])];
                     if (d == null) usage(this);
                     if (di.locked) fail('The difficulty can\'t be changed in this game mode - it is always ' + (di.name || 'Hard'));
                     world('difficulty', d);
-                    feedback(x.sd, 'Set game difficulty to ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][d]);
+                    feedback(x.sd, 'Set game difficulty to ' + ['Peaceful', 'Easy', 'Normal', 'Hard', 'Brutal'][d]);
                 },
-                complete: function (x, i, p) { return i === 0 ? filt(p, ['peaceful', 'easy', 'normal', 'hard']) : []; } });
+                complete: function (x, i, p) { return i === 0 ? filt(p, ['peaceful', 'easy', 'normal', 'hard', 'brutal']) : []; } });
 
             def('time', { level: 2, usage: '/time <set|add|query> <value>', args: ['set|add|query', 'value'],
                 run: function (x) {
@@ -13292,6 +13359,7 @@
             var BOT_SUBS = ['spawn', 'get', 'drop', 'come', 'follow', 'defend', 'stop', 'status', 'hunt', 'unhunt', 'clear', 'tunnel',
                 'creative', 'verbose', 'despawn', 'list', 'settings', 'help'];
             function botMobile(sd) {
+                return false;
                 try {
                     if (Module._mcIsPhoneDevice && Module._mcIsPhoneDevice()) return true;
                     if (sd && sd.guid && net().presenceOf) { var pr = net().presenceOf(sd.guid); if (pr && pr.device === 2) return true; }
