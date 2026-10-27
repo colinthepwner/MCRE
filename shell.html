@@ -2222,6 +2222,9 @@
                     ['bucketCreativeKeepsEmpty', false, 'In creative, filling a bucket takes the liquid but leaves the bucket empty (MITE)'],
                     ['nutritionOnlyHunger', 0, 'This share of hungerPerTick builds up apart; each time it reaches a food unit the next point comes off the food bar even with saturation left (MITE 0.25)', [0, 1]],
                     ['grassSpreadTries', 1, 'Spots a grass block tries each random tick to spread onto dirt or let trampled grass recover (MITE 4)', [1, 64]],
+                    ['tutorialHints', true, 'Tutorial worlds show the console tutorial\'s walkthrough and hints'],
+                    ['tutorialAreaGate', true, 'In a tutorial world the walled spawn area can\'t be left before the main tutorial is done or skipped'],
+                    ['tutorialHunger', true, 'Tutorial worlds have hunger and sprinting, and the walkthrough teaches them (off: the original TU3 rules, neither)'],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
@@ -2934,14 +2937,16 @@
                 var ERR = 2;
                 dlg = Module.mcDialog.open({
                     title: 'Join a game',
-                    items: [{ t: 'text', text: 'Type the code the host sees after choosing Open to friends in their game menu.', color: 'a0a0a0' },
-                            { t: 'input', id: 'code', max: 5, filter: 'code', focus: true },
+                    items: [{ t: 'text', text: 'Type the code the host sees after choosing Open to friends in their game menu - or a Beta 1.7.3 server address.', color: 'a0a0a0' },
+                            { t: 'input', id: 'code', max: 64, focus: true },
                             { t: 'text', text: message || '', color: 'ff7070' }],
                     buttons: [{ id: 'join', label: 'Join', primary: true, keep: true }, { id: 'no', label: 'Cancel', cancel: true }],
                     onAction: function (a, v, d) {
                         if (a !== 'join') { dlg = null; Module.mcRoomCodeInput = ''; return; }
-                        var c = String(v.code || '').trim().toUpperCase();
-                        if (c.length !== 5) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers'; d.update(); return; }
+                        var raw = String(v.code || '').trim();
+                        var server = /[.:]/.test(raw) || /^localhost$/i.test(raw);
+                        var c = server ? raw : raw.toUpperCase();
+                        if (!server && !/^[A-Z0-9]{5}$/.test(c)) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers (or type a server address)'; d.update(); return; }
                         d.close();
                         dlg = null;
                         Module.mcRoomCodeInput = c;
@@ -9953,6 +9958,8 @@
                             setGameRule: function (name, value) { act(mod, ['setgamerule', String(name), value === undefined ? null : value]); },
                             bot: function () { return ask(mod, ['botinfo']).then(function (r) { return r.bot || null; }); },
                             botCommand: function (line) { return ask(mod, ['botcmd', String(line == null ? '' : line)]).then(function (r) { return r; }); },
+                            tutorial: function () { return ask(mod, ['tutorialinfo']).then(function (r) { return r.tutorial || null; }); },
+                            tutorialSkip: function () { return ask(mod, ['tutorialskip']).then(function (r) { return !!r.ok; }); },
                             skyColor: function () { return ask(mod, ['skycolor']).then(function (r) { return r.color; }); },
                             setSkyColor: function (c) { act(mod, ['setsky', c === undefined ? null : c]); },
                             setDifficulty: function (d) {
@@ -10415,6 +10422,17 @@
                 }
                 if (k === 'gamerule') { deliver(fromGuid, a[1], { value: Module.mcGameRules.get(String(a[2])) }); return; }
                 if (k === 'botinfo') { deliver(fromGuid, a[1], { bot: Module.mcBotPage ? Module.mcBotPage.info() : null }); return; }
+                if (k === 'tutorialinfo') {
+                    var tut = null;
+                    try { if (Module._mcTutorialInfo) tut = JSON.parse(UTF8ToString(Module._mcTutorialInfo())); } catch (e) { tut = null; }
+                    deliver(fromGuid, a[1], { tutorial: tut });
+                    return;
+                }
+                if (k === 'tutorialskip') {
+                    if (fromGuid && !isOp(byGuid(fromGuid))) { deliver(fromGuid, a[1], { ok: false }); return; }
+                    deliver(fromGuid, a[1], { ok: !!(Module._mcTutorialSkip && Module._mcTutorialSkip()) });
+                    return;
+                }
                 if (k === 'botcmd') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) { deliver(fromGuid, a[1], { ok: false, msg: 'Only operators can command the bot from a script' }); return; }
                     deliver(fromGuid, a[1], Module.mcBotPage ? Module.mcBotPage.script(a[2]) : { ok: false, msg: 'no bots' });

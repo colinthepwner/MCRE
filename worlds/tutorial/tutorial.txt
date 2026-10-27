@@ -1,0 +1,10 @@
+# MCRE tutorial world (Xbox 360 Edition TU3). Coordinates: blocks, max exclusive.
+version 1
+tu 3
+area tutorialArea 385 0 350 472 128 447
+area pistonArea 402 64 371 420 80 393
+area boatArea 430 62 362 444 80 377
+area fishingArea 444 62 390 458 80 406
+area pistonBridgeArea 290 62 356 310 80 380
+area minecartArea 308 62 412 320 76 426
+area portalArea 363 86 402 371 100 420
