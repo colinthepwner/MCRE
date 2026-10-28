@@ -24418,6 +24418,7 @@ function installMobs(vm) {
 		self[':lookHelper'] = newOf(vm, SRC + 'EntityLookHelper');
 		self[':jumpHelper'] = newOf(vm, SRC + 'EntityJumpHelper');
 		self[':senses'] = newOf(vm, SRC + 'EntitySenses');
+		[':navigator', ':moveHelper', ':lookHelper', ':jumpHelper', ':senses'].forEach(function (k) { if (self[k]) self[k].$owner = self; });
 		JVM.javaEntityInit(vm, self);
 		if (JVM.livingAttributes) JVM.livingAttributes(vm, self);
 		(vm.$livingInitHooks || []).forEach(function (h) { h(vm, self, world); });
@@ -24433,7 +24434,7 @@ function installMobs(vm) {
 		'getMoveHelper()Lnet/minecraft/src/EntityMoveHelper;': function (vm, self) { return self[':moveHelper'] || newOf(vm, SRC + 'EntityMoveHelper'); },
 		'getLookHelper()Lnet/minecraft/src/EntityLookHelper;': function (vm, self) { return self[':lookHelper'] || newOf(vm, SRC + 'EntityLookHelper'); },
 		'getJumpHelper()Lnet/minecraft/src/EntityJumpHelper;': function (vm, self) { return self[':jumpHelper'] || newOf(vm, SRC + 'EntityJumpHelper'); },
-		'getEntitySenses()Lnet/minecraft/src/EntitySenses;': function (vm, self) { return self[':senses'] || newOf(vm, SRC + 'EntitySenses'); },
+		'getEntitySenses()Lnet/minecraft/src/EntitySenses;': function (vm, self) { return self[':senses'] || (self[':senses'] = newOf(vm, SRC + 'EntitySenses')); },
 		'getAIMoveSpeed()F': function (vm, self) { return self[':landMovementFactor'] || self[':moveSpeed'] || 0.7; },
 		'setAIMoveSpeed(F)V': function (vm, self, a) { self[':landMovementFactor'] = a[0]; },
 		'isAIEnabled()Z': function () { return 0; },
@@ -26285,7 +26286,7 @@ function install(vm) {
 	add('EntityJumpHelper', {
 		'setJumping()V': function (vm, self) { var o = owner(self); if (o && o[':onGround']) o[':motionY'] = 0.42; },
 	});
-	['getNavigator()Lnet/minecraft/src/PathNavigate;', 'getMoveHelper()Lnet/minecraft/src/EntityMoveHelper;', 'getJumpHelper()Lnet/minecraft/src/EntityJumpHelper;', 'getLookHelper()Lnet/minecraft/src/EntityLookHelper;'].forEach(function (k) {
+	['getNavigator()Lnet/minecraft/src/PathNavigate;', 'getMoveHelper()Lnet/minecraft/src/EntityMoveHelper;', 'getJumpHelper()Lnet/minecraft/src/EntityJumpHelper;', 'getLookHelper()Lnet/minecraft/src/EntityLookHelper;', 'getEntitySenses()Lnet/minecraft/src/EntitySenses;'].forEach(function (k) {
 		var EL = spec('EntityLiving'), prev = EL && EL.methods[k];
 		if (!prev) return;
 		EL.methods[k] = function (vm, self, a) { var h = prev(vm, self, a); if (h) h.$owner = self; return h; };
@@ -26590,6 +26591,8 @@ JVM.mobTick = function (vm) {
 		if (o[':health'] !== before.h && isFinite(+o[':health'])) op(vm, 'mobhealth', id, Math.round(+o[':health']));
 		var nt = o[':attackTarget'] || o[':entityToAttack'] || null;
 		if (nt !== before.t) op(vm, 'mobtarget', id, nt ? idOf(nt) : 0);
+		var spNow = JVM.attrValue ? JVM.attrValue(o, 'generic.movementSpeed') : null;
+		if (spNow != null && isFinite(+spNow) && +spNow > 0 && +spNow !== o.$sentSpeed) { op(vm, 'mobnav', id, 'speed', +spNow); o.$sentSpeed = +spNow; }
 		if ((B.tick + id) % 40 === 0) { if (JVM.mobLook) JVM.mobLook(vm, o, id); if (JVM.mobSaveState) JVM.mobSaveState(vm, o, id); }
 	}
 };

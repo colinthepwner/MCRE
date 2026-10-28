@@ -2561,6 +2561,8 @@
                     ['brutalCreeperHits', 1, 'On Brutal, the hits from a player that kill a creeper (0: its usual health)', [0, 100]],
                     ['brutalSkeletonHits', 2, 'On Brutal, the hits from a player that kill a skeleton (0: its usual health)', [0, 100]],
                     ['preloadShare', 30, 'With Pre-load Chunks on, the share of time (percent) making the rest of the world may use while playing (0: paused)', [0, 90]],
+                    ['spongeRange', 6, 'How far (in steps through water) a sponge soaks up water (0: sponges soak nothing, as before 1.8)', [0, 16]],
+                    ['spongeLimit', 65, 'The most water blocks one sponge soaks up', [0, 4096]],
                 ];
                 if (Module.mcGameRules) SURVIVAL.forEach(function (r) { Module.mcGameRules.define(r[0], r[1], r[2], r[3]); });
                 function mobRef(r) { r = String(r || '').toLowerCase().trim(); return r.replace(/^minecraft:/, ''); }
