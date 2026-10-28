@@ -140,6 +140,17 @@
                     s = Math.max(1, Math.floor(bh / 190 + 0.5));
                     while (s > 1 && Math.floor(bw / s) < 400) --s;
                 }
+                var gs = 0;
+                try {
+                    gs = (window.Module && Module.mcGuiScaleOption != null) ? (Module.mcGuiScaleOption | 0)
+                        : (parseInt(localStorage.getItem('mcre.guiScale'), 10) || 0);
+                } catch (e) { }
+                if (gs > 0) {
+                    var minW = touch ? 400 : 320, minH = touch ? 140 : 240, fit = 1;
+                    while (fit < 16 && Math.floor(bw / (fit + 1)) >= minW && Math.floor(bh / (fit + 1)) >= minH) ++fit;
+                    if (fit < s) fit = s;
+                    s = Math.min(gs, fit);
+                }
                 var inv = Math.fround(1 / s);
                 var gw = Math.floor(Math.fround(bw * inv)), gh = Math.floor(Math.fround(bh * inv));
                 if (gw < 1 || gh < 1) return;
@@ -232,26 +243,59 @@
             var SETS = ['cherry_blossom_grove', 'garden', 'orchard'];
             var set = SETS[Math.floor(Math.random() * SETS.length)];
             if (!window.fetch || !window.createImageBitmap) return;
-            var faces = [0, 1, 2, 3, 4, 5].map(function (i) {
+            var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+            var fetchFace = function (i) {
                 return fetch('title/bg/' + set + '/panorama' + i + '.jpg' + MCRE_V).then(function (r) {
                     if (!r.ok) throw new Error('panorama ' + r.status);
                     return r.blob();
-                }).then(createImageBitmap).then(function (bm) {
+                });
+            };
+            var first = [0, 1, 2, 3, 4, 5].map(function (i) { var f = fetchFace(i); f.catch(function () { }); return f; });
+            var face = function (i) {
+                var got = first[i] || fetchFace(i);
+                first[i] = null;
+                return got.then(createImageBitmap).then(function (bm) {
                     var c = document.createElement('canvas');
                     c.width = bm.width; c.height = bm.height;
                     c.getContext('2d').drawImage(bm, 0, 0);
-                    return new Promise(function (res) { c.toBlob(res, 'image/png'); });
+                    try { bm.close(); } catch (e) { }
+                    return new Promise(function (res, rej) {
+                        c.toBlob(function (b) { c.width = c.height = 0; if (b) res(b); else rej(new Error('toBlob gave nothing')); }, 'image/png');
+                    });
                 }).then(function (b) { return b.arrayBuffer(); });
-            });
-            Promise.all(faces).then(function (bufs) {
-                (function put() {
-                    var up = false; try { up = typeof FS !== 'undefined' && FS.analyzePath('/data/images').exists; } catch (e) { }
-                    if (!up) { setTimeout(put, 250); return; }
-                    try { FS.mkdirTree('/data/images/title/bg'); } catch (e) {   }
-                    for (var i = 0; i < 6; i++) FS.writeFile('/data/images/title/bg/panorama' + i + '.png', new Uint8Array(bufs[i]));
-                    FS.writeFile('/data/images/title/bg/ready', '1');
-                })();
-            }).catch(function (e) { console.warn('[title] no panorama:', e); });
+            };
+            var faceTries = function (i, left) {
+                return face(i).catch(function (e) {
+                    if (left <= 1) throw e;
+                    return wait(800).then(function () { return faceTries(i, left - 1); });
+                });
+            };
+            var runs = 0, busy = false, done = false;
+            var load = function () {
+                if (busy || done || runs >= 4) return;
+                busy = true; runs++;
+                var bufs = [];
+                var chain = Promise.resolve();
+                [0, 1, 2, 3, 4, 5].forEach(function (i) { chain = chain.then(function () { return faceTries(i, 3); }).then(function (b) { bufs[i] = b; }); });
+                chain.then(function () {
+                    (function put() {
+                        var up = false; try { up = typeof FS !== 'undefined' && FS.analyzePath('/data/images').exists; } catch (e) { }
+                        if (!up) { setTimeout(put, 250); return; }
+                        try { FS.mkdirTree('/data/images/title/bg'); } catch (e) {   }
+                        for (var i = 0; i < 6; i++) FS.writeFile('/data/images/title/bg/panorama' + i + '.png', new Uint8Array(bufs[i]));
+                        FS.writeFile('/data/images/title/bg/ready', '1');
+                        done = true; busy = false;
+                    })();
+                }).catch(function (e) {
+                    busy = false;
+                    console.warn('[title] no panorama (run ' + runs + '):', e);
+                    if (runs === 1) setTimeout(load, 5000);
+                });
+            };
+            load();
+            var again = function () { if (!done && !busy && runs > 1) setTimeout(load, 1500); };
+            window.addEventListener('orientationchange', again);
+            window.addEventListener('resize', again);
         })();
         (function checkForUpdate() {
             if (MCRE_BUILD === 'dev' || !window.fetch) return;
@@ -1886,13 +1930,13 @@
                     ov.remove();
                     document.documentElement.classList.remove('mc-loading');
                     try { if (Module.mcRenderScaleOption != null) localStorage.setItem('mcre.renderScale', String(Module.mcRenderScaleOption | 0)); } catch (e) { }
-                    setTimeout(function () { backNote.remove(); }, 3000);
                 }, 400);
             };
             var armedAt = 0, litFrames = 0, probe = null, firstFrameAt = 0;
             var reveal = function () { requestAnimationFrame(function () { requestAnimationFrame(hide); }); };
             Module.mcTitleShown = function () { if (!armedAt) armedAt = performance.now(); };
             Module.mcLoadingFrame = function () {
+                if (backNote.parentNode) backNote.remove();
                 if (gone) return 0;
                 if (!armedAt) {
                     if (!firstFrameAt) firstFrameAt = performance.now();

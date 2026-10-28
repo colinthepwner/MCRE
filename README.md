@@ -80,7 +80,7 @@ the game go to `saves\.trash` instead of disappearing.
 | Break / attack | Left mouse button |
 | Place / use | Right mouse button |
 | Jump | Space |
-| Sprint | Double-tap W, or Tab |
+| Sprint | Double-tap W, or hold Tab |
 | Sneak | Shift |
 | Fly (Creative) | Double-tap Space, then hold Space to go up and Shift to go down |
 | Hotbar | 1-9 or the mouse wheel |
