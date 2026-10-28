@@ -26531,6 +26531,14 @@ JVM.mobTick = function (vm) {
 		o[':onGround'] = info.onGround ? 1 : 0; o[':inWater'] = info.inWater ? 1 : 0;
 		o[':ticksExisted'] = info.age | 0; o[':hurtTime'] = info.hurt | 0;
 		o[':health'] = +info.health; o[':isDead'] = 0;
+		var rvT = o[':entityLivingToAttack'];
+		if (rvT) {
+			if (o.$revengeAt == null || o.$revengeFor !== rvT) { o.$revengeFor = rvT; if (o.$revengeAt == null) o.$revengeAt = info.age | 0; }
+			if (rvT[':isDead'] || (info.age | 0) - o.$revengeAt > 100) {
+				o[':entityLivingToAttack'] = null; o.$revengeFor = null; o.$revengeAt = null;
+				if ((o[':revengeTimer'] | 0) === 100) o[':revengeTimer'] = 0;
+			}
+		} else { o.$revengeFor = null; o.$revengeAt = null; }
 		o[':worldObj'] = JVM.mc152.worldObj(vm);
 		if (JVM.mc152.entityInit && !o[':boundingBox']) JVM.mc152.entityInit(vm, o);
 		if (JVM.entityBoxSync) JVM.entityBoxSync(vm, o);
@@ -46938,7 +46946,7 @@ function install(vm) {
 
 	var ticks = function (self) { return self[':ticksExisted'] | 0; };
 	var living16 = {
-		'setRevengeTarget(Lnet/minecraft/src/EntityLivingBase;)V': function (vm, self, a) { self[':entityLivingToAttack'] = a[0]; self[':revengeTimer'] = ticks(self); },
+		'setRevengeTarget(Lnet/minecraft/src/EntityLivingBase;)V': function (vm, self, a) { self[':entityLivingToAttack'] = a[0]; self[':revengeTimer'] = ticks(self); self.$revengeAt = ticks(self); },
 		'func_142015_aE()I': function (vm, self) { return self[':revengeTimer'] | 0; },
 		'getRevengeTimer()I': function (vm, self) { return self[':revengeTimer'] | 0; },
 		'setLastAttacker(Lnet/minecraft/src/Entity;)V': function (vm, self, a) {
@@ -46956,7 +46964,7 @@ function install(vm) {
 	add('EntityLivingBase', living16);
 	add('EntityLiving', living16);
 	add('EntityLiving', {
-		'setRevengeTarget(Lnet/minecraft/src/EntityLiving;)V': function (vm, self, a) { self[':entityLivingToAttack'] = a[0]; self[':revengeTimer'] = a[0] ? 100 : 0; },
+		'setRevengeTarget(Lnet/minecraft/src/EntityLiving;)V': function (vm, self, a) { self[':entityLivingToAttack'] = a[0]; self[':revengeTimer'] = a[0] ? 100 : 0; self.$revengeAt = ticks(self); },
 		'getAITarget()Lnet/minecraft/src/EntityLiving;': function (vm, self) { return self[':entityLivingToAttack'] || null; },
 		'getLastAttackingEntity()Lnet/minecraft/src/EntityLiving;': function (vm, self) { return self[':lastAttackingEntity'] || null; },
 		'setLastAttackingEntity(Lnet/minecraft/src/Entity;)V': function (vm, self, a) { self[':lastAttackingEntity'] = isA(a[0], 'EntityLiving') ? a[0] : null; },
