@@ -1813,7 +1813,9 @@
             var big = Math.max(3, Math.min(7, Math.floor(window.innerWidth / 120)));
             var logo = document.createElement('img');
             logo.alt = 'Minecraft RE';
-            logo.style.cssText = 'width:min(640px,86vw);height:auto;image-rendering:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))';
+            var logoDpr = window.devicePixelRatio || 1;
+            var logoK = Math.max(1, Math.floor(Math.min(640, window.innerWidth * 0.86) * logoDpr / 274));
+            logo.style.cssText = 'width:' + (logoK * 274 / logoDpr) + 'px;height:' + (logoK * 68 / logoDpr) + 'px;image-rendering:pixelated;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))';
             logo.onerror = function () { logo.replaceWith(pix('MINECRAFT RE', big + 2, '#c6c6c6')); };
             logo.src = 'icons/logo.png';
             ov.appendChild(logo);
