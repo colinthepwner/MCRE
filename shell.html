@@ -3179,7 +3179,10 @@
                                             }
                                             dropGhosts(id, vi);
                                         }
-                                        if (c._withMods) Module.mcMods.offer().then(function (list) { sendCtl(c, { t: 'mods', list: list, map: Module.mcMods.mapText() }); })
+                                        if (c._withMods) Module.mcMods.offer().then(function (list) {
+                                            var share = Module.mcMods.shareConfig ? Module.mcMods.shareConfig(list) : {};
+                                            sendCtl(c, { t: 'mods', list: list, map: Module.mcMods.mapText(), cfg: share.cfg, settings: share.settings });
+                                        })
                                             .catch(function () { sendCtl(c, { t: 'mods', list: [] }); });
                                         return;
                                     }
@@ -3278,17 +3281,20 @@
                                     var list = Array.isArray(msg.json.list) ? msg.json.list.slice(0, 64) : [];
                                     Module.mcMods.setJoinedMap(typeof msg.json.map === 'string' ? msg.json.map.slice(0, 1000000) : '');
                                     if (!list.length) { enter(); return; }
+                                    var share = msg.json.cfg || msg.json.settings ? { cfg: msg.json.cfg, settings: msg.json.settings } : null, listIds = list.map(function (o) { return o.id; });
                                     want = { list: list, keep: false, ids: [] };
                                     Module.mcMods.missing(list).then(function (ids) {
                                         if (!ids.length) {
                                             return Module.mcMods.sameAsMine(list).then(function (same) {
+                                                if (same && !Module.mcMods.sameConfigAsMine(share, listIds)) same = false;
+                                                if (!same && share) Module.mcMods.setJoinedConfig(share, listIds);
                                                 return Module.mcMods.startSession(list, {}, false, same);
                                             }).then(enter, function () { fail('mods'); });
                                         }
                                         net.closePrompt = function () { if (prompt) { prompt.close(); prompt = null; } };
                                         prompt = Module.mcMods.askJoin(list.filter(function (o) { return ids.indexOf(o.id) >= 0; }), function (yes, keep, ui) {
                                             if (!yes) { prompt = null; fail('declined'); return; }
-                                            want = { list: list, keep: keep, ids: ids };
+                                            want = { list: list, keep: keep, ids: ids, share: share, listIds: listIds };
                                             ui.progress('Downloading ' + ids.length + ' mod(s)...');
                                             sendCtl(c, { t: 'get', ids: ids });
                                             joinTimer = setTimeout(function () { fail('mods'); }, 120000);
@@ -3334,6 +3340,7 @@
                         function finish() {
                             if (joinTimer) { clearTimeout(joinTimer); joinTimer = 0; }
                             if (prompt) prompt.progress('Turning the mods on...');
+                            if (want.share) Module.mcMods.setJoinedConfig(want.share, want.listIds);
                             Module.mcMods.startSession(want.list, got, want.keep).then(enter, function () { fail('mods'); });
                         }
                         function gone() {
@@ -3474,7 +3481,75 @@
             };
             var worldDir = null;
             function safeName(s) { return String(s).replace(/[^\w.-]/g, '_'); }
+            var shared = null;
+            function overlayFs(modId, ov, real) {
+                var key = function (p) { return String(p || '').replace(/^\/+/, '').replace(/\/+$/, ''); };
+                var isWorld = function (p) { p = key(p); return !!worldDir && (p === 'world' || p.indexOf('world/') === 0); };
+                var dirHas = function (k) { if (!k) return true; var pre = k + '/'; return Object.keys(ov).some(function (f) { return f.indexOf(pre) === 0; }); };
+                return {
+                    read: function (p) { if (isWorld(p)) return real.read(p); var k = key(p); return ov.hasOwnProperty(k) ? ov[k] : null; },
+                    write: function (p, b) { if (isWorld(p)) return real.write(p, b); ov[key(p)] = b instanceof Uint8Array ? b.slice() : new TextEncoder().encode(String(b)); },
+                    exists: function (p) { if (isWorld(p)) return real.exists(p); var k = key(p); return ov.hasOwnProperty(k) || dirHas(k); },
+                    isDir: function (p) { if (isWorld(p)) return real.isDir(p); var k = key(p); return !ov.hasOwnProperty(k) && dirHas(k); },
+                    list: function (p) {
+                        if (isWorld(p)) return real.list(p);
+                        var k = key(p), pre = k ? k + '/' : '', out = [];
+                        Object.keys(ov).forEach(function (f) { if (f.indexOf(pre) === 0) { var n = f.slice(pre.length).split('/')[0]; if (n && out.indexOf(n) < 0) out.push(n); } });
+                        return out;
+                    },
+                    mkdirs: function (p) { if (isWorld(p)) real.mkdirs(p); },
+                    remove: function (p) { if (isWorld(p)) return real.remove(p); delete ov[key(p)]; },
+                };
+            }
+            var PRIVATE = /token|secret|passw|credential|auth|session|cookie|account|login|api[-_ ]?key|\.(pem|key|p12|pfx|jks|keystore)$/i;
+            J.isPrivate = function (name) { return PRIVATE.test(String(name)); };
+            J.configOf = function (modId, budget) {
+                var base = '/games/java/' + safeName(modId), out = {}, n = 0;
+                var walk = function (dir, rel) {
+                    var names; try { names = FS.readdir(dir); } catch (e) { return; }
+                    names.forEach(function (nm) {
+                        if (nm === '.' || nm === '..') return;
+                        var r = rel ? rel + '/' + nm : nm, p = dir + '/' + nm, st;
+                        if (!rel && nm === 'world') return;
+                        if (J.isPrivate(r)) return;
+                        try { st = FS.stat(p); } catch (e) { return; }
+                        if (FS.isDir(st.mode)) return walk(p, r);
+                        if (st.size > 262144 || st.size > budget.left) return;
+                        try { out[r] = b64(FS.readFile(p)); budget.left -= st.size; n++; } catch (e) { }
+                    });
+                };
+                walk(base, '');
+                return n ? out : null;
+            };
+            J.setSharedConfig = function (cfg, ids) {
+                fsCache = {};
+                if (!cfg) { shared = null; return; }
+                shared = {};
+                (ids || []).concat(Object.keys(cfg)).forEach(function (id) {
+                    var files = cfg[id] || {}, ov = shared[id] = shared[id] || {};
+                    Object.keys(files).forEach(function (p) {
+                        var k = String(p).replace(/\\/g, '/').replace(/^\/+/, '');
+                        if (!k || /(^|\/)\.\.(\/|$)/.test(k) || J.isPrivate(k) || typeof files[p] !== 'string') return;
+                        try { ov[k] = unb64(files[p]); } catch (e) { }
+                    });
+                });
+            };
+            J.sameConfig = function (cfg) {
+                if (!cfg) return true;
+                return Object.keys(cfg).every(function (id) {
+                    var mine = J.configOf(id, { left: Infinity }) || {}, theirs = cfg[id] || {};
+                    var a = Object.keys(mine).sort(), b = Object.keys(theirs).sort();
+                    return a.length === b.length && a.every(function (k, i) { return k === b[i] && mine[k] === theirs[k]; });
+                });
+            };
+            J.hasSharedConfig = function (modId) { return !!(shared && shared[modId]); };
+            function b64(u8) { var s = ''; for (var i = 0; i < u8.length; i += 32768) s += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); return btoa(s); }
+            function unb64(s) { var t = atob(s), u = new Uint8Array(t.length); for (var i = 0; i < t.length; i++) u[i] = t.charCodeAt(i); return u; }
             function folderFs(modId) {
+                var real = realFs(modId);
+                return shared && shared[modId] ? overlayFs(modId, shared[modId], real) : real;
+            }
+            function realFs(modId) {
                 var base = '/games/java/' + safeName(modId);
                 var abs = function (p) {
                     p = String(p || '').replace(/^\/+/, '');
@@ -6470,7 +6545,7 @@
                                 settingDecls[id] = (settingDecls[id] || []).concat(jd);
                                 var all = readSettings(), mine = all[id] || {}, seeded = false;
                                 jd.forEach(function (d) { if (mine[d.id] === undefined && d.current !== undefined && d.current !== d.default) { mine[d.id] = d.current; seeded = true; } });
-                                if (seeded) { all[id] = mine; try { FS.mkdirTree(LIB); FS.writeFile(SETTINGS, JSON.stringify(all)); } catch (e) { } }
+                                if (seeded) { all[id] = mine; writeSettings(all); }
                             }
                             return files;
                         });
@@ -9434,7 +9509,52 @@
 
             var SETTINGS = LIB + '/settings.json';
             var settingDecls = {};
-            function readSettings() { try { return JSON.parse(new TextDecoder().decode(FS.readFile(SETTINGS))) || {}; } catch (e) { return {}; } }
+            var sessionSettings = null;
+            function diskSettings() { try { return JSON.parse(new TextDecoder().decode(FS.readFile(SETTINGS))) || {}; } catch (e) { return {}; } }
+            function readSettings() { return sessionSettings ? JSON.parse(JSON.stringify(sessionSettings)) : diskSettings(); }
+            function writeSettings(all) {
+                if (sessionSettings) { sessionSettings = JSON.parse(JSON.stringify(all)); return; }
+                try { FS.mkdirTree(LIB); FS.writeFile(SETTINGS, JSON.stringify(all)); } catch (e) { console.warn('[mods] settings', e); }
+                if (Module._syncSaves) Module._syncSaves();
+            }
+            function isKeySetting(k) { return /^key\|/.test(k); }
+            function privateSetting(k, v) {
+                return (Module.mcJava && Module.mcJava.isPrivate && Module.mcJava.isPrivate(k)) || /token|secret|passw|api[-_ ]?key/i.test(typeof v === 'string' ? v : '');
+            }
+            api.shareSettings = function (ids) {
+                var all = readSettings(), out = {};
+                ids.forEach(function (id) {
+                    var v = all[id], o = {}, n = 0;
+                    if (!v) return;
+                    Object.keys(v).forEach(function (k) { if (!isKeySetting(k) && !privateSetting(k, v[k])) { o[k] = v[k]; n++; } });
+                    if (n) out[id] = o;
+                });
+                return out;
+            };
+            api.shareConfig = function (list) {
+                var ids = list.map(function (o) { return o.id; }), cfg = {}, budget = { left: 1048576 };
+                if (Module.mcJava && Module.mcJava.configOf) ids.forEach(function (id) { var c = Module.mcJava.configOf(id, budget); if (c) cfg[id] = c; });
+                return { cfg: cfg, settings: api.shareSettings(ids) };
+            };
+            api.setJoinedConfig = function (share, ids) {
+                if (!share) { sessionSettings = null; if (Module.mcJava && Module.mcJava.setSharedConfig) Module.mcJava.setSharedConfig(null); return; }
+                var hs = share.settings && typeof share.settings === 'object' ? share.settings : {}, mine = diskSettings(), st = {};
+                (ids || []).forEach(function (id) {
+                    var o = {}, h = hs[id] || {}, m = mine[id] || {};
+                    Object.keys(m).forEach(function (k) { if (isKeySetting(k)) o[k] = m[k]; });
+                    Object.keys(h).forEach(function (k) { if (!isKeySetting(k) && !privateSetting(k, h[k])) o[k] = h[k]; });
+                    st[id] = o;
+                });
+                sessionSettings = st;
+                if (Module.mcJava && Module.mcJava.setSharedConfig) Module.mcJava.setSharedConfig(share.cfg && typeof share.cfg === 'object' ? share.cfg : {}, ids);
+            };
+            api.sameConfigAsMine = function (share, ids) {
+                if (!share) return true;
+                var hs = share.settings || {}, mine = diskSettings();
+                var norm = function (v) { var o = []; Object.keys(v || {}).sort().forEach(function (k) { if (!isKeySetting(k)) o.push([k, v[k]]); }); return JSON.stringify(o); };
+                if (!(ids || []).every(function (id) { return norm(hs[id]) === norm(mine[id]); })) return false;
+                return !Module.mcJava || !Module.mcJava.sameConfig || Module.mcJava.sameConfig(share.cfg || {});
+            };
             api.settingsOf = function (modId) {
                 var decl = settingDecls[modId] || [], saved = readSettings()[modId] || {}, out = {};
                 decl.forEach(function (d) { out[d.id] = settingValue(d, saved[d.id]); });
@@ -9445,8 +9565,7 @@
                 var all = readSettings();
                 var changed = JSON.stringify(all[modId] || {}) !== JSON.stringify(values);
                 all[modId] = values;
-                try { FS.mkdirTree(LIB); FS.writeFile(SETTINGS, JSON.stringify(all)); } catch (e) { console.warn('[mods] settings', e); }
-                if (Module._syncSaves) Module._syncSaves();
+                writeSettings(all);
                 if (Module.mcScripts && Module.mcScripts.settingsChanged) Module.mcScripts.settingsChanged(modId, api.settingsOf(modId));
                 if (changed && Module.mcJava && Module.mcJava.saveSettings(modId, api.settingsOf(modId)) && !Module.mcJava.running()) reapply(true);
             }
@@ -9869,6 +9988,7 @@
                 });
             };
             api.endSession = function () {
+                api.setJoinedConfig(null);
                 if (!session) return;
                 if (session.same) { session = null; bump(''); return; }
                 session = null;
