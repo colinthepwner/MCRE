@@ -298,15 +298,27 @@
             window.addEventListener('resize', again);
         })();
         (function checkForUpdate() {
+            Module.mcSiteBuild = function () {
+                if (!window.fetch) return Promise.resolve('');
+                return fetch('./?mcre-check=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (html) {
+                    var m = /<meta\b[^>]*\bname=["']?mcre-build["']?[^>]*\bcontent=["']([^"']+)["']/i.exec(html) ||
+                            /<meta\b[^>]*\bcontent=["']([^"']+)["'][^>]*\bname=["']?mcre-build\b/i.exec(html);
+                    return m ? m[1] : '';
+                }, function () { return ''; });
+            };
+            try {
+                var rj = JSON.parse(sessionStorage.getItem('mcre.rejoin') || 'null');
+                sessionStorage.removeItem('mcre.rejoin');
+                if (rj && /^[A-Z0-9]{5}$/.test(String(rj.code)) && Date.now() - (+rj.at || 0) < 180000) Module.mcRejoin = String(rj.code);
+            } catch (e) { }
             if (MCRE_BUILD === 'dev' || !window.fetch) return;
             var shown = false, last = 0;
             function check() {
                 var now = Date.now();
                 if (shown || now - last < 60000) return;
                 last = now;
-                fetch('./?mcre-check=' + now, { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (html) {
-                    var m = /<meta\b[^>]*\bname=["']?mcre-build["']?[^>]*\bcontent=["']([^"']+)["']/i.exec(html) ||
-                            /<meta\b[^>]*\bcontent=["']([^"']+)["'][^>]*\bname=["']?mcre-build\b/i.exec(html);
+                Module.mcSiteBuild().then(function (tag) {
+                    var m = tag ? [tag, tag] : null;
                     if (!m || m[1] === MCRE_BUILD || m[1] === 'dev' || shown) return;
                     shown = true;
                     var newer = m[1];
@@ -963,7 +975,9 @@
                 var cur = (D._fieldText || {})[id + ':' + fid];
                 var t = cur ? (cur.sel || cur.text) : '';
                 if (!t) return;
-                var ok = function () { D._clipQ.push([id, 'c', fid, '']); };
+                copyText(t, function (ok) { if (ok) D._clipQ.push([id, 'c', fid, '']); });
+            };
+            function copyText(t, done) {
                 var did = false;
                 try {
                     var ta = document.createElement('textarea');
@@ -973,8 +987,34 @@
                     did = document.execCommand && document.execCommand('copy');
                     ta.remove();
                 } catch (e) { }
-                if (did) { ok(); return; }
-                try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { }); } catch (e) { }
+                if (did) { done(true); return; }
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(function () { done(true); }, function () { done(false); }); return; }
+                } catch (e) { }
+                done(false);
+            }
+            D._zoneQ = [];
+            D.clipZone = function (key, x, y, w, h, text) {
+                var k = 'zone:' + key, p = placed[k];
+                if (!text) { if (p) { p.el.remove(); delete placed[k]; } return; }
+                if (!p) {
+                    var el = document.createElement('button');
+                    el.addEventListener('click', function () {
+                        var z = placed[k];
+                        if (!z || !z.text) return;
+                        copyText(z.text, function (ok) { D._zoneQ.push(key + '\t' + (ok ? 'c' : 'f')); if (D._zoneQ.length > 20) D._zoneQ.shift(); });
+                    });
+                    el.setAttribute('data-mc-own-ui', '');
+                    el.style.cssText = 'position:fixed;margin:0;padding:0;border:0;opacity:0;cursor:pointer;z-index:9996;font-size:0;background:transparent';
+                    ['mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(function (t) { el.addEventListener(t, function (e) { e.stopPropagation(); }); });
+                    document.body.appendChild(el);
+                    p = placed[k] = { el: el };
+                }
+                p.text = String(text);
+                p.el.setAttribute('aria-label', 'Copy ' + p.text);
+                p.el.title = 'Copy ' + p.text;
+                p.x = x; p.y = y; p.w = w; p.h = h;
+                place();
             };
             D._rects = function (id, str) {
                 var d = D._byId[id], want = {}, layout = {};
@@ -3028,6 +3068,40 @@
             window.addEventListener('blur', function () { presenceTick(true); });
             window.addEventListener('focus', function () { pres.lastInput = Date.now(); presenceTick(true); });
 
+            function buildOrder(a, b) {
+                var na = /-([0-9]+)$/.exec(String(a || '')), nb = /-([0-9]+)$/.exec(String(b || ''));
+                if (!na || !nb) return 0;
+                return +na[1] > +nb[1] ? 1 : +na[1] < +nb[1] ? -1 : 0;
+            }
+            net.buildOrder = buildOrder;
+            function hostNotice(text) {
+                try { if (Module.mcInWorld === 1 && Module._mcChatPrint) Module.ccall('mcChatPrint', null, ['string', 'number'], ['§e' + text, 0]); } catch (e) { }
+            }
+            var refusedAt = {};
+            function versionRefused(theirs) {
+                theirs = theirs.replace(/[^ -~]/g, '').slice(0, 40);
+                if (!theirs || Date.now() - (refusedAt[theirs] || 0) < 60000) return;
+                refusedAt[theirs] = Date.now();
+                var o = buildOrder(theirs, MCRE_BUILD);
+                hostNotice(o > 0 ? "A friend on a newer version (" + theirs + ") couldn't join. To update: save, quit to the title screen and reload the page."
+                         : o < 0 ? "A friend on an older version (" + theirs + ") couldn't join - they need to reload their page to update."
+                         : "A friend on version " + theirs + " couldn't join (you're on " + MCRE_BUILD + ").");
+            }
+            var GHOST_MS = 8000;
+            function dropGhosts(id, ident) {
+                conns.forEach(function (oc, oid) {
+                    if (oid === id || !oc._ver) return;
+                    var op = pres.peers[oid];
+                    if (!op || op.ident !== ident || Date.now() - (oc._heard || 0) < GHOST_MS) return;
+                    console.log('[net] the same device joined again: its old connection (silent ' + Math.round((Date.now() - (oc._heard || 0)) / 1000) + ' s) leaves first');
+                    conns.delete(oid);
+                    ev({ t: 'close', p: oid });
+                    sendCtl(oc, { t: 'kick', why: 'You joined again from this device' });
+                    setTimeout(function () { try { oc.close(); } catch (e) { } }, 500);
+                });
+            }
+            var hostWake = null;
+            document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && hostWake) hostWake(); });
             net.host = function () {
                 if (net.state === 'opening' || net.state === 'open') return;
                 reset();
@@ -3037,15 +3111,36 @@
                     var code = newCode();
                     var p = new Peer(PREFIX + code, { debug: 0 });
                     p.on('open', function () {
+                        if (peer === p) return;
                         if (net.state !== 'opening') { p.destroy(); return; }
                         peer = p; net.code = code; net.state = 'open';
                     });
                     p.on('error', function (err) {
-                        if (err && err.type === 'unavailable-id') { p.destroy(); tryOpen(); return; }
-                        if (net.state === 'opening') { net.state = 'error'; net.error = (err && err.type) || 'network'; try { p.destroy(); } catch (e) { } }
+                        if (err && err.type === 'unavailable-id' && net.state === 'opening' && !peer) { p.destroy(); tryOpen(); return; }
+                        if (net.state === 'opening' && !peer) { net.state = 'error'; net.error = (err && err.type) || 'network'; try { p.destroy(); } catch (e) { } }
                     });
-                    p.on('disconnected', function () { try { if (!p.destroyed) p.reconnect(); } catch (e) { } });
+                    var regTimer = 0, regWait = 1000;
+                    function reRegister() {
+                        regTimer = 0;
+                        if (p.destroyed || peer !== p || net.state !== 'open') return;
+                        if (!p.disconnected) return;
+                        try { p.reconnect(); } catch (e) { }
+                        regTimer = setTimeout(reRegister, regWait);
+                        regWait = Math.min(15000, regWait * 2);
+                    }
+                    p.on('disconnected', function () {
+                        if (p.destroyed || peer !== p) return;
+                        if (!regTimer) regTimer = setTimeout(reRegister, regWait);
+                    });
+                    p.on('open', function () { if (peer === p) { regWait = 1000; if (regTimer) { clearTimeout(regTimer); regTimer = 0; } } });
+                    hostWake = function () {
+                        if (p.destroyed || peer !== p || !p.disconnected) return;
+                        if (regTimer) clearTimeout(regTimer);
+                        regWait = 1000;
+                        reRegister();
+                    };
                     p.on('connection', function (c) {
+                        if (c.metadata && c.metadata.probe) { c.on('open', function () { setTimeout(function () { try { c.close(); } catch (e) { } }, 200); }); return; }
                         var id = nextId++;
                         var opened = false;
                         c.on('open', function () {
@@ -3061,6 +3156,7 @@
                         });
                         c.on('data', function (d) {
                             var b = bytes(d);
+                            c._heard = Date.now();
                             if (b) queueRecv(c, b, function (u) {
                                 if (!conns.has(id)) return;
                                 if (c._refused) return;
@@ -3081,12 +3177,14 @@
                                                 net.kick(id, 'You are banned from this world' + (ban.reason ? ': ' + ban.reason : ''));
                                                 return;
                                             }
+                                            dropGhosts(id, vi);
                                         }
                                         if (c._withMods) Module.mcMods.offer().then(function (list) { sendCtl(c, { t: 'mods', list: list, map: Module.mcMods.mapText() }); })
                                             .catch(function () { sendCtl(c, { t: 'mods', list: [] }); });
                                         return;
                                     }
                                     console.warn('[net] a different build tried to join; closed');
+                                    if (first && first.json && first.json.t === 'ver' && first.json.v) versionRefused(String(first.json.v));
                                     try { c.close(); } catch (e) { }
                                     gone();
                                     return;
@@ -3106,6 +3204,8 @@
                 reset();
                 code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
                 net.state = 'joining';
+                net.updateOffer = null;
+                net.joinStart = Date.now();
                 var failed = false;
                 function fail(m) {
                     if (failed || (net.state !== 'joining' && net.state !== 'mods')) return;
@@ -3148,8 +3248,12 @@
                                 myId = (b[1] | (b[2] << 8) | (b[3] << 16) | (b[4] << 24)) >>> 0;
                                 var theirs = b.length > 6 ? dec.decode(b.subarray(6)).replace(/[^ -~]/g, '').slice(0, 40) : '';
                                 if (theirs !== MCRE_BUILD) {
-                                    fail('msg:That game is on version ' + (theirs || 'an older one') + ' and you are on ' + MCRE_BUILD +
-                                         '. Both of you need the same version - reload the page to update.');
+                                    sayBye(c, { t: 'ver', v: MCRE_BUILD });
+                                    var older = buildOrder(theirs, MCRE_BUILD);
+                                    net.updateOffer = older > 0 ? { code: code, build: theirs } : null;
+                                    fail('msg:' + (older > 0 ? 'That game is on a newer version (' + theirs + ') than yours (' + MCRE_BUILD + '). Reload the page to update, then join again.'
+                                                 : older < 0 ? 'That game is on an older version (' + theirs + ') than yours (' + MCRE_BUILD + '). The host needs to reload their page to update.'
+                                                 : 'That game is on version ' + (theirs || 'an older one') + ' and you are on ' + MCRE_BUILD + '. Both of you need the same version - reload the page to update.'));
                                     return;
                                 }
                                 sendCtl(c, { t: 'ver', v: MCRE_BUILD, ident: Module.mcIdent || '' });
@@ -3275,13 +3379,30 @@
             Module.mcAskRoomCode = function (message) {
                 close();
                 var ERR = 2;
+                var up = message && Module.mcNet ? Module.mcNet.updateOffer : null;
+                if (Module.mcNet) Module.mcNet.updateOffer = null;
+                var buttons = [{ id: 'join', label: 'Join', primary: !up, keep: true }, { id: 'no', label: 'Cancel', cancel: true }];
+                if (up) buttons.unshift({ id: 'reload', label: 'Reload and join', primary: true, keep: true });
                 dlg = Module.mcDialog.open({
                     title: 'Join a game',
                     items: [{ t: 'text', text: 'Type the code the host sees after choosing Open to friends in their game menu - or a Beta 1.7.3 server address.', color: 'a0a0a0' },
-                            { t: 'input', id: 'code', max: 64, focus: true },
+                            { t: 'input', id: 'code', max: 64, focus: true, value: up ? up.code : '' },
                             { t: 'text', text: message || '', color: 'ff7070' }],
-                    buttons: [{ id: 'join', label: 'Join', primary: true, keep: true }, { id: 'no', label: 'Cancel', cancel: true }],
+                    buttons: buttons,
                     onAction: function (a, v, d) {
+                        if (a === 'reload' && up) {
+                            d.spec.items[ERR].text = 'Looking for the update...'; d.update();
+                            Module.mcSiteBuild().then(function (site) {
+                                if (site !== up.build && !(Module.mcNet && Module.mcNet.buildOrder(site, MCRE_BUILD) > 0)) {
+                                    d.spec.items[ERR].text = "The update (" + up.build + ") isn't here yet - try again in a minute or two.";
+                                    d.update();
+                                    return;
+                                }
+                                try { sessionStorage.setItem('mcre.rejoin', JSON.stringify({ code: up.code, at: Date.now() })); } catch (e) { }
+                                location.reload();
+                            });
+                            return;
+                        }
                         if (a !== 'join') { dlg = null; Module.mcRoomCodeInput = ''; return; }
                         var raw = String(v.code || '').trim();
                         var server = /[.:]/.test(raw) || /^localhost$/i.test(raw);
@@ -15770,16 +15891,18 @@
                     });
                 }).then(function (mc) {
                     if (!mc.access_token) throw fail('Minecraft did not sign in (' + mc._status + ').');
-                    return call('/mc/profile', 'GET', undefined, null, mc.access_token);
+                    return call('/mc/profile', 'GET', undefined, null, mc.access_token).then(function (p) { p._token = mc.access_token; return p; });
                 }).then(function (p) {
                     if (!p.name) throw fail('This Microsoft account does not own Minecraft: Java Edition.');
                     var skin = null;
                     (p.skins || []).forEach(function (s) { if (!skin || s.state === 'ACTIVE') skin = s.url; });
-                    return { name: p.name, uuid: p.id, skin: skin, refresh: refresh };
+                    return { name: p.name, uuid: p.id, skin: skin, refresh: refresh, token: p._token };
                 });
             }
 
+            var mcToken = null, mcTokenAt = 0;
             function signedInAs(a) {
+                if (a.token) { mcToken = a.token; mcTokenAt = Date.now(); }
                 account = { name: a.name, uuid: a.uuid, skin: a.skin || null };
                 put(K_ACCOUNT, JSON.stringify(account));
                 if (a.refresh) put(K_REFRESH, a.refresh);
@@ -15892,7 +16015,29 @@
             var LOCKED = 'Without signing in: worlds are §eClassic PE§r only (no Rocket worlds), up to §eNormal§r size, ' +
                 'and the §e404 Challenge§r, §eSkyblock§r, §emods§r and §emultiplayer§r are locked.';
 
+            function joinServer(serverId) {
+                if (!account || !account.uuid) return Promise.reject(new Error('noauth'));
+                var fresh = mcToken && Date.now() - mcTokenAt < 20 * 3600 * 1000 ? Promise.resolve(mcToken) : (function () {
+                    var rt = get(K_REFRESH);
+                    if (!rt) return Promise.reject(new Error('noauth'));
+                    return call('/ms/token', 'POST', form({ grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: rt, scope: SCOPE }),
+                        'application/x-www-form-urlencoded').then(function (j) {
+                        if (!j.access_token) throw new Error('your Microsoft sign-in has expired - sign in again');
+                        return minecraft(j.access_token, j.refresh_token || rt, function () { }).then(function (a) { signedInAs(a); return mcToken; });
+                    });
+                })();
+                return fresh.then(function (tok) {
+                    if (!tok) throw new Error('no Minecraft session');
+                    var q = 'user=' + encodeURIComponent(account.name) + '&sessionId=' + encodeURIComponent('token:' + tok + ':' + account.uuid) +
+                        '&serverId=' + encodeURIComponent(serverId);
+                    return fetch(RELAY + '/mc/join?' + q).then(function (r) { return r.text(); });
+                }).then(function (t) {
+                    t = String(t || '').trim();
+                    if (t.toLowerCase() !== 'ok') throw new Error(t.charAt(0) === '{' ? 'the sign-in relay needs an update' : (t || 'Bad login'));
+                });
+            }
             Module.mcAuth = {
+                joinServer: joinServer,
                 signedIn: function () { return !!account; },
                 account: function () { return account; },
                 onChange: function (f) { listeners.push(f); },
