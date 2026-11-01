@@ -3668,6 +3668,21 @@
                 for (var i = 0; i < taps.length; i++) if (Math.abs(taps[i] - at) <= TAP_SLACK) return 'both';
                 return '';
             }
+            var glow = null;
+            N.pulses = 0;
+            function found() {
+                Module.mcNearbyChime = 1;
+                N.pulses++;
+                try {
+                    if (!glow) {
+                        glow = document.createElement('div');
+                        glow.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:2147483000;opacity:0;' +
+                            'background:radial-gradient(ellipse at center, rgba(80,255,96,0) 38%, rgba(80,255,96,0.35) 75%, rgba(60,235,80,0.75) 100%)';
+                        document.body.appendChild(glow);
+                    }
+                    if (glow.animate) glow.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 1100, easing: 'ease-out' });
+                } catch (e) { }
+            }
             var asking = null, refused = {};
             function onBeaconConn(c) {
                 if (!c.metadata || c.metadata.near !== 1) { setTimeout(function () { try { c.close(); } catch (e) { } }, 100); return; }
@@ -3682,6 +3697,7 @@
                         who = { name: clean(m.name) || 'A friend', ident: /^[0-9a-f]{16,64}$/.test(String(m.ident || '')) ? String(m.ident) : '' };
                         var open = !!st && net.state === 'open' && !!net.code;
                         match = st ? tapMatch(m.tap) : '';
+                        if (match === 'both') found();
                         var o = { t: 'info', open: open };
                         if (st && (open || match)) {
                             o.name = myName(); o.world = clean(st.world, 40); o.players = st.players | 0; o.v = MCRE_BUILD; o.match = match;
@@ -3692,6 +3708,7 @@
                         return;
                     }
                     if (m.t === 'want' && match && who && st) {
+                        if (match === 'one') found();
                         if (net.state === 'open' && net.code) { send({ t: 'code', code: net.code }); return; }
                         if (match === 'both') { openFor(who, send); return; }
                         askHost(who, function (yes) { if (yes) openFor(who, send); else send({ t: 'no' }); });
@@ -3833,6 +3850,7 @@
             function showPopup(list) {
                 if (!Module.mcDialog) { list.forEach(letGo); return; }
                 held++;
+                found();
                 var wasBox = !!(box && !box.closed);
                 if (wasBox) box.close();
                 var one = list.length === 1 ? list[0] : null, items = [];
