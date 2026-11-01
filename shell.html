@@ -1601,24 +1601,105 @@
                 return true;
             }
 
-            var remoteSerial = 0;
+            var PNG_MAX = 16384;
+            function cleanLook(l) {
+                if (!l || typeof l !== 'object') return null;
+                var o = {};
+                if (typeof l.name === 'string' && valid(l.name)) o.name = l.name;
+                if (typeof l.cape === 'string' && valid(l.cape)) o.cape = l.cape;
+                if (typeof l.png === 'string' && l.png.length <= PNG_MAX && /^[A-Za-z0-9+/]+=*$/.test(l.png)) o.png = l.png;
+                return o.name || o.png ? o : null;
+            }
+            function lookKey(l) {
+                if (!l) return '';
+                var h = 5381, s = l.png || '';
+                for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+                return (l.png ? 'p' + h.toString(16) + '-' + s.length : 'n:' + String(l.name || '').toLowerCase()) + '|c:' + String(l.cape || '').toLowerCase();
+            }
+            function skinImage(bytes) {
+                return new Promise(function (res, rej) {
+                    var url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+                    var img = new Image();
+                    img.onload = function () {
+                        URL.revokeObjectURL(url);
+                        var w = img.width, h = img.height;
+                        if (w < 64 || w > 1024 || w % 64 || (h !== w && h * 2 !== w)) { rej(new Error('That isn\'t a skin: it must be 64x64 or 64x32 pixels (it is ' + w + 'x' + h + ').')); return; }
+                        res(img);
+                    };
+                    img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('That file isn\'t a PNG picture.')); };
+                    img.src = url;
+                });
+            }
+            function resolveLook(l) {
+                var asked = {};
+                var find = function (n) { if (!n) return Promise.resolve(null); var k = n.toLowerCase(); return asked[k] || (asked[k] = lookup(n)); };
+                var skin = l.png ? skinImage(fromB64(l.png)).then(function (img) { return convertSkin(img, false); })
+                    : find(l.name).then(function (t) { return t && t.skin ? loadImage(t.skin).then(function (img) { return convertSkin(img, t.slim); }) : null; });
+                var cape = find(l.cape || (l.png ? null : l.name)).then(function (t) {
+                    return t && t.cape ? loadImage(t.cape).then(convertCape).catch(function () { return null; }) : null;
+                }).catch(function () { return null; });
+                return Promise.all([skin, cape]);
+            }
+            Module.mcSkins = {
+                clean: cleanLook,
+                key: lookKey,
+                fromFile: function (file) {
+                    if (!file) return Promise.reject(new Error('No file.'));
+                    if (file.size > 1048576) return Promise.reject(new Error('That file is too big for a skin.'));
+                    return file.arrayBuffer().then(function (ab) { return skinImage(new Uint8Array(ab)); }).then(function (img) {
+                        var slim = false;
+                        if (img.height === img.width) {
+                            var c = document.createElement('canvas'); c.width = 64; c.height = 64;
+                            var g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+                            g.drawImage(img, 0, 0, 64, 64);
+                            var px = g.getImageData(54, 20, 2, 12).data;
+                            slim = true;
+                            for (var i = 3; i < px.length; i += 4) if (px[i] !== 0) { slim = false; break; }
+                        }
+                        return convertSkin(img, slim);
+                    }).then(function (bytes) {
+                        var b = toB64(bytes);
+                        if (!b || b.length > PNG_MAX) throw new Error('That skin could not be used.');
+                        return { png: b };
+                    });
+                },
+                exists: function (name) {
+                    if (!valid(name)) return Promise.resolve(false);
+                    return lookup(name).then(function (t) { return !!(t && t.skin && !/mc-heads/.test(t.skin)); }, function () { return false; });
+                }
+            };
+
+            var remoteSerial = 0, looks = {}, askedLook = {}, askSerial = {};
             Module.mcRemoteSkinQueue = [];
             Module.mcRequestRemoteSkin = function (name) {
-                var done = function (skin, cape) { Module.mcRemoteSkinQueue.push(name + '\n' + (skin || '') + '\n' + (cape || '')); };
-                var account = String(name).replace(/_[0-9]+$/, '');
-                if (!valid(account) || typeof FS === 'undefined') { done('', ''); return; }
-                lookup(account).then(function (t) {
-                    return Promise.all([
-                        t.skin ? loadImage(t.skin).then(function (img) { return convertSkin(img, t.slim); }) : null,
-                        t.cape ? loadImage(t.cape).then(convertCape).catch(function () { return null; }) : null
-                    ]);
-                }).then(function (r) {
+                name = String(name);
+                var mine = askSerial[name] = (askSerial[name] || 0) + 1;
+                askedLook[name] = lookKey(looks[name] || null);
+                var done = function (skin, cape) { if (askSerial[name] === mine) Module.mcRemoteSkinQueue.push(name + '\n' + (skin || '') + '\n' + (cape || '')); };
+                var look = looks[name] || null;
+                if (!look) {
+                    var account = name.replace(/_[0-9]+$/, '');
+                    if (valid(account)) look = { name: account };
+                }
+                if (!look || typeof FS === 'undefined') { done('', ''); return; }
+                resolveLook(look).then(function (r) {
                     var n = ++remoteSerial, sp = '', cp = '';
                     try { FS.mkdirTree('/data/images/mob'); } catch (e) {   }
                     if (r[0]) { sp = 'mob/web_rskin_' + n + '.png'; FS.writeFile('/data/images/' + sp, r[0]); }
                     if (r[1]) { cp = 'mob/web_rcape_' + n + '.png'; FS.writeFile('/data/images/' + cp, r[1]); }
                     done(sp, cp);
                 }).catch(function () { done('', ''); });
+            };
+            Module.mcLooks = {
+                set: function (name, look) {
+                    name = String(name || '');
+                    if (!name) return;
+                    look = cleanLook(look);
+                    if (look) looks[name] = look; else delete looks[name];
+                    if (name in askedLook && askedLook[name] !== lookKey(look)) Module.mcRequestRemoteSkin(name);
+                },
+                get: function (name) { return looks[String(name)] || null; },
+                clear: function () { looks = {}; askedLook = {}; }
             };
 
             Module.mcSaveThumb = function (rgba, w, h, path) {
@@ -1645,22 +1726,21 @@
                 } catch (e) { console.warn('[thumb] ' + e); }
             };
 
-            function loadProfile(name) {
-                var key = name.toLowerCase();
+            function myLook() {
+                try { if (Module.mcAuth && Module.mcAuth.signedIn() && Module.mcAuth.look) return cleanLook(Module.mcAuth.look()); } catch (e) { }
+                return Module.mcUsernameSet === 1 && Module.mcUsername && valid(Module.mcUsername) ? { name: Module.mcUsername } : null;
+            }
+            function loadLook(look) {
+                var key = lookKey(look);
                 loadedFor = key;
-                var cached = cacheGet(name);
+                var cached = cacheGet(key);
                 if (cached) install(fromB64(cached.skin), fromB64(cached.cape));
-                lookup(name).then(function (t) {
-                    return Promise.all([
-                        t.skin ? loadImage(t.skin).then(function (img) { return convertSkin(img, t.slim); }) : null,
-                        t.cape ? loadImage(t.cape).then(convertCape).catch(function () { return null; }) : null
-                    ]);
-                }).then(function (r) {
+                resolveLook(look).then(function (r) {
                     if (loadedFor !== key) return;
                     install(r[0], r[1]);
-                    cachePut(name, r[0], r[1]);
+                    cachePut(key, r[0], r[1]);
                 }).catch(function (e) {
-                    console.warn('[skin] lookup failed for ' + name + (cached ? ' (using the saved one)' : '') + ':', e);
+                    console.warn('[skin] lookup failed for ' + key + (cached ? ' (using the saved one)' : '') + ':', e);
                 });
             }
 
@@ -1686,7 +1766,7 @@
                         Module.mcUsernamePending = n;
                         Module.mcUsername = n;
                         Module.mcUsernameSet = 1;
-                        loadProfile(n);
+                        loadLook({ name: n });
                     },
                     onClose: function () { overlay = null; }
                 });
@@ -1702,8 +1782,8 @@
                     askedThisLoad = true;
                     ask('', false);
                 }
-                if (Module.mcUsernameSet === 1 && Module.mcUsername && loadedFor !== Module.mcUsername.toLowerCase())
-                    loadProfile(Module.mcUsername);
+                var look = myLook();
+                if (look && loadedFor !== lookKey(look)) loadLook(look);
             }, 500);
         })();
     </script>
@@ -2848,6 +2928,7 @@
             }
             function hostCtl(c, msg, id) {
                 if (msg && msg.json && msg.json.t === 'presence') { presenceReport(id, msg.json); if (Module.mcJava && Module.mcJava.seen) Module.mcJava.seen(id); return; }
+                if (msg && msg.json && msg.json.t === 'look') { hostLook(c, id, msg.json.look); return; }
                 if (msg && msg.json && msg.json.t === 'bye') {
                     if (conns.get(id) === c) { conns.delete(id); ev({ t: 'close', p: id }); }
                     setTimeout(function () { try { c.close(); } catch (e) { } }, 200);
@@ -2895,6 +2976,55 @@
                 net.state = 'idle'; net.code = ''; net.error = '';
                 pres.peers = {}; pres.sentAfk = null; pres.forceAfk = false;
                 try { if (Module._mcPresenceClear && Module.mcInWorld === 1) Module._mcPresenceClear(); } catch (e) { }
+                looksById = {};
+                if (Module.mcLooks) Module.mcLooks.clear();
+            }
+
+            var looksById = {};
+            function cleanAcct(a, ident) {
+                if (!a || typeof a !== 'object') return null;
+                var uuid = String(a.uuid || '').toLowerCase().replace(/-/g, ''), name = String(a.name || '');
+                if (!/^[0-9a-f]{32}$/.test(uuid) || !/^[A-Za-z0-9_]{3,16}$/.test(name)) return null;
+                var look = Module.mcSkins ? Module.mcSkins.clean(a.look) : null;
+                return { uuid: uuid, name: name, ident: ident || '', look: look || { name: name, cape: name } };
+            }
+            function myLook() { try { return Module.mcAuth && Module.mcAuth.signedIn() && Module.mcAuth.look ? Module.mcAuth.look() : null; } catch (e) { return null; } }
+            function lookOut(name, look) {
+                conns.forEach(function (c) { if (c.open) sendCtl(c, { t: 'look', name: name, look: look }); });
+                if (Module.mcLooks) Module.mcLooks.set(name, look);
+            }
+            net.accountOf = function (id) {
+                if (id === 1) {
+                    var w = Module.mcAuth && Module.mcAuth.wire ? Module.mcAuth.wire() : null;
+                    return w ? { uuid: w.uuid, name: w.name, ident: Module.mcIdent || '' } : null;
+                }
+                var c = conns.get(id);
+                return c && c._acct ? c._acct : null;
+            };
+            net.named = function (id, eid, name, note, renamed) {
+                if (net.state !== 'open') return;
+                var c = id === 1 ? null : conns.get(id);
+                var look = id === 1 ? myLook() : (c && c._acct ? c._acct.look : null);
+                var old = looksById[id];
+                if (old && old.name !== name) lookOut(old.name, null);
+                looksById[id] = { name: name, look: look, eid: eid };
+                if (!old || old.name !== name || JSON.stringify(old.look) !== JSON.stringify(look)) lookOut(name, look);
+                if (c && c.open && !renamed) Object.keys(looksById).forEach(function (k) {
+                    var o = looksById[k];
+                    if (+k !== id && (+k === 1 || conns.has(+k))) sendCtl(c, { t: 'look', name: o.name, look: o.look });
+                });
+                if (renamed) conns.forEach(function (oc, oid) { if (oc.open) sendCtl(oc, { t: 'rename', eid: eid, name: name, note: oid === id ? (note || '') : '' }); });
+                else if (c && c.open && note) sendCtl(c, { t: 'rename', eid: eid, name: name, note: note });
+            };
+            net.lookChanged = function () {
+                var look = myLook();
+                if (net.state === 'in') net.sendCtlHost({ t: 'look', look: look });
+                else if (net.state === 'open' && looksById[1]) { looksById[1].look = look; lookOut(looksById[1].name, look); }
+            };
+            function hostLook(c, id, look) {
+                if (!c._acct) return;
+                c._acct.look = (Module.mcSkins && Module.mcSkins.clean(look)) || { name: c._acct.name, cape: c._acct.name };
+                if (looksById[id]) { looksById[id].look = c._acct.look; lookOut(looksById[id].name, c._acct.look); }
             }
 
             var QUIET_MS = 15000, BEAT_MS = 5000;
@@ -2912,6 +3042,7 @@
             Module.mcGameRules.define('modDimensionTravel', true, 'Mods\' portals and world.travel take players to mods\' dimensions');
             Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
             Module.mcGameRules.define('keepJoinedPlayers', true, "The world keeps joined players' inventory, armour, food, experience and spot for when they come back");
+            Module.mcGameRules.define('allowNicknames', true, "Signed-in players may play under the in-game name they picked (off: everyone is their account's name)");
             Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
             Module.mcGameRules.define('edgeAssistDrop', 3, 'How deep (blocks) a drop has to be for Edge Assist; smaller steps are just terrain', [1, 64]);
             Module.mcGameRules.define('edgeAssistHoldSeconds', 1, 'How long a touch player backing or strafing off an edge is held before they go over (walking at it: a moment)', [0, 10]);
@@ -3076,6 +3207,7 @@
                 return +na[1] > +nb[1] ? 1 : +na[1] < +nb[1] ? -1 : 0;
             }
             net.buildOrder = buildOrder;
+            net.loadLib = loadLib;
             function hostNotice(text) {
                 try { if (Module.mcInWorld === 1 && Module._mcChatPrint) Module.ccall('mcChatPrint', null, ['string', 'number'], ['§e' + text, 0]); } catch (e) { }
             }
@@ -3167,6 +3299,7 @@
                                     if (first && first.json && first.json.t === 'ver' && first.json.v === MCRE_BUILD) {
                                         c._ver = true;
                                         var vi = String(first.json.ident || '');
+                                        c._acct = cleanAcct(first.json.acct, /^[0-9a-f]{16,64}$/.test(vi) ? vi : '');
                                         if (/^[0-9a-f]{16,64}$/.test(vi)) {
                                             var pp = pres.peers[id] || (pres.peers[id] = { device: 0, afkSince: 0, heard: Date.now() });
                                             pp.ident = vi;
@@ -3261,7 +3394,8 @@
                                                  : 'That game is on version ' + (theirs || 'an older one') + ' and you are on ' + MCRE_BUILD + '. Both of you need the same version - reload the page to update.'));
                                     return;
                                 }
-                                sendCtl(c, { t: 'ver', v: MCRE_BUILD, ident: Module.mcIdent || '' });
+                                sendCtl(c, { t: 'ver', v: MCRE_BUILD, ident: Module.mcIdent || '',
+                                    acct: Module.mcAuth && Module.mcAuth.wire ? Module.mcAuth.wire() : null });
                                 if (b.length >= 6 && b[5] === 1 && Module.mcMods && Module.mcMods.askJoin) {
                                     net.state = 'mods';
                                     joinTimer = setTimeout(function () { fail('mods'); }, 30000);
@@ -3330,6 +3464,16 @@
                                     return;
                                 }
                                 if (hm && hm.json && hm.json.t === 'setafk') { setMyAfk(!!hm.json.on); return; }
+                                if (hm && hm.json && hm.json.t === 'look') { if (Module.mcLooks) Module.mcLooks.set(String(hm.json.name || '').slice(0, 24), hm.json.look); return; }
+                                if (hm && hm.json && hm.json.t === 'rename') {
+                                    var rn = String(hm.json.name || '');
+                                    if (/^[A-Za-z0-9_]{1,24}$/.test(rn) && (hm.json.eid | 0) === +hm.json.eid) {
+                                        Module.mcRenameQueue = Module.mcRenameQueue || [];
+                                        if (Module.mcRenameQueue.length < 64)
+                                            Module.mcRenameQueue.push((hm.json.eid | 0) + '\n' + rn + '\n' + String(hm.json.note || '').replace(/[\r\n]+/g, ' ').slice(0, 200));
+                                    }
+                                    return;
+                                }
                                 if (hm && hm.json && hm.json.t === 'daycycle') { if (Module._mcDaylightCycle) Module._mcDaylightCycle(hm.json.on ? 1 : 0); return; }
                                 if (hm && hm.json && hm.json.t === 'kick') { net.kickReason = String(hm.json.why || 'Disconnected').slice(0, 150); return; }
                                 if (hm && hm.json && { jinvwatch: 1, jinvop: 1, jgui: 1, jop: 1, jhud: 1 }[hm.json.t]) { if (Module.mcJava && Module.mcJava.fromHost) Module.mcJava.fromHost(hm.json); return; }
@@ -3382,11 +3526,414 @@
         })();
 
         (function () {
+            var net = Module.mcNet;
+            if (!net) return;
+            var N = Module.mcNearby = {};
+            var PREFIX = 'mcre-near-', SLOTS = 8;
+            var PROBE_MS = 4000;
+            var TAP_G = 9, CALM_G = 2.5, CALM_MS = 250, JOLT_MS = 150, TAP_GAP = 1000;
+            var TAP_SLACK = 700;
+            function signedIn() { try { return !Module.mcAuth || Module.mcAuth.signedIn(); } catch (e) { return false; } }
+            function clean(s, max) { return String(s == null ? '' : s).replace(/[^ -~]/g, '').trim().slice(0, max || 32); }
+            function myName() { return clean(Module.mcUsername) || 'A friend'; }
+            function chat(text) {
+                try { if (Module.mcInWorld === 1 && Module._mcChatPrint) Module.ccall('mcChatPrint', null, ['string', 'number'], ['§e' + text, 0]); } catch (e) { }
+            }
+
+            var keyP = null, keyAt = 0;
+            function netKey() {
+                if (keyP && Date.now() - keyAt < 300000) return keyP;
+                keyAt = Date.now();
+                var p = keyP = new Promise(function (res) {
+                    var pc = null, done = false;
+                    function finish(ip) {
+                        if (done) return;
+                        done = true;
+                        try { if (pc) pc.close(); } catch (e) { }
+                        if (!ip || !(window.crypto && crypto.subtle)) { res(''); return; }
+                        crypto.subtle.digest('SHA-256', new TextEncoder().encode('mcre-near:' + ip + (window.__mcNearSalt || ''))).then(function (h) {
+                            res(Array.prototype.map.call(new Uint8Array(h).subarray(0, 6), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''));
+                        }, function () { res(''); });
+                    }
+                    try {
+                        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                        pc.createDataChannel('near');
+                        pc.onicecandidate = function (e) {
+                            if (!e.candidate) { finish(''); return; }
+                            var m = / ([0-9]{1,3}(?:\.[0-9]{1,3}){3}) [0-9]+ typ srflx/.exec(e.candidate.candidate || '');
+                            if (m) finish(m[1]);
+                        };
+                        pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).catch(function () { finish(''); });
+                    } catch (e) { finish(''); }
+                    setTimeout(function () { finish(''); }, 5000);
+                });
+                p.then(function (k) { if (!k && keyP === p) keyAt = Date.now() - 240000; });
+                return p;
+            }
+            try { if (navigator.connection) navigator.connection.addEventListener('change', function () { keyAt = 0; }); } catch (e) { }
+            window.addEventListener('online', function () { keyAt = 0; });
+
+            var sense = false, taps = [], grav = null, calmSince = 0, joltAt = -1e9, joltCalm = 0, lastTap = -1e9;
+            function onMotion(e) {
+                var lin, a = e.acceleration;
+                if (a && a.x != null && a.y != null && a.z != null) lin = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+                else {
+                    var g = e.accelerationIncludingGravity;
+                    if (!g || g.x == null || g.y == null || g.z == null) return;
+                    if (!grav) { grav = { x: g.x, y: g.y, z: g.z }; return; }
+                    grav.x += (g.x - grav.x) * 0.08; grav.y += (g.y - grav.y) * 0.08; grav.z += (g.z - grav.z) * 0.08;
+                    var dx = g.x - grav.x, dy = g.y - grav.y, dz = g.z - grav.z;
+                    lin = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                }
+                if (!isFinite(lin)) return;
+                sense = true;
+                var now = performance.now();
+                if (lin < CALM_G) { if (!calmSince) calmSince = now; return; }
+                if (calmSince) { joltAt = now; joltCalm = now - calmSince; calmSince = 0; }
+                if (lin >= TAP_G && now - joltAt <= JOLT_MS && joltCalm >= CALM_MS && now - lastTap >= TAP_GAP) {
+                    lastTap = now;
+                    taps.push(now);
+                    while (taps.length && now - taps[0] > 20000) taps.shift();
+                    console.log('[near] tap felt (' + lin.toFixed(1) + ' m/s2 after ' + Math.round(joltCalm) + ' ms steady)');
+                    onTap(now);
+                }
+            }
+            window.addEventListener('devicemotion', onMotion);
+            N.needsMotionPermission = function () {
+                return !sense && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'
+                    && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
+            };
+            N.askMotion = function (done) {
+                try { DeviceMotionEvent.requestPermission().then(function (s) { done(s === 'granted'); }, function () { done(false); }); } catch (e) { done(false); }
+            };
+            N.sensing = function () { return sense; };
+
+            var beacon = null, beaconFails = 0, beaconRetryAt = 0;
+            function hostState() { return Module.mcNearbyHostState || null; }
+            function wantBeacon() { return !!hostState() && signedIn() && !N.off; }
+            function dropBeacon() {
+                var b = beacon;
+                beacon = null;
+                if (b && b.peer) try { b.peer.destroy(); } catch (e) { }
+            }
+            function beaconTick() {
+                if (!wantBeacon()) { if (beacon) dropBeacon(); return; }
+                if (beacon && beacon.key && keyAt && Date.now() - keyAt < 300000 && beacon.ready) return;
+                if (Date.now() < beaconRetryAt) return;
+                netKey().then(function (key) {
+                    if (!wantBeacon()) return;
+                    if (!key) { if (beacon) dropBeacon(); return; }
+                    if (beacon && beacon.key !== key) dropBeacon();
+                    if (!beacon && Date.now() >= beaconRetryAt) claim(key, 0);
+                });
+            }
+            setInterval(beaconTick, 2000);
+            function claim(key, slot) {
+                if (slot >= SLOTS) { beaconRetryAt = Date.now() + 60000; return; }
+                var b = beacon = { key: key, slot: slot, peer: null, ready: false };
+                function fail() {
+                    if (beacon !== b) return;
+                    dropBeacon();
+                    beaconFails++;
+                    beaconRetryAt = Date.now() + Math.min(60000, 2000 * Math.pow(2, Math.min(5, beaconFails)));
+                }
+                net.loadLib().then(function () {
+                    if (beacon !== b) return;
+                    var p = b.peer = new Peer(PREFIX + key + '-' + slot, { debug: 0 });
+                    p.on('open', function () {
+                        if (beacon !== b) { try { p.destroy(); } catch (e) { } return; }
+                        b.ready = true;
+                        beaconFails = 0;
+                        console.log('[near] beacon up (slot ' + slot + ')');
+                    });
+                    p.on('error', function (err) {
+                        if (beacon !== b) return;
+                        var type = err && err.type;
+                        if (type === 'peer-unavailable') return;
+                        if (type === 'unavailable-id' && !b.ready) { try { p.destroy(); } catch (e) { } beacon = null; claim(key, slot + 1); return; }
+                        if (!b.ready || p.destroyed) fail();
+                    });
+                    p.on('disconnected', function () {
+                        if (beacon !== b) return;
+                        setTimeout(function () { if (beacon === b && p.disconnected && !p.destroyed) try { p.reconnect(); } catch (e) { } }, 1000);
+                        setTimeout(function () { if (beacon === b && p.disconnected) fail(); }, 12000);
+                    });
+                    p.on('connection', onBeaconConn);
+                }, function () { if (beacon === b) { beacon = null; beaconRetryAt = Date.now() + 30000; } });
+            }
+            function tapMatch(ago) {
+                if (typeof ago !== 'number' || !(ago >= 0) || ago > 15000) return '';
+                if (!sense) return 'one';
+                var at = performance.now() - ago;
+                for (var i = 0; i < taps.length; i++) if (Math.abs(taps[i] - at) <= TAP_SLACK) return 'both';
+                return '';
+            }
+            var asking = null, refused = {};
+            function onBeaconConn(c) {
+                if (!c.metadata || c.metadata.near !== 1) { setTimeout(function () { try { c.close(); } catch (e) { } }, 100); return; }
+                var match = '', who = null, quiet = 0;
+                var life = setTimeout(end, 90000);
+                function end() { clearTimeout(life); clearTimeout(quiet); try { c.close(); } catch (e) { } }
+                function send(o) { try { if (c.open) c.send(o); } catch (e) { } }
+                c.on('data', function (m) {
+                    if (!m || typeof m !== 'object') return;
+                    var st = hostState();
+                    if (m.t === 'hello' && !who) {
+                        who = { name: clean(m.name) || 'A friend', ident: /^[0-9a-f]{16,64}$/.test(String(m.ident || '')) ? String(m.ident) : '' };
+                        var open = !!st && net.state === 'open' && !!net.code;
+                        match = st ? tapMatch(m.tap) : '';
+                        var o = { t: 'info', open: open };
+                        if (st && (open || match)) {
+                            o.name = myName(); o.world = clean(st.world, 40); o.players = st.players | 0; o.v = MCRE_BUILD; o.match = match;
+                            if (open) o.code = net.code;
+                        }
+                        send(o);
+                        if (!match) quiet = setTimeout(end, 2000);
+                        return;
+                    }
+                    if (m.t === 'want' && match && who && st) {
+                        if (net.state === 'open' && net.code) { send({ t: 'code', code: net.code }); return; }
+                        if (match === 'both') { openFor(who, send); return; }
+                        askHost(who, function (yes) { if (yes) openFor(who, send); else send({ t: 'no' }); });
+                        return;
+                    }
+                    if (m.t === 'bye') end();
+                });
+                c.on('close', function () { clearTimeout(life); clearTimeout(quiet); });
+                c.on('error', function () { clearTimeout(life); clearTimeout(quiet); });
+            }
+            function openFor(who, send) {
+                console.log('[near] opening the world for a nearby friend');
+                if (net.state !== 'open' && net.state !== 'opening') Module.mcNearbyOpenReq = 1;
+                var t0 = Date.now();
+                (function wait() {
+                    if (net.state === 'open' && net.code) {
+                        send({ t: 'code', code: net.code });
+                        chat(who.name + ' is joining from nearby - your world is open to friends (code ' + net.code + ')');
+                        return;
+                    }
+                    var failed = net.state === 'error' && !Module.mcNearbyOpenReq && Date.now() - t0 > 1500;
+                    if (failed || Date.now() - t0 > 20000 || !hostState()) { send({ t: 'no', why: 'open' }); return; }
+                    setTimeout(wait, 250);
+                })();
+            }
+            function askHost(who, cb) {
+                var k = who.ident || who.name;
+                if ((refused[k] && Date.now() - refused[k] < 120000) || asking || !Module.mcDialog) { cb(false); return; }
+                var done = false;
+                function answer(yes) {
+                    if (done) return;
+                    done = true;
+                    if (asking) { try { asking.close(); } catch (e) { } }
+                    asking = null;
+                    if (!yes) refused[k] = Date.now();
+                    cb(yes);
+                }
+                asking = Module.mcDialog.open({
+                    title: 'A friend nearby',
+                    items: [{ t: 'text', text: who.name + ', on the same network as you, wants to join this world.' },
+                            { t: 'text', text: 'Letting them in opens your world to friends - the game menu shows its code.', color: 'a0a0a0' }],
+                    buttons: [{ id: 'yes', label: 'Let them join', primary: true }, { id: 'no', label: 'Not now', cancel: true }],
+                    when: function () { return Module.mcInWorld === 1; },
+                    onAction: function (a) { answer(a === 'yes'); },
+                    onClose: function () { answer(false); }
+                });
+                setTimeout(function () { answer(false); }, 60000);
+            }
+
+            var scanPeer = null, scanPeerP = null, scanIdle = 0, held = 0;
+            function getScanPeer() {
+                if (scanPeer && !scanPeer.destroyed && !scanPeer.disconnected) return Promise.resolve(scanPeer);
+                if (scanPeerP) return scanPeerP;
+                var pp = scanPeerP = net.loadLib().then(function () {
+                    return new Promise(function (res, rej) {
+                        var p = new Peer({ debug: 0 }), ok = false;
+                        var t = setTimeout(function () { try { p.destroy(); } catch (e) { } rej(new Error('timeout')); }, 10000);
+                        p.on('open', function () { ok = true; clearTimeout(t); scanPeer = p; res(p); });
+                        p.on('error', function (err) { if (!ok) { clearTimeout(t); try { p.destroy(); } catch (e) { } rej(err); } });
+                        p.on('disconnected', function () { if (scanPeer === p && !held) { scanPeer = null; try { p.destroy(); } catch (e) { } } });
+                    });
+                });
+                pp.then(function () { scanPeerP = null; }, function () { scanPeerP = null; });
+                return pp;
+            }
+            function letGoLater() {
+                clearTimeout(scanIdle);
+                scanIdle = setTimeout(function () {
+                    if (scanPeer && !held) { try { scanPeer.destroy(); } catch (e) { } scanPeer = null; }
+                }, 60000);
+            }
+            function scan(tapAt, keep) {
+                return netKey().then(function (key) {
+                    if (!key) return [];
+                    return getScanPeer().then(function (p) {
+                        var found = [], all = [];
+                        for (var s = 0; s < SLOTS; s++) all.push(probe(p, key, s, tapAt, keep, found));
+                        return Promise.all(all).then(function () { letGoLater(); return found; });
+                    });
+                }).catch(function () { return []; });
+            }
+            function probe(p, key, slot, tapAt, keep, found) {
+                return new Promise(function (res) {
+                    var c = null, done = false, got = null;
+                    try { c = p.connect(PREFIX + key + '-' + slot, { reliable: true, serialization: 'json', metadata: { near: 1 } }); } catch (e) { c = null; }
+                    if (!c) { res(); return; }
+                    var t = setTimeout(finish, PROBE_MS);
+                    function finish() {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(t);
+                        if (!(got && got.conn)) { try { c.close(); } catch (e) { } }
+                        res();
+                    }
+                    c.on('open', function () {
+                        var ago = tapAt ? Math.max(0, Math.round(performance.now() - tapAt)) : -1;
+                        try { c.send({ t: 'hello', v: MCRE_BUILD, name: myName(), ident: Module.mcIdent || '', tap: ago }); } catch (e) { finish(); }
+                    });
+                    c.on('data', function (m) {
+                        if (got) { if (c._near) c._near(m || {}); return; }
+                        if (!m || m.t !== 'info') return;
+                        got = { slot: slot, open: !!m.open, name: clean(m.name) || 'A friend', world: clean(m.world, 40), players: +m.players || 0,
+                                code: /^[A-Z0-9]{5}$/.test(String(m.code || '')) ? String(m.code) : '', v: clean(m.v, 40),
+                                match: m.match === 'both' || m.match === 'one' ? m.match : '' };
+                        if (keep && got.match) got.conn = c;
+                        if ((got.open && got.code) || got.match) found.push(got);
+                        finish();
+                    });
+                    c.on('close', function () { if (got && got.conn && c._near) c._near({ t: '_closed' }); finish(); });
+                    c.on('error', finish);
+                });
+            }
+            function letGo(w) {
+                if (!w || !w.conn) return;
+                var c = w.conn;
+                w.conn = null;
+                c._near = null;
+                try { if (c.open) c.send({ t: 'bye' }); } catch (e) { }
+                setTimeout(function () { try { c.close(); } catch (e) { } }, 300);
+            }
+
+            var popup = null, lastTapScan = 0, snooze = {};
+            function onTap(at) {
+                if (Module.mcInWorld === 1 || !signedIn() || N.off || popup) return;
+                if (net.state === 'joining' || net.state === 'mods' || net.state === 'in') return;
+                if (Date.now() - lastTapScan < 2500) return;
+                lastTapScan = Date.now();
+                scan(at, true).then(function (found) {
+                    var hits = found.filter(function (w) { return w.match; });
+                    var both = hits.filter(function (w) { return w.match === 'both'; });
+                    var pick = (both.length ? both : hits).filter(function (w) { return !(snooze[w.name] > Date.now()); }).slice(0, 3);
+                    hits.forEach(function (w) { if (pick.indexOf(w) < 0) letGo(w); });
+                    console.log('[near] after a tap: ' + found.length + ' answered, ' + hits.length + ' matched (' + hits.map(function (w) { return w.match; }).join(',') + ')');
+                    if (!pick.length) return;
+                    if (popup || Module.mcInWorld === 1 || net.state === 'joining' || net.state === 'mods' || net.state === 'in') { pick.forEach(letGo); return; }
+                    showPopup(pick);
+                });
+            }
+            function showPopup(list) {
+                if (!Module.mcDialog) { list.forEach(letGo); return; }
+                held++;
+                var wasBox = !!(box && !box.closed);
+                if (wasBox) box.close();
+                var one = list.length === 1 ? list[0] : null, items = [];
+                if (one) items.push({ t: 'text', text: one.name + ' is playing ' + (one.world ? '"' + one.world + '"' : 'a world') + ' right next to you' + (one.players > 1 ? ' (' + one.players + ' playing)' : '') + '.' });
+                else list.forEach(function (w, i) { items.push({ t: 'row', id: 'w' + i, title: w.name + "'s world", sub: (w.world || '') + (w.players > 1 ? ' - ' + w.players + ' playing' : ''), button: 'Join' }); });
+                var STATUS = items.length;
+                items.push({ t: 'text', text: '', color: 'a0a0a0' });
+                var finished = false;
+                function finish(joined) {
+                    if (finished) return;
+                    finished = true;
+                    held--;
+                    popup = null;
+                    clearTimeout(expire);
+                    list.forEach(letGo);
+                    if (!joined && wasBox && Module.mcInWorld !== 1 && Module.mcAskRoomCode && N.joinScreenUp && N.joinScreenUp()) Module.mcAskRoomCode('');
+                }
+                function status(d, text, color) { d.spec.items[STATUS].text = text; d.spec.items[STATUS].color = color || 'a0a0a0'; d.update(); }
+                function go(d, code) {
+                    finish(true);
+                    d.close();
+                    Module.mcNearbyJoinCode = code;
+                }
+                var d0 = popup = Module.mcDialog.open({
+                    title: "Join a friend's world?",
+                    items: items,
+                    buttons: one ? [{ id: 'join', label: 'Join', primary: true, keep: true }, { id: 'no', label: 'Not now', cancel: true }]
+                                 : [{ id: 'no', label: 'Not now', cancel: true }],
+                    when: function () { return Module.mcInWorld !== 1; },
+                    onAction: function (a, v, d) {
+                        var w = a === 'join' ? one : /^row:w[0-9]$/.test(a) ? list[+a.slice(5)] : null;
+                        if (!w) { finish(false); return; }
+                        if (w.open && w.code) { go(d, w.code); return; }
+                        if (!w.conn || !w.conn.open) { status(d, 'Lost ' + w.name + ' - tap again.', 'ff7070'); return; }
+                        status(d, w.match === 'one' ? 'Asking ' + w.name + '...' : 'Opening ' + w.name + "'s world...");
+                        w.conn._near = function (m) {
+                            if (finished) return;
+                            if (m.t === 'code' && /^[A-Z0-9]{5}$/.test(String(m.code || ''))) go(d, String(m.code));
+                            else if (m.t === 'no') {
+                                snooze[w.name] = Date.now() + 60000;
+                                status(d, m.why === 'open' ? "Couldn't open " + w.name + "'s world - try again." : w.name + " didn't let you in this time.", 'ff7070');
+                            } else if (m.t === '_closed') status(d, 'Lost ' + w.name + ' - tap again.', 'ff7070');
+                        };
+                        try { w.conn.send({ t: 'want' }); } catch (e) { status(d, 'Lost ' + w.name + ' - tap again.', 'ff7070'); }
+                    },
+                    onClose: function () { finish(false); }
+                });
+                var expire = setTimeout(function () { if (!finished) { finish(false); d0.close(); } }, 60000);
+            }
+
+            var box = null;
+            N.watchBox = function (d) {
+                box = d;
+                if (!signedIn()) return;
+                var base = d.spec.items.length, last = '';
+                d.spec.items.push({ t: 'text', text: 'Looking for games on this network...', color: '808080' });
+                if (N.needsMotionPermission()) {
+                    d.spec.buttons.splice(d.spec.buttons.length - 1, 0, { id: 'motion', label: 'Turn on tap-to-join', keep: true, activate: function (dd) {
+                        N.askMotion(function (ok) {
+                            if (dd.closed) return;
+                            dd.spec.buttons = dd.spec.buttons.filter(function (b) { return b.id !== 'motion'; });
+                            dd.update();
+                        });
+                    } });
+                }
+                d.update();
+                (function look() {
+                    if (d.closed || box !== d) return;
+                    scan(null, false).then(function (found) {
+                        if (d.closed || box !== d) return;
+                        var open = found.filter(function (w) { return w.open && w.code; }), items = d.spec.items.slice(0, base);
+                        if (!open.length) items.push({ t: 'text', text: sense || N.needsMotionPermission() ? 'No open games on this network right now. To join a friend whose world isn\'t open, tap your phones together.'
+                                                                                                        : 'No open games on this network right now.', color: '808080' });
+                        else {
+                            items.push({ t: 'heading', text: 'On this network' });
+                            open.forEach(function (w) {
+                                items.push({ t: 'row', id: 'near' + w.code, title: w.name + (w.world ? ' - ' + w.world : ''), button: 'Join',
+                                             sub: 'Code ' + w.code + (w.players ? ' - ' + w.players + ' playing' : '') + (w.v && w.v !== MCRE_BUILD ? ' - version ' + w.v : '') });
+                            });
+                        }
+                        var now = JSON.stringify(items.slice(base));
+                        if (now !== last) { last = now; d.spec.items = items; d.update(); }
+                        setTimeout(look, 4000);
+                    });
+                })();
+            };
+            N.codeFor = function (action) { var m = /^row:near([A-Z0-9]{5})$/.exec(String(action || '')); return m ? m[1] : ''; };
+            N.scan = scan;
+            N.beaconInfo = function () { return beacon ? { key: beacon.key, slot: beacon.slot, ready: beacon.ready } : null; };
+            N.key = netKey;
+        })();
+
+        (function () {
             var dlg = null;
+            var waiting = false;
             function close() { if (dlg) dlg.close(); dlg = null; }
-            Module.mcHideRoomCode = close;
+            Module.mcHideRoomCode = function () { waiting = false; close(); };
+            if (Module.mcNearby) Module.mcNearby.joinScreenUp = function () { return waiting; };
             Module.mcAskRoomCode = function (message) {
                 close();
+                waiting = true;
                 var ERR = 2;
                 var up = message && Module.mcNet ? Module.mcNet.updateOffer : null;
                 if (Module.mcNet) Module.mcNet.updateOffer = null;
@@ -3412,17 +3959,22 @@
                             });
                             return;
                         }
-                        if (a !== 'join') { dlg = null; Module.mcRoomCodeInput = ''; return; }
+                        if (a === 'motion') return;
+                        var near = Module.mcNearby ? Module.mcNearby.codeFor(a) : '';
+                        if (near) { d.close(); dlg = null; waiting = false; Module.mcRoomCodeInput = near; return; }
+                        if (a !== 'join') { dlg = null; waiting = false; Module.mcRoomCodeInput = ''; return; }
                         var raw = String(v.code || '').trim();
                         var server = /[.:]/.test(raw) || /^localhost$/i.test(raw);
                         var c = server ? raw : raw.toUpperCase();
                         if (!server && !/^[A-Z0-9]{5}$/.test(c)) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers (or type a server address)'; d.update(); return; }
                         d.close();
                         dlg = null;
+                        waiting = false;
                         Module.mcRoomCodeInput = c;
                     },
                     onClose: function () { dlg = null; }
                 });
+                if (Module.mcNearby) Module.mcNearby.watchBox(dlg);
             };
         })();
 
@@ -6306,6 +6858,20 @@
                 return filesOf(x, false).then(function (files) { x.zip = makeZip(files); return x.zip; });
             }
 
+            function clientOnlyOf(files) {
+                files = forPlatform(files);
+                var keys = Object.keys(files).filter(function (k) { return !/[/]$/.test(k); });
+                if (files['fabric.mod.json']) {
+                    try {
+                        var fm = mcLenientJson(new TextDecoder().decode(files['fabric.mod.json']));
+                        return !!fm && String(fm.environment || '').toLowerCase() === 'client';
+                    } catch (e) { return false; }
+                }
+                if (keys.some(function (k) { return /[.]class$/i.test(k); })) return false;
+                var changesGame = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions|mobs?|rules|loot_tables?|scripts|modpe)[/]|^data[/][^/]+[/]loot_tables?[/]/i;
+                if (keys.some(function (k) { return changesGame.test(k); })) return false;
+                return keys.some(function (k) { return /^(textures[/]|images[/]|sounds[/]|lang[/]|(assets[/][^/]+[/])?models[/])/i.test(k); });
+            }
             function contentsOf(files) {
                 files = forPlatform(files);
                 var n = {}, keys = Object.keys(files);
@@ -6385,6 +6951,7 @@
                                 } else x.m.id = x.id;
                                 x.icon = iconOf(x.contentId || x.id, files, x.m);
                                 x.contents = contentsOf(files);
+                                x.clientOnly = clientOnlyOf(files);
                                 x.modeTypeName = '';
                                 var gwt = x.m && x.m.game_mode ? modeTypeKey(x) : '';
                                 if (gwt && gwt.split(':')[0] === cid(x)) {
@@ -9989,6 +10556,21 @@
                     return reapply(true);
                 });
             };
+            api.contentModsOn = function () {
+                if (Module.mcAuth && !Module.mcAuth.signedIn()) return false;
+                if (session) return session.some(function (s) { var x = mods[find(s.id)]; return !x || !x.clientOnly; });
+                return mods.some(function (x) { return x.enabled && !x.err && !x.clientOnly; });
+            };
+            api.forBtaVisit = function () {
+                if (!api.contentModsOn()) return Promise.resolve(false);
+                return Promise.all(mods.map(hashOf)).then(function () {
+                    var keep = mods.filter(function (x) { return x.enabled && !x.err && x.clientOnly; });
+                    return api.startSession(keep.map(function (x) { return { id: x.id, hash: x.hash }; }), {}, false).then(function () {
+                        bump(keep.length ? 'Mods off while you play on BTA (looks-only ones stay on)' : 'Mods off while you play on BTA');
+                        return true;
+                    });
+                });
+            };
             api.endSession = function () {
                 api.setJoinedConfig(null);
                 if (!session) return;
@@ -10776,6 +11358,22 @@
                                     data == null ? (it && it.data != null ? it.data | 0 : -1) : data | 0], mod).then(function (r) { return !!r.ok; });
                             },
                             captureSlots: function (on) { post({ t: 'capture', mod: mod, on: !!on }); },
+                            display: function (id, spec) { post({ t: 'disp', mod: mod, id: String(id), spec: spec == null ? null : plain(spec) }); },
+                            displayFrame: function (id, px, w, h) {
+                                if (px && px.data && px.width && w == null) { w = px.width; h = px.height; px = px.data; }
+                                w = w | 0; h = h | 0;
+                                var len = w * h * 4;
+                                if (w <= 0 || h <= 0 || w > 2048 || h > 2048 || !px || !(px.length >= len)) return false;
+                                var buf = new Uint8Array(len);
+                                if (px.subarray) buf.set(px.length === len ? px : px.subarray(0, len));
+                                else for (var i = 0; i < len; i++) buf[i] = px[i];
+                                post({ t: 'dispf', mod: mod, id: String(id), w: w, h: h, px: buf }, [buf.buffer]);
+                                return true;
+                            },
+                            captureKeys: function (on) { post({ t: 'ckeys', mod: mod, on: !!on }); },
+                            pickFile: function (o) { return cask('pickfile', [plain(o) || {}], mod).then(function (r) { return r.file || null; }); },
+                            openUrl: function (url) { return cask('openurl', [String(url)], mod).then(function (r) { return !!r.ok; }); },
+                            displayCapture: function (id, on) { post({ t: 'dcap', mod: mod, id: String(id), on: on !== false }); },
                             openControls: function () { post({ t: 'controls', mod: mod }); },
                             sound: function (name, v, p) { post({ t: 'csound', name: String(name), v: v == null ? 1 : +v, p: p == null ? 1 : +p }); },
                             soundStyle: function () { return cask('soundstyle').then(function (r) { return r.style; }); },
@@ -10797,7 +11395,7 @@
                 }
                 function fire(list, type, e) {
                     (list[type] || []).forEach(function (h) {
-                        if (e.mod && (type === 'gui' || type === 'message' || type === 'settings' || type === 'keybind') && e.mod !== h.mod) return;
+                        if (e.mod && (type === 'gui' || type === 'message' || type === 'settings' || type === 'keybind' || type === 'displayCapture') && e.mod !== h.mod) return;
                         try { var r = h.fn(e); if (r && r.catch) r.catch(function (x) { report(h.mod, x); }); } catch (x) { report(h.mod, x); }
                     });
                 }
@@ -11163,6 +11761,7 @@
                     else if (gui && gui.mod === d.mod && String(gui.id) === d.id) closeGui(true);
                     break;
                 case 'cask':
+                    if (d.what === 'pickfile' || d.what === 'openurl') { askPlayer(d); break; }
                     var ans = {}, ca = Array.isArray(d.args) ? d.args : [];
                     if (d.what === 'screen') ans = screenInfo();
                     else if (d.what === 'soundstyle') ans.style = Module.mcSoundStyle === 1 ? 'new' : 'old';
@@ -11212,6 +11811,16 @@
                 case 'capture':
                     if (d.on) capturing[d.mod] = true; else delete capturing[d.mod];
                     slotHooks();
+                    break;
+                case 'disp':
+                    displays.set(d.mod, d.id, d.spec);
+                    if (d.spec == null) capture.stop(d.mod, d.id);
+                    break;
+                case 'dcap': if (d.on) capture.start(d.mod, d.id); else capture.stop(d.mod, d.id); break;
+                case 'dispf': displays.frame(d.mod, d.id, d.w | 0, d.h | 0, d.px); break;
+                case 'ckeys':
+                    if (d.on) keyGrab[d.mod] = true; else delete keyGrab[d.mod];
+                    keyGrabApply();
                     break;
                 case 'me':
                     var p = null;
@@ -11430,6 +12039,9 @@
                 closeGui(true);
                 closePanels();
                 hud(null);
+                displays.clear();
+                capture.stopAll();
+                if (Object.keys(keyGrab).length) { keyGrab = {}; keyGrabApply(); }
                 lastScreen = '';
                 capturing = {};
                 slotHooks();
@@ -11688,7 +12300,12 @@
                 toWorker({ t: 'screen', client: true, screen: s.screen, rect: s.rect, width: s.width, height: s.height, scale: s.scale, held: s.held, close: s.close || null });
             }
 
+            var keyGrab = {};
+            function keyGrabApply() {
+                if (Module._mcScriptKeys) Module.ccall('mcScriptKeys', null, ['number'], [Object.keys(keyGrab).length ? 1 : 0]);
+            }
             function onKey(e) {
+                if (e.key === 'Escape' && e.type === 'keydown' && Object.keys(keyGrab).length) { keyGrab = {}; keyGrabApply(); }
                 if (!worker || !wants.key || e.repeat || gui) return;
                 var t = e.target;
                 if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -11696,6 +12313,185 @@
             }
             window.addEventListener('keydown', onKey);
             window.addEventListener('keyup', onKey);
+
+            var displays = Module.mcDisplays = (function () {
+                var byKey = {}, byNum = {}, nextNum = 1;
+                var FACES = { down: [0, -1, 0], up: [0, 1, 0], north: [0, 0, -1], south: [0, 0, 1], west: [-1, 0, 0], east: [1, 0, 0] };
+                var ORDER = ['down', 'up', 'north', 'south', 'west', 'east'];
+                var faceOf = function (f) { return typeof f === 'number' ? ORDER[f | 0] : String(f || '').toLowerCase(); };
+                function geo(s) {
+                    var N = FACES[faceOf(s.face)];
+                    if (!N || !isFinite(s.x) || !isFinite(s.y) || !isFinite(s.z)) return null;
+                    var T = [0, 1, 0];
+                    if (N[1] !== 0) {
+                        T = FACES[faceOf(s.top == null ? 'north' : s.top)];
+                        if (!T || T[1] !== 0) T = [0, 0, -1];
+                    }
+                    var R = [T[1] * N[2] - T[2] * N[1], T[2] * N[0] - T[0] * N[2], T[0] * N[1] - T[1] * N[0]];
+                    var wd = s.width == null ? 1 : +s.width, ht = s.height == null ? 1 : +s.height;
+                    var mg = s.margin == null ? 0 : s.margin;
+                    var mx = Array.isArray(mg) ? +mg[0] : +mg, my = Array.isArray(mg) ? +(mg.length > 1 ? mg[1] : mg[0]) : +mg;
+                    var off = s.offset == null ? 0.003 : +s.offset;
+                    if (!(wd > 0) || !(ht > 0) || !isFinite(mx) || !isFinite(my) || !isFinite(off) || wd > 256 || ht > 256) return null;
+                    wd -= 2 * mx; ht -= 2 * my;
+                    if (!(wd > 0) || !(ht > 0)) return null;
+                    var g = [];
+                    for (var k = 0; k < 3; k++) {
+                        var c = [+s.x, +s.y, +s.z][k] + 0.5 + N[k] * (0.5 + off);
+                        g.push(c - R[k] * (0.5 - mx) - T[k] * (0.5 - my));
+                    }
+                    return g.concat([R[0] * wd, R[1] * wd, R[2] * wd, T[0] * ht, T[1] * ht, T[2] * ht]);
+                }
+                return {
+                    set: function (mod, id, spec) {
+                        var key = mod + '\n' + id, o = byKey[key];
+                        if (spec == null) { if (o) { delete byKey[key]; delete byNum[o.num]; } return; }
+                        if (!o) { o = byKey[key] = { num: nextNum++, ver: 0, w: 0, h: 0, px: null, geo: null }; byNum[o.num] = o; }
+                        o.geo = geo(spec);
+                        if (!o.geo && W() && W().problem) W().problem(mod, 'scripts', 'client.display: "' + id + '" needs x, y, z, a face (up, down, north, south, east, west) and a positive width / height', 'script');
+                    },
+                    frame: function (mod, id, w, h, px) {
+                        var o = byKey[mod + '\n' + id];
+                        if (!o || !px || px.length !== w * h * 4) return;
+                        o.w = w; o.h = h; o.px = px; o.ver = (o.ver + 1) % 0x7fffff;
+                    },
+                    clear: function () { byKey = {}; byNum = {}; },
+                    geoOf: function (mod, id) { var o = byKey[mod + '\n' + id]; return o ? o.geo : null; },
+                    list: function () {
+                        var out = [];
+                        for (var k in byKey) { var o = byKey[k]; if (o.geo && o.px) out.push([o.num, o.ver, o.w, o.h].concat(o.geo, [0, 0, 0])); }
+                        return out;
+                    },
+                    pixels: function (num) { var o = byNum[num]; return o ? o.px : null; }
+                };
+            })();
+
+            function modName(mod) {
+                try {
+                    var row = W().list().split('\n').map(function (l) { return l.split('\t'); }).filter(function (f) { return f[0] === mod; })[0];
+                    if (row && row[1]) return row[1];
+                } catch (x) { }
+                return mod;
+            }
+            function freshClick() { return !!(navigator.userActivation && navigator.userActivation.isActive); }
+            function askPlayer(d) {
+                var done = false, a = (Array.isArray(d.args) ? d.args : [])[0];
+                var reply = function (ans) { if (done) return; done = true; toWorker(Object.assign({ t: 'reply', req: d.req }, ans)); };
+                if (d.what === 'pickfile') {
+                    var o = a && typeof a === 'object' ? a : {};
+                    var max = +o.maxBytes > 0 ? +o.maxBytes : 16 * 1024 * 1024;
+                    var take = function (files) {
+                        var f = files && files[0];
+                        if (!f) { reply({ file: null }); return; }
+                        if (f.size > max) { chat('[' + modName(d.mod) + '] ' + f.name + ' is too big'); reply({ file: null }); return; }
+                        f.arrayBuffer().then(function (ab) { reply({ file: { name: f.name, size: f.size, data: new Uint8Array(ab) } }); },
+                            function () { reply({ file: null }); });
+                    };
+                    if (freshClick()) {
+                        var inp = document.createElement('input');
+                        inp.type = 'file';
+                        if (o.accept) inp.accept = String(o.accept);
+                        inp.style.display = 'none';
+                        document.body.appendChild(inp);
+                        inp.addEventListener('change', function () { take(inp.files); inp.remove(); });
+                        inp.addEventListener('cancel', function () { reply({ file: null }); inp.remove(); });
+                        inp.click();
+                        return;
+                    }
+                    if (gui) closeGui(true);
+                    Module.mcDialog.open({
+                        title: String(o.title || 'Choose a file'),
+                        items: [{ t: 'text', text: modName(d.mod) + ' asks for a file from this device.' }],
+                        buttons: [{ id: 'pick', label: 'Choose a file...', primary: true, keep: true, file: { accept: String(o.accept || ''), onFiles: function (fs, dlg) { dlg.close(); take(fs); } } },
+                                  { id: 'cancel', label: 'Cancel', cancel: true }],
+                        onAction: function (act) { if (act === 'cancel') reply({ file: null }); },
+                        onClose: function () { reply({ file: null }); }
+                    });
+                    return;
+                }
+                var url = String(a || ''), host = '';
+                try { var u = new URL(url); if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host; } catch (x) { }
+                if (!host) { reply({ ok: false }); return; }
+                if (gui) closeGui(true);
+                Module.mcDialog.open({
+                    title: 'Open a web page?',
+                    items: [{ t: 'text', text: modName(d.mod) + ' wants to open ' + host + ' in a new window.' }],
+                    buttons: [{ id: 'open', label: 'Open', primary: true, keep: true, activate: function (dlg) {
+                                  window.open(url, '_blank', 'noopener,popup,left=0,top=0,width=' + screen.availWidth + ',height=' + screen.availHeight);
+                                  dlg.close();
+                                  reply({ ok: true });
+                              } },
+                              { id: 'cancel', label: 'Cancel', cancel: true }],
+                    onAction: function (act) { if (act === 'cancel') reply({ ok: false }); },
+                    onClose: function () { reply({ ok: false }); }
+                });
+            }
+
+            var capture = (function () {
+                var caps = {};
+                function tell(mod, id, on) { toWorker({ t: 'displayCapture', client: true, mod: mod, id: id, on: !!on }); }
+                function stop(mod, id, quiet) {
+                    var key = mod + '\n' + id, c = caps[key];
+                    if (!c) return;
+                    delete caps[key];
+                    cancelAnimationFrame(c.raf);
+                    try { c.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (x) { }
+                    c.video.srcObject = null;
+                    if (!quiet) tell(mod, id, false);
+                }
+                function run(mod, id, stream) {
+                    var key = mod + '\n' + id;
+                    stop(mod, id, true);
+                    var c = caps[key] = { stream: stream, video: document.createElement('video'), canvas: document.createElement('canvas'), raf: 0, last: 0 };
+                    c.video.muted = true;
+                    c.video.playsInline = true;
+                    c.video.srcObject = stream;
+                    c.video.play().catch(function () { });
+                    var ctx = c.canvas.getContext('2d', { willReadFrequently: true });
+                    stream.getVideoTracks().forEach(function (t) { t.addEventListener('ended', function () { if (caps[key] === c) stop(mod, id); }); });
+                    var pump = function (now) {
+                        if (caps[key] !== c) return;
+                        c.raf = requestAnimationFrame(pump);
+                        if (now - c.last < 32) return;
+                        c.last = now;
+                        var g = displays.geoOf(mod, id), vw = c.video.videoWidth, vh = c.video.videoHeight;
+                        if (!g || !vw || !vh) return;
+                        var lr = Math.sqrt(g[3] * g[3] + g[4] * g[4] + g[5] * g[5]), lu = Math.sqrt(g[6] * g[6] + g[7] * g[7] + g[8] * g[8]);
+                        var w = Math.max(64, Math.min(1024, Math.round(lr * 256))), h = Math.max(36, Math.min(1024, Math.round(w * lu / lr)));
+                        if (c.canvas.width !== w || c.canvas.height !== h) { c.canvas.width = w; c.canvas.height = h; }
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, w, h);
+                        var s = Math.min(w / vw, h / vh), dw = vw * s, dh = vh * s;
+                        ctx.drawImage(c.video, (w - dw) / 2, (h - dh) / 2, dw, dh);
+                        displays.frame(mod, id, w, h, ctx.getImageData(0, 0, w, h).data);
+                    };
+                    c.raf = requestAnimationFrame(pump);
+                    tell(mod, id, true);
+                }
+                function start(mod, id) {
+                    var md = navigator.mediaDevices;
+                    if (!md || !md.getDisplayMedia) { chat('[' + modName(mod) + '] this browser can\'t share a window'); tell(mod, id, false); return; }
+                    var go = function () {
+                        md.getDisplayMedia({ video: { frameRate: 30 }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include' })
+                            .then(function (stream) { run(mod, id, stream); }, function () { tell(mod, id, false); });
+                    };
+                    if (freshClick()) { go(); return; }
+                    if (gui) closeGui(true);
+                    Module.mcDialog.open({
+                        title: 'Show a window here?',
+                        items: [{ t: 'text', text: 'Pick the window or tab to show on the screen in the world. Its sound stays with it, and you use it in its own window.' }],
+                        buttons: [{ id: 'pick', label: 'Pick a window...', primary: true, keep: true, activate: function (dlg) { dlg.close(); go(); } },
+                                  { id: 'cancel', label: 'Not now', cancel: true }],
+                        onAction: function (act) { if (act === 'cancel') tell(mod, id, false); },
+                        onClose: function () { tell(mod, id, false); }
+                    });
+                }
+                return {
+                    start: start,
+                    stop: function (mod, id) { stop(mod, id); },
+                    stopAll: function () { Object.keys(caps).forEach(function (k) { var i = k.indexOf('\n'); stop(k.slice(0, i), k.slice(i + 1), true); }); }
+                };
+            })();
 
             var hudBox = null, hudLines = {};
             function hud(key, text) {
@@ -13863,7 +14659,7 @@
                 if (orig.__bot) return;
                 var f = function (name) {
                     if (skinFor(name)) { applySkin(name); return; }
-                    if (joined()) { var self = this, args = arguments; setTimeout(function () { if (skinFor(name)) applySkin(name); else orig.apply(self, args); }, 5000); return; }
+                    if (joined() && !(Module.mcLooks && Module.mcLooks.get(name))) { var self = this, args = arguments; setTimeout(function () { if (skinFor(name)) applySkin(name); else orig.apply(self, args); }, 5000); return; }
                     return orig.apply(this, arguments);
                 };
                 f.__bot = true;
@@ -16029,10 +16825,141 @@
                 put(K_ACCOUNT, JSON.stringify(account));
                 if (a.refresh) put(K_REFRESH, a.refresh);
                 Module.mcSignedIn = 1;
-                Module.mcUsernamePending = account.name;
-                Module.mcUsername = account.name;
-                Module.mcUsernameSet = 1;
+                applyName();
                 listeners.forEach(function (f) { try { f(account); } catch (e) { } });
+            }
+
+            var K_PROFILES = 'mcre.profiles';
+            function validName(n) { return /^[A-Za-z0-9_]{3,16}$/.test(String(n || '')); }
+            function profiles() { try { var o = JSON.parse(get(K_PROFILES) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+            function profile() {
+                if (!account || !account.uuid) return {};
+                var p = profiles()[account.uuid];
+                return p && typeof p === 'object' ? p : {};
+            }
+            function saveProfile(p) {
+                if (!account || !account.uuid) return;
+                var all = profiles();
+                all[account.uuid] = p;
+                put(K_PROFILES, JSON.stringify(all));
+            }
+            function displayName() {
+                if (!account) return null;
+                var p = profile();
+                return validName(p.nick) ? p.nick : account.name;
+            }
+            function myLook() {
+                if (!account) return null;
+                var p = profile(), l = { name: account.name, cape: account.name };
+                if (typeof p.png === 'string' && p.png) l.png = p.png;
+                else if (validName(p.skinName)) l.name = p.skinName;
+                return l;
+            }
+            function wire() {
+                if (!account || !account.uuid) return null;
+                return { uuid: String(account.uuid).toLowerCase().replace(/-/g, ''), name: account.name, look: myLook() };
+            }
+            function applyName() {
+                var n = displayName();
+                if (!n) return;
+                Module.mcUsernamePending = n;
+                Module.mcUsername = n;
+                Module.mcUsernameSet = 1;
+            }
+            function inMultiplayer() {
+                var N = Module.mcNet;
+                if (!N) return false;
+                if (N.state === 'in' || N.state === 'mods' || N.state === 'joining') return true;
+                var n = 0;
+                if (N.state === 'open' && N.eachConn) N.eachConn(function () { n++; });
+                return n > 0;
+            }
+            function lookChanged() { try { if (Module.mcNet && Module.mcNet.lookChanged) Module.mcNet.lookChanged(); } catch (e) { } }
+
+            function manage() {
+                if (!account) { startSignIn(); return; }
+                var p = profile(), shown = displayName();
+                var skinText = typeof p.png === 'string' && p.png ? 'From a skin file'
+                    : validName(p.skinName) && p.skinName.toLowerCase() !== account.name.toLowerCase() ? p.skinName + "'s skin" : 'Your account skin';
+                Module.mcDialog.open({
+                    title: 'Account',
+                    items: [{ t: 'text', text: 'Signed in as §e' + account.name + '§r (Microsoft account).' },
+                            { t: 'row', id: 'name', title: 'In-game name', sub: shown === account.name ? shown + ' (your account name)' : shown, button: 'Change' },
+                            { t: 'row', id: 'skin', title: 'Skin', sub: skinText, button: 'Change' },
+                            { t: 'text', text: "On a friend's world you play as §e" + account.name + "§r instead if your in-game name belongs to someone who has played there.", color: 'a0a0a0' }],
+                    buttons: [{ id: 'ok', label: 'Done', primary: true }, { id: 'out', label: 'Sign out' }],
+                    onAction: function (a, v, d) {
+                        if (a === 'row:name') { d.close(); setTimeout(askName, 0); return; }
+                        if (a === 'row:skin') { d.close(); setTimeout(askSkin, 0); return; }
+                        if (a === 'out') signOut();
+                    }
+                });
+            }
+            function askName() {
+                if (!account) return;
+                var ERR = 2;
+                Module.mcDialog.open({
+                    title: 'In-game name',
+                    items: [{ t: 'text', text: 'The name other players see. Your account stays §e' + account.name + '§r.', color: 'a0a0a0' },
+                            { t: 'input', id: 'name', value: displayName(), max: 16, filter: 'name', focus: true },
+                            { t: 'text', text: '', color: 'ff7070' }],
+                    buttons: [{ id: 'save', label: 'Save', primary: true, keep: true },
+                              { id: 'reset', label: 'Use ' + account.name, keep: true },
+                              { id: 'no', label: 'Cancel', cancel: true }],
+                    onAction: function (a, v, d) {
+                        if (a !== 'save' && a !== 'reset') { setTimeout(manage, 0); return; }
+                        var n = a === 'reset' ? account.name : String(v.name || '').trim();
+                        var err = !validName(n) ? '3 to 16 letters, numbers or _'
+                            : inMultiplayer() ? 'Leave the multiplayer game first, then change your name.' : '';
+                        if (err) { d.spec.items[ERR].text = err; d.update(); return; }
+                        var pr = profile();
+                        if (n === account.name) delete pr.nick; else pr.nick = n;
+                        saveProfile(pr);
+                        applyName();
+                        d.close();
+                        setTimeout(manage, 0);
+                    }
+                });
+            }
+            function askSkin() {
+                if (!account) return;
+                var ST = 2;
+                var status = function (d, t, col) { d.spec.items[ST].text = t; d.spec.items[ST].color = col || 'ff7070'; d.update(); };
+                var done = function (d, change) {
+                    var pr = profile();
+                    delete pr.png; delete pr.skinName;
+                    change(pr);
+                    saveProfile(pr);
+                    lookChanged();
+                    d.close();
+                    setTimeout(manage, 0);
+                };
+                Module.mcDialog.open({
+                    title: 'Skin',
+                    items: [{ t: 'text', text: "Pick a skin file (a 64x64 or 64x32 PNG), or type a Minecraft player's name to wear their skin. Friends see it too.", color: 'a0a0a0' },
+                            { t: 'input', id: 'who', value: '', max: 16, filter: 'name', hint: 'Player name' },
+                            { t: 'text', text: '' }],
+                    buttons: [{ id: 'name', label: "Use this player's skin", primary: true, keep: true },
+                              { id: 'file', label: 'Choose a skin file...', keep: true, file: { accept: 'image/png', onFiles: function (fs, d) {
+                                  status(d, 'Reading the skin...', 'a0a0a0');
+                                  Module.mcSkins.fromFile(fs[0]).then(function (r) { done(d, function (pr) { pr.png = r.png; }); },
+                                      function (e) { status(d, (e && e.message) || 'That file could not be used.'); });
+                              } } },
+                              { id: 'acct', label: 'Use my account skin', keep: true },
+                              { id: 'no', label: 'Back', cancel: true }],
+                    onAction: function (a, v, d) {
+                        if (a === 'file') return;
+                        if (a === 'acct') { done(d, function () { }); return; }
+                        if (a !== 'name') { setTimeout(manage, 0); return; }
+                        var who = String(v.who || '').trim();
+                        if (!validName(who)) { status(d, "Type a player's name first (3 to 16 letters, numbers or _)."); return; }
+                        status(d, 'Looking up ' + who + '...', 'a0a0a0');
+                        Module.mcSkins.exists(who).then(function (ok) {
+                            if (!ok) { status(d, 'No skin found for ' + who + '.'); return; }
+                            done(d, function (pr) { if (who.toLowerCase() !== account.name.toLowerCase()) pr.skinName = who; });
+                        });
+                    }
+                });
             }
             function signOut() {
                 account = null;
@@ -16177,18 +17104,13 @@
                         onAction: function (a) { if (a === 'in') setTimeout(function () { startSignIn(); }, 0); }
                     });
                 },
-                manage: function () {
-                    if (!account) { startSignIn(); return; }
-                    Module.mcDialog.open({
-                        title: 'Account',
-                        items: [{ t: 'text', text: 'Signed in as §e' + account.name + '§r (Microsoft account).' }],
-                        buttons: [{ id: 'ok', label: 'Done', primary: true }, { id: 'out', label: 'Sign out' }],
-                        onAction: function (a) { if (a === 'out') signOut(); }
-                    });
-                }
+                manage: manage,
+                displayName: displayName,
+                look: myLook,
+                wire: wire
             };
             Module.mcSignedIn = account ? 1 : 0;
-            if (account) { Module.mcUsernamePending = account.name; Module.mcUsername = account.name; Module.mcUsernameSet = 1; }
+            if (account) applyName();
             Module.mcAuth.ready = refreshNow();
         })();
     </script>
