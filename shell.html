@@ -309,7 +309,7 @@
             try {
                 var rj = JSON.parse(sessionStorage.getItem('mcre.rejoin') || 'null');
                 sessionStorage.removeItem('mcre.rejoin');
-                if (rj && /^[A-Z0-9]{5}$/.test(String(rj.code)) && Date.now() - (+rj.at || 0) < 180000) Module.mcRejoin = String(rj.code);
+                if (rj && /^[A-Z0-9]{5,16}$/.test(String(rj.code)) && Date.now() - (+rj.at || 0) < 180000) Module.mcRejoin = String(rj.code);
             } catch (e) { }
             if (MCRE_BUILD === 'dev' || !window.fetch) return;
             var shown = false, last = 0;
@@ -3983,8 +3983,8 @@
                         if (a !== 'join') { dlg = null; waiting = false; Module.mcRoomCodeInput = ''; return; }
                         var raw = String(v.code || '').trim();
                         var server = /[.:]/.test(raw) || /^localhost$/i.test(raw);
-                        var c = server ? raw : raw.toUpperCase();
-                        if (!server && !/^[A-Z0-9]{5}$/.test(c)) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers (or type a server address)'; d.update(); return; }
+                        var c = server ? raw : raw.replace(/[\s_-]+/g, '').toUpperCase();
+                        if (!server && !/^[A-Z0-9]{5}$/.test(c) && !/^[A-Z0-9]{6,16}$/.test(c)) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers, or 6-16 for a picked code (or type a server address)'; d.update(); return; }
                         d.close();
                         dlg = null;
                         waiting = false;
