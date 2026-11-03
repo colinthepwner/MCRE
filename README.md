@@ -31,11 +31,14 @@ in the browser in the first place.
 - **The old Xbox 360 tutorial.** Play Tutorial on the title screen loads the Title Update 3 tutorial world
   with its walkthrough, and I've added steps for sprinting and hunger.
 - **Multiplayer.** Open your world to friends from the pause menu and they join with a short code. You don't
-  need a server or any port forwarding. Chat, commands, operators and command blocks all work.
+  need a server or any port forwarding. Chat, commands, operators and command blocks all work, and you
+  can also join Beta 1.7.3 and Better than Adventure servers by address or by code.
 - **A helper bot.** Type `/bot spawn` and tell it what you need, like `/bot get 64 planks` or
   `/bot get iron set`. It gathers, crafts and smelts everything itself (mod items too) and brings it back.
-  It can also follow you, guard you, clear an area or dig a tunnel, and if you hook up a chat AI in
-  Options > Bot you can just talk to it normally.
+  It can also follow you, guard you, clear an area or dig a tunnel, and it comes along onto servers you
+  join. Ask it where the nearest village is, or which way out of a cave you're lost in, and it answers
+  from where you're standing and which way you're facing. If you hook up a chat AI in Options > Bot you
+  can just talk to it normally, and it'd rather help you earn something than hand it straight over.
 - **It feels right on whatever you're using.** On a computer you get Java's title screen, menus, inventory and
   controls. On a phone or tablet you get touch controls built for it.
 

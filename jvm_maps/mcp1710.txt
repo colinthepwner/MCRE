@@ -6902,6 +6902,7 @@ D	net/minecraft/src/BlockDoor	field_150017_a:[Lnet/minecraft/src/Icon;:|field_15
 D	net/minecraft/src/BlockFire	field_149849_a:[I:|field_149848_b:[I:|field_149850_M:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockFlowing	field_149815_a:I:|field_149814_b:[Z:|field_149816_M:[I:
 D	net/minecraft/src/BlockFluid	field_149806_a:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockHalfSlab	isFullBlock:Z:
 D	net/minecraft/src/BlockJukeBox	field_149927_a:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockLeaves	field_150128_a:[I:|field_150127_b:I:|field_150129_M:[[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockLeavesBase	field_150121_P:Z:

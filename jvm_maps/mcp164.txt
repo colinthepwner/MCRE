@@ -2029,6 +2029,7 @@ F	any	a	field_82527_a	dispenseBehaviorRegistry
 F	any	b	field_72284_a	random
 F	aoi	a	field_72258_a	chanceToEncourageFire
 F	aoi	b	field_72257_b	abilityToCatchFire
+F	aop	a	field_72242_a	isDoubleSlab
 F	aos	c	field_72192_a	fallInstantly
 F	aow	a	field_94450_a	theIcon
 F	aox	a	field_70417_a	record
@@ -4550,6 +4551,17 @@ M	aoi	k	(Labw;III)Z	func_72251_l	canNeighborBurn
 M	aoi	m	()Z	func_71935_l	isCollidable
 M	aoi	m	(Labw;III)I	func_72254_n	getChanceOfNeighborsEncouragingFire
 M	aoi	s_	()V	func_71928_r_	initializeBlock
+M	aop	a	(I)I	func_71899_b	damageDropped
+M	aop	a	(Labw;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	aop	a	(Labw;IIILasx;Ljava/util/List;Lnn;)V	func_71871_a	addCollisionBoxesToList
+M	aop	a	(Lacf;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	aop	a	(Lacf;IIII)Z	func_71877_c	shouldSideBeRendered
+M	aop	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	aop	b	()Z	func_71886_c	renderAsNormalBlock
+M	aop	c	()Z	func_71926_d	isOpaqueCube
+M	aop	c	(I)Ljava/lang/String;	func_72240_d	getFullSlabName
+M	aop	d	(Labw;III)I	func_71922_a	idPicked
+M	aop	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	aos	a	(Labw;)I	func_71859_p_	tickRate
 M	aos	a	(Labw;III)V	func_71861_g	onBlockAdded
 M	aos	a	(Labw;IIII)V	func_71863_a	onNeighborBlockChange
@@ -8618,7 +8630,6 @@ R	func_71889_f_	getRenderColor
 R	func_71895_b	getBlockTexture
 R	func_71920_b	colorMultiplier
 R	func_71933_m	getBlockColor
-R	func_72240_d	getFullSlabName
 R	func_111048_c	getSideIcon
 R	func_72200_l	checkForHarden
 R	func_72216_n	isFlammable
@@ -8627,6 +8638,7 @@ R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
 R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
+R	func_72240_d	getFullSlabName
 R	func_71932_i	isNormalCube
 R	func_71519_b	canCommandSenderUseCommand
 R	func_72676_a	getBreakSound
@@ -9241,6 +9253,7 @@ D	net/minecraft/src/BlockColored	iconArray:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/IRegistry;:s|random:Ljava/util/Random;:|furnaceTopIcon:Lnet/minecraft/src/Icon;:|furnaceFrontIcon:Lnet/minecraft/src/Icon;:|field_96473_e:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDoor	field_111044_a:[Lnet/minecraft/src/Icon;:|field_111043_b:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockFire	chanceToEncourageFire:[I:|abilityToCatchFire:[I:|iconArray:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockHalfSlab	isDoubleSlab:Z:
 D	net/minecraft/src/BlockSand	fallInstantly:Z:s
 D	net/minecraft/src/BlockJukeBox	theIcon:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/TileEntityRecordPlayer	record:Lnet/minecraft/src/ItemStack;:

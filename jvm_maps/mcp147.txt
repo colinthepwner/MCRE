@@ -1643,6 +1643,7 @@ F	ajw	a	field_82527_a	dispenseBehaviorRegistry
 F	ajw	b	field_72284_a	random
 F	akf	a	field_72258_a	chanceToEncourageFire
 F	akf	b	field_72257_b	abilityToCatchFire
+F	akl	a	field_72242_a	isDoubleSlab
 F	akn	c	field_72192_a	fallInstantly
 F	akt	cD	field_72134_cr	baseIndexInPNG
 F	alp	a	everything	everything
@@ -3799,6 +3800,18 @@ M	akf	m	()Z	func_71935_l	isCollidable
 M	akf	n	(Lyc;III)I	func_72254_n	getChanceOfNeighborsEncouragingFire
 M	akf	r_	()I	func_71859_p_	tickRate
 M	akf	t_	()V	func_71928_r_	initializeBlock
+M	akl	a	(I)I	func_71851_a	getBlockTextureFromSide
+M	akl	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	akl	a	(Lyc;III)I	func_71922_a	idPicked
+M	akl	a	(Lyc;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	akl	a	(Lyc;IIILaoe;Ljava/util/List;Llq;)V	func_71871_a	addCollisionBoxesToList
+M	akl	a	(Lym;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	akl	a	(Lym;IIII)Z	func_71877_c	shouldSideBeRendered
+M	akl	b	()Z	func_71886_c	renderAsNormalBlock
+M	akl	b	(I)I	func_71899_b	damageDropped
+M	akl	c	()Z	func_71926_d	isOpaqueCube
+M	akl	d	(I)Ljava/lang/String;	func_72240_d	getFullSlabName
+M	akl	f	()V	func_71919_f	setBlockBoundsForItemRender
 M	akn	a	(Lpw;)V	func_82520_a	onStartFalling
 M	akn	a	(Lyc;IIII)V	func_71863_a	onNeighborBlockChange
 M	akn	a_	(Lyc;III)Z	func_72191_e_	canFallBelow
@@ -7988,7 +8001,6 @@ R	func_71856_s_	getRenderBlockPass
 R	func_71920_b	colorMultiplier
 R	func_71889_f_	getRenderColor
 R	func_71933_m	getBlockColor
-R	func_72240_d	getFullSlabName
 R	func_71910_a	quantityDroppedWithBonus
 R	func_72200_l	checkForHarden
 R	func_72216_n	isFlammable
@@ -8000,6 +8012,7 @@ R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
 R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
+R	func_72240_d	getFullSlabName
 R	func_71932_i	isNormalCube
 R	func_72676_a	getBreakSound
 R	func_82593_b	getPlaceSound
@@ -8602,6 +8615,7 @@ D	net/minecraft/src/MapStorage	saveHandler:Lnet/minecraft/src/ISaveHandler;:|loa
 D	net/minecraft/src/BlockButton	sensible:Z:
 D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/IRegistry;:s|random:Ljava/util/Random;:
 D	net/minecraft/src/BlockFire	chanceToEncourageFire:[I:|abilityToCatchFire:[I:
+D	net/minecraft/src/BlockHalfSlab	isDoubleSlab:Z:
 D	net/minecraft/src/BlockSand	fallInstantly:Z:s
 D	net/minecraft/src/BlockLeaves	baseIndexInPNG:I:|LEAF_TYPES:[Ljava/lang/String;:s|adjacentTreeBlocks:[I:
 D	net/minecraft/src/BlockFlowing	numAdjacentSources:I:|isOptimalFlowDirection:[Z:|flowCost:[I:

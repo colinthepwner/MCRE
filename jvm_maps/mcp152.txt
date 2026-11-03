@@ -1957,6 +1957,7 @@ F	amb	a	field_82527_a	dispenseBehaviorRegistry
 F	amb	b	field_72284_a	random
 F	aml	a	field_72258_a	chanceToEncourageFire
 F	aml	b	field_72257_b	abilityToCatchFire
+F	amr	a	field_72242_a	isDoubleSlab
 F	amt	c	field_72192_a	fallInstantly
 F	ane	a	field_94425_a	theIcon
 F	any	a	everything	everything
@@ -4317,6 +4318,17 @@ M	aml	k	(Laab;III)Z	func_72251_l	canNeighborBurn
 M	aml	m	()Z	func_71935_l	isCollidable
 M	aml	m	(Laab;III)I	func_72254_n	getChanceOfNeighborsEncouragingFire
 M	aml	s_	()V	func_71928_r_	initializeBlock
+M	amr	a	(I)I	func_71899_b	damageDropped
+M	amr	a	(Laab;IIIIFFFI)I	func_85104_a	onBlockPlaced
+M	amr	a	(Laab;IIILaqx;Ljava/util/List;Lmp;)V	func_71871_a	addCollisionBoxesToList
+M	amr	a	(Laak;III)V	func_71902_a	setBlockBoundsBasedOnState
+M	amr	a	(Laak;IIII)Z	func_71877_c	shouldSideBeRendered
+M	amr	a	(Ljava/util/Random;)I	func_71925_a	quantityDropped
+M	amr	b	()Z	func_71886_c	renderAsNormalBlock
+M	amr	c	()Z	func_71926_d	isOpaqueCube
+M	amr	c	(I)Ljava/lang/String;	func_72240_d	getFullSlabName
+M	amr	d	(Laab;III)I	func_71922_a	idPicked
+M	amr	g	()V	func_71919_f	setBlockBoundsForItemRender
 M	amt	a	(Laab;)I	func_71859_p_	tickRate
 M	amt	a	(Laab;III)V	func_71861_g	onBlockAdded
 M	amt	a	(Laab;IIII)V	func_71863_a	onNeighborBlockChange
@@ -8470,7 +8482,6 @@ R	func_71889_f_	getRenderColor
 R	func_71895_b	getBlockTexture
 R	func_71920_b	colorMultiplier
 R	func_71933_m	getBlockColor
-R	func_72240_d	getFullSlabName
 R	func_71519_b	canCommandSenderUseCommand
 R	func_71910_a	quantityDroppedWithBonus
 R	func_72200_l	checkForHarden
@@ -8480,6 +8491,7 @@ R	func_71891_b	onEntityWalking
 R	func_72176_l	glow
 R	func_72167_k_	checkBlockCoordValid
 R	func_72265_d	getState
+R	func_72240_d	getFullSlabName
 R	func_71932_i	isNormalCube
 R	func_72676_a	getBreakSound
 R	func_82593_b	getPlaceSound
@@ -9101,6 +9113,7 @@ D	net/minecraft/src/BlockCloth	iconArray:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDispenser	dispenseBehaviorRegistry:Lnet/minecraft/src/IRegistry;:s|random:Ljava/util/Random;:|furnaceTopIcon:Lnet/minecraft/src/Icon;:|furnaceFrontIcon:Lnet/minecraft/src/Icon;:|field_96473_e:Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockDoor	doorIconNames:[Ljava/lang/String;:s|doorTypeForIcon:I:|iconArray:[Lnet/minecraft/src/Icon;:
 D	net/minecraft/src/BlockFire	chanceToEncourageFire:[I:|abilityToCatchFire:[I:|iconArray:[Lnet/minecraft/src/Icon;:
+D	net/minecraft/src/BlockHalfSlab	isDoubleSlab:Z:
 D	net/minecraft/src/BlockSand	fallInstantly:Z:s
 D	net/minecraft/src/BlockLeaves	LEAF_TYPES:[Ljava/lang/String;:s|field_94396_b:[[Ljava/lang/String;:s|iconType:I:|iconArray:[[Lnet/minecraft/src/Icon;:|adjacentTreeBlocks:[I:
 D	net/minecraft/src/BlockFluid	theIcon:[Lnet/minecraft/src/Icon;:

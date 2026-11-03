@@ -144,6 +144,20 @@
         "overrides",
         "scripts"
       ]
+    },
+    {
+      "id": "bot_example",
+      "name": "Example Bot Senses",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Reads the world through the bot's eyes: where the nearest village, water or way out is, what is around it, and how far along a player is - with a guide command and a signpost that points at whatever you name.",
+      "url": "bot_example.zip",
+      "tags": [
+        "scripts",
+        "commands",
+        "bot"
+      ]
     }
   ]
 }

@@ -11094,7 +11094,9 @@
                         world: {
                             setBlock: function (x, y, z, block, data) { act(mod, ['setblock', x | 0, y | 0, z | 0, block, data == null ? '' : data | 0]); },
                             setData: function (x, y, z, data) { act(mod, ['setdata', x | 0, y | 0, z | 0, data | 0]); },
-                            getBlock: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return { block: r.block, data: r.data }; }); },
+                            getBlock: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return { block: r.block, data: r.data, built: !!r.built }; }); },
+                            isBuilt: function (x, y, z) { return ask(mod, ['getblock', x | 0, y | 0, z | 0]).then(function (r) { return !!r.built; }); },
+                            setBuilt: function (x, y, z, on) { act(mod, ['setbuilt', x | 0, y | 0, z | 0, on === false ? 0 : 1]); },
                             light: function (x, y, z) { return ask(mod, ['light', x | 0, y | 0, z | 0]).then(function (r) {
                                 return { light: r.light | 0, full: r.full | 0, sky: r.sky | 0, block: r.block | 0, seesSky: !!r.seesSky, outdoors: !!r.outdoors,
                                          biome: String(r.biome || ''), temperature: r.temperature == null ? null : +r.temperature, rains: !!r.rains }; }); },
@@ -11141,6 +11143,10 @@
                             setGameRule: function (name, value) { act(mod, ['setgamerule', String(name), value === undefined ? null : value]); },
                             bot: function () { return ask(mod, ['botinfo']).then(function (r) { return r.bot || null; }); },
                             botCommand: function (line) { return ask(mod, ['botcmd', String(line == null ? '' : line)]).then(function (r) { return r; }); },
+                            botSense: function (of, radius) { return ask(mod, ['botsense', 'sense', String(of == null ? '' : of), '', radius | 0]).then(function (r) { return r.sense; }); },
+                            botFind: function (what, of, range) { return ask(mod, ['botsense', 'find', String(of == null ? '' : of), String(what == null ? '' : what), range | 0]).then(function (r) { return r.sense; }); },
+                            botLook: function (of) { return ask(mod, ['botsense', 'look', String(of == null ? '' : of), '', 0]).then(function (r) { return r.sense; }); },
+                            botProgress: function (of) { return ask(mod, ['botsense', 'progress', String(of == null ? '' : of), '', 0]).then(function (r) { return r.sense; }); },
                             tutorial: function () { return ask(mod, ['tutorialinfo']).then(function (r) { return r.tutorial || null; }); },
                             tutorialSkip: function () { return ask(mod, ['tutorialskip']).then(function (r) { return !!r.ok; }); },
                             skyColor: function () { return ask(mod, ['skycolor']).then(function (r) { return r.color; }); },
@@ -11635,6 +11641,10 @@
                 if (k === 'botcmd') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) { deliver(fromGuid, a[1], { ok: false, msg: 'Only operators can command the bot from a script' }); return; }
                     deliver(fromGuid, a[1], Module.mcBotPage ? Module.mcBotPage.script(a[2]) : { ok: false, msg: 'no bots' });
+                    return;
+                }
+                if (k === 'botsense') {
+                    deliver(fromGuid, a[1], { sense: Module.mcBotPage ? Module.mcBotPage.sense(a[2], a[3], a[4], a[5]) : null });
                     return;
                 }
                 if (k === 'gamerules') { deliver(fromGuid, a[1], { rules: Module.mcGameRules.list() }); return; }
@@ -14188,6 +14198,14 @@
                 out.push(cur);
                 return out;
             }
+            function betaGame() { var B = Module.mcBeta; return !!(B && B.state === 'open'); }
+            function betaSender() {
+                var p = null;
+                try { p = JSON.parse(UTF8ToString(Module._mcScriptLocalPlayer())); } catch (e) { p = null; }
+                if (!p || !p.name) return null;
+                return { kind: 'player', name: p.name, guid: 0, player: p, op: true,
+                         pos: { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } };
+            }
             function senderFor(guid) {
                 var ps = world('players') || [];
                 var p = ps.filter(function (q) { return guid ? q.guid === guid : q.local; })[0] || null;
@@ -14313,6 +14331,7 @@
                     try { cancel = !!Module.mcModpe.hook('procCmd', JSON.stringify([text]), true); } catch (e) { }
                     if (cancel) return;
                 }
+                if (betaGame() && /^[/]bot(\s|$)/i.test(text)) { var bsd = betaSender(); if (bsd) { run(text, bsd); return; } }
                 if (joined()) { if (net().sendCtlHost) net().sendCtlHost({ t: 'cmd2', text: text.slice(0, 500) }); return; }
                 var sd = senderFor(0);
                 if (sd) run(text, sd);
@@ -14378,17 +14397,25 @@
                 Module.mcGameRules.define('botBreakBlocks', true, 'Bots may dig through blocks on their way (off: they walk and bridge only)');
                 Module.mcGameRules.define('botFight', true, 'Bots fight monsters that come at them or at whoever they defend');
                 Module.mcGameRules.define('botPickup', true, 'Bots pick up items lying near them');
+                Module.mcGameRules.define('botKeepBuilds', true, 'Bots never mine a block a player placed - any house, anywhere in the world');
+                Module.mcGameRules.define('botGuessBuilds', true, 'Bots also leave alone what looks built - for houses that were standing before the game started recording who placed what');
+                Module.mcGameRules.define('botUnstick', true, 'A bot wedged on the same spot for a while hops free instead of standing there');
+                Module.mcGameRules.define('botMine', true, 'Bots may dig their own way down for deep ores (one shaft a world, reused)');
+                Module.mcGameRules.define('botTorches', true, 'Bots stand a torch down where they are working in the dark');
                 Module.mcGameRules.define('botChat', true, 'Bots answer chat lines that name them');
+                Module.mcGameRules.define('botSense', true, 'Bots know their surroundings and can be asked about them (off: they still take orders, they just have nothing to say about where they are)');
+                Module.mcGameRules.define('botSpoonfeed', false, 'Bots hand over whatever is asked for without a word (off: they offer the least cheaty route to it first, and still do as they are told if you insist)');
             }
             function botRules() {
                 var b = function (n, d) { var v = rule(n); return (v === undefined ? d : v) ? 1 : 0; };
-                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) && b('botsAllowed', 1) ? 1 : 0]);
+                botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) && b('botsAllowed', 1) ? 1 : 0,
+                    b('botKeepBuilds', 1), b('botGuessBuilds', 1), b('botUnstick', 1), b('botMine', 1), b('botTorches', 1), b('botSense', 1)]);
             }
             function botCmd(fields) {
                 var r = json(cc('mcBotCmd', 'string', ['string'], [fields.map(function (x) { return String(x == null ? '' : x).replace(/[\t\n]/g, ' '); }).join('\t')]));
                 return r || { ok: 0, msg: RED + 'The bots are not here (no world?).' };
             }
-            function botList() { if (joined()) return []; var r = botCmd(['list']); BOT.list = r && r.bots ? r.bots : []; return BOT.list; }
+            function botList() { if (joined() && !betaGame()) return []; var r = botCmd(['list']); BOT.list = r && r.bots ? r.bots : []; return BOT.list; }
             function botNamed(n) { n = lc(n); return botList().filter(function (b) { return lc(b.name) === n; })[0] || null; }
             setInterval(function () { try { if (!joined() && Module._mcBotCmd && Module.mcCurrentWorld !== undefined) botRules(); } catch (e) { } }, 4000);
 
@@ -14480,7 +14507,7 @@
             }
 
             var BOT_SUBS = ['spawn', 'get', 'drop', 'come', 'follow', 'defend', 'stop', 'status', 'hunt', 'unhunt', 'clear', 'tunnel',
-                'creative', 'verbose', 'despawn', 'list', 'settings', 'help'];
+                'creative', 'verbose', 'despawn', 'list', 'settings', 'help', 'sense', 'find', 'look', 'progress', 'where'];
             function botMobile(sd) {
                 return false;
                 try {
@@ -14495,6 +14522,8 @@
                 tellTo(sd, SS + 'e/bot come | follow | defend | stop | status | drop [all|item]' + GREY);
                 tellTo(sd, SS + 'e/bot clear [WxHxD] | tunnel [length [width height]]' + GREY + ' - dig out where you look / face');
                 tellTo(sd, SS + 'e/bot hunt <player> | unhunt | creative | verbose | despawn | list | settings' + GREY);
+                tellTo(sd, SS + 'e/bot find <what>' + GREY + ' - where the nearest village, water, cave, ore, chest, way out... is, and how to get there');
+                tellTo(sd, SS + 'e/bot sense | look | progress' + GREY + " - what is around it, what it can see, how far along you are");
                 tellTo(sd, GREY + 'More than one bot: /bot <name> <command>. Or just talk to it in chat: "chives, come here".');
             }
             function botRun(sd, args, quiet) {
@@ -14550,6 +14579,23 @@
                     if (t.length === 3 && /x/.test(a.join(''))) return say(botCmd(['tunnel', who, botName, t[2], t[0], t[1]]));
                     return say(botCmd(['tunnel', who, botName, t[0] || 10, t[1] || 1, t[2] || 2]));
                 }
+                case 'find': case 'where': {
+                    if (!a.length) fail('Usage: /bot find <what> - village, water, lava, a cave, the way out, diamonds, a chest, back, spawn, a player...');
+                    var rf = botCmd(['find', who, botName, a.join(' ').replace(/^(is|are|the)\s+/i, ''), 0]);
+                    if (!rf.ok) return say(rf);
+                    var nm = (botNamed(botName) || botList()[0] || { name: 'The bot' }).name;
+                    tellTo(sd, SS + 'e<' + nm + '> ' + SS + 'f' + (rf.words || 'I have nothing to say about that.'));
+                    if (rf.found && rf.route && rf.route.words) tellTo(sd, GREY + 'Route: ' + rf.route.words + '.');
+                    if (rf.found && rf.facing && rf.facing.words) tellTo(sd, GREY + rf.facing.words);
+                    return true;
+                }
+                case 'sense': case 'look': case 'progress': {
+                    var rs2 = botCmd([sub, who, botName, sub === 'sense' ? (a[0] || 0) : '']);
+                    if (!rs2.ok) return say(rs2);
+                    var nm2 = (botNamed(botName) || botList()[0] || { name: 'The bot' }).name;
+                    tellTo(sd, SS + 'e<' + nm2 + '> ' + SS + 'f' + (rs2.words || '(nothing)'));
+                    return true;
+                }
                 case 'hunt': if (!a.length) fail('Usage: /bot hunt <player>'); return say(botCmd([(sd._queue ? '+' : '') + 'hunt', who, botName, a.join(' ')]));
                 case 'creative': case 'verbose': return say(botCmd([sub, who, botName, lc(a[0] || '')]));
                 case 'come': case 'follow': case 'defend': case 'stop': case 'status': case 'unhunt': case 'despawn':
@@ -14564,6 +14610,8 @@
                     if (i === 0) return filt(p, BOT_SUBS.concat(joined() ? [] : botList().map(function (b) { return b.name; })));
                     var sub = lc(x.args[0] || '');
                     if (sub === 'get' || sub === 'drop') return itemNames(p).map(function (n) { return n.replace(/^minecraft:/, ''); });
+                    if (sub === 'find' || sub === 'where') return filt(p, ['village', 'water', 'lava', 'cave', 'the way out', 'back', 'spawn', 'my mine',
+                        'diamonds', 'iron', 'coal', 'gold', 'redstone', 'logs', 'a chest', 'a furnace', 'a bed', 'a monster', 'an animal'].concat(playerNames()));
                     if (sub === 'hunt') return filt(p, playerNames());
                     if (sub === 'creative' || sub === 'verbose') return filt(p, ['on', 'off']);
                     return [];
@@ -14581,6 +14629,15 @@
             }
             BOT.target = botTarget;
             BOT.info = function () { var l = joined() ? [] : botList(); return l[0] || null; };
+            BOT.sense = function (op, of, what, n) {
+                op = lc(String(op || 'sense'));
+                if (['sense', 'find', 'look', 'progress'].indexOf(op) < 0) return { ok: false, msg: 'no such question: ' + op };
+                var bs = joined() && !betaGame() ? [] : botList();
+                if (!bs.length) return { ok: false, msg: 'no bot in this world' };
+                var who = String(of || '');
+                if (!who) { var p = players().filter(function (x) { return x.name === bs[0].owner; })[0]; who = p ? p.name : (players()[0] || { name: '' }).name; }
+                return botCmd([op, who, bs[0].name, op === 'find' ? String(what || '') : '', n | 0]);
+            };
             BOT.script = function (line) {
                 var sd = { kind: 'block', name: 'Server', guid: 0, op: true, output: '', pos: { x: 0, y: 64, z: 0, yaw: 0, pitch: 0 } };
                 try { var ok = botRun(sd, tokens(String(line || '').replace(/^\/?bot\s+/i, '')), false); return { ok: !!ok, msg: plainOf(sd.output || '') }; }
@@ -14943,6 +15000,7 @@
                 try { out = JSON.parse(content); } catch (e) { var m = /\{[\s\S]*\}/.exec(String(content)); try { out = m ? JSON.parse(m[0]) : null; } catch (e2) { out = null; } }
                 if (out && typeof out.say !== 'string' && typeof out.reply === 'string') out.say = out.reply;
                 if (out && !Array.isArray(out.commands) && Array.isArray(out.actions)) out.commands = out.actions;
+                if (out && out.ask == null) out.ask = out.lookup != null ? out.lookup : out.tool != null ? out.tool : out.query;
                 return out;
             }
 
@@ -14982,6 +15040,14 @@
                 else if (/\b(defend|protect|guard)\b/.test(t)) { cmd = 'defend'; reply = 'I shall keep you safe.'; }
                 else if (/\b(status|doing|up to|carrying|inventory)\b/.test(t)) { cmd = 'status'; }
                 else if (/\b(drop|give me (it|that|everything|all)|hand (it )?over)\b/.test(t)) { cmd = /\b(all|everything)\b/.test(t) ? 'drop all' : 'drop'; reply = 'Here you are.'; }
+                else if (askedAbout(text)) {
+                    var rq = botLookup(bot, sd, askedAbout(text));
+                    botSays(bot, rq && rq.ok
+                        ? [rq.words, rq.route && rq.route.words ? 'From where you are: ' + rq.route.words + '.' : '',
+                           rq.facing && rq.facing.words ? rq.facing.words : ''].filter(Boolean).join(' ')
+                        : plainOf((rq && rq.msg) || 'I could not say.'));
+                    return;
+                }
                 else {
                     var m = /\b(?:get|bring|fetch|gather|collect|mine|chop|make|craft|find)\b(?: me| us)?\s+(.+)$/.exec(t);
                     if (m) { cmd = 'get ' + m[1].replace(/\b(please|pls|for me|now)\b/g, '').trim(); reply = 'Right away.'; }
@@ -15006,29 +15072,145 @@
                 '"queue": true when they want the new jobs AFTER your current work ("after that", "when you are done", "then", "also"); otherwise false and the new jobs replace what you are doing.',
                 'Never invent commands. Use plain item names (planks, logs, stick, torch, iron ingot, cobblestone, wooden pickaxe...).'
             ].join('\n');
+            var BOT_TOOLS = [
+                'LOOKING THINGS UP. You can ask the world a question before you answer. Reply with ONLY',
+                '{"ask": "<lookup>"} (or {"ask": ["<lookup>", "<lookup>"]}, at most three) and no "say" and no',
+                '"commands"; I will run it and put the answer to you again. The lookups:',
+                '  find <thing>   - where the nearest one is, how to get there, and whether the player is facing it.',
+                '                   <thing>: village, water, lava, a cave, the way out, back (the way you came),',
+                '                   spawn, my mine, diamonds, iron, coal, gold, redstone, logs, a chest, a furnace,',
+                '                   a bed, a monster, an animal, a player\'s name, or any block by name.',
+                '  look           - what you can see from where you stand, all round.',
+                '  sense          - a fresh look at your surroundings.',
+                '  progress       - how far along the player is.',
+                'Look it up rather than guess. If a lookup says it found nothing, say so plainly - never invent a place.',
+                '',
+                'ANSWERING A "WHERE IS" / "WHICH WAY" / "AM I FACING IT" QUESTION.',
+                'A lookup hands you words, a route and a facing verdict already worked out from WHERE THE PLAYER',
+                'IS STANDING and WHICH WAY THEY ARE LOOKING. Speak from those and nothing else. NEVER answer with',
+                'a bare compass point - "north, sir" is no use to somebody lost in a cave. Say which way they must',
+                'turn, what they will pass on the way, how far it is in blocks and roughly how long it takes, and',
+                'what the very first move is ("out of this passage behind you, then up the slope to your left").'
+            ].join('\n');
+            var BOT_STANCE = [
+                'WHAT THE PLAYER HAS EARNED. You never refuse, never gate anything and never lecture. But you do',
+                'not hand the game over either. When they ask for something far beyond where they are (their stage',
+                'is in YOUR STATE below), you offer THE LEAST CHEATY WAY OF THEM GETTING IT - in one short sentence,',
+                'in your own voice - and set about THAT instead of the thing itself:',
+                '  a full diamond set, on day two with a stone pick -> offer to dig and light a shaft down to',
+                '    diamond level so they can mine the diamonds themselves, and run "get 1 stone pickaxe" or',
+                '    "tunnel 40" rather than handing over armour.',
+                '  a house -> offer to fetch and stack the wood while they build it.',
+                '  food -> offer to go hunting with them rather than conjuring steak.',
+                '  a stack of diamonds on a fresh world -> offer the shaft, or the iron gear that gets them there.',
+                'Say what you WILL do, not what you will not. One suggestion only: if they say no, ask again, or',
+                'tell you to just do it, you do exactly what they asked at once and say nothing further about it.',
+                'Something in reach of where they already are is not extravagant - just fetch it.'
+            ].join('\n');
+            function askedAbout(text) {
+                var t = lc(text).replace(/[,.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                if (/\b(what.s (around|near|here)|around (me|us)|where are we)\b/.test(t)) return 'sense';
+                if (/\b(what (can you |do you )?see|can you see|look around)\b/.test(t)) return 'look';
+                if (/\b(way out|get out|out of (this|the) cave|lost|back to the surface)\b/.test(t)) return 'find the way out';
+                if (/\b(facing|the right way|right direction|am i going the right)\b/.test(t)) return 'find ' + (BOT.lastFind || 'the way out');
+                var m = /\b(?:where(?:'s| is| are)?|how far(?: is| to)?|which way(?: to| is)?|how do i (?:get|find))\s+(?:the |a |an |my |to |from )*(.+)$/.exec(t);
+                if (m) {
+                    var what = m[1].replace(/\b(from here|from me|please|pls|now)\b/g, '').trim();
+                    if (what) return 'find ' + what;
+                }
+                return null;
+            }
+
+            function botLookup(bot, sd, line) {
+                var t = String(line || '').trim().split(/\s+/);
+                var op = lc(t.shift() || '');
+                if (op === 'where') op = 'find';
+                if (['sense', 'find', 'look', 'progress'].indexOf(op) < 0) return { ok: false, msg: 'no such lookup: ' + op };
+                var arg = t.join(' ').replace(/^(is|are|the)\s+/i, '');
+                if (op === 'find' && !arg) return { ok: false, msg: 'find what?' };
+                if (op === 'find') BOT.lastFind = arg;
+                return botCmd([op, sd.name, bot.name, op === 'find' ? arg : '', 0]);
+            }
+            function lookupText(line, r) {
+                if (!r || !r.ok) return line + ' -> ' + plainOf((r && r.msg) || 'no answer');
+                var out = [line + ' -> ' + (r.words || '(nothing to say)')];
+                if (r.found === 0) return out.join(' ');
+                if (r.route && r.route.words) out.push('Route from me: ' + r.route.words + '. (' + (r.route.reachable ? 'I can walk it' : 'I cannot promise a clear way') + ')');
+                if (r.facing && r.facing.words) out.push('Facing: ' + r.facing.words);
+                if (r.x !== undefined) out.push('It is at ' + r.x + ',' + r.y + ',' + r.z + '.');
+                if (r.place) out.push('[height ' + r.place.y + (r.place.outdoors ? ', outdoors' : ', underground, ' + r.place.depth + ' under the surface')
+                    + ', ' + (r.place.biome || 'nowhere in particular') + ', light ' + r.place.light + ', ' + r.place.time + ', day ' + r.place.day + ']');
+                if (r.stage) out.push('[stage: ' + r.stage + '; tools tier ' + r.toolTier + ', armour ' + r.armourPieces + ', diamonds ' + r.diamonds + ', iron ' + r.iron + ', day ' + r.day + ']');
+                return out.join(' ');
+            }
             function brainHear(bot, sd, text, c) {
                 var b = botNamed(bot.name) || bot;
                 var inv = botCmd(['inventory', sd.name, bot.name]);
                 var carrying = inv && inv.items && inv.items.length ? inv.items.slice(0, 20).map(function (i) { return i.count + ' ' + i.name; }).join(', ') : 'nothing';
                 var state = 'You are ' + (b.task ? 'busy: ' + b.task : 'idle') + '; health ' + b.health + '/20; carrying ' + carrying + '. ' + sd.name + ' is talking to you.';
-                var system = 'You are ' + bot.name + ', a helper bot player in a Minecraft world (Minecraft Pocket Edition with Java-style mods). ' +
-                    'Your personality (stay in character, always): ' + plainOf(c.personality) + '\n\n' + BOT_RULES + '\n\nYOUR STATE: ' + state;
+                var senseOn = rule('botSense') !== false;
+                var sense = senseOn ? botCmd(['sense', sd.name, bot.name, 0]) : null;
+                var prog = senseOn ? botCmd(['progress', sd.name, bot.name, '']) : null;
+                if (sense && sense.ok) {
+                    state += '\n\nWHERE YOU ARE (you can see this; the player cannot): ' + sense.words;
+                    state += '\n  [height ' + sense.place.y + ', surface ' + sense.place.surfaceY + ', ' + (sense.place.outdoors ? 'outdoors' : 'underground')
+                        + ', light ' + sense.place.light + ', ' + (sense.place.biome || 'no biome') + ', ' + sense.place.dimension + ', day ' + sense.place.day + ']';
+                    if (sense.asker) state += '\n  ' + sd.name + ' is ' + sense.asker.fromMe.words + ', facing ' + sense.asker.facing + '.';
+                    if (sense.cameFrom) state += '\n  We came from ' + sense.cameFrom.words + '.';
+                    if (sense.mine && sense.mine.has) state += '\n  My own way down is ' + sense.mine.dir.words + ' (' + sense.mine.kind + ', floor at height ' + sense.mine.floorY + ').';
+                }
+                if (prog && prog.ok) state += '\n\nTHE PLAYER: ' + prog.words + ' [stage: ' + prog.stage + ', tools tier ' + prog.toolTier
+                    + ' of 3, armour ' + prog.armourPieces + '/4, diamonds ' + prog.diamonds + ', iron ' + prog.iron + ', day ' + prog.day + ']';
+                var parts = ['You are ' + bot.name + ', a helper bot player in a Minecraft world (Minecraft Pocket Edition with Java-style mods). ' +
+                    'Your personality (stay in character, always): ' + plainOf(c.personality), BOT_RULES];
+                if (senseOn) parts.push(BOT_TOOLS);
+                if (rule('botSpoonfeed') !== true) parts.push(BOT_STANCE);
+                var system = parts.join('\n\n') + '\n\nYOUR STATE: ' + state;
                 var key = lc(bot.name), hist = BOT.hist[key] = BOT.hist[key] || [];
-                var msgs = hist.concat([{ role: 'user', content: sd.name + ': ' + text }]);
-                return askBrain(c, system, msgs, 180000).then(function (content) {
-                    var out = parseReply(content);
-                    if (!out) { botSays(bot, plainOf(content).slice(0, 200)); return; }
-                    hist.push({ role: 'user', content: sd.name + ': ' + text }, { role: 'assistant', content: JSON.stringify(out) });
-                    while (hist.length > 12) hist.shift();
-                    botSays(bot, out.say);
-                    var cmds = (Array.isArray(out.commands) ? out.commands : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 6);
-                    if (cmds.length && !out.queue && b.task && !/^(status|drop)/.test(cmds[0])) runAs(sd, bot, 'stop');
-                    cmds.forEach(function (cmd, i) {
-                        var q = i > 0 || !!out.queue;
-                        var sd2 = Object.assign({}, sd, { _queue: q });
-                        runAs(sd2, bot, cmd.trim());
+                var turn = [{ role: 'user', content: sd.name + ': ' + text }];
+                var pre = senseOn ? askedAbout(text) : null;
+
+                var rounds = 0, looked = '';
+                if (pre) {
+                    looked = lookupText(pre, botLookup(bot, sd, pre));
+                    turn.push({ role: 'user', content: 'Before you answer, I looked: ' + looked
+                        + '\nThat is what is true RIGHT NOW. Answer ' + sd.name + ' from it and from nothing else -'
+                        + ' give them the direction to turn, what they pass and how far, in your own voice.' });
+                }
+                function round() {
+                    return askBrain(c, system, hist.concat(turn), 180000).then(function (content) {
+                        var out = parseReply(content);
+                        if (!out) { botSays(bot, plainOf(content).slice(0, 200)); return; }
+                        var asks = out.ask == null ? [] : (Array.isArray(out.ask) ? out.ask : [out.ask]);
+                        asks = asks.filter(function (x) { return typeof x === 'string' && x.trim(); });
+                        if (Array.isArray(out.commands)) out.commands = out.commands.filter(function (x) {
+                            if (typeof x !== 'string' || !/^\/?(bot\s+)?(find|where|sense|look|progress)\b/i.test(x.trim())) return true;
+                            asks.push(x.trim().replace(/^\/?(bot\s+)?/i, ''));
+                            return false;
+                        });
+                        asks = asks.slice(0, 3);
+                        if (senseOn && asks.length && rounds < 2) {
+                            rounds++;
+                            var answers = asks.map(function (line) { return lookupText(line, botLookup(bot, sd, line)); });
+                            looked = answers.join(' ');
+                            turn = turn.concat([{ role: 'assistant', content: JSON.stringify({ ask: asks }) },
+                                                { role: 'user', content: 'I looked: ' + answers.join('\n') + '\nNow answer ' + sd.name + ' in character, with "say" (and "commands" if they asked you to do something).' }]);
+                            return round();
+                        }
+                        hist.push({ role: 'user', content: sd.name + ': ' + text },
+                                  { role: 'assistant', content: JSON.stringify({ say: out.say || '', commands: out.commands || [] }) });
+                        while (hist.length > 12) hist.shift();
+                        botSays(bot, out.say || looked.replace(/^[^>]*-> /, '') || '');
+                        var cmds = (Array.isArray(out.commands) ? out.commands : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 6);
+                        if (cmds.length && !out.queue && b.task && !/^(status|drop|find|sense|look|progress)/.test(cmds[0])) runAs(sd, bot, 'stop');
+                        cmds.forEach(function (cmd, i) {
+                            var q = i > 0 || !!out.queue;
+                            var sd2 = Object.assign({}, sd, { _queue: q });
+                            runAs(sd2, bot, cmd.trim());
+                        });
                     });
-                });
+                }
+                return round();
             }
 
             C.fromJoiner = function (guid, msg) {

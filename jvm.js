@@ -12659,7 +12659,7 @@ function* collectContentSteps(vm, modId) {
 		BlockWall: { see: true, box: [4, 0, 4, 12, 16, 12] }, BlockFenceGate: { see: true, box: [0, 0, 6, 16, 16, 10], tool: 'axe', sound: 'wood' },
 		BlockTorch: { see: true, box: [7, 0, 7, 9, 10, 9], walk: true, tool: 'none', sound: 'wood', light: 14 },
 		BlockLadder: { see: true, box: [0, 0, 15, 16, 16, 16], tool: 'axe', sound: 'wood' }, BlockVine: { see: true, box: [0, 0, 15, 16, 16, 16], walk: true, sound: 'grass', tool: 'none' },
-		BlockHalfSlab: { see: true, box: [0, 0, 0, 16, 8, 16] }, BlockStep: { see: true, box: [0, 0, 0, 16, 8, 16] }, BlockWoodSlab: { see: true, box: [0, 0, 0, 16, 8, 16], tool: 'axe', sound: 'wood' },
+		BlockHalfSlab: { see: true, box: [0, 0, 0, 16, 8, 16], slab: true }, BlockStep: { see: true, box: [0, 0, 0, 16, 8, 16], slab: true }, BlockWoodSlab: { see: true, box: [0, 0, 0, 16, 8, 16], tool: 'axe', sound: 'wood', slab: true },
 		BlockSnow: { see: true, box: [0, 0, 0, 16, 2, 16], tool: 'shovel', sound: 'cloth' }, BlockLilyPad: { see: true, box: [0, 0, 0, 16, 1, 16], sound: 'grass', tool: 'none' },
 		BlockCarpet: { see: true, box: [0, 0, 0, 16, 1, 16], sound: 'cloth', tool: 'none' }, BlockPressurePlate: { see: true, box: [1, 0, 1, 15, 1, 15], walk: true },
 		BlockButton: { see: true, box: [5, 6, 0, 11, 10, 2], walk: true }, BlockTrapDoor: { see: true, box: [0, 0, 0, 16, 3, 16], tool: 'axe', sound: 'wood' },
@@ -12800,11 +12800,13 @@ function* collectContentSteps(vm, modId) {
 		if (box.join() !== '0,0,0,16,16,16') json.shape = box;
 		var rtype = safe(function () { return vm.callVirtual(b, 'getRenderType', '()I', []); }, 0);
 		var kind = vanillaKind(b, rtype);
+		var slabDouble = kind && kind.slab && !json.shape;
+		if (kind && kind.slab && json.shape) json.shape = (meta & 8) ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16];
 		if (kind) {
 			if (kind.cross) { json.shape = 'cross'; json.collision = false; json.transparent = true; }
-			if (kind.box && !json.shape) json.shape = kind.box;
+			if (kind.box && !json.shape && !slabDouble) json.shape = kind.box;
 			if (kind.box && kind.walk) json.collision = false;
-			if (kind.see) json.transparent = true;
+			if (kind.see && !slabDouble) json.transparent = true;
 			if (kind.tool) json.tool = kind.tool;
 			if (kind.sound && (!json.sound || json.sound === 'stone')) json.sound = kind.sound;
 			if (kind.light && !json.light) json.light = kind.light;
@@ -16530,6 +16532,33 @@ function install(vm) {
 		'getPlantMetadata(Lnet/minecraft/src/World;III)I': function (vm, self, a) { return meta(a[0], a[1], a[2], a[3]); },
 	} });
 	def('BlockBush', { super: SRC + 'BlockFlower' });
+	var slabInit = function (vm, self, bid, isDouble, mat) {
+		var k = vm.loadClass(SRC + 'Block').findDeclared('<init>(ILnet/minecraft/src/Material;)V');
+		if (k) vm.invoke(k, self, [bid, mat]);
+		self[':isDoubleSlab'] = isDouble ? 1 : 0;
+		if (!isDouble) { self[':minX'] = 0; self[':minY'] = 0; self[':minZ'] = 0; self[':maxX'] = 1; self[':maxY'] = 0.5; self[':maxZ'] = 1; }
+	};
+	var slabBounds = function (self, top) {
+		self[':minX'] = 0; self[':minZ'] = 0; self[':maxX'] = 1; self[':maxZ'] = 1;
+		if (self[':isDoubleSlab']) { self[':minY'] = 0; self[':maxY'] = 1; }
+		else { self[':minY'] = top ? 0.5 : 0; self[':maxY'] = top ? 1 : 0.5; }
+	};
+	def('BlockHalfSlab', { super: SRC + 'Block', methods: {
+		'<init>(IZLnet/minecraft/src/Material;)V': function (vm, self, a) { slabInit(vm, self, a[0], a[1], a[2]); },
+		'isOpaqueCube()Z': function (vm, self) { return self[':isDoubleSlab'] ? 1 : 0; },
+		'renderAsNormalBlock()Z': function (vm, self) { return self[':isDoubleSlab'] ? 1 : 0; },
+		'setBlockBoundsBasedOnState(Lnet/minecraft/src/IBlockAccess;III)V': function (vm, self, a) {
+			slabBounds(self, (vm.callVirtual(a[0], 'getBlockMetadata', '(III)I', [a[1], a[2], a[3]]) & 8) !== 0);
+		},
+		'setBlockBoundsForItemRender()V': function (vm, self) { slabBounds(self, false); },
+		'onBlockPlaced(Lnet/minecraft/src/World;IIIIFFFI)I': function (vm, self, a) {
+			var side = a[4], hitY = a[6], m = a[8];
+			if (self[':isDoubleSlab']) return m;
+			return side === 0 || (side !== 1 && hitY > 0.5) ? m | 8 : m & 7;
+		},
+		'quantityDropped(Ljava/util/Random;)I': function (vm, self) { return self[':isDoubleSlab'] ? 2 : 1; },
+		'damageDropped(I)I': function (vm, self, a) { return a[0] & 7; },
+	} });
 	var popIfLoose = function (vm, self, w, x, y, z) {
 		if (vm.callVirtual(self, 'canBlockStay', '(Lnet/minecraft/src/World;III)Z', [w, x, y, z])) return;
 		vm.callVirtual(self, 'dropBlockAsItem', '(Lnet/minecraft/src/World;IIIII)V', [w, x, y, z, meta(w, x, y, z), 0]);
