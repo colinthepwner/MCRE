@@ -14508,6 +14508,41 @@
 
             var BOT_SUBS = ['spawn', 'get', 'drop', 'come', 'follow', 'defend', 'stop', 'status', 'hunt', 'unhunt', 'clear', 'tunnel',
                 'creative', 'verbose', 'despawn', 'list', 'settings', 'help', 'sense', 'find', 'look', 'progress', 'where'];
+            var BOT_VERB_FIX = {
+                craft: 'get', make: 'get', build: 'get', create: 'get', produce: 'get',
+                fashion: 'get', forge: 'get', smelt: 'get', cook: 'get', gather: 'get',
+                collect: 'get', fetch: 'get', bring: 'get', grab: 'get', obtain: 'get',
+                acquire: 'get', farm: 'get', harvest: 'get', mine: 'get', dig: 'get',
+                give: 'drop', hand: 'drop',
+                attack: 'hunt', kill: 'hunt', fight: 'hunt',
+                wait: 'stop', halt: 'stop', cancel: 'stop', idle: 'stop',
+                inventory: 'status', items: 'status', carrying: 'status'
+            };
+            function botRepair(line) {
+                var m = /^([a-z_]+)\b\s*([\s\S]*)$/i.exec(String(line).trim());
+                if (!m) return null;
+                var verb = lc(m[1]), rest = m[2].trim();
+                if (BOT_SUBS.indexOf(verb) >= 0 || verb === 'give') return null;
+                var real = BOT_VERB_FIX[verb];
+                if (!real) return null;
+                if ((verb === 'dig' || verb === 'mine') && /\btunnel\b/.test(lc(rest))) real = 'tunnel';
+                else if ((verb === 'dig' || verb === 'mine') && /\d+\s*x\s*\d+/.test(lc(rest))) real = 'clear';
+                if (real === 'get') {
+                    for (var g = 0; g < 4; g++) {
+                        var cut = rest.replace(/^(me|us|some|a|an|the|my|him|her|them|please)\s+/i, '').trim();
+                        if (cut === rest) break;
+                        rest = cut;
+                    }
+                    if (!/\bset\b/i.test(rest)) rest = rest.replace(/\b(tool ?set|toolset|tools|gear|kit|equipment)\b/i, 'set');
+                    rest = rest.replace(/\s+/g, ' ').trim();
+                }
+                if (!rest && ['get', 'drop', 'hunt', 'clear', 'tunnel'].indexOf(real) >= 0) return null;
+                return (real + ' ' + rest).trim();
+            }
+            function botRealCmd(line) {
+                var m = /^([a-z_]+)\b/i.exec(String(line).trim());
+                return !!m && (BOT_SUBS.indexOf(lc(m[1])) >= 0 || lc(m[1]) === 'give');
+            }
             function botMobile(sd) {
                 return false;
                 try {
@@ -15170,7 +15205,7 @@
                 var turn = [{ role: 'user', content: sd.name + ': ' + text }];
                 var pre = senseOn ? askedAbout(text) : null;
 
-                var rounds = 0, looked = '';
+                var rounds = 0, looked = '', repaired = false;
                 if (pre) {
                     looked = lookupText(pre, botLookup(bot, sd, pre));
                     turn.push({ role: 'user', content: 'Before you answer, I looked: ' + looked
@@ -15197,11 +15232,27 @@
                                                 { role: 'user', content: 'I looked: ' + answers.join('\n') + '\nNow answer ' + sd.name + ' in character, with "say" (and "commands" if they asked you to do something).' }]);
                             return round();
                         }
+                        var raw = (Array.isArray(out.commands) ? out.commands : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 6);
+                        var strip = new RegExp('^(bot|' + lc(bot.name).replace(/[^a-z0-9_]/g, '.') + ')\s+', 'i');
+                        var lines = raw.map(function (x) {
+                            var s = x.trim().replace(/^\/+/, '').replace(strip, '').trim();
+                            return botRepair(s) || s;
+                        });
+                        var bad = lines.filter(function (s) { return !botRealCmd(s); });
+                        if (bad.length && !repaired) {
+                            repaired = true;
+                            turn = turn.concat([{ role: 'assistant', content: JSON.stringify({ say: out.say || '', commands: raw }) },
+                                { role: 'user', content: 'There is no such command as: ' + bad.join('; ')
+                                    + '. The only commands are: get <count> <item> (this is also how you craft and smelt - "get 1 iron pickaxe", "get iron set", "get 64 planks"),'
+                                    + ' come, follow, defend, stop, status, drop, drop all, drop <item>, clear <w>x<h>x<d>, tunnel <length>, hunt <player>, unhunt.'
+                                    + ' Say the same thing again, with the job written as one of those.' }]);
+                            return round();
+                        }
                         hist.push({ role: 'user', content: sd.name + ': ' + text },
-                                  { role: 'assistant', content: JSON.stringify({ say: out.say || '', commands: out.commands || [] }) });
+                                  { role: 'assistant', content: JSON.stringify({ say: out.say || '', commands: lines }) });
                         while (hist.length > 12) hist.shift();
                         botSays(bot, out.say || looked.replace(/^[^>]*-> /, '') || '');
-                        var cmds = (Array.isArray(out.commands) ? out.commands : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 6);
+                        var cmds = lines.filter(botRealCmd);
                         if (cmds.length && !out.queue && b.task && !/^(status|drop|find|sense|look|progress)/.test(cmds[0])) runAs(sd, bot, 'stop');
                         cmds.forEach(function (cmd, i) {
                             var q = i > 0 || !!out.queue;
