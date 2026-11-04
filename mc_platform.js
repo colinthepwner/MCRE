@@ -309,6 +309,37 @@ mergeInto(LibraryManager.library, {
 
             var tex = (flags & 1) !== 0, col = (flags & 2) !== 0, lit = (flags & 4) !== 0;
             if (lit && (!Module.mcLitL || Module.mcLitCap === undefined)) return 0;
+
+            // Whether a draw is TEXTURED is not the caller's to say. The flag above only says
+            // "this buffer carries texture coordinates"; what decides whether the emulation
+            // SAMPLES is glEnable/glDisable(GL_TEXTURE_2D) - which is NOT the no-op it looks
+            // like. GLEmulation's own glEnable does return early for GL_TEXTURE_2D, but
+            // GLImmediate.init wraps glEnable a SECOND time, and that outer wrapper calls
+            // TexEnvJIT.hook_enable first. With the unit disabled, TexEnvJIT generates a
+            // fragment shader with no texture2D in it at all - just the colour.
+            //
+            // Getting this wrong is what darkened the sky while flying (user: "fly flickers",
+            // 2026-11-04). LevelRenderer::renderSky turns texturing OFF and then draws the sky
+            // dome through drawArrayVT - texture coordinates present, texturing off - so this
+            // path sampled whatever texture happened to still be bound and multiplied the sky
+            // colour by it. Which texture that was depended on what had been drawn last, so the
+            // sky changed shade as the view swung around: the flicker.
+            var TJ = GLImmediate.TexEnvJIT;
+            if (!TJ || typeof TJ.getTexUnitType !== 'function') return 0;
+            if (typeof TJ.getActiveTexture === 'function' && TJ.getActiveTexture() !== 0) return 0;
+            var t0 = TJ.getTexUnitType(0);
+            if (t0 !== 0 && t0 !== 0xDE1) return 0;          // 1D / 3D / cube: leave it to the emulation
+            var mt = GLImmediate.MAX_TEXTURES || 1;
+            for (var ti = 1; ti < mt; ti++) if (TJ.getTexUnitType(ti)) return 0;   // multitexture
+            var texOn = t0 === 0xDE1;
+            // Texturing on with no texture coordinates in the buffer: the emulation would sample at
+            // the generic a_texCoord0 value. Rare, and not worth reproducing - hand it back.
+            if (texOn && !tex) return 0;
+            tex = texOn;
+            // From here on `flags` must not be used for what is drawn: one buffer that carries
+            // texture coordinates needs a different program AND a different vertex array object
+            // depending on whether this draw is textured.
+            var eflags = (tex ? 1 : 0) | (col ? 2 : 0) | (lit ? 4 : 0);
             var cp = GLEmulation.clipPlaneEnabled;
             if (cp) for (var ci = 0; ci < cp.length; ci++) if (cp[ci]) return 0;
 
@@ -381,6 +412,11 @@ mergeInto(LibraryManager.library, {
                         tex ? '  v_uv = a_uv;' : '',
                         '  v_color = ' + (col ? 'a_color' : 'u_color') + ';',
                         litPass,
+                        // The fog distance is the RADIAL distance from the eye, not the eye-space depth:
+                        // build.py rewrites the emulation's own `v_fogFragCoord = abs(ecPosition.z)` into
+                        // `length(ecPosition.xyz)` after the link, so fog is a sphere round the player and
+                        // does not thin out at the edges of a wide field of view. This line has to match
+                        // that patch, not Emscripten's original.
                         fog ? '  v_fog = length(ec.xyz);' : '',
                         '}'].join('\n');
                     var fs = [
@@ -487,7 +523,7 @@ mergeInto(LibraryManager.library, {
             }
 
             // --- the buffer's vertex array object ----------------------------------------------
-            var vkey = vbo * 64 + (flags & 7) * 8 + (stride & 7);
+            var vkey = vbo * 64 + eflags * 8 + (stride & 7);
             var vao = F.vaos.get(vkey), made = false;
             if (!vao || vao.mcBuffer !== buf || vao.mcStride !== stride) {
                 if (vao) gl.deleteVertexArray(vao);
