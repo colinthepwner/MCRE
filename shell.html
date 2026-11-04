@@ -172,8 +172,10 @@
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
     <script type='text/javascript'>
+        try { window.mcreAA = localStorage.getItem('mcre.aa') !== '0'; } catch (e) { window.mcreAA = true; }
         var Module = {
-            canvas: (function () { return document.getElementById('canvas'); })()
+            canvas: (function () { return document.getElementById('canvas'); })(),
+            mcSetAA: function (on) { try { localStorage.setItem('mcre.aa', on ? '1' : '0'); } catch (e) { } window.mcreAA = !!on; }
         };
 
         (function () {
@@ -3933,13 +3935,19 @@
                 var base = d.spec.items.length, last = '';
                 d.spec.items.push({ t: 'text', text: 'Looking for games on this network...', color: '808080' });
                 if (N.needsMotionPermission()) {
-                    d.spec.buttons.splice(d.spec.buttons.length - 1, 0, { id: 'motion', label: 'Turn on tap-to-join', keep: true, activate: function (dd) {
-                        N.askMotion(function (ok) {
-                            if (dd.closed) return;
-                            dd.spec.buttons = dd.spec.buttons.filter(function (b) { return b.id !== 'motion'; });
-                            dd.update();
-                        });
-                    } });
+                    var addMotionButton = function () {
+                        if (d.closed || box !== d) return;
+                        for (var i = 0; i < d.spec.buttons.length; i++) if (d.spec.buttons[i].id === 'motion') return;
+                        d.spec.buttons.splice(d.spec.buttons.length - 1, 0, { id: 'motion', label: 'Turn on tap-to-join', keep: true, activate: function (dd) {
+                            N.askMotion(function (ok) {
+                                if (dd.closed) return;
+                                dd.spec.buttons = dd.spec.buttons.filter(function (b) { return b.id !== 'motion'; });
+                                dd.update();
+                            });
+                        } });
+                        d.update();
+                    };
+                    N.askMotion(function (ok) { if (!ok) addMotionButton(); });
                 }
                 d.update();
                 (function look() {
@@ -13776,9 +13784,10 @@
             def('difficulty', { level: 2, usage: '/difficulty <peaceful|easy|normal|hard|brutal>', args: ['difficulty'],
                 run: function (x) {
                     var di = world('difficultyinfo') || {};
-                    if (!x.args[0]) { tellTo(x.sd, 'The difficulty is ' + (di.name || ['Peaceful', 'Easy', 'Normal', 'Hard', 'Brutal'][world('difficulty') | 0]) + (di.locked ? (di.why === 'Hardcore' ? ' (Hardcore)' : ' (locked by the game mode)') : '')); return; }
+                    if (!x.args[0]) { tellTo(x.sd, 'The difficulty is ' + (di.name || ['Peaceful', 'Easy', 'Normal', 'Hard', 'Brutal'][world('difficulty') | 0]) + (di.locked ? (di.why === 'Hardcore' ? ' (Hardcore)' : di.why === 'Host' ? " (the host's)" : ' (locked by the game mode)') : '')); return; }
                     var d = { 0: 0, p: 0, peaceful: 0, 1: 1, e: 1, easy: 1, 2: 2, n: 2, normal: 2, 3: 3, h: 3, hard: 3, 4: 4, b: 4, brutal: 4 }[lc(x.args[0])];
                     if (d == null) usage(this);
+                    if (di.locked && di.why === 'Host') fail('The host of this world sets the difficulty - it is ' + (di.name || 'Easy') + ' here');
                     if (di.locked) fail('The difficulty can\'t be changed in this game mode - it is always ' + (di.name || 'Hard'));
                     world('difficulty', d);
                     feedback(x.sd, 'Set game difficulty to ' + ['Peaceful', 'Easy', 'Normal', 'Hard', 'Brutal'][d]);
