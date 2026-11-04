@@ -36,11 +36,16 @@ in the browser in the first place.
 - **A helper bot.** Type `/bot spawn` and tell it what you need, like `/bot get 64 planks` or
   `/bot get iron set`. It gathers, crafts and smelts everything itself (mod items too) and brings it back.
   It can also follow you, guard you, clear an area or dig a tunnel, and it comes along onto servers you
-  join. Ask it where the nearest village is, or which way out of a cave you're lost in, and it answers
+  join. It sorts out the small things a job needs without being asked - fuel when the furnace runs dry,
+  something to stack up with when it's stuck at the bottom of a hole. Ask it where the nearest village
+  is, or which way out of a cave you're lost in, and it answers
   from where you're standing and which way you're facing. If you hook up a chat AI in Options > Bot you
   can just talk to it normally, and it'd rather help you earn something than hand it straight over.
 - **It feels right on whatever you're using.** On a computer you get Java's title screen, menus, inventory and
   controls. On a phone or tablet you get touch controls built for it.
+- **Easier on your device.** Antialiasing (Options > Video) is on by default and smooths edges cleanly
+  right across the game, text and foliage included, and each frame takes noticeably less work to draw -
+  which you'll feel most on a phone.
 
 Signing in with a Microsoft account that owns Minecraft unlocks mods, multiplayer, Rocket terrain and the
 bigger worlds. You can play without signing in, just with a smaller set of options.

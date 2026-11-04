@@ -14438,12 +14438,14 @@
                 Module.mcGameRules.define('botTorches', true, 'Bots stand a torch down where they are working in the dark');
                 Module.mcGameRules.define('botChat', true, 'Bots answer chat lines that name them');
                 Module.mcGameRules.define('botSense', true, 'Bots know their surroundings and can be asked about them (off: they still take orders, they just have nothing to say about where they are)');
+                Module.mcGameRules.define('botSelfHelp', true, 'Bots see to small shortages themselves - fuel for a furnace, blocks to stack out of a hole (off: they tell you what is missing and stop)');
                 Module.mcGameRules.define('botSpoonfeed', false, 'Bots hand over whatever is asked for without a word (off: they offer the least cheaty route to it first, and still do as they are told if you insist)');
             }
             function botRules() {
                 var b = function (n, d) { var v = rule(n); return (v === undefined ? d : v) ? 1 : 0; };
                 botCmd(['rules', '', '', b('botTeleport', 1), b('botBreakBlocks', 1), b('botFight', 1), b('botPickup', 1), botConf().enabled === true && !botMobile(null) && b('botsAllowed', 1) ? 1 : 0,
-                    b('botKeepBuilds', 1), b('botGuessBuilds', 1), b('botUnstick', 1), b('botMine', 1), b('botTorches', 1), b('botSense', 1)]);
+                    b('botKeepBuilds', 1), b('botGuessBuilds', 1), b('botUnstick', 1), b('botMine', 1), b('botTorches', 1), b('botSense', 1),
+                    b('botSelfHelp', 1)]);
             }
             function botCmd(fields) {
                 var r = json(cc('mcBotCmd', 'string', ['string'], [fields.map(function (x) { return String(x == null ? '' : x).replace(/[\t\n]/g, ' '); }).join('\t')]));
