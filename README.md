@@ -46,6 +46,9 @@ in the browser in the first place.
 - **Easier on your device.** Antialiasing (Options > Video) is on by default and smooths edges cleanly
   right across the game, text and foliage included, and each frame takes noticeably less work to draw -
   which you'll feel most on a phone.
+- **Play it in 3D.** Options > Video > 3D draws the world for both eyes at once. Pick a stereogram
+  (side by side, or the cross-eyed kind) to free-view it, Anaglyph for red/cyan glasses, or Polarized
+  for a 3D monitor.
 
 Signing in with a Microsoft account that owns Minecraft unlocks mods, multiplayer, Rocket terrain and the
 bigger worlds. You can play without signing in, just with a smaller set of options.

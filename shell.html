@@ -427,6 +427,7 @@
                 return c;
             }
             return {
+                ready: function (cb) { if (ready) cb(); else waiting.push(cb); },
                 text: function (str, opts) {
                     opts = opts || {};
                     var scale = opts.scale || 2, colour = opts.colour || '#ffffff';
@@ -468,6 +469,12 @@
             var canvas = document.getElementById('canvas');
             var wanted = false;
             var disabled = false;
+            try {
+                if (navigator.webdriver === true || String(navigator.userAgent).indexOf('Headless') >= 0) {
+                    disabled = true;
+                    Module.mcPointerLockOff = 'automated';
+                }
+            } catch (e) { }
             var swallowUp = -1;
             var clickAttemptAt = 0;
             var failures = 0, firstFailureAt = 0;
@@ -523,8 +530,9 @@
                 if (ua && typeof ua.isActive === 'boolean') return ua.isActive;
                 return Date.now() - lastGestureAt < 4500;
             }
-            function tryLock() {
+            function tryLock(fromClick) {
                 if (!wanted || locked() || !pcMode() || !supported()) return;
+                if (!fromClick && !document.hasFocus()) return;
                 if (escHeld) { lockAfterEsc = true; return; }
                 try {
                     lockAskedAt = Date.now();
@@ -639,7 +647,7 @@
                 e.preventDefault();
                 swallowUp = e.button;
                 clickAttemptAt = Date.now();
-                tryLock();
+                tryLock(true);
             }, true);
             window.addEventListener('mouseup', function (e) {
                 if (e.button !== swallowUp) return;
@@ -657,10 +665,12 @@
                 if (x < r[0] || y < r[1] || x >= r[0] + r[2] || y >= r[1] + r[3]) return;
                 wanted = true;
                 clickAttemptAt = Date.now();
-                tryLock();
+                tryLock(true);
                 Module.mcResumePending = 1;
             }, true);
 
+            window.addEventListener('focus', function () { updateHint(); });
+            window.addEventListener('blur', function () { updateHint(); });
             document.addEventListener('pointerlockchange', function () {
                 if (locked()) {
                     lockAskedAt = 0;
@@ -17052,6 +17062,1373 @@
     </script>
     <script>
         (function () {
+            var MCQR = (function () {
+                'use strict';
+
+                function gfMulSlow(a, b) {
+                    var z = 0;
+                    for (var i = 7; i >= 0; i--) {
+                        z = ((z << 1) ^ ((z >>> 7) * 0x11d)) & 0xff;
+                        z ^= ((b >>> i) & 1) * a;
+                    }
+                    return z;
+                }
+                var _lastGrid = null;
+                var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+                (function () {
+                    var x = 1;
+                    for (var i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x = gfMulSlow(x, 2); }
+                    for (i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+                })();
+                function gmul(a, b) { return a && b ? EXP[LOG[a] + LOG[b]] : 0; }
+                function ginv(a) { return EXP[255 - LOG[a]]; }
+                function gpow(i) { return EXP[((i % 255) + 255) % 255]; }
+
+                var ECC_TABLE = ('7,1 10,1 13,1 17,1|10,1 16,1 22,1 28,1|15,1 26,1 18,2 22,2|20,1 18,2 26,2 16,4|' +
+                    '26,1 24,2 18,4 22,4|18,2 16,4 24,4 28,4|20,2 18,4 18,6 26,5|24,2 22,4 22,6 26,6|' +
+                    '30,2 22,5 20,8 24,8|18,4 26,5 24,8 28,8|20,4 30,5 28,8 24,11|24,4 22,8 26,10 28,11|' +
+                    '26,4 22,9 24,12 22,16|30,4 24,9 20,16 24,16|22,6 24,10 30,12 24,18|24,6 28,10 24,17 30,16|' +
+                    '28,6 28,11 28,16 28,19|30,6 26,13 28,18 28,21|28,7 26,14 26,21 26,25|28,8 26,16 30,20 28,25|' +
+                    '28,8 26,17 28,23 30,25|28,9 28,17 30,23 24,34|30,9 28,18 30,25 30,30|30,10 28,20 30,27 30,32|' +
+                    '26,12 28,21 30,29 30,35|28,12 28,23 28,34 30,37|30,12 28,25 30,34 30,40|30,13 28,26 30,35 30,42|' +
+                    '30,14 28,28 30,38 30,45|30,15 28,29 30,40 30,48|30,16 28,31 30,43 30,51|30,17 28,33 30,45 30,54|' +
+                    '30,18 28,35 30,48 30,57|30,19 28,37 30,51 30,60|30,19 28,38 30,53 30,63|30,20 28,40 30,56 30,66|' +
+                    '30,21 28,43 30,59 30,70|30,22 28,45 30,62 30,74|30,24 28,47 30,65 30,77|30,25 28,49 30,68 30,81')
+                    .split('|').map(function (row) { return row.split(' ').map(function (p) { return p.split(',').map(Number); }); });
+                var LEVELS = 'LMQH';
+                var FORMAT_BITS = [1, 0, 3, 2];
+
+                function size(ver) { return ver * 4 + 17; }
+                function alignPositions(ver) {
+                    if (ver === 1) return [];
+                    var n = Math.floor(ver / 7) + 2;
+                    var step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2;
+                    var out = [6];
+                    for (var pos = ver * 4 + 10; out.length < n; pos -= step) out.splice(1, 0, pos);
+                    return out;
+                }
+                function rawDataModules(ver) {
+                    var result = (16 * ver + 128) * ver + 64;
+                    if (ver >= 2) {
+                        var n = Math.floor(ver / 7) + 2;
+                        result -= (25 * n - 10) * n - 55;
+                        if (ver >= 7) result -= 36;
+                    }
+                    return result;
+                }
+                function totalCodewords(ver) { return Math.floor(rawDataModules(ver) / 8); }
+                function eccInfo(ver, lvl) { return ECC_TABLE[ver - 1][lvl]; }
+                function dataCodewords(ver, lvl) {
+                    var e = eccInfo(ver, lvl);
+                    return totalCodewords(ver) - e[0] * e[1];
+                }
+                function lenBitsFor(mode, ver) {
+                    var i = ver <= 9 ? 0 : ver <= 26 ? 1 : 2;
+                    if (mode === 1) return [10, 12, 14][i];
+                    if (mode === 2) return [9, 11, 13][i];
+                    if (mode === 4) return [8, 16, 16][i];
+                    return [8, 10, 12][i];
+                }
+
+                function rsGenerator(degree) {
+                    var result = new Uint8Array(degree);
+                    result[degree - 1] = 1;
+                    var root = 1;
+                    for (var i = 0; i < degree; i++) {
+                        for (var j = 0; j < degree; j++) {
+                            result[j] = gfMulSlow(result[j], root);
+                            if (j + 1 < degree) result[j] ^= result[j + 1];
+                        }
+                        root = gfMulSlow(root, 2);
+                    }
+                    return result;
+                }
+                function rsRemainder(data, gen) {
+                    var result = new Uint8Array(gen.length);
+                    for (var i = 0; i < data.length; i++) {
+                        var factor = data[i] ^ result[0];
+                        for (var j = 0; j + 1 < result.length; j++) result[j] = result[j + 1];
+                        result[result.length - 1] = 0;
+                        for (var k = 0; k < gen.length; k++) result[k] ^= gmul(gen[k], factor);
+                    }
+                    return result;
+                }
+                function addEcc(data, ver, lvl) {
+                    var e = eccInfo(ver, lvl), ecLen = e[0], blocks = e[1];
+                    var total = totalCodewords(ver), dataLen = total - ecLen * blocks;
+                    var shortLen = Math.floor(dataLen / blocks), numShort = blocks - dataLen % blocks;
+                    var gen = rsGenerator(ecLen), bl = [], at = 0;
+                    for (var i = 0; i < blocks; i++) {
+                        var len = shortLen + (i < numShort ? 0 : 1);
+                        var d = data.subarray(at, at + len);
+                        at += len;
+                        bl.push({ d: d, e: rsRemainder(d, gen) });
+                    }
+                    var out = new Uint8Array(total), p = 0;
+                    for (var j = 0; j <= shortLen; j++)
+                        for (i = 0; i < blocks; i++)
+                            if (j < bl[i].d.length) out[p++] = bl[i].d[j];
+                    for (j = 0; j < ecLen; j++)
+                        for (i = 0; i < blocks; i++) out[p++] = bl[i].e[j];
+                    return out;
+                }
+
+                function Grid(ver) {
+                    this.ver = ver;
+                    this.n = size(ver);
+                    this.m = new Uint8Array(this.n * this.n);
+                    this.f = new Uint8Array(this.n * this.n);
+                }
+                Grid.prototype.set = function (x, y, dark) {
+                    if (x < 0 || y < 0 || x >= this.n || y >= this.n) return;
+                    this.m[y * this.n + x] = dark ? 1 : 0;
+                    this.f[y * this.n + x] = 1;
+                };
+                Grid.prototype.get = function (x, y) { return this.m[y * this.n + x]; };
+
+                function drawFunctionPatterns(g, lvl) {
+                    var n = g.n, i, j;
+                    for (i = 0; i < n; i++) { g.set(6, i, i % 2 === 0); g.set(i, 6, i % 2 === 0); }
+                    var corners = [[3, 3], [n - 4, 3], [3, n - 4]];
+                    for (var c = 0; c < 3; c++)
+                        for (var dy = -4; dy <= 4; dy++)
+                            for (var dx = -4; dx <= 4; dx++) {
+                                var dist = Math.max(Math.abs(dx), Math.abs(dy));
+                                g.set(corners[c][0] + dx, corners[c][1] + dy, dist !== 2 && dist !== 4);
+                            }
+                    var pos = alignPositions(g.ver);
+                    for (i = 0; i < pos.length; i++)
+                        for (j = 0; j < pos.length; j++) {
+                            if ((i === 0 && j === 0) || (i === 0 && j === pos.length - 1) || (i === pos.length - 1 && j === 0)) continue;
+                            for (dy = -2; dy <= 2; dy++)
+                                for (dx = -2; dx <= 2; dx++)
+                                    g.set(pos[i] + dx, pos[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+                        }
+                    drawFormatBits(g, lvl, 0);
+                    drawVersionBits(g);
+                }
+                function drawFormatBits(g, lvl, mask) {
+                    var n = g.n, data = (FORMAT_BITS[lvl] << 3) | mask, rem = data, i;
+                    for (i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+                    var bits = ((data << 10) | rem) ^ 0x5412;
+                    var bit = function (k) { return ((bits >>> k) & 1) !== 0; };
+                    for (i = 0; i <= 5; i++) g.set(8, i, bit(i));
+                    g.set(8, 7, bit(6));
+                    g.set(8, 8, bit(7));
+                    g.set(7, 8, bit(8));
+                    for (i = 9; i < 15; i++) g.set(14 - i, 8, bit(i));
+                    for (i = 0; i < 8; i++) g.set(n - 1 - i, 8, bit(i));
+                    for (i = 8; i < 15; i++) g.set(8, n - 15 + i, bit(i));
+                    g.set(8, n - 8, true);
+                }
+                function drawVersionBits(g) {
+                    if (g.ver < 7) return;
+                    var n = g.n, rem = g.ver, i;
+                    for (i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1f25);
+                    var bits = (g.ver << 12) | rem;
+                    for (i = 0; i < 18; i++) {
+                        var bit = ((bits >>> i) & 1) !== 0;
+                        var a = n - 11 + i % 3, b = Math.floor(i / 3);
+                        g.set(a, b, bit);
+                        g.set(b, a, bit);
+                    }
+                }
+                function dataPositions(g) {
+                    var n = g.n, out = [];
+                    for (var right = n - 1; right >= 1; right -= 2) {
+                        if (right === 6) right = 5;
+                        for (var vert = 0; vert < n; vert++)
+                            for (var j = 0; j < 2; j++) {
+                                var x = right - j;
+                                var upward = ((right + 1) & 2) === 0;
+                                var y = upward ? n - 1 - vert : vert;
+                                if (!g.f[y * n + x]) out.push(y * n + x);
+                            }
+                    }
+                    return out;
+                }
+                function drawCodewords(g, all, places) {
+                    for (var i = 0; i < places.length; i++) {
+                        var bit = i < all.length * 8 ? (all[i >>> 3] >>> (7 - (i & 7))) & 1 : 0;
+                        g.m[places[i]] = bit;
+                    }
+                }
+                function maskBit(mask, x, y) {
+                    switch (mask) {
+                        case 0: return (x + y) % 2 === 0;
+                        case 1: return y % 2 === 0;
+                        case 2: return x % 3 === 0;
+                        case 3: return (x + y) % 3 === 0;
+                        case 4: return (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
+                        case 5: return x * y % 2 + x * y % 3 === 0;
+                        case 6: return (x * y % 2 + x * y % 3) % 2 === 0;
+                        default: return ((x + y) % 2 + x * y % 3) % 2 === 0;
+                    }
+                }
+                function applyMask(g, mask) {
+                    var n = g.n;
+                    for (var y = 0; y < n; y++)
+                        for (var x = 0; x < n; x++)
+                            if (!g.f[y * n + x] && maskBit(mask, x, y)) g.m[y * n + x] ^= 1;
+                }
+                function penalty(g) {
+                    var n = g.n, score = 0, x, y, i;
+                    var runColour, runLen, runHistory;
+                    var addRun = function (len) {
+                        if (len >= 5) score += 3 + (len - 5);
+                    };
+                    for (var dir = 0; dir < 2; dir++)
+                        for (y = 0; y < n; y++) {
+                            runColour = 0; runLen = 0; runHistory = [0, 0, 0, 0, 0, 0, 0];
+                            for (x = 0; x < n; x++) {
+                                var c = dir === 0 ? g.m[y * n + x] : g.m[x * n + y];
+                                if (c === runColour) { runLen++; continue; }
+                                addRunHistory(runHistory, runLen);
+                                if (runColour === 0 && hasFinderLike(runHistory)) score += 40;
+                                addRun(runLen);
+                                runColour = c; runLen = 1;
+                            }
+                            addRun(runLen);
+                            addRunHistory(runHistory, runLen);
+                            if (runColour === 1) addRunHistory(runHistory, 0);
+                            if (hasFinderLike(runHistory)) score += 40;
+                        }
+                    for (y = 0; y + 1 < n; y++)
+                        for (x = 0; x + 1 < n; x++) {
+                            var v = g.m[y * n + x];
+                            if (v === g.m[y * n + x + 1] && v === g.m[(y + 1) * n + x] && v === g.m[(y + 1) * n + x + 1]) score += 3;
+                        }
+                    var dark = 0;
+                    for (i = 0; i < g.m.length; i++) dark += g.m[i];
+                    var total = n * n;
+                    var k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
+                    return score + Math.max(0, k) * 10;
+                }
+                function addRunHistory(h, len) {
+                    h.pop();
+                    h.unshift(len);
+                }
+                function hasFinderLike(h) {
+                    var n = h[1];
+                    if (n <= 0 || h[2] !== n || h[4] !== n || h[5] !== n || h[3] !== n * 3) return false;
+                    return h[0] >= n * 4 || h[6] >= n * 4;
+                }
+
+                function encode(text, opts) {
+                    opts = opts || {};
+                    var bytes = toUtf8(text);
+                    var lvl = Math.max(0, LEVELS.indexOf(opts.ecc || 'L'));
+                    var ver = Math.max(1, opts.minVer || 1);
+                    for (; ver <= 40; ver++) {
+                        var cap = dataCodewords(ver, lvl) * 8;
+                        if (4 + lenBitsFor(4, ver) + bytes.length * 8 <= cap) break;
+                    }
+                    if (ver > 40) return null;
+
+                    var bits = [];
+                    var push = function (val, len) { for (var i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+                    push(4, 4);
+                    push(bytes.length, lenBitsFor(4, ver));
+                    for (var i = 0; i < bytes.length; i++) push(bytes[i], 8);
+                    var capBits = dataCodewords(ver, lvl) * 8;
+                    push(0, Math.min(4, capBits - bits.length));
+                    push(0, (8 - bits.length % 8) % 8);
+                    for (var pad = 0xec; bits.length < capBits; pad ^= 0xec ^ 0x11) push(pad, 8);
+                    var data = new Uint8Array(bits.length / 8);
+                    for (i = 0; i < bits.length; i++) data[i >>> 3] |= bits[i] << (7 - (i & 7));
+
+                    var all = addEcc(data, ver, lvl);
+                    var best = null, bestScore = Infinity;
+                    var masks = opts.mask >= 0 && opts.mask <= 7 ? [opts.mask] : [0, 1, 2, 3, 4, 5, 6, 7];
+                    for (var mi = 0; mi < masks.length; mi++) {
+                        var g = new Grid(ver);
+                        drawFunctionPatterns(g, lvl);
+                        drawCodewords(g, all, dataPositions(g));
+                        applyMask(g, masks[mi]);
+                        drawFormatBits(g, lvl, masks[mi]);
+                        var sc = masks.length === 1 ? 0 : penalty(g);
+                        if (sc < bestScore) { bestScore = sc; best = g; best.mask = masks[mi]; }
+                    }
+                    return { n: best.n, m: best.m, ver: ver, lvl: LEVELS.charAt(lvl), mask: best.mask, text: text };
+                }
+                function toUtf8(s) {
+                    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s);
+                    var out = [], str = unescape(encodeURIComponent(s));
+                    for (var i = 0; i < str.length; i++) out.push(str.charCodeAt(i));
+                    return new Uint8Array(out);
+                }
+                function fromUtf8(bytes) {
+                    if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+                    var s = '';
+                    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+                    try { return decodeURIComponent(escape(s)); } catch (e) { return s; }
+                }
+
+                function rsCorrect(cw, ecLen) {
+                    var i, j, n = cw.length;
+                    var syn = new Uint8Array(ecLen), any = false;
+                    for (i = 0; i < ecLen; i++) {
+                        var s = 0;
+                        for (j = 0; j < n; j++) s = gmul(s, gpow(i)) ^ cw[j];
+                        syn[i] = s;
+                        if (s) any = true;
+                    }
+                    if (!any) return 0;
+                    var C = [1], B = [1], L = 0, m = 1, b = 1;
+                    for (var r = 0; r < ecLen; r++) {
+                        var d = syn[r];
+                        for (i = 1; i <= L; i++) d ^= gmul(C[i] || 0, syn[r - i]);
+                        if (d === 0) { m++; continue; }
+                        var T = C.slice();
+                        var scale = gmul(d, ginv(b));
+                        for (i = 0; i < B.length; i++) C[i + m] = (C[i + m] || 0) ^ gmul(scale, B[i]);
+                        if (2 * L <= r) { L = r + 1 - L; B = T; b = d; m = 1; } else m++;
+                    }
+                    if (L === 0 || L > ecLen / 2) return -1;
+                    var pos = [];
+                    for (i = 0; i < 255 && pos.length <= L; i++) {
+                        var v = 0;
+                        for (j = C.length - 1; j >= 0; j--) v = gmul(v, gpow(i)) ^ (C[j] || 0);
+                        if (v === 0) {
+                            var p = (255 - i) % 255;
+                            if (p >= n) return -1;
+                            pos.push(p);
+                        }
+                    }
+                    if (pos.length !== L) return -1;
+                    var A = [], rhs = [];
+                    for (i = 0; i < L; i++) {
+                        var row = [];
+                        for (j = 0; j < L; j++) row.push(gpow(pos[j] * i));
+                        A.push(row);
+                        rhs.push(syn[i]);
+                    }
+                    var e = solveGf(A, rhs);
+                    if (!e) return -1;
+                    for (j = 0; j < L; j++) cw[n - 1 - pos[j]] ^= e[j];
+                    for (i = 0; i < ecLen; i++) {
+                        var s2 = 0;
+                        for (j = 0; j < n; j++) s2 = gmul(s2, gpow(i)) ^ cw[j];
+                        if (s2) return -1;
+                    }
+                    return L;
+                }
+                function solveGf(A, rhs) {
+                    var n = rhs.length, i, j, k;
+                    for (i = 0; i < n; i++) {
+                        var p = -1;
+                        for (j = i; j < n; j++) if (A[j][i]) { p = j; break; }
+                        if (p < 0) return null;
+                        if (p !== i) { var t = A[p]; A[p] = A[i]; A[i] = t; var tv = rhs[p]; rhs[p] = rhs[i]; rhs[i] = tv; }
+                        var inv = ginv(A[i][i]);
+                        for (j = i; j < n; j++) A[i][j] = gmul(A[i][j], inv);
+                        rhs[i] = gmul(rhs[i], inv);
+                        for (k = 0; k < n; k++) {
+                            if (k === i || !A[k][i]) continue;
+                            var f = A[k][i];
+                            for (j = i; j < n; j++) A[k][j] ^= gmul(f, A[i][j]);
+                            rhs[k] ^= gmul(f, rhs[i]);
+                        }
+                    }
+                    return rhs;
+                }
+
+                function decodeModules(bits, n) {
+                    if (n < 21 || n > 177 || (n - 17) % 4) return null;
+                    var ver = (n - 17) / 4;
+                    var fmt = readFormat(bits, n);
+                    if (!fmt) return null;
+                    var g = new Grid(ver);
+                    drawFunctionPatterns(g, fmt.lvl);
+                    var places = dataPositions(g);
+                    var all = new Uint8Array(totalCodewords(ver));
+                    for (var i = 0; i < places.length; i++) {
+                        var p = places[i], x = p % n, y = (p - x) / n;
+                        var bit = bits[p] ^ (maskBit(fmt.mask, x, y) ? 1 : 0);
+                        if (bit) all[i >>> 3] |= 1 << (7 - (i & 7));
+                    }
+                    var e = eccInfo(ver, fmt.lvl), ecLen = e[0], blocks = e[1];
+                    var dataLen = totalCodewords(ver) - ecLen * blocks;
+                    var shortLen = Math.floor(dataLen / blocks), numShort = blocks - dataLen % blocks;
+                    var bl = [], fixed = 0;
+                    for (i = 0; i < blocks; i++) bl.push(new Uint8Array((i < numShort ? shortLen : shortLen + 1) + ecLen));
+                    var at = 0;
+                    for (var j = 0; j <= shortLen; j++)
+                        for (i = 0; i < blocks; i++) {
+                            var dl = i < numShort ? shortLen : shortLen + 1;
+                            if (j < dl) bl[i][j] = all[at++];
+                        }
+                    for (j = 0; j < ecLen; j++)
+                        for (i = 0; i < blocks; i++) bl[i][bl[i].length - ecLen + j] = all[at++];
+                    var data = [];
+                    for (i = 0; i < blocks; i++) {
+                        var got = rsCorrect(bl[i], ecLen);
+                        if (got < 0) return null;
+                        fixed += got;
+                        for (j = 0; j < bl[i].length - ecLen; j++) data.push(bl[i][j]);
+                    }
+                    var text = readSegments(data, ver);
+                    if (text === null) return null;
+                    return { text: text, ver: ver, lvl: LEVELS.charAt(fmt.lvl), mask: fmt.mask, fixed: fixed };
+                }
+                function readFormat(bits, n) {
+                    var a = 0, b = 0, i;
+                    for (i = 0; i <= 5; i++) a |= bits[i * n + 8] << i;
+                    a |= bits[7 * n + 8] << 6;
+                    a |= bits[8 * n + 8] << 7;
+                    a |= bits[8 * n + 7] << 8;
+                    for (i = 9; i < 15; i++) a |= bits[8 * n + (14 - i)] << i;
+                    for (i = 0; i < 8; i++) b |= bits[8 * n + (n - 1 - i)] << i;
+                    for (i = 8; i < 15; i++) b |= bits[(n - 15 + i) * n + 8] << i;
+                    var best = null, bestDist = 4;
+                    for (var lvl = 0; lvl < 4; lvl++)
+                        for (var mask = 0; mask < 8; mask++) {
+                            var data = (FORMAT_BITS[lvl] << 3) | mask, rem = data;
+                            for (i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+                            var ref = ((data << 10) | rem) ^ 0x5412;
+                            var d = Math.min(popcount(ref ^ a), popcount(ref ^ b));
+                            if (d < bestDist) { bestDist = d; best = { lvl: lvl, mask: mask }; }
+                        }
+                    return best;
+                }
+                function popcount(v) { var c = 0; while (v) { c += v & 1; v >>>= 1; } return c; }
+                function readSegments(data, ver) {
+                    var at = 0, total = data.length * 8;
+                    var read = function (len) {
+                        if (at + len > total) return -1;
+                        var v = 0;
+                        for (var i = 0; i < len; i++, at++) v = (v << 1) | ((data[at >>> 3] >>> (7 - (at & 7))) & 1);
+                        return v;
+                    };
+                    var ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+                    var out = '', bytes = [];
+                    var flush = function () { if (bytes.length) { out += fromUtf8(bytes); bytes = []; } };
+                    for (;;) {
+                        if (total - at < 4) break;
+                        var mode = read(4);
+                        if (mode <= 0) break;
+                        if (mode === 7) { if (read(8) < 0) return null; continue; }
+                        if (mode !== 1 && mode !== 2 && mode !== 4) return null;
+                        var cnt = read(lenBitsFor(mode, ver));
+                        if (cnt < 0) return null;
+                        if (mode === 4) {
+                            for (var i = 0; i < cnt; i++) {
+                                var byt = read(8);
+                                if (byt < 0) return null;
+                                bytes.push(byt);
+                            }
+                            continue;
+                        }
+                        flush();
+                        if (mode === 1) {
+                            while (cnt >= 3) { var t = read(10); if (t < 0 || t > 999) return null; out += pad(t, 3); cnt -= 3; }
+                            if (cnt === 2) { t = read(7); if (t < 0 || t > 99) return null; out += pad(t, 2); }
+                            else if (cnt === 1) { t = read(4); if (t < 0 || t > 9) return null; out += String(t); }
+                        } else {
+                            while (cnt >= 2) { t = read(11); if (t < 0 || t >= 45 * 45) return null; out += ALNUM.charAt(Math.floor(t / 45)) + ALNUM.charAt(t % 45); cnt -= 2; }
+                            if (cnt === 1) { t = read(6); if (t < 0 || t >= 45) return null; out += ALNUM.charAt(t); }
+                        }
+                    }
+                    flush();
+                    return out;
+                }
+                function pad(v, len) { var s = String(v); while (s.length < len) s = '0' + s; return s; }
+
+                function binarize(grey, w, h) {
+                    var bw = Math.max(1, w >> 3), bh = Math.max(1, h >> 3);
+                    var points = new Int32Array(bw * bh);
+                    for (var by = 0; by < bh; by++)
+                        for (var bx = 0; bx < bw; bx++) {
+                            var x0 = Math.min(bx << 3, w - 8), y0 = Math.min(by << 3, h - 8);
+                            if (x0 < 0) x0 = 0;
+                            if (y0 < 0) y0 = 0;
+                            var sum = 0, mn = 255, mx = 0, cnt = 0;
+                            for (var y = y0; y < Math.min(y0 + 8, h); y++)
+                                for (var x = x0; x < Math.min(x0 + 8, w); x++) {
+                                    var v = grey[y * w + x];
+                                    sum += v; cnt++;
+                                    if (v < mn) mn = v;
+                                    if (v > mx) mx = v;
+                                }
+                            var avg;
+                            if (mx - mn > 24) avg = Math.round(sum / Math.max(1, cnt));
+                            else {
+                                avg = mn >> 1;
+                                if (by > 0 && bx > 0) {
+                                    var near = (points[(by - 1) * bw + bx] + 2 * points[by * bw + bx - 1] + points[(by - 1) * bw + bx - 1]) / 4;
+                                    if (mn < near) avg = Math.round(near);
+                                }
+                            }
+                            points[by * bw + bx] = avg;
+                        }
+                    var bits = new Uint8Array(w * h);
+                    for (by = 0; by < bh; by++)
+                        for (bx = 0; bx < bw; bx++) {
+                            var cx = Math.min(Math.max(bx, 2), bw - 3), cy = Math.min(Math.max(by, 2), bh - 3);
+                            var t = 0;
+                            for (var dy = -2; dy <= 2; dy++)
+                                for (var dx = -2; dx <= 2; dx++) t += points[Math.min(Math.max(cy + dy, 0), bh - 1) * bw + Math.min(Math.max(cx + dx, 0), bw - 1)];
+                            t = Math.round(t / 25);
+                            var ex = Math.min((bx << 3) + 8, w), ey = Math.min((by << 3) + 8, h);
+                            for (y = by << 3; y < ey; y++)
+                                for (x = bx << 3; x < ex; x++) bits[y * w + x] = grey[y * w + x] <= t ? 1 : 0;
+                        }
+                    return bits;
+                }
+                function findFinders(bits, w, h) {
+                    var found = [];
+                    var counts = [0, 0, 0, 0, 0];
+                    var step = Math.max(1, Math.floor(h / 240));
+                    for (var y = step; y < h; y += step) {
+                        counts[0] = counts[1] = counts[2] = counts[3] = counts[4] = 0;
+                        var state = 0;
+                        for (var x = 0; x < w; x++) {
+                            if (bits[y * w + x]) {
+                                if ((state & 1) === 1) state++;
+                                counts[state]++;
+                            } else if ((state & 1) === 0) {
+                                if (state !== 4) counts[++state]++;
+                                else if (ratioOk(counts)) {
+                                    tryFinder(bits, w, h, x, y, counts, found);
+                                    state = 0;
+                                    counts[0] = counts[1] = counts[2] = counts[3] = counts[4] = 0;
+                                } else {
+                                    counts[0] = counts[2]; counts[1] = counts[3]; counts[2] = counts[4];
+                                    counts[3] = 1; counts[4] = 0;
+                                    state = 3;
+                                }
+                            } else {
+                                counts[state]++;
+                            }
+                        }
+                        if (state === 4 && ratioOk(counts)) tryFinder(bits, w, h, w, y, counts, found);
+                    }
+                    return found;
+                }
+                function ratioOk(c) {
+                    var total = c[0] + c[1] + c[2] + c[3] + c[4];
+                    if (total < 7) return false;
+                    var mod = total / 7, tol = mod / 1.6;
+                    return Math.abs(mod - c[0]) < tol && Math.abs(mod - c[1]) < tol &&
+                        Math.abs(3 * mod - c[2]) < 3 * tol && Math.abs(mod - c[3]) < tol && Math.abs(mod - c[4]) < tol;
+                }
+                function centreOf(c, end) { return end - c[4] - c[3] - c[2] / 2; }
+                function tryFinder(bits, w, h, x, y, counts, found) {
+                    var total = counts[0] + counts[1] + counts[2] + counts[3] + counts[4];
+                    var cx = centreOf(counts, x);
+                    var cy = crossCheck(bits, w, h, Math.round(cx), y, total, true);
+                    if (cy < 0) return;
+                    var cx2 = crossCheck(bits, w, h, Math.round(cy), Math.round(cx), total, false);
+                    if (cx2 < 0) return;
+                    var mod = total / 7;
+                    for (var i = 0; i < found.length; i++) {
+                        var f = found[i];
+                        if (Math.abs(f.x - cx2) < mod && Math.abs(f.y - cy) < mod) {
+                            f.x = (f.x * f.n + cx2) / (f.n + 1);
+                            f.y = (f.y * f.n + cy) / (f.n + 1);
+                            f.mod = (f.mod * f.n + mod) / (f.n + 1);
+                            f.n++;
+                            return;
+                        }
+                    }
+                    found.push({ x: cx2, y: cy, mod: mod, n: 1 });
+                }
+                function crossCheck(bits, w, h, fixed, start, total, vertical) {
+                    var limit = vertical ? h : w;
+                    var at = function (i) { return vertical ? bits[i * w + fixed] : bits[fixed * w + i]; };
+                    var c = [0, 0, 0, 0, 0];
+                    var i = start;
+                    while (i >= 0 && at(i)) { c[2]++; i--; }
+                    if (i < 0) return -1;
+                    while (i >= 0 && !at(i) && c[1] <= total) { c[1]++; i--; }
+                    if (i < 0 || c[1] > total) return -1;
+                    while (i >= 0 && at(i) && c[0] <= total) { c[0]++; i--; }
+                    if (c[0] > total) return -1;
+                    i = start + 1;
+                    while (i < limit && at(i)) { c[2]++; i++; }
+                    if (i >= limit) return -1;
+                    while (i < limit && !at(i) && c[3] <= total) { c[3]++; i++; }
+                    if (i >= limit || c[3] > total) return -1;
+                    while (i < limit && at(i) && c[4] <= total) { c[4]++; i++; }
+                    if (c[4] > total) return -1;
+                    var sum = c[0] + c[1] + c[2] + c[3] + c[4];
+                    if (Math.abs(sum - total) * 5 > 2 * total) return -1;
+                    return ratioOk(c) ? centreOf(c, i) : -1;
+                }
+                function squareToQuad(p) {
+                    var dx3 = p[0][0] - p[1][0] + p[2][0] - p[3][0];
+                    var dy3 = p[0][1] - p[1][1] + p[2][1] - p[3][1];
+                    if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9)
+                        return [[p[1][0] - p[0][0], p[2][0] - p[1][0], p[0][0]],
+                                [p[1][1] - p[0][1], p[2][1] - p[1][1], p[0][1]],
+                                [0, 0, 1]];
+                    var dx1 = p[1][0] - p[2][0], dx2 = p[3][0] - p[2][0];
+                    var dy1 = p[1][1] - p[2][1], dy2 = p[3][1] - p[2][1];
+                    var den = dx1 * dy2 - dx2 * dy1;
+                    var a13 = (dx3 * dy2 - dx2 * dy3) / den;
+                    var a23 = (dx1 * dy3 - dx3 * dy1) / den;
+                    return [[p[1][0] - p[0][0] + a13 * p[1][0], p[3][0] - p[0][0] + a23 * p[3][0], p[0][0]],
+                            [p[1][1] - p[0][1] + a13 * p[1][1], p[3][1] - p[0][1] + a23 * p[3][1], p[0][1]],
+                            [a13, a23, 1]];
+                }
+                function matMul(a, b) {
+                    var out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+                    for (var i = 0; i < 3; i++)
+                        for (var j = 0; j < 3; j++) {
+                            var s = 0;
+                            for (var k = 0; k < 3; k++) s += a[i][k] * b[k][j];
+                            out[i][j] = s;
+                        }
+                    return out;
+                }
+                function matAdj(m) {
+                    return [[m[1][1] * m[2][2] - m[2][1] * m[1][2], m[2][1] * m[0][2] - m[0][1] * m[2][2], m[0][1] * m[1][2] - m[1][1] * m[0][2]],
+                            [m[1][2] * m[2][0] - m[1][0] * m[2][2], m[0][0] * m[2][2] - m[0][2] * m[2][0], m[0][2] * m[1][0] - m[0][0] * m[1][2]],
+                            [m[1][0] * m[2][1] - m[2][0] * m[1][1], m[2][0] * m[0][1] - m[0][0] * m[2][1], m[0][0] * m[1][1] - m[0][1] * m[1][0]]];
+                }
+                function quadToQuad(from, to) { return matMul(squareToQuad(to), matAdj(squareToQuad(from))); }
+                function apply(m, x, y) {
+                    var d = m[2][0] * x + m[2][1] * y + m[2][2];
+                    return [(m[0][0] * x + m[0][1] * y + m[0][2]) / d, (m[1][0] * x + m[1][1] * y + m[1][2]) / d];
+                }
+                function findAlignment(bits, w, h, ex, ey, mod, radius) {
+                    var r = Math.max(4, Math.round(radius || mod * 4));
+                    var x0 = Math.max(0, Math.round(ex - r)), x1 = Math.min(w, Math.round(ex + r) + 1);
+                    var y0 = Math.max(0, Math.round(ey - r)), y1 = Math.min(h, Math.round(ey + r) + 1);
+                    var best = null, bestD = 1e9;
+                    var take = function (cx, y, c) {
+                        var cy = crossCheck3(bits, w, h, Math.round(cx), y, mod, c[0] + c[1] + c[2]);
+                        if (cy == null) return;
+                        var d = (cx - ex) * (cx - ex) + (cy - ey) * (cy - ey);
+                        if (d < bestD) { bestD = d; best = [cx, cy]; }
+                    };
+                    for (var y = y0; y < y1; y++) {
+                        var c = [0, 0, 0], state = 0;
+                        for (var x = x0; x < x1; x++) {
+                            if (bits[y * w + x]) {
+                                if (state === 1) c[1]++;
+                                else if (state === 2) {
+                                    if (ok3(c, mod)) take(x - c[2] - c[1] / 2, y, c);
+                                    c[0] = c[2]; c[1] = 1; c[2] = 0; state = 1;
+                                } else c[++state]++;
+                            } else {
+                                if (state === 1) state++;
+                                c[state]++;
+                            }
+                        }
+                        if (state === 2 && ok3(c, mod)) take(x1 - c[2] - c[1] / 2, y, c);
+                    }
+                    return best;
+                }
+                function ok3(c, mod) {
+                    var tol = mod / 1.5;
+                    return Math.abs(c[0] - mod) < tol && Math.abs(c[1] - mod) < tol && Math.abs(c[2] - mod) < tol;
+                }
+                function crossCheck3(bits, w, h, x, y, mod, total) {
+                    if (x < 0 || x >= w) return null;
+                    var at = function (k) { return k >= 0 && k < h ? bits[k * w + x] : 0; };
+                    var c = [0, 0, 0], max = total;
+                    var i = y;
+                    while (i >= 0 && at(i) && c[1] <= max) { c[1]++; i--; }
+                    if (i < 0 || c[1] > max) return null;
+                    while (i >= 0 && !at(i) && c[0] <= max) { c[0]++; i--; }
+                    if (c[0] > max) return null;
+                    i = y + 1;
+                    while (i < h && at(i) && c[1] <= max) { c[1]++; i++; }
+                    if (i >= h || c[1] > max) return null;
+                    while (i < h && !at(i) && c[2] <= max) { c[2]++; i++; }
+                    if (c[2] > max) return null;
+                    var sum = c[0] + c[1] + c[2];
+                    if (5 * Math.abs(sum - total) >= 2 * total) return null;
+                    return ok3(c, mod) ? i - c[2] - c[1] / 2 : null;
+                }
+
+                function decodeGrey(grey, w, h) {
+                    var bits = binarize(grey, w, h);
+                    var got = decodeFromBits(bits, w, h);
+                    if (got) return got;
+                    var inv = new Uint8Array(bits.length);
+                    for (var i = 0; i < bits.length; i++) inv[i] = bits[i] ^ 1;
+                    return decodeFromBits(inv, w, h);
+                }
+                function decodeFromBits(bits, w, h) {
+                    var found = findFinders(bits, w, h);
+                    if (found.length < 3) return null;
+                    found.sort(function (a, b) { return b.n - a.n; });
+                    var cand = found.slice(0, 30), tries = [];
+                    for (var a = 0; a < cand.length; a++)
+                        for (var b = a + 1; b < cand.length; b++)
+                            for (var c = b + 1; c < cand.length; c++) {
+                                var tri = [cand[a], cand[b], cand[c]];
+                                var mods = [tri[0].mod, tri[1].mod, tri[2].mod];
+                                var mn = Math.min(mods[0], mods[1], mods[2]), mx = Math.max(mods[0], mods[1], mods[2]);
+                                var spread = (mx - mn) / mx;
+                                var sq = squareness(tri);
+                                var side = Math.min(dist(tri[0], tri[1]), dist(tri[0], tri[2]), dist(tri[1], tri[2])) / mx;
+                                if (side < 12 || side > 180) continue;
+                                tries.push({ t: tri, s: sq * 2 + spread });
+                            }
+                    tries.sort(function (p, q) { return p.s - q.s; });
+                    for (var i = 0; i < tries.length && i < 24; i++) {
+                        var got = readTriple(bits, w, h, tries[i].t);
+                        if (got) return got;
+                    }
+                    return null;
+                }
+                function dist(a, b) { return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)); }
+                function runToSecondEdge(bits, w, h, fx, fy, tx, ty) {
+                    var steep = Math.abs(ty - fy) > Math.abs(tx - fx), i;
+                    var x0 = fx, y0 = fy, x1 = tx, y1 = ty;
+                    if (steep) { i = x0; x0 = y0; y0 = i; i = x1; x1 = y1; y1 = i; }
+                    var dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+                    var err = -dx >> 1, xs = x0 < x1 ? 1 : -1, ys = y0 < y1 ? 1 : -1;
+                    var state = 0, xLimit = x1 + xs;
+                    for (var x = x0, y = y0; x !== xLimit; x += xs) {
+                        var rx = steep ? y : x, ry = steep ? x : y;
+                        var dark = rx >= 0 && ry >= 0 && rx < w && ry < h ? bits[ry * w + rx] : 0;
+                        if ((state === 1) === (dark !== 0)) {
+                            if (state === 2) return Math.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0));
+                            state++;
+                        }
+                        err += dy;
+                        if (err > 0) {
+                            if (y === y1) break;
+                            y += ys;
+                            err -= dx;
+                        }
+                    }
+                    if (state === 2) return Math.sqrt((x1 + xs - x0) * (x1 + xs - x0) + (y1 - y0) * (y1 - y0));
+                    return NaN;
+                }
+                function runBothWays(bits, w, h, fx, fy, tx, ty) {
+                    var a = runToSecondEdge(bits, w, h, fx, fy, tx, ty);
+                    var ox = fx - (tx - fx), oy = fy - (ty - fy), scale = 1;
+                    if (ox < 0) { scale = fx / (fx - ox); ox = 0; }
+                    else if (ox >= w) { scale = (w - 1 - fx) / (ox - fx); ox = w - 1; }
+                    oy = Math.round(fy - (ty - fy) * scale);
+                    scale = 1;
+                    if (oy < 0) { scale = fy / (fy - oy); oy = 0; }
+                    else if (oy >= h) { scale = (h - 1 - fy) / (oy - fy); oy = h - 1; }
+                    ox = Math.round(fx + (ox - fx) * scale);
+                    var b = runToSecondEdge(bits, w, h, fx, fy, ox, oy);
+                    return a + b - 1;
+                }
+                function moduleSizeBetween(bits, w, h, a, b) {
+                    var e1 = runBothWays(bits, w, h, Math.round(a.x), Math.round(a.y), Math.round(b.x), Math.round(b.y));
+                    var e2 = runBothWays(bits, w, h, Math.round(b.x), Math.round(b.y), Math.round(a.x), Math.round(a.y));
+                    if (isNaN(e1)) return isNaN(e2) ? NaN : e2 / 7;
+                    if (isNaN(e2)) return e1 / 7;
+                    return (e1 + e2) / 14;
+                }
+                function squareness(p) {
+                    var d01 = dist(p[0], p[1]), d02 = dist(p[0], p[2]), d12 = dist(p[1], p[2]);
+                    var sides = [[d01, d02, d12], [d01, d12, d02], [d02, d12, d01]];
+                    var best = 1e18;
+                    for (var i = 0; i < 3; i++) {
+                        var s = sides[i], hyp = s[2], legs = Math.abs(s[0] - s[1]) / Math.max(1, s[0]);
+                        var right = Math.abs(hyp - Math.sqrt(s[0] * s[0] + s[1] * s[1])) / Math.max(1, hyp);
+                        best = Math.min(best, legs + right);
+                    }
+                    return best;
+                }
+                function readTriple(bits, w, h, three) {
+                    var order = null, bestScore = 1e18;
+                    for (var i = 0; i < 3; i++) {
+                        var tl = three[i], o1 = three[(i + 1) % 3], o2 = three[(i + 2) % 3];
+                        var d1 = dist(tl, o1), d2 = dist(tl, o2), hyp = dist(o1, o2);
+                        var s = Math.abs(d1 - d2) / Math.max(1, d1) + Math.abs(hyp - Math.sqrt(d1 * d1 + d2 * d2)) / Math.max(1, hyp);
+                        if (s < bestScore) { bestScore = s; order = [tl, o1, o2]; }
+                    }
+                    var tl = order[0], p1 = order[1], p2 = order[2];
+                    var cross = (p1.x - tl.x) * (p2.y - tl.y) - (p1.y - tl.y) * (p2.x - tl.x);
+                    var tr = cross < 0 ? p2 : p1, bl = cross < 0 ? p1 : p2;
+                    var mod = (tl.mod + tr.mod + bl.mod) / 3;
+                    if (mod < 1) return null;
+                    var along = (moduleSizeBetween(bits, w, h, tl, tr) + moduleSizeBetween(bits, w, h, tl, bl)) / 2;
+                    if (along > 0.5 && !isNaN(along)) mod = along;
+                    else {
+                        var ang = Math.abs(Math.atan2(tr.y - tl.y, tr.x - tl.x)) % (Math.PI / 2);
+                        if (ang > Math.PI / 4) ang = Math.PI / 2 - ang;
+                        mod *= Math.cos(ang);
+                    }
+                    var est = ((dist(tl, tr) + dist(tl, bl)) / 2) / mod + 7;
+                    var dim0 = Math.round((est - 17) / 4) * 4 + 17;
+                    var dims = [dim0, dim0 - 4, dim0 + 4, dim0 - 8, dim0 + 8];
+                    for (var di = 0; di < dims.length; di++) {
+                        var got = readAtDimension(bits, w, h, tl, tr, bl, mod, dims[di]);
+                        if (got) return got;
+                    }
+                    return null;
+                }
+                function readAtDimension(bits, w, h, tl, tr, bl, mod, dim) {
+                    if (dim < 21 || dim > 177 || (dim - 17) % 4) return null;
+                    var ver = (dim - 17) / 4;
+                    var quads = [];
+                    if (ver >= 2) {
+                        var pos = alignPositions(ver);
+                        var ac = pos[pos.length - 1];
+                        var fx = (ac - 3) / (dim - 7), ex = tr.x + bl.x - tl.x, ey = tr.y + bl.y - tl.y;
+                        var gx = tl.x + (ex - tl.x) * fx, gy = tl.y + (ey - tl.y) * fx;
+                        for (var k = 0; k < 4 && !quads.length; k++) {
+                            var br = findAlignment(bits, w, h, gx, gy, mod, mod * [4, 8, 16, 32][k]);
+                            if (br) quads.push([[[3.5, 3.5], [dim - 3.5, 3.5], [ac + 0.5, ac + 0.5], [3.5, dim - 3.5]],
+                                [[tl.x, tl.y], [tr.x, tr.y], [br[0], br[1]], [bl.x, bl.y]]]);
+                        }
+                    }
+                    quads.push([[[3.5, 3.5], [dim - 3.5, 3.5], [dim - 3.5, dim - 3.5], [3.5, dim - 3.5]],
+                        [[tl.x, tl.y], [tr.x, tr.y], [tr.x + bl.x - tl.x, tr.y + bl.y - tl.y], [bl.x, bl.y]]]);
+                    for (var qi = 0; qi < quads.length; qi++) {
+                        var got = sampleAndDecode(bits, w, h, quads[qi][0], quads[qi][1], dim);
+                        if (got) return got;
+                    }
+                    return null;
+                }
+                function sampleAndDecode(bits, w, h, from, to, dim) {
+                    var m = quadToQuad(from, to);
+                    var a0 = apply(m, dim / 2, dim / 2), a1 = apply(m, dim / 2 + 1, dim / 2), a2 = apply(m, dim / 2, dim / 2 + 1);
+                    var modPx = Math.min(Math.sqrt((a1[0] - a0[0]) * (a1[0] - a0[0]) + (a1[1] - a0[1]) * (a1[1] - a0[1])),
+                        Math.sqrt((a2[0] - a0[0]) * (a2[0] - a0[0]) + (a2[1] - a0[1]) * (a2[1] - a0[1])));
+                    var rad = modPx >= 9 ? 2 : modPx >= 4 ? 1 : 0;
+                    var grid = new Uint8Array(dim * dim);
+                    for (var y = 0; y < dim; y++)
+                        for (var x = 0; x < dim; x++) {
+                            var p = apply(m, x + 0.5, y + 0.5);
+                            var px = Math.round(p[0]), py = Math.round(p[1]);
+                            if (px < 0 || py < 0 || px >= w || py >= h) return null;
+                            if (!rad) { grid[y * dim + x] = bits[py * w + px]; continue; }
+                            var votes = 0, seen = 0;
+                            for (var dy = -rad; dy <= rad; dy++)
+                                for (var dx = -rad; dx <= rad; dx++) {
+                                    var qx = px + dx, qy = py + dy;
+                                    if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue;
+                                    votes += bits[qy * w + qx];
+                                    seen++;
+                                }
+                            grid[y * dim + x] = votes * 2 > seen ? 1 : 0;
+                        }
+                    _lastGrid = { g: grid, dim: dim };
+                    return decodeModules(grid, dim);
+                }
+                function padded(grey, w, h, pad) {
+                    var nw = w + 2 * pad, nh = h + 2 * pad;
+                    var out = new Uint8Array(nw * nh);
+                    out.fill(255);
+                    for (var y = 0; y < h; y++) out.set(grey.subarray(y * w, y * w + w), (y + pad) * nw + pad);
+                    return { grey: out, w: nw, h: nh };
+                }
+                function median3(grey, w, h) {
+                    var out = new Uint8Array(w * h), v = new Uint8Array(9);
+                    for (var y = 0; y < h; y++)
+                        for (var x = 0; x < w; x++) {
+                            var k = 0;
+                            for (var dy = -1; dy <= 1; dy++)
+                                for (var dx = -1; dx <= 1; dx++) {
+                                    var qx = x + dx, qy = y + dy;
+                                    v[k++] = grey[(qy < 0 ? 0 : qy >= h ? h - 1 : qy) * w + (qx < 0 ? 0 : qx >= w ? w - 1 : qx)];
+                                }
+                            for (var a = 1; a < 9; a++) { var t = v[a], b = a - 1; while (b >= 0 && v[b] > t) { v[b + 1] = v[b]; b--; } v[b + 1] = t; }
+                            out[y * w + x] = v[4];
+                        }
+                    return out;
+                }
+                function shrink(grey, w, h, f) {
+                    var sw = Math.floor(w / f), sh = Math.floor(h / f);
+                    var small = new Uint8Array(sw * sh);
+                    for (var y = 0; y < sh; y++)
+                        for (var x = 0; x < sw; x++) {
+                            var sum = 0;
+                            for (var dy = 0; dy < f; dy++)
+                                for (var dx = 0; dx < f; dx++) sum += grey[(y * f + dy) * w + x * f + dx];
+                            small[y * sw + x] = Math.round(sum / (f * f));
+                        }
+                    return { grey: small, w: sw, h: sh };
+                }
+                function decodeImageData(img) {
+                    var w = img.width, h = img.height, d = img.data;
+                    var grey = new Uint8Array(w * h);
+                    for (var i = 0, p = 0; i < grey.length; i++, p += 4)
+                        grey[i] = (d[p] * 77 + d[p + 1] * 151 + d[p + 2] * 28) >> 8;
+                    return decodeGreyChain(grey, w, h);
+                }
+                function decodeGreyChain(grey, w, h) {
+                    var got = decodeGrey(grey, w, h);
+                    if (got) return got;
+                    var pad = padded(grey, w, h, Math.max(8, Math.round(Math.min(w, h) / 20)));
+                    got = decodeGrey(pad.grey, pad.w, pad.h);
+                    if (got) return got;
+                    var med = median3(grey, w, h);
+                    got = decodeGrey(med, w, h);
+                    if (got) return got;
+                    for (var f = 2; f <= 4 && w / f >= 60 && h / f >= 60; f *= 2) {
+                        var sm = shrink(grey, w, h, f);
+                        got = decodeGrey(sm.grey, sm.w, sm.h);
+                        if (got) return got;
+                    }
+                    return null;
+                }
+
+                return {
+                    encode: encode,
+                    decodeModules: decodeModules,
+                    decodeGrey: decodeGrey,
+                    decodeGreyChain: decodeGreyChain,
+                    decodeImageData: decodeImageData,
+                    capacityBytes: function (ver, ecc) {
+                        var lvl = Math.max(0, LEVELS.indexOf(ecc || 'L'));
+                        return Math.floor((dataCodewords(ver, lvl) * 8 - 4 - lenBitsFor(4, ver)) / 8);
+                    },
+                    _dbg: { lastGrid: function () { return _lastGrid; }, readAtDimension: readAtDimension, binarize: binarize, findFinders: findFinders, decodeFromBits: decodeFromBits, readTriple: readTriple, squareness: squareness, findAlignment: findAlignment },
+                    _internals: { size: size, alignPositions: alignPositions, totalCodewords: totalCodewords, dataCodewords: dataCodewords, penalty: penalty, Grid: Grid, drawFunctionPatterns: drawFunctionPatterns }
+                };
+            })();
+
+            var SHEET = {};
+            function gameImage(path) {
+                if (SHEET[path]) return SHEET[path];
+                return (SHEET[path] = new Promise(function (res, rej) {
+                    var bytes;
+                    try { bytes = FS.readFile('/data/images/' + path); } catch (e) { rej(e); return; }
+                    var url = URL.createObjectURL(new Blob([bytes.buffer ? bytes.slice() : bytes], { type: 'image/png' }));
+                    var im = new Image();
+                    im.onload = function () { URL.revokeObjectURL(url); res(im); };
+                    im.onerror = function () { URL.revokeObjectURL(url); rej(new Error(path)); };
+                    im.src = url;
+                }));
+            }
+            function codeCanvas(code, scale, quiet) {
+                var q = quiet == null ? 4 : quiet, side = (code.n + q * 2) * scale;
+                var c = document.createElement('canvas');
+                c.setAttribute('data-mc-qr', '');
+                c.width = side; c.height = side;
+                var g = c.getContext('2d');
+                g.fillStyle = '#ffffff';
+                g.fillRect(0, 0, side, side);
+                g.fillStyle = '#10100f';
+                for (var y = 0; y < code.n; y++)
+                    for (var x = 0; x < code.n; x++)
+                        if (code.m[y * code.n + x]) g.fillRect((x + q) * scale, (y + q) * scale, scale, scale);
+                return c;
+            }
+            function drawText(g, str, cx, y, scale, colour, maxCss) {
+                var span = window.mcPixel.text(str, { scale: scale, colour: colour, maxWidth: maxCss });
+                var cv = span.firstChild;
+                if (!cv || !cv.getContext) return y + 10 * scale;
+                g.imageSmoothingEnabled = false;
+                g.drawImage(cv, Math.round(cx - cv.width * scale / 2), Math.round(y), cv.width * scale, cv.height * scale);
+                return y + cv.height * scale;
+            }
+            function textHeight(str, scale, maxCss) {
+                var span = window.mcPixel.text(str, { scale: scale, maxWidth: maxCss });
+                var cv = span.firstChild;
+                return cv && cv.getContext ? cv.height * scale : 10 * scale;
+            }
+            function makeCard(code, who, when) {
+                return Promise.all([gameImage('gui/title.png'), gameImage('gui/background.png')]).then(function (art) {
+                    var logo = art[0], dirt = art[1];
+                    var M = 6, PAD = 30, qrSide = (code.n + 8) * M;
+                    var W = Math.max(qrSide + PAD * 2, 460);
+                    var warn = 'DO NOT SHARE THIS PICTURE';
+                    var l1 = 'Anyone who has it plays as ' + who + ' and owns that account in MCRE.';
+                    var l2 = 'To use it: open MCRE there, Options > Username, then "Sign in with a code".';
+                    var l3 = 'Made ' + when + '. If it gets out: take MCRE off the account at account.live.com/consent/Manage.';
+                    var inner = W - PAD * 2;
+                    var logoS = Math.max(1, Math.min(2, Math.floor(inner / 274)));
+                    var H = PAD + 68 * logoS + 14 + textHeight('SIGN-IN CODE', 3, inner) + 16 + qrSide + 18 +
+                        textHeight(warn, 3, inner) + 12 + textHeight(l1, 2, inner) + 8 + textHeight(l2, 2, inner) +
+                        8 + textHeight(l3, 2, inner) + PAD;
+                    var c = document.createElement('canvas');
+                    c.width = W; c.height = Math.round(H);
+                    var g = c.getContext('2d');
+                    g.imageSmoothingEnabled = false;
+                    var tile = 32;
+                    for (var y = 0; y < c.height; y += tile)
+                        for (var x = 0; x < W; x += tile) g.drawImage(dirt, x, y, tile, tile);
+                    g.fillStyle = 'rgba(0,0,0,0.55)';
+                    g.fillRect(0, 0, W, c.height);
+                    var at = PAD;
+                    g.drawImage(logo, 0, 0, 274, 68, Math.round((W - 274 * logoS) / 2), at, 274 * logoS, 68 * logoS);
+                    at += 68 * logoS + 14;
+                    at = drawText(g, 'SIGN-IN CODE', W / 2, at, 3, '#ffffff', inner) + 16;
+                    var qx = Math.round((W - qrSide) / 2);
+                    g.fillStyle = '#000000';
+                    g.fillRect(qx - 4, at - 4, qrSide + 8, qrSide + 8);
+                    g.fillStyle = '#8b8b8b';
+                    g.fillRect(qx - 3, at - 3, qrSide + 6, qrSide + 6);
+                    g.drawImage(codeCanvas(code, M, 4), qx, at);
+                    at += qrSide + 18;
+                    at = drawText(g, warn, W / 2, at, 3, '#ff5555', inner) + 12;
+                    at = drawText(g, l1, W / 2, at, 2, '#e0e0e0', inner) + 8;
+                    at = drawText(g, l2, W / 2, at, 2, '#a0a0a0', inner) + 8;
+                    drawText(g, l3, W / 2, at, 2, '#a0a0a0', inner);
+                    return c;
+                });
+            }
+
+            var CRC = null;
+            function crc32(bytes) {
+                if (!CRC) {
+                    CRC = new Uint32Array(256);
+                    for (var n = 0; n < 256; n++) {
+                        var c = n;
+                        for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+                        CRC[n] = c >>> 0;
+                    }
+                }
+                var crc = 0xffffffff;
+                for (var i = 0; i < bytes.length; i++) crc = CRC[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+                return (crc ^ 0xffffffff) >>> 0;
+            }
+            function pngAddText(png, keyword, text) {
+                var kw = [], i;
+                for (i = 0; i < keyword.length; i++) kw.push(keyword.charCodeAt(i) & 0x7f);
+                var body = new TextEncoder().encode(text);
+                var data = new Uint8Array(4 + kw.length + 1 + body.length);
+                data.set([0x74, 0x45, 0x58, 0x74], 0);
+                data.set(kw, 4);
+                data[4 + kw.length] = 0;
+                data.set(body, 5 + kw.length);
+                var len = data.length - 4, crc = crc32(data);
+                var chunk = new Uint8Array(data.length + 8);
+                chunk[0] = (len >>> 24) & 255; chunk[1] = (len >>> 16) & 255; chunk[2] = (len >>> 8) & 255; chunk[3] = len & 255;
+                chunk.set(data, 4);
+                var p = data.length + 4;
+                chunk[p] = (crc >>> 24) & 255; chunk[p + 1] = (crc >>> 16) & 255; chunk[p + 2] = (crc >>> 8) & 255; chunk[p + 3] = crc & 255;
+                var out = new Uint8Array(png.length + chunk.length);
+                out.set(png.subarray(0, 33), 0);
+                out.set(chunk, 33);
+                out.set(png.subarray(33), 33 + chunk.length);
+                return out;
+            }
+            function pngFindText(png, keyword) {
+                var at = 8, dec = new TextDecoder('utf-8');
+                if (png.length < 12 || png[1] !== 0x50 || png[2] !== 0x4e) return null;
+                while (at + 8 <= png.length) {
+                    var len = (png[at] << 24 | png[at + 1] << 16 | png[at + 2] << 8 | png[at + 3]) >>> 0;
+                    var type = String.fromCharCode(png[at + 4], png[at + 5], png[at + 6], png[at + 7]);
+                    var start = at + 8;
+                    if (type === 'tEXt' && start + len <= png.length) {
+                        var zero = start;
+                        while (zero < start + len && png[zero]) zero++;
+                        if (dec.decode(png.subarray(start, zero)) === keyword) return dec.decode(png.subarray(zero + 1, start + len));
+                    }
+                    if (type === 'IEND') break;
+                    at = start + len + 4;
+                }
+                return null;
+            }
+            function canvasPngBytes(canvas) {
+                return new Promise(function (res) {
+                    canvas.toBlob(function (b) {
+                        var r = new FileReader();
+                        r.onload = function () { res(new Uint8Array(r.result)); };
+                        r.readAsArrayBuffer(b);
+                    }, 'image/png');
+                });
+            }
+            function saveBytes(bytes, name) {
+                var url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                a.style.cssText = 'position:fixed;left:-9999px';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 4000);
+            }
+
+            function imageDataOf(src, maxSide) {
+                return new Promise(function (res, rej) {
+                    var im = new Image();
+                    im.onload = function () {
+                        var s = Math.min(1, (maxSide || 1600) / Math.max(im.width, im.height));
+                        var w = Math.max(1, Math.round(im.width * s)), h = Math.max(1, Math.round(im.height * s));
+                        var c = document.createElement('canvas');
+                        c.width = w; c.height = h;
+                        var g = c.getContext('2d', { willReadFrequently: true });
+                        g.imageSmoothingEnabled = s < 1;
+                        g.drawImage(im, 0, 0, w, h);
+                        if (src.revoke) URL.revokeObjectURL(im.src);
+                        res(g.getImageData(0, 0, w, h));
+                    };
+                    im.onerror = function () { rej(new Error('that file is not a picture')); };
+                    im.src = src.url;
+                });
+            }
+            function readFile(file) {
+                return file.arrayBuffer().then(function (ab) {
+                    var bytes = new Uint8Array(ab);
+                    var baked = pngFindText(bytes, 'mcre-login');
+                    if (baked) return baked;
+                    var url = URL.createObjectURL(new Blob([bytes], { type: file.type || 'image/png' }));
+                    return imageDataOf({ url: url, revoke: true }, 1600).then(function (img) {
+                        var got = MCQR.decodeImageData(img);
+                        return got ? got.text : null;
+                    });
+                });
+            }
+
+            function panelEl() {
+                var el = document.createElement('div');
+                el.setAttribute('data-mc-own-ui', '');
+                el.style.cssText = 'position:fixed;z-index:9998;box-sizing:border-box;background:rgba(14,14,16,0.93);' +
+                    'border:2px solid #6d6d6d;outline:2px solid #000;padding:10px;display:flex;flex-direction:column;' +
+                    'align-items:center;gap:8px;font:12px monospace;color:#fff;user-select:none;cursor:default';
+                ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'wheel'].forEach(function (t) {
+                    el.addEventListener(t, function (e) { e.stopPropagation(); });
+                });
+                return el;
+            }
+            function label(str, scale, colour, maxCss) {
+                var span = window.mcPixel.text(str, { scale: scale || 2, colour: colour || '#ffffff', maxWidth: maxCss });
+                span.style.textAlign = 'center';
+                return span;
+            }
+            function gameButton(str, onClick) {
+                var b = document.createElement('button');
+                b.setAttribute('data-mc-own-ui', '');
+                b.style.cssText = 'display:block;padding:6px 10px;background:#6d6d6d;border:2px solid;' +
+                    'border-color:#c6c6c6 #313131 #313131 #c6c6c6;cursor:pointer;line-height:0';
+                b.appendChild(label(str, 2, '#ffffff'));
+                b.addEventListener('mouseenter', function () { b.style.background = '#7f7f7f'; });
+                b.addEventListener('mouseleave', function () { b.style.background = '#6d6d6d'; });
+                b.addEventListener('click', function (e) { e.stopPropagation(); onClick(b); });
+                return b;
+            }
+
+            function codeBox(code, opts) {
+                var wrap = document.createElement('div');
+                wrap.style.cssText = 'position:relative;line-height:0';
+                var cv = codeCanvas(code, opts.scale, 4);
+                cv.style.cssText = 'display:block;width:' + cv.width + 'px;height:' + cv.height + 'px;' +
+                    'image-rendering:pixelated;image-rendering:crisp-edges';
+                wrap.appendChild(cv);
+                var cover = document.createElement('div');
+                cover.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:#1e1e1f;' +
+                    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer';
+                cover.appendChild(label('Show the code', 2, '#ffff55'));
+                cover.appendChild(label('Keep it off camera', 1, '#a0a0a0'));
+                cover.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    cover.remove();
+                    if (opts.onShow) opts.onShow();
+                });
+                if (!opts.shown) wrap.appendChild(cover);
+                return wrap;
+            }
+
+            var dock = null;
+            function showDock(spec) {
+                hideDock();
+                var el = panelEl();
+                el.appendChild(label('SIGN IN ON', 2, '#ffffff'));
+                el.appendChild(label('ANOTHER DEVICE', 2, '#ffffff'));
+                if (spec.scale >= 2) {
+                    var box = codeBox(spec.code, { scale: spec.scale, shown: spec.shown, onShow: function () { spec.shown = true; } });
+                    box.style.cursor = 'pointer';
+                    box.title = 'Show it big';
+                    box.addEventListener('click', function () { if (spec.shown) showBig(spec); });
+                    el.appendChild(box);
+                } else {
+                    var ask = document.createElement('div');
+                    ask.style.cssText = 'width:150px;height:150px;background:#1e1e1f;display:flex;' +
+                        'flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer';
+                    ask.appendChild(label('Show the code', 2, '#ffff55'));
+                    ask.appendChild(label('Keep it off camera', 1, '#a0a0a0'));
+                    ask.addEventListener('click', function () { showBig(spec); });
+                    el.appendChild(ask);
+                }
+                el.appendChild(label('DO NOT SHARE IT', 2, '#ff5555'));
+                el.appendChild(label('Scan it there, or save it and load it there', 1, '#a0a0a0', spec.scale * (spec.code.n + 8)));
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:6px';
+                row.appendChild(gameButton('Save', function () { spec.onSave(); }));
+                row.appendChild(gameButton('Bigger', function () { showBig(spec); }));
+                el.appendChild(row);
+                document.body.appendChild(el);
+                dock = { el: el, spec: spec, timer: setInterval(place, 200) };
+                place();
+                return true;
+            }
+            function hideDock() {
+                if (!dock) return;
+                clearInterval(dock.timer);
+                dock.el.remove();
+                dock = null;
+            }
+            function dockRoom() {
+                var c = Module.canvas, L = Module.mcDialog && Module.mcDialog.layout;
+                if (!c || !L) return 0;
+                var r = c.getBoundingClientRect(), right = 0;
+                Object.keys(L).forEach(function (k) {
+                    if (k.charAt(0) === 'R' || k.charAt(0) === 'I') right = Math.max(right, (L[k][0] + L[k][2]) * r.width);
+                });
+                if (!right) return 0;
+                return r.width - right - 24;
+            }
+            function place() {
+                if (!dock) return;
+                var c = Module.canvas, L = Module.mcDialog && Module.mcDialog.layout, d = dock.spec.dialog;
+                if (!c || !L || (d && d.closed)) { hideDock(); return; }
+                var r = c.getBoundingClientRect(), right = 0, top = 0;
+                Object.keys(L).forEach(function (k) {
+                    if (k.charAt(0) !== 'R' && k.charAt(0) !== 'I') return;
+                    right = Math.max(right, (L[k][0] + L[k][2]) * r.width);
+                    top = top ? Math.min(top, L[k][1] * r.height) : L[k][1] * r.height;
+                });
+                if (!right) { hideDock(); return; }
+                var el = dock.el;
+                var w = el.offsetWidth, h = el.offsetHeight;
+                var x = r.left + right + 14;
+                if (x + w > r.left + r.width - 6) x = r.left + r.width - w - 6;
+                var y = r.top + Math.max(10, top - 24);
+                if (y + h > r.top + r.height - 6) y = Math.max(r.top + 4, r.top + r.height - h - 6);
+                el.style.left = Math.round(x) + 'px';
+                el.style.top = Math.round(y) + 'px';
+            }
+
+            var big = null;
+            function showBig(spec) {
+                closeBig();
+                var back = document.createElement('div');
+                back.setAttribute('data-mc-own-ui', '');
+                back.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:10002;background:rgba(0,0,0,0.82);' +
+                    'display:flex;align-items:center;justify-content:center';
+                var el = panelEl();
+                el.style.position = 'relative';
+                el.style.padding = '16px';
+                el.style.maxHeight = '96vh';
+                el.style.overflow = 'auto';
+                var room = Math.min(window.innerWidth - 80, window.innerHeight - 230);
+                var scale = Math.max(2, Math.floor(room / (spec.code.n + 8)));
+                el.appendChild(label('SIGN IN ON ANOTHER DEVICE', 3, '#ffffff'));
+                el.appendChild(codeBox(spec.code, { scale: scale, shown: spec.shown, onShow: function () { spec.shown = true; } }));
+                el.appendChild(label('DO NOT SHARE THIS CODE', 3, '#ff5555'));
+                el.appendChild(label('On the other device: Options > Username, then "Sign in with a code"', 2, '#e0e0e0', scale * (spec.code.n + 8)));
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:8px';
+                row.appendChild(gameButton('Save the picture', function () { spec.onSave(); }));
+                row.appendChild(gameButton('Done', closeBig));
+                el.appendChild(row);
+                back.appendChild(el);
+                back.addEventListener('click', function (e) { if (e.target === back) closeBig(); });
+                document.body.appendChild(back);
+                var esc = function (e) {
+                    if (e.key !== 'Escape') return;
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    closeBig();
+                };
+                window.addEventListener('keydown', esc, true);
+                big = { el: back, esc: esc };
+            }
+            function closeBig() {
+                if (!big) return;
+                window.removeEventListener('keydown', big.esc, true);
+                big.el.remove();
+                big = null;
+            }
+
+            var cam = null;
+            function startCamera(onText, onFail) {
+                stopCamera();
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { onFail('This browser has no camera for pages to use.'); return; }
+                var back = document.createElement('div');
+                back.setAttribute('data-mc-own-ui', '');
+                back.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:10003;background:rgba(0,0,0,0.9);' +
+                    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px';
+                var video = document.createElement('video');
+                video.setAttribute('playsinline', '');
+                video.muted = true;
+                video.style.cssText = 'max-width:92vw;max-height:70vh;background:#000;border:2px solid #6d6d6d;outline:2px solid #000';
+                back.appendChild(label('POINT THE CAMERA AT THE CODE', 3, '#ffffff'));
+                back.appendChild(video);
+                var note = label('Looking for a sign-in code...', 2, '#a0a0a0');
+                back.appendChild(note);
+                back.appendChild(gameButton('Cancel', function () { stopCamera(); }));
+                document.body.appendChild(back);
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d', { willReadFrequently: true });
+                var detector = null;
+                try { if (window.BarcodeDetector) detector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; }
+                cam = { el: back, stream: null, stop: false };
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }).then(function (stream) {
+                    if (!cam) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+                    cam.stream = stream;
+                    video.srcObject = stream;
+                    video.play();
+                    var tick = function () {
+                        if (!cam || cam.stop) return;
+                        var vw = video.videoWidth, vh = video.videoHeight;
+                        if (!vw || !vh) { setTimeout(tick, 120); return; }
+                        var s = Math.min(1, 1600 / Math.max(vw, vh));
+                        canvas.width = Math.round(vw * s); canvas.height = Math.round(vh * s);
+                        ctx.imageSmoothingEnabled = s < 1;
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        var done = function (text) {
+                            if (!text) { setTimeout(tick, 120); return; }
+                            stopCamera();
+                            onText(text);
+                        };
+                        var look = function () {
+                            try { return MCQR.decodeImageData(ctx.getImageData(0, 0, canvas.width, canvas.height)); }
+                            catch (e) { return null; }
+                        };
+                        if (detector) {
+                            detector.detect(canvas).then(function (list) {
+                                if (list && list.length && list[0].rawValue) { done(list[0].rawValue); return; }
+                                var got = look();
+                                done(got && got.text);
+                            }, function () {
+                                var got = look();
+                                done(got && got.text);
+                            });
+                            return;
+                        }
+                        var got = look();
+                        done(got && got.text);
+                    };
+                    setTimeout(tick, 300);
+                }, function (e) {
+                    stopCamera();
+                    onFail(e && e.name === 'NotAllowedError' ? 'The camera was not allowed. Use "I have a picture" instead.'
+                        : 'No camera on this device. Use "I have a picture" instead.');
+                });
+            }
+            function stopCamera() {
+                if (!cam) return;
+                cam.stop = true;
+                if (cam.stream) cam.stream.getTracks().forEach(function (t) { t.stop(); });
+                cam.el.remove();
+                cam = null;
+            }
+
+            Module.mcQr = {
+                encode: MCQR.encode,
+                decodeImageData: MCQR.decodeImageData,
+                capacityBytes: MCQR.capacityBytes,
+                readFile: readFile,
+                makeCard: makeCard,
+                cardBytes: function (code, who, when) {
+                    return makeCard(code, who, when).then(canvasPngBytes).then(function (png) {
+                        return pngAddText(png, 'mcre-login', code.text);
+                    });
+                },
+                savePicture: function (code, who, when, name) {
+                    return Module.mcQr.cardBytes(code, who, when).then(function (bytes) {
+                        saveBytes(bytes, name);
+                        return true;
+                    });
+                },
+                dock: { show: showDock, hide: hideDock, room: dockRoom },
+                big: { show: showBig, close: closeBig },
+                camera: { start: startCamera, stop: stopCamera },
+                _png: { addText: pngAddText, findText: pngFindText }
+            };
+
+        })();
+    </script>
+    <script>
+        (function () {
             var RELAY = 'https://authrelay-vercel.vercel.app';
             var CLIENT_ID = 'e8efb1ff-9804-4260-964b-de466cd050fb';
             var SCOPE = 'XboxLive.signin offline_access';
@@ -17168,19 +18545,22 @@
                 var p = profile(), shown = displayName();
                 var skinText = typeof p.png === 'string' && p.png ? 'From a skin file'
                     : validName(p.skinName) && p.skinName.toLowerCase() !== account.name.toLowerCase() ? p.skinName + "'s skin" : 'Your account skin';
-                Module.mcDialog.open({
+                var box = Module.mcDialog.open({
                     title: 'Account',
                     items: [{ t: 'text', text: 'Signed in as §e' + account.name + '§r (Microsoft account).' },
                             { t: 'row', id: 'name', title: 'In-game name', sub: shown === account.name ? shown + ' (your account name)' : shown, button: 'Change' },
                             { t: 'row', id: 'skin', title: 'Skin', sub: skinText, button: 'Change' },
+                            { t: 'row', id: 'qr', title: 'Sign in on another device', sub: 'A code that device can scan - never share it', button: 'Show' },
                             { t: 'text', text: "On a friend's world you play as §e" + account.name + "§r instead if your in-game name belongs to someone who has played there.", color: 'a0a0a0' }],
                     buttons: [{ id: 'ok', label: 'Done', primary: true }, { id: 'out', label: 'Sign out' }],
                     onAction: function (a, v, d) {
                         if (a === 'row:name') { d.close(); setTimeout(askName, 0); return; }
                         if (a === 'row:skin') { d.close(); setTimeout(askSkin, 0); return; }
+                        if (a === 'row:qr') { showCodeBig(); return; }
                         if (a === 'out') signOut();
                     }
                 });
+                dockCode(box);
             }
             function askName() {
                 if (!account) return;
@@ -17248,9 +18628,145 @@
                     }
                 });
             }
+            var CODE_HEAD = 'MCRE-LOGIN:1';
+            var codeCache = null;
+            function today() { return new Date().toISOString().slice(0, 10); }
+            function loginCodeText() {
+                var rt = get(K_REFRESH);
+                if (!account || !rt) return null;
+                var p = profile();
+                var body = { n: account.name, u: account.uuid, t: today(), r: rt };
+                if (validName(p.nick)) body.k = p.nick;
+                if (validName(p.skinName)) body.s = p.skinName;
+                return 'MCRE SIGN-IN CODE FOR ' + account.name + ' - DO NOT SHARE IT. Anyone who scans this ' +
+                    'is signed in to this Minecraft account in MCRE: worlds, skin, friends. It is not the ' +
+                    'account password, but keep it like one. Made ' + today() + '.\n' +
+                    CODE_HEAD + '\n' + JSON.stringify(body);
+            }
+            function loginCode() {
+                var text = loginCodeText();
+                if (!text || !Module.mcQr) return null;
+                if (codeCache && codeCache.text === text) return codeCache.code;
+                var code = null;
+                try { code = Module.mcQr.encode(text, { ecc: 'L' }); } catch (e) { code = null; }
+                if (!code) return null;
+                codeCache = { text: text, code: code };
+                return code;
+            }
+            function parseCodeText(text) {
+                var s = String(text || ''), at = s.indexOf(CODE_HEAD);
+                if (at < 0) return null;
+                var rest = s.slice(at + CODE_HEAD.length), brace = rest.indexOf('{');
+                if (brace < 0) return null;
+                var info = null;
+                try { info = JSON.parse(rest.slice(brace)); } catch (e) { return null; }
+                return info && typeof info.r === 'string' && info.r ? info : null;
+            }
+            function noCodeHere(why) {
+                Module.mcDialog.open({
+                    title: 'Sign-in code',
+                    items: [{ t: 'text', text: why }],
+                    buttons: [{ id: 'ok', label: 'OK', primary: true }]
+                });
+            }
+            function saveCodePicture(code) {
+                Module.mcQr.savePicture(code, account ? account.name : 'this account', today(),
+                    'mcre-sign-in-code-DO-NOT-SHARE.png').catch(function (e) {
+                    Module.mcQr.big.close();
+                    Module.mcDialog.open({
+                        title: 'Could not save it',
+                        items: [{ t: 'text', text: 'The picture could not be made (' + ((e && e.message) || 'unknown') + ').' }],
+                        buttons: [{ id: 'ok', label: 'OK', primary: true }]
+                    });
+                });
+            }
+            function showCodeBig() {
+                var code = loginCode();
+                if (!code) {
+                    noCodeHere(!get(K_REFRESH) ? 'This device has nothing to make a code from. Sign out, sign in again, then try.'
+                        : "This account's Microsoft sign-in is too long to fit in a code. Sign in with Microsoft on the other device instead.");
+                    return;
+                }
+                Module.mcQr.big.show({ code: code, shown: false, onSave: function () { saveCodePicture(code); } });
+            }
+            function dockCode(d) {
+                if (!d || !Module.mcQr) return;
+                var code = loginCode();
+                if (!code) return;
+                var tries = 0;
+                var iv = setInterval(function () {
+                    if (d.closed || ++tries > 30) { clearInterval(iv); return; }
+                    var room = Module.mcQr.dock.room();
+                    if (!room) return;
+                    clearInterval(iv);
+                    if (room < 170) return;
+                    var scale = Math.min(5, Math.floor((room - 30) / (code.n + 8)));
+                    Module.mcQr.dock.show({ code: code, scale: scale, dialog: d, shown: false,
+                        onSave: function () { saveCodePicture(code); } });
+                }, 60);
+            }
+            function askCodeSignIn() {
+                var ST = 1;
+                var box = Module.mcDialog.open({
+                    title: 'Sign in with a code',
+                    items: [{ t: 'text', text: 'On the device that is already signed in: §eOptions > Username > Sign in on another device§r. Scan the code it shows, or load the picture it saved.', color: 'a0a0a0' },
+                            { t: 'text', text: '' }],
+                    buttons: [{ id: 'cam', label: 'Scan with the camera', primary: true, keep: true, activate: function (d) {
+                                  Module.mcQr.camera.start(function (text) { useCode(text, d); },
+                                      function (msg) { say(d, msg); });
+                              } },
+                              { id: 'pic', label: 'I have a picture...', keep: true, file: { accept: 'image/*', onFiles: function (fs, d) {
+                                  say(d, 'Reading the picture...', 'a0a0a0');
+                                  Module.mcQr.readFile(fs[0]).then(function (text) {
+                                      if (!text) { say(d, 'No code was found in that picture.'); return; }
+                                      useCode(text, d);
+                                  }, function (e) { say(d, (e && e.message) || 'That file could not be read.'); });
+                              } } },
+                              { id: 'no', label: 'Back', cancel: true }],
+                    onAction: function (a, v, d) {
+                        if (a === 'cam' || a === 'pic') return;
+                        Module.mcQr.camera.stop();
+                    },
+                    onClose: function () { Module.mcQr.camera.stop(); }
+                });
+                var say = function (d, t, col) { d.spec.items[ST].text = t; d.spec.items[ST].color = col || 'ff7070'; d.update(); };
+                return box;
+            }
+            function useCode(text, d) {
+                var say = function (t, col) { d.spec.items[1].text = t; d.spec.items[1].color = col || 'ff7070'; d.update(); };
+                var info = parseCodeText(text);
+                if (!info) { say('That is not an MCRE sign-in code.'); return; }
+                say('Signing in as ' + (info.n || 'that account') + '...', 'a0a0a0');
+                call('/ms/token', 'POST', form({ grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: info.r, scope: SCOPE }),
+                    'application/x-www-form-urlencoded').then(function (j) {
+                    if (!j.access_token) throw fail(j.error === 'invalid_grant' || j.error === 'invalid_request'
+                        ? 'That code does not work any more. Make a new one on the other device.'
+                        : 'Microsoft refused the code (' + (j.error || j._status) + ').');
+                    return minecraft(j.access_token, j.refresh_token || info.r, function (t) { say(t, 'a0a0a0'); });
+                }).then(function (a) {
+                    signedInAs(a);
+                    var pr = profile(), keep = false;
+                    if (info.k && validName(info.k) && info.k !== a.name) { pr.nick = info.k; keep = true; }
+                    if (info.s && validName(info.s)) { pr.skinName = info.s; keep = true; }
+                    if (keep) { saveProfile(pr); applyName(); lookChanged(); }
+                    d.close();
+                    Module.mcDialog.open({
+                        title: 'Signed in',
+                        items: [{ t: 'text', text: 'Welcome, §e' + a.name + '§r! This device is signed in now - everything is unlocked.' }],
+                        buttons: [{ id: 'ok', label: 'Play', primary: true }]
+                    });
+                    try { if (Module.mcMods && Module.mcMods.reload) Module.mcMods.reload(); } catch (e) { }
+                }).catch(function (e) {
+                    say(e && e.auth ? e.message : 'Could not reach the sign-in service. Check the connection and try again.');
+                });
+            }
+
             function signOut() {
                 account = null;
-                put(K_ACCOUNT, null); put(K_REFRESH, null);
+                codeCache = null;
+                try { Module.mcQr.dock.hide(); Module.mcQr.big.close(); } catch (e) { }
+                put(K_ACCOUNT, null);
+                put(K_REFRESH, null);
                 Module.mcSignedIn = 0;
                 listeners.forEach(function (f) { try { f(null); } catch (e) { } });
                 try { if (Module.mcMods && Module.mcMods.reload) Module.mcMods.reload(); } catch (e) { }
@@ -17290,15 +18806,18 @@
                 dlg = Module.mcDialog.open({
                     title: 'Sign in with Microsoft',
                     items: [{ t: 'text', text: 'Use the Microsoft account that owns Minecraft: Java Edition.', color: 'a0a0a0' },
+                            { t: 'text', text: 'Already signed in on another device? Take the code IT shows instead - nothing to type.', color: '808080' },
                             { t: 'text', text: 'Getting a sign-in code...' },
                             { t: 'text', text: '', color: 'ffff55' }],
                     buttons: [{ id: 'open', label: 'Open microsoft.com/link', primary: true, keep: true },
                               { id: 'copy', label: 'Copy code', keep: true },
+                              { id: 'qr', label: 'Sign in with a code' },
                               { id: 'no', label: 'Cancel', cancel: true }],
                     onAction: function (a, v, d) {
                         if (a === 'open') { try { window.open(d._url || 'https://www.microsoft.com/link', '_blank', 'noopener'); } catch (e) { } return; }
                         if (a === 'copy') { try { navigator.clipboard.writeText(d._code || ''); } catch (e) { } return; }
                         cancelled = true; dlg = null; hideLink();
+                        if (a === 'qr') setTimeout(askCodeSignIn, 0);
                     },
                     onClose: function () { cancelled = true; dlg = null; hideLink(); }
                 });
@@ -17392,6 +18911,10 @@
                     });
                 },
                 manage: manage,
+                codeText: loginCodeText,
+                showCode: showCodeBig,
+                askCode: askCodeSignIn,
+                useCode: useCode,
                 displayName: displayName,
                 look: myLook,
                 wire: wire

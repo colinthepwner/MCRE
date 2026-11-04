@@ -385,14 +385,42 @@ try {
     }
 } catch { }
 
-$listener = New-Object Net.HttpListener
-$listener.Prefixes.Add($Url)
-try {
-    $listener.Start()
-} catch {
-    Show-Error ("Couldn't start the game's local server on port $Port.`n`n" +
-        "Something else is probably using that port. Close it, or change the port number in " +
-        "'Launch Game.bat'.`n`n($($_.Exception.Message))")
+$tried = @()
+$listener = $null
+foreach ($try in $Port..($Port + 20)) {
+    $tryUrl = "http://localhost:$try/"
+    if ($try -ne $Port) {
+        try {
+            $ping = Invoke-RestMethod -Uri "${tryUrl}api/ping" -TimeoutSec 1 -ErrorAction Stop
+            if ($ping.app -eq $AppTag) {
+                $script:Port = $try
+                $script:Url = $tryUrl
+                [void](Open-Game)
+                exit 0
+            }
+        } catch { }
+    }
+    $candidate = New-Object Net.HttpListener
+    $candidate.Prefixes.Add($tryUrl)
+    try {
+        $candidate.Start()
+        $listener = $candidate
+        if ($try -ne $Port) {
+            Write-Host "Port $Port was busy - using $try instead."
+            $script:Port = $try
+            $script:Url = $tryUrl
+        }
+        break
+    } catch {
+        $tried += "$try ($($_.Exception.Message.Split([char]10)[0]))"
+        try { $candidate.Close() } catch { }
+    }
+}
+if (-not $listener) {
+    Show-Error ("Couldn't start the game's local server on port $Port, or on any of the 20 ports " +
+        "after it.`n`nSomething is using the whole range, or something is blocking this program " +
+        "from listening at all - a firewall or security tool will do that. You can also set a " +
+        "different port in 'Launch Game.bat'.`n`n" + ($tried[0]))
     exit 1
 }
 
