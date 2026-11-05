@@ -52,6 +52,7 @@ in the browser in the first place.
 
 Signing in with a Microsoft account that owns Minecraft unlocks mods, multiplayer, Rocket terrain and the
 bigger worlds. You can play without signing in, just with a smaller set of options.
+- An off-by-default **Herobrine** setting. Purely cosmetic: a figure at the edge of the fog, things that were never really there, sounds from the wrong direction. It changes nothing in your world and nobody else in a shared game sees any of it.
 
 
 ## Mods

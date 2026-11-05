@@ -1267,7 +1267,7 @@
                 a.playbackRate = Math.max(0.25, Math.min(4, pitch || 1));
             }
             var SETS = ['bta', 'v17'], setMaps = {}, setLoading = {};
-            function curStyle() { return Module.mcSoundStyle === 1 ? 1 : 0; }
+            function curStyle() { return Module.mcSoundStyle === 0 ? 0 : 1; }
             function loadSet(i) {
                 var dir = SETS[i];
                 if (setMaps[dir] || setLoading[dir]) return;
@@ -2220,7 +2220,9 @@
                         var nm = pick('name');
                         if (typeof nm === 'string' && nm.trim()) put('name', clean(nm).trim());
                         var th = pick('throwable');
-                        if (th) { var to = typeof th === 'object' ? th : {}; put('throw', [Math.max(0.1, num(to.speed) || 1.5), Math.max(0, num(to.gravity) === null ? 0.03 : num(to.gravity)), Math.max(0, num(to.damage) | 0)].join(',')); }
+                        if (th) { var to = typeof th === 'object' ? th : {}; put('throw', [Math.max(0.1, num(to.speed) || 1.5), Math.max(0, num(to.gravity) === null ? 0.03 : num(to.gravity)), Math.max(0, num(to.damage) | 0)].join(','));
+                            if (typeof to.particle === 'string' && to.particle.trim()) put('throwparticle', clean(to.particle).trim());
+                        }
                         var rg = pick('ranged');
                         if (rg && typeof rg === 'object') {
                             if (num(rg.power) !== null) put('ranged_power', Math.max(0.1, num(rg.power)));
@@ -3091,6 +3093,7 @@
             Module.mcGameRules.define('hostLostSeconds', 30, 'A joined player who hears nothing from the host this long leaves ("Lost connection to the host")', [10, 600]);
             Module.mcGameRules.define('mobCapMonster', 70, 'How many monsters can be around the players (per 256 chunks of the area round each; Java: 70)', [0, 1000]);
             Module.mcGameRules.define('mobCapAnimal', 10, 'How many animals can be around the players (per 256 chunks; Java: 10)', [0, 1000]);
+            Module.mcGameRules.define('babyCompanionPercent', 10, 'Of the animals that spawn naturally, the percentage that bring one baby along (0: none, as Java)', [0, 100]);
             Module.mcGameRules.define('mobCapWater', 5, 'How many squid and other water creatures can be around the players (per 256 chunks; Java: 5)', [0, 1000]);
             [['Sheep', 12], ['Pig', 10], ['Chicken', 10], ['Cow', 8], ['Squid', 10], ['Zombie', 12], ['Skeleton', 6], ['Spider', 8], ['Creeper', 4]].forEach(function (m) {
                 Module.mcGameRules.define('spawnWeight' + m[0], m[1], 'How often ' + m[0].toLowerCase() + 's spawn naturally, as a share of the spawn picks (' + m[1] + ' is normal; 0: never; every biome scales its own weight the same way)', [0, 1000]);
@@ -11445,6 +11448,7 @@
                             sound: function (name, v, p) { post({ t: 'csound', name: String(name), v: v == null ? 1 : +v, p: p == null ? 1 : +p }); },
                             soundStyle: function () { return cask('soundstyle').then(function (r) { return r.style; }); },
                             setSoundStyle: function (s) { post({ t: 'csoundstyle', style: String(s).toLowerCase() === 'new' || s === 1 ? 1 : 0 }); },
+                            herobrine: function (name) { return cask('herobrine', [String(name == null ? '' : name)], mod).then(function (r) { return !!r.ok; }); },
                             message: function (text) { post({ t: 'cmsg', text: String(text) }); },
                             hud: function (id, text) { post({ t: 'hud', mod: mod, id: String(id), text: text == null ? null : String(text) }); },
                             storage: {
@@ -11836,6 +11840,10 @@
                     var ans = {}, ca = Array.isArray(d.args) ? d.args : [];
                     if (d.what === 'screen') ans = screenInfo();
                     else if (d.what === 'soundstyle') ans.style = Module.mcSoundStyle === 1 ? 'new' : 'old';
+                    else if (d.what === 'herobrine') {
+                        try { ans.ok = !!Module.ccall('mcSpookForce', 'number', ['string'], [String((d.args && d.args[0]) || '')]); }
+                        catch (e) { ans.ok = false; }
+                    }
                     else if (d.what === 'items') {
                         try { ans.items = JSON.parse(UTF8ToString(Module._mcItemCatalog())).filter(Boolean); } catch (x) { ans.items = []; }
                     } else if (d.what === 'iteminfo') {
