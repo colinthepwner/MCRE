@@ -4377,6 +4377,22 @@
                 }, function () { looking = false; });
             }, LOOK_MS);
 
+            Module.mcAskDeviceName = function () {
+                if (!Module.mcDialog) return;
+                Module.mcDialog.open({
+                    title: 'This device',
+                    items: [{ t: 'text', text: 'What your other devices call this one when they offer to sync worlds with it.', color: 'a0a0a0' },
+                            { t: 'input', id: 'name', value: deviceName(), max: 24, focus: true, hint: deviceKind() === 'pc' ? 'Computer' : deviceKind() === 'tablet' ? 'Tablet' : 'Phone' }],
+                    buttons: [{ id: 'ok', label: 'Done', primary: true }, { id: 'no', label: 'Cancel', cancel: true }],
+                    onAction: function (a, v) {
+                        if (a !== 'ok') return;
+                        var n = String((v && v.name) || '').replace(/[^ -~]/g, '').trim().slice(0, 24);
+                        if (n) S.setDeviceName(n);
+                        else { try { localStorage.removeItem('mcre.sync.name'); } catch (e) { } }
+                    }
+                });
+            };
+
             S.look = look;
             S.plan = planFor;
             S.forget = function () { save(SEPARATE_KEY, {}); save(STATE_KEY, {}); };
