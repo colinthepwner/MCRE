@@ -1041,7 +1041,7 @@
                     }
                     if (f[0] !== 'B') return;
                     var b = (d.spec.buttons || []).filter(function (x) { return x.id === f[1]; })[0];
-                    if (b && (b.file || b.activate)) want[id + ':' + f[1]] = { bid: f[1], x: +f[2], y: +f[3], w: +f[4], h: +f[5] };
+                    if (b && (b.file || b.activate || b.link)) want[id + ':' + f[1]] = { bid: f[1], x: +f[2], y: +f[3], w: +f[4], h: +f[5] };
                 });
                 if (d) D.layout = layout; else if (str === '') D.layout = {};
                 Object.keys(placed).forEach(function (k) {
@@ -1064,6 +1064,10 @@
                                 var fs = el.files ? Array.prototype.slice.call(el.files) : [];
                                 if (fs.length) b.file.onFiles(fs, d);
                             });
+                        } else if (b.link) {
+                            el = document.createElement('a');
+                            el.target = '_blank';
+                            el.rel = 'noopener';
                         } else {
                             el = document.createElement('button');
                             el.addEventListener('click', function () { b.activate(d); });
@@ -1076,10 +1080,16 @@
                         document.body.appendChild(el);
                         p = placed[k] = { el: el };
                     }
+                    if (b.link && p.el.tagName === 'A') p.el.href = b.link;
                     p.x = w.x; p.y = w.y; p.w = w.w; p.h = w.h;
                 });
                 place();
             };
+            var lastRects = {};
+            var rawRects = D._rects;
+            D._rects = function (id, str) { lastRects[id] = str; if (!str) delete lastRects[id]; return rawRects(id, str); };
+            D.relayout = function (id) { if (lastRects[id]) rawRects(id, lastRects[id]); };
+            D.copyText = function (t, done) { copyText(t, done || function () { }); };
         })();
 
         (function () {
@@ -19204,22 +19214,20 @@
             }
 
             var dlg = null;
-            var linkEl = null;
-            function showLink(url) {
-                hideLink();
-                linkEl = document.createElement('a');
-                linkEl.href = url; linkEl.target = '_blank'; linkEl.rel = 'noopener';
-                linkEl.textContent = 'Tap here to open ' + url.replace(/^https?:[/][/](www[.])?/, '');
-                linkEl.style.cssText = 'position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:10001;' +
-                    'font:16px/1.2 monospace;color:#ffff55;background:rgba(0,0,0,.75);border:2px solid #a0a0a0;' +
-                    'padding:10px 18px;text-decoration:underline;white-space:nowrap';
-                document.body.appendChild(linkEl);
-            }
-            function hideLink() { if (linkEl && linkEl.parentNode) linkEl.parentNode.removeChild(linkEl); linkEl = null; }
             function startSignIn(then) {
                 if (dlg) return;
                 var ST = 1, CODE = 2;
                 var cancelled = false;
+                var copyCode = function (dd) {
+                    var code = dd._code || '';
+                    if (!code) return;
+                    Module.mcDialog.copyText(code, function (ok) {
+                        if (cancelled) return;
+                        status(ok ? 'Copied ' + code + ' - paste it at microsoft.com/link.'
+                                  : 'This browser would not let the page copy. Type the code in: ' + code,
+                               ok ? '55ff55' : 'ffff55');
+                    });
+                };
                 dlg = Module.mcDialog.open({
                     title: 'Sign in with Microsoft',
                     items: [{ t: 'text', text: 'Use the Microsoft account that owns Minecraft: Java Edition.', color: 'a0a0a0' },
@@ -19227,23 +19235,24 @@
                             { t: 'text', text: 'Getting a sign-in code...' },
                             { t: 'text', text: '', color: 'ffff55' }],
                     buttons: [{ id: 'open', label: 'Open microsoft.com/link', primary: true, keep: true },
-                              { id: 'copy', label: 'Copy code', keep: true },
+                              { id: 'copy', label: 'Copy code', keep: true, activate: function (dd) { copyCode(dd); } },
                               { id: 'qr', label: 'Sign in with a code' },
                               { id: 'no', label: 'Cancel', cancel: true }],
                     onAction: function (a, v, d) {
                         if (a === 'open') { try { window.open(d._url || 'https://www.microsoft.com/link', '_blank', 'noopener'); } catch (e) { } return; }
-                        if (a === 'copy') { try { navigator.clipboard.writeText(d._code || ''); } catch (e) { } return; }
-                        cancelled = true; dlg = null; hideLink();
+                        if (a === 'copy') { copyCode(d); return; }
+                        cancelled = true; dlg = null;
                         if (a === 'qr') setTimeout(askCodeSignIn, 0);
                     },
-                    onClose: function () { cancelled = true; dlg = null; hideLink(); }
+                    onClose: function () { cancelled = true; dlg = null; }
                 });
                 var d = dlg;
                 var status = function (t, col) { if (cancelled) return; d.spec.items[ST].text = t; d.spec.items[ST].color = col || null; d.update(); };
                 call('/ms/devicecode', 'POST', form({ client_id: CLIENT_ID, scope: SCOPE }), 'application/x-www-form-urlencoded').then(function (dc) {
                     if (!dc.user_code) throw fail('Microsoft did not give a sign-in code.');
                     d._code = dc.user_code; d._url = dc.verification_uri || 'https://www.microsoft.com/link';
-                    showLink(d._url);
+                    (d.spec.buttons || []).forEach(function (b) { if (b.id === 'open') b.link = d._url; });
+                    try { Module.mcDialog.relayout(d.id); } catch (e) { }
                     d.spec.items[CODE].text = 'Your code:  ' + dc.user_code;
                     status('Go to microsoft.com/link, enter the code below and sign in. This screen continues by itself.');
                     var interval = Math.max(1, dc.interval || 5) * 1000, until = Date.now() + (dc.expires_in || 900) * 1000;
@@ -19265,7 +19274,6 @@
                     });
                 }).then(function (j) {
                     d.spec.items[CODE].text = '';
-                    hideLink();
                     status('Signed in to Microsoft...');
                     return minecraft(j.access_token, j.refresh_token, status);
                 }).then(function (a) {
@@ -19279,7 +19287,6 @@
                 }).catch(function (e) {
                     if (cancelled) return;
                     d.spec.items[CODE].text = '';
-                    hideLink();
                     status(e && e.auth ? e.message : 'Could not reach the sign-in service. Check your connection and try again.', 'ff7070');
                 });
             }
