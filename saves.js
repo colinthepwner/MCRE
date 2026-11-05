@@ -535,6 +535,53 @@
         toastTimer = setTimeout(function () { toastEl.style.opacity = '0'; }, ms || 1500);
     }
 
+    var WORLDS = 'com.mojang/minecraftWorlds/';
+
+    function syncWorlds() {
+        var all = scan(), out = {};
+        keys(all).forEach(function (rel) {
+            if (rel.indexOf(WORLDS) !== 0) return;
+            var rest = rel.slice(WORLDS.length), slash = rest.indexOf('/');
+            if (slash <= 0) return;
+            var id = rest.slice(0, slash);
+            var w = out[id] || (out[id] = { id: id, files: 0, bytes: 0, newest: 0 });
+            w.files++;
+            w.bytes += all[rel].s;
+            if (all[rel].m > w.newest) w.newest = all[rel].m;
+        });
+        keys(out).forEach(function (id) {
+            try { out[id].name = fs.readFile(MOUNT + '/' + WORLDS + id + '/levelname.txt', { encoding: 'utf8' }).trim(); }
+            catch (e) { out[id].name = id; }
+        });
+        return out;
+    }
+
+    function syncFiles(id) {
+        var all = scan(), out = {}, pre = WORLDS + id + '/';
+        keys(all).forEach(function (rel) { if (rel.indexOf(pre) === 0) out[rel] = all[rel]; });
+        return out;
+    }
+
+    function syncRead(rel) {
+        try { return fs.readFile(MOUNT + '/' + rel); } catch (e) { return null; }
+    }
+    function syncWrite(rel, bytes, mtime) {
+        writeLocal(rel, bytes, mtime || Date.now());
+    }
+    function syncRemove(rel) { deleteLocal(rel); }
+
+    function syncCommit() { return Promise.resolve(tick(true)); }
+
+    Module.mcSaveSync = {
+        ready: function () { return ready; },
+        worlds: syncWorlds,
+        files: syncFiles,
+        read: syncRead,
+        write: syncWrite,
+        remove: syncRemove,
+        commit: syncCommit
+    };
+
     function boot(callback, err) {
         ready = true;
         idbSnap = scan();

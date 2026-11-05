@@ -903,6 +903,7 @@
                         case 'slider': out.push(line(['L', it.id, it.label, it.min, it.max, it.step || 0, it.value, fl])); break;
                         case 'key': out.push(line(['K', it.id, it.label, it.shown])); break;
                         case 'row': out.push(line(['R', it.id, it.title, it.sub || '', it.button || '', it.enabled === false ? 0 : 1])); break;
+                        case 'device': out.push(line(['D', it.id, it.kind || 'phone', it.title, it.sub || '', it.button || '', it.enabled === false ? 0 : 1])); break;
                     }
                 });
                 (s.buttons || []).forEach(function (b) {
@@ -3987,6 +3988,398 @@
             N.scan = scan;
             N.beaconInfo = function () { return beacon ? { key: beacon.key, slot: beacon.slot, ready: beacon.ready } : null; };
             N.key = netKey;
+        })();
+
+        (function () {
+            var net = Module.mcNet, N = Module.mcNearby;
+            if (!net || !N) return;
+            var S = Module.mcSync = {};
+            var PREFIX = 'mcre-sync-', SLOTS = 4, PROBE_MS = 4000;
+            var LOOK_MS = 20000;
+            var CHUNK = 48 * 1024;
+            var SEPARATE_KEY = 'mcre.sync.separate';
+            var STATE_KEY = 'mcre.sync.state';
+
+            function signedIn() { try { return !!(Module.mcAuth && Module.mcAuth.signedIn()); } catch (e) { return false; } }
+            function acct() { try { var w = Module.mcAuth && Module.mcAuth.wire ? Module.mcAuth.wire() : null; return w && w.uuid ? String(w.uuid) : ''; } catch (e) { return ''; } }
+            function saves() { var s = Module.mcSaveSync; return s && s.ready() ? s : null; }
+            function load(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
+            function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
+
+            function deviceKind() {
+                try {
+                    var touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+                    if (!touch) return 'pc';
+                    var narrow = Math.min(screen.width, screen.height);
+                    return narrow >= 600 ? 'tablet' : 'phone';
+                } catch (e) { return 'pc'; }
+            }
+            function deviceName() {
+                try {
+                    var n = localStorage.getItem('mcre.sync.name');
+                    if (n) return String(n).slice(0, 24);
+                } catch (e) { }
+                var k = deviceKind();
+                return k === 'pc' ? 'Computer' : k === 'tablet' ? 'Tablet' : 'Phone';
+            }
+            S.deviceName = deviceName;
+            S.deviceKind = deviceKind;
+            S.setDeviceName = function (n) { try { localStorage.setItem('mcre.sync.name', String(n || '').slice(0, 24)); } catch (e) { } };
+
+            var keyP = null, keyFor = '';
+            function syncKey() {
+                var a = acct();
+                if (!a) return Promise.resolve('');
+                if (keyP && keyFor === a) return keyP;
+                keyFor = a;
+                return (keyP = N.key().then(function (nk) {
+                    if (!nk || !(window.crypto && crypto.subtle)) return '';
+                    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('mcre-sync:' + nk + ':' + a + (window.__mcNearSalt || '')))
+                        .then(function (h) {
+                            return Array.prototype.map.call(new Uint8Array(h).subarray(0, 6), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+                        }, function () { return ''; });
+                }, function () { return ''; }));
+            }
+
+            var beacon = null, retryAt = 0;
+            function idle() { return Module.mcInWorld !== 1; }
+            function want() { return signedIn() && !S.off && idle(); }
+            function drop() { var b = beacon; beacon = null; if (b && b.peer) try { b.peer.destroy(); } catch (e) { } }
+            function claim(key, slot) {
+                if (slot >= SLOTS) { retryAt = Date.now() + 60000; return; }
+                var b = beacon = { key: key, slot: slot, peer: null, ready: false };
+                net.loadLib().then(function () {
+                    if (beacon !== b) return;
+                    var p = b.peer = new Peer(PREFIX + key + '-' + slot, { debug: 0 });
+                    p.on('open', function () { if (beacon === b) { b.ready = true; console.log('[sync] findable (slot ' + slot + ')'); } });
+                    p.on('error', function (err) {
+                        if (beacon !== b) return;
+                        var ty = err && err.type;
+                        if (ty === 'peer-unavailable') return;
+                        if (ty === 'unavailable-id' && !b.ready) { try { p.destroy(); } catch (e) { } beacon = null; claim(key, slot + 1); return; }
+                        if (!b.ready || p.destroyed) { drop(); retryAt = Date.now() + 15000; }
+                    });
+                    p.on('disconnected', function () {
+                        if (beacon !== b) return;
+                        setTimeout(function () { if (beacon === b && p.disconnected && !p.destroyed) try { p.reconnect(); } catch (e) { } }, 1000);
+                    });
+                    p.on('connection', serve);
+                }, function () { if (beacon === b) { beacon = null; retryAt = Date.now() + 30000; } });
+            }
+            setInterval(function () {
+                if (!want()) { if (beacon) drop(); return; }
+                if (beacon && beacon.ready) return;
+                if (Date.now() < retryAt) return;
+                syncKey().then(function (k) {
+                    if (!want() || !k) { if (beacon) drop(); return; }
+                    if (beacon && beacon.key !== k) drop();
+                    if (!beacon && Date.now() >= retryAt) claim(k, 0);
+                });
+            }, 5000);
+
+            function serve(c) {
+                if (!c.metadata || c.metadata.sync !== 1) { setTimeout(function () { try { c.close(); } catch (e) { } }, 100); return; }
+                var life = setTimeout(function () { try { c.close(); } catch (e) { } }, 10 * 60000);
+                var inbox = {};
+                c.on('data', function (m) {
+                    if (!m || typeof m !== 'object') return;
+                    var sv = saves();
+                    try {
+                        if (m.t === 'hello') {
+                            c.send({ t: 'me', name: deviceName(), kind: deviceKind(), ident: Module.mcIdent || '',
+                                     worlds: sv && idle() ? sv.worlds() : null, v: MCRE_BUILD });
+                        } else if (m.t === 'manifest' && sv) {
+                            c.send({ t: 'manifest', id: m.id, files: sv.files(m.id) });
+                        } else if (m.t === 'get' && sv) {
+                            sendFile(c, m.rel, sv);
+                        } else if (m.t === 'put') {
+                            takeChunk(inbox, m, sv);
+                        } else if (m.t === 'done') {
+                            if (sv) sv.commit();
+                            try { c.send({ t: 'done' }); } catch (e) { }
+                            console.log('[sync] my worlds were updated by my other device');
+                        } else if (m.t === 'bye') { clearTimeout(life); try { c.close(); } catch (e) { } }
+                    } catch (e) { console.warn('[sync] serve', e); }
+                });
+                c.on('close', function () { clearTimeout(life); });
+                c.on('error', function () { clearTimeout(life); });
+            }
+
+            function sendFile(c, rel, sv) {
+                var data = sv.read(rel);
+                if (!data) { try { c.send({ t: 'put', rel: rel, miss: 1 }); } catch (e) { } return; }
+                var meta = sv.files(worldOf(rel))[rel];
+                var total = Math.max(1, Math.ceil(data.length / CHUNK));
+                for (var i = 0; i < total; i++) {
+                    c.send({ t: 'put', rel: rel, n: i, of: total, m: meta ? meta.m : Date.now(),
+                             b: data.subarray(i * CHUNK, Math.min(data.length, (i + 1) * CHUNK)) });
+                }
+            }
+            function takeChunk(inbox, m, sv) {
+                if (!sv || m.miss) return;
+                var e = inbox[m.rel] || (inbox[m.rel] = { parts: [], got: 0, of: m.of, m: m.m });
+                if (e.parts[m.n] === undefined) { e.parts[m.n] = new Uint8Array(m.b); e.got++; }
+                if (e.got < e.of) return;
+                var len = 0, i;
+                for (i = 0; i < e.of; i++) len += e.parts[i].length;
+                var all = new Uint8Array(len), at = 0;
+                for (i = 0; i < e.of; i++) { all.set(e.parts[i], at); at += e.parts[i].length; }
+                sv.write(m.rel, all, e.m);
+                delete inbox[m.rel];
+            }
+            function worldOf(rel) { var p = rel.split('/'); return p[2] || ''; }
+
+            var peer = null, peerP = null;
+            function getPeer() {
+                if (peer && !peer.destroyed && !peer.disconnected) return Promise.resolve(peer);
+                if (peerP) return peerP;
+                var pp = peerP = net.loadLib().then(function () {
+                    return new Promise(function (res, rej) {
+                        var p = new Peer({ debug: 0 }), ok = false;
+                        var t = setTimeout(function () { try { p.destroy(); } catch (e) { } rej(new Error('timeout')); }, 10000);
+                        p.on('open', function () { ok = true; clearTimeout(t); peer = p; res(p); });
+                        p.on('error', function (e) { if (!ok) { clearTimeout(t); try { p.destroy(); } catch (x) { } rej(e); } });
+                    });
+                });
+                pp.then(function () { peerP = null; }, function () { peerP = null; });
+                return pp;
+            }
+            function look() {
+                return syncKey().then(function (key) {
+                    if (!key) return [];
+                    return getPeer().then(function (p) {
+                        var found = [], all = [];
+                        for (var s = 0; s < SLOTS; s++) all.push(askSlot(p, key, s, found));
+                        return Promise.all(all).then(function () { return found; });
+                    });
+                }).catch(function () { return []; });
+            }
+            function askSlot(p, key, slot, found) {
+                return new Promise(function (res) {
+                    var c = null, done = false;
+                    try { c = p.connect(PREFIX + key + '-' + slot, { reliable: true, metadata: { sync: 1 } }); } catch (e) { c = null; }
+                    if (!c) { res(); return; }
+                    var t = setTimeout(fin, PROBE_MS);
+                    function fin(keep) { if (done) return; done = true; clearTimeout(t); if (keep !== true) try { c.close(); } catch (e) { } res(); }
+                    c.on('open', function () { try { c.send({ t: 'hello', v: MCRE_BUILD, ident: Module.mcIdent || '' }); } catch (e) { fin(); } });
+                    c.on('data', function (m) {
+                        if (!m || m.t !== 'me') return;
+                        var ident = String(m.ident || '');
+                        if (!ident || ident === (Module.mcIdent || '')) { fin(); return; }
+                        if (!m.worlds) { fin(); return; }
+                        found.push({ conn: c, ident: ident, name: String(m.name || 'Device').slice(0, 24),
+                                     kind: /^(phone|tablet|pc)$/.test(m.kind) ? m.kind : 'phone',
+                                     worlds: m.worlds, v: String(m.v || '') });
+                        fin(true);
+                    });
+                    c.on('error', function () { fin(); });
+                });
+            }
+            function letGo(d) {
+                if (!d || !d.conn) return;
+                var c = d.conn;
+                d.conn = null;
+                try { if (c.open) c.send({ t: 'bye' }); } catch (e) { }
+                setTimeout(function () { try { c.close(); } catch (e) { } }, 300);
+            }
+
+            function planFor(mine, theirs, them) {
+                var state = load(STATE_KEY), plan = [], id;
+                for (id in theirs) {
+                    if (!Object.prototype.hasOwnProperty.call(theirs, id)) continue;
+                    var t = theirs[id], m = mine[id], seen = state[id] || 0;
+                    if (!m) { plan.push({ id: id, dir: 'pull', why: 'new here' }); continue; }
+                    var iChanged = m.newest > seen, theyChanged = t.newest > seen;
+                    if (iChanged && theyChanged && m.newest !== t.newest) {
+                        plan.push({ id: id, dir: 'pull', into: id + '_from_' + them.ident.slice(0, 8),
+                                    name: (t.name || id) + ' (from ' + them.name + ')', why: 'changed in both places' });
+                    } else if (t.newest > m.newest) {
+                        plan.push({ id: id, dir: 'pull', why: 'newer there' });
+                    } else if (m.newest > t.newest) {
+                        plan.push({ id: id, dir: 'push', why: 'newer here' });
+                    }
+                }
+                for (id in mine) {
+                    if (!Object.prototype.hasOwnProperty.call(mine, id)) continue;
+                    if (!theirs[id]) plan.push({ id: id, dir: 'push', why: 'not there yet' });
+                }
+                return plan;
+            }
+            function remember(ids, mine) {
+                var state = load(STATE_KEY);
+                ids.forEach(function (id) { if (mine[id]) state[id] = mine[id].newest; });
+                save(STATE_KEY, state);
+            }
+
+            function runSync(them, plan, onStep) {
+                var sv = saves();
+                if (!sv) return Promise.reject(new Error('saves not ready'));
+                var c = them.conn, step = 0;
+                function ask(msg, want, ms) {
+                    return new Promise(function (res, rej) {
+                        var t = setTimeout(function () { off(); rej(new Error('timed out')); }, ms || 30000);
+                        function on(m) { if (m && m.t === want) { off(); res(m); } }
+                        function off() { clearTimeout(t); c.off('data', on); }
+                        c.on('data', on);
+                        try { c.send(msg); } catch (e) { off(); rej(e); }
+                    });
+                }
+                function pull(job) {
+                    return ask({ t: 'manifest', id: job.id }, 'manifest').then(function (r) {
+                        var theirFiles = r.files || {}, mineFiles = sv.files(job.id), rels = [];
+                        Object.keys(theirFiles).forEach(function (rel) {
+                            var a = mineFiles[rel], b = theirFiles[rel];
+                            if (!a || a.s !== b.s || Math.abs(a.m - b.m) > 1500) rels.push(rel);
+                        });
+                        if (!rels.length) return;
+                        return rels.reduce(function (p, rel) {
+                            return p.then(function () {
+                                return new Promise(function (res, rej) {
+                                    var parts = [], got = 0, of = 0, mt = 0;
+                                    var t = setTimeout(function () { off(); rej(new Error('timed out on ' + rel)); }, 60000);
+                                    function on(m) {
+                                        if (!m || m.t !== 'put' || m.rel !== rel) return;
+                                        if (m.miss) { off(); res(); return; }
+                                        of = m.of; mt = m.m;
+                                        if (parts[m.n] === undefined) { parts[m.n] = new Uint8Array(m.b); got++; }
+                                        if (got < of) return;
+                                        var len = 0, i;
+                                        for (i = 0; i < of; i++) len += parts[i].length;
+                                        var all = new Uint8Array(len), at = 0;
+                                        for (i = 0; i < of; i++) { all.set(parts[i], at); at += parts[i].length; }
+                                        var dest = job.into ? rel.replace('minecraftWorlds/' + job.id + '/', 'minecraftWorlds/' + job.into + '/') : rel;
+                                        sv.write(dest, all, mt);
+                                        off(); res();
+                                    }
+                                    function off() { clearTimeout(t); c.off('data', on); }
+                                    c.on('data', on);
+                                    try { c.send({ t: 'get', rel: rel }); } catch (e) { off(); rej(e); }
+                                });
+                            });
+                        }, Promise.resolve()).then(function () {
+                            if (job.into && job.name) sv.write('com.mojang/minecraftWorlds/' + job.into + '/levelname.txt',
+                                                               new TextEncoder().encode(job.name), Date.now());
+                        });
+                    });
+                }
+                function push(job) {
+                    return ask({ t: 'manifest', id: job.id }, 'manifest').then(function (r) {
+                        var theirFiles = r.files || {}, mineFiles = sv.files(job.id);
+                        Object.keys(mineFiles).forEach(function (rel) {
+                            var a = mineFiles[rel], b = theirFiles[rel];
+                            if (!b || a.s !== b.s || Math.abs(a.m - b.m) > 1500) sendFile(c, rel, sv);
+                        });
+                    });
+                }
+                return plan.reduce(function (p, job) {
+                    return p.then(function () {
+                        onStep(++step, plan.length, job);
+                        return job.dir === 'pull' ? pull(job) : push(job);
+                    });
+                }, Promise.resolve()).then(function () {
+                    try { c.send({ t: 'done' }); } catch (e) { }
+                    return sv.commit();
+                }).then(function () {
+                    remember(plan.map(function (j) { return j.id; }), sv.worlds());
+                });
+            }
+
+            var popup = null, asked = {}, looking = false;
+            function mayAsk(d) {
+                if (load(SEPARATE_KEY)[d.ident]) return false;
+                if (asked[d.ident] && Date.now() - asked[d.ident] < 300000) return false;
+                return (Module.mcIdent || '') < d.ident;
+            }
+            function plural(n, one) { return n + ' ' + one + (n === 1 ? '' : 's'); }
+            function describe(d) {
+                var n = Object.keys(d.worlds || {}).length;
+                return n ? plural(n, 'world') : 'no worlds yet';
+            }
+            function showPopup(list) {
+                if (!Module.mcDialog || popup) { list.forEach(letGo); return; }
+                var sv = saves();
+                if (!sv) { list.forEach(letGo); return; }
+                var mine = sv.worlds();
+                var items = [{ t: 'text', text: list.length === 1
+                        ? 'This is signed in to your account and is on the same network. Sync worlds between them?'
+                        : 'These are signed in to your account and on the same network. Sync worlds with one of them?',
+                    color: 'a0a0a0' }];
+                list.forEach(function (d, i) {
+                    items.push({ t: 'device', id: 'd' + i, kind: d.kind, title: d.name, sub: describe(d), button: 'Sync' });
+                });
+                var STATUS = items.length;
+                items.push({ t: 'text', text: '', color: 'a0a0a0' });
+                var done = false;
+                function finish(keep) {
+                    if (done) return;
+                    done = true;
+                    popup = null;
+                    list.forEach(function (d) { if (d !== keep) letGo(d); });
+                    if (keep) letGo(keep);
+                }
+                function status(d, text, colour) { d.spec.items[STATUS].text = text; d.spec.items[STATUS].color = colour || 'a0a0a0'; d.update(); }
+                popup = Module.mcDialog.open({
+                    title: 'Your other device',
+                    items: items,
+                    buttons: [{ id: 'later', label: 'Not now', cancel: true },
+                              { id: 'separate', label: 'Keep separate' }],
+                    when: function () { return Module.mcInWorld !== 1; },
+                    onAction: function (a, v, dlg) {
+                        if (a === 'separate') {
+                            var sep = load(SEPARATE_KEY);
+                            list.forEach(function (d) { sep[d.ident] = Date.now(); });
+                            save(SEPARATE_KEY, sep);
+                            finish(null);
+                            return;
+                        }
+                        var m = /^row:d([0-9]+)$/.exec(a);
+                        if (!m) { finish(null); return; }
+                        var them = list[+m[1]];
+                        if (!them || !them.conn || !them.conn.open) { status(dlg, 'Lost that device - it may have gone to sleep.', 'ff7070'); return; }
+                        list.forEach(function (d) { if (d !== them) letGo(d); });
+                        var plan = planFor(mine, them.worlds, them);
+                        if (!plan.length) { status(dlg, 'Already the same on both - nothing to copy.', 'a0ffa0'); return; }
+                        dlg.spec.buttons = [{ id: 'later', label: 'Close', cancel: true }];
+                        status(dlg, 'Syncing ' + plural(plan.length, 'world') + '...');
+                        runSync(them, plan, function (n, total, job) {
+                            if (dlg.closed) return;
+                            var w = (them.worlds[job.id] && them.worlds[job.id].name) || (mine[job.id] && mine[job.id].name) || job.id;
+                            status(dlg, '(' + n + '/' + total + ') ' + (job.dir === 'pull' ? 'Getting' : 'Sending') + ' "' + w + '" - ' + job.why + '...');
+                        }).then(function () {
+                            if (dlg.closed) return;
+                            var clashes = plan.filter(function (j) { return j.into; }).length;
+                            status(dlg, 'Done. ' + plural(plan.length, 'world') + ' synced.' +
+                                (clashes ? ' ' + plural(clashes, 'world') + ' had been played in both places, so you have both copies.' : ''), 'a0ffa0');
+                            finish(null);
+                        }, function (e) {
+                            if (!dlg.closed) status(dlg, 'Sync stopped: ' + (e && e.message ? e.message : 'the other device went away') + '. Nothing was lost - try again.', 'ff7070');
+                            finish(null);
+                        });
+                    },
+                    onClose: function () { finish(null); }
+                });
+                list.forEach(function (d) { asked[d.ident] = Date.now(); });
+            }
+
+            setInterval(function () {
+                if (looking || popup || S.off) return;
+                if (!signedIn() || !idle() || !saves()) return;
+                if (Module.mcDialog && Module.mcDialog._queue && Module.mcDialog._queue.length) return;
+                looking = true;
+                look().then(function (found) {
+                    looking = false;
+                    var pick = found.filter(mayAsk);
+                    found.forEach(function (d) { if (pick.indexOf(d) < 0) letGo(d); });
+                    if (!pick.length) return;
+                    if (popup || !idle()) { pick.forEach(letGo); return; }
+                    console.log('[sync] ' + pick.length + ' of your other device(s) nearby');
+                    showPopup(pick.slice(0, 3));
+                }, function () { looking = false; });
+            }, LOOK_MS);
+
+            S.look = look;
+            S.plan = planFor;
+            S.forget = function () { save(SEPARATE_KEY, {}); save(STATE_KEY, {}); };
         })();
 
         (function () {
