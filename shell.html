@@ -206,6 +206,7 @@
             c.addEventListener('webglcontextlost', function (e) {
                 e.preventDefault();
                 window.mcGfxLost = true;
+                reportFatal('webglcontextlost');
                 tell('The graphics stopped.',
                     'The browser took the graphics away from the game, so nothing can be drawn - the world is '
                     + 'still running, which is why you can still hear it. Reload to carry on; your world is saved.');
@@ -225,6 +226,80 @@
                         + 'been drawn for half a minute. Reload to carry on; your world is saved.');
                 } else { still = 0; lastFrame = n; }
             }, 5000);
+
+            function running() { return typeof Module.mcFrameCount === 'number'; }
+            function fatal(what) {
+                var text = String(what == null ? 'unknown' : what);
+                window.mcLastFatal = text;
+                reportFatal(text);
+                tell('The game hit an error and stopped.',
+                    'The world was still running, which is why the sound carried on for a moment. '
+                    + 'Reload to carry on; your world is saved. Please send this text, it says what broke:');
+                var box = document.getElementById('mcGfxLost');
+                if (!box) return;
+                var pre = document.createElement('pre');
+                pre.setAttribute('style', 'max-width:52em;max-height:12em;overflow:auto;text-align:left;'
+                    + 'background:#111;border:1px solid #444;padding:10px;font:12px/1.4 monospace;color:#f88');
+                pre.textContent = text;
+                var copy = document.createElement('button');
+                copy.textContent = 'Copy the error';
+                copy.setAttribute('style', 'font:16px monospace;padding:8px 20px;cursor:pointer');
+                copy.onclick = function () {
+                    try { navigator.clipboard.writeText(text); copy.textContent = 'Copied'; }
+                    catch (e) { copy.textContent = 'Select it and copy by hand'; }
+                };
+                box.appendChild(pre);
+                box.appendChild(copy);
+            }
+            var REPORT_URL = 'https://authrelay-vercel.vercel.app/crash';
+            var reported = false;
+            function reportFatal(text) {
+                if (reported || !REPORT_URL) return;
+                reported = true;
+                var on = true;
+                try { on = localStorage.getItem('mcre.crashReports') !== '0'; } catch (e) { }
+                if (!on) return;
+                var where = 'single player';
+                try {
+                    if (Module.mcNetRole) where = String(Module.mcNetRole);
+                    else if (window.mcIsHost) where = 'hosting';
+                    else if (window.mcIsJoined) where = 'joined';
+                } catch (e) { }
+                var build = '';
+                try {
+                    var mb = document.querySelector('meta[name="mcre-build"]');
+                    build = (mb && mb.getAttribute('content')) || '';
+                } catch (e) { }
+                try {
+                    fetch(REPORT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            err: String(text).slice(0, 1400),
+                            build: build,
+                            where: where + (Module.mcThreaded ? ' (threaded build)' : ''),
+                            ua: String(navigator.userAgent).slice(0, 160)
+                        }),
+                        keepalive: true
+                    }).catch(function () { });
+                } catch (e) { }
+            }
+
+            var prevOnAbort = Module.onAbort;
+            Module.onAbort = function (what) {
+                if (prevOnAbort) { try { prevOnAbort(what); } catch (e) { } }
+                if (running()) fatal('abort: ' + what);
+            };
+            window.addEventListener('error', function (e) {
+                if (!running()) return;
+                var m = e && e.error ? (e.error.stack || e.error.message || e.error) : (e && e.message);
+                fatal(m || 'error');
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+                if (!running()) return;
+                var r = e && e.reason;
+                fatal('unhandled rejection: ' + (r && (r.stack || r.message) ? (r.stack || r.message) : r));
+            });
         })();
 
         (function () {
