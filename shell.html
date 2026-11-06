@@ -179,6 +179,55 @@
         };
 
         (function () {
+            var c = Module.canvas;
+            if (!c || !c.addEventListener) return;
+            var shown = false;
+            function tell(title, detail) {
+                if (shown) return;
+                shown = true;
+                try { console.error('[mcre] ' + title + ' - ' + detail); } catch (e) { }
+                var d = document.createElement('div');
+                d.id = 'mcGfxLost';
+                d.setAttribute('style', 'position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;'
+                    + 'align-items:center;justify-content:center;gap:18px;background:rgba(0,0,0,.88);color:#fff;'
+                    + 'font:16px/1.5 monospace;text-align:center;padding:24px');
+                var p1 = document.createElement('div');
+                p1.textContent = title;
+                var p2 = document.createElement('div');
+                p2.setAttribute('style', 'opacity:.75;max-width:40em');
+                p2.textContent = detail;
+                var b = document.createElement('button');
+                b.textContent = 'Reload';
+                b.setAttribute('style', 'font:16px monospace;padding:10px 28px;cursor:pointer');
+                b.onclick = function () { location.reload(); };
+                d.appendChild(p1); d.appendChild(p2); d.appendChild(b);
+                document.body.appendChild(d);
+            }
+            c.addEventListener('webglcontextlost', function (e) {
+                e.preventDefault();
+                window.mcGfxLost = true;
+                tell('The graphics stopped.',
+                    'The browser took the graphics away from the game, so nothing can be drawn - the world is '
+                    + 'still running, which is why you can still hear it. Reload to carry on; your world is saved.');
+            }, false);
+            c.addEventListener('webglcontextrestored', function () {
+                try { console.warn('[mcre] webgl context restored'); } catch (e) { }
+            }, false);
+
+            var lastFrame = -1, still = 0;
+            setInterval(function () {
+                if (shown || document.hidden) { still = 0; return; }
+                var n = Module.mcFrameCount;
+                if (typeof n !== 'number') return;
+                if (n === lastFrame) {
+                    if (++still >= 6) tell('The game stopped drawing.',
+                        'The world is still running - that is why you can still hear it - but no new frame has '
+                        + 'been drawn for half a minute. Reload to carry on; your world is saved.');
+                } else { still = 0; lastFrame = n; }
+            }, 5000);
+        })();
+
+        (function () {
             var NAMES = ['bufferData', 'bufferSubData', 'texImage2D', 'texSubImage2D', 'compressedTexImage2D', 'compressedTexSubImage2D',
                 'uniform1fv', 'uniform2fv', 'uniform3fv', 'uniform4fv', 'uniform1iv', 'uniform2iv', 'uniform3iv', 'uniform4iv',
                 'uniformMatrix2fv', 'uniformMatrix3fv', 'uniformMatrix4fv', 'vertexAttrib1fv', 'vertexAttrib2fv', 'vertexAttrib3fv', 'vertexAttrib4fv',
