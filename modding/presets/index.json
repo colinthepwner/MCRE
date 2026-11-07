@@ -158,6 +158,20 @@
         "commands",
         "bot"
       ]
+    },
+    {
+      "id": "shaders_example",
+      "name": "Example Shaders",
+      "author": "Minecraft RE",
+      "version": "1.0",
+      "devices": "any",
+      "description": "Switches shader packs from a command, reads and changes a pack's own options, and hears when the live pack changes.",
+      "url": "shaders_example.zip",
+      "tags": [
+        "scripts",
+        "client",
+        "shaders"
+      ]
     }
   ]
 }

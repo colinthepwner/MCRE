@@ -4,6 +4,7 @@ const ASSETS_TO_CACHE = [
     './index.html',
     './mc_platform.js',
     './saves.js',
+    './shaderlib.js',
     './manifest.json'
 ];
 

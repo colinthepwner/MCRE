@@ -3215,6 +3215,11 @@
             Module.mcGameRules.define('announceAchievements', true, 'Chat tells everyone when a player earns an achievement (mods\' achievements)');
             Module.mcGameRules.define('modDimensionTravel', true, 'Mods\' portals and world.travel take players to mods\' dimensions');
             Module.mcGameRules.define('afkMobsIgnore', true, 'Mobs leave AFK players alone');
+            Module.mcGameRules.define('shaderPack', '', 'The shader pack drawing the world on this device ("" none). A pack is a mod, so this is its mod id; setting it switches pack (the mod has to be on)');
+            Module.mcGameRules.define('shadersAllowed', true, 'Shader packs may run on this device (off: none is used, whatever is installed - for a world or a mod with a look of its own)');
+            Module.mcGameRules.bind('shaderPack',
+                function () { return Module.mcShaders ? Module.mcShaders.current() : undefined; },
+                function (v) { if (Module.mcShaders) Module.mcShaders.use(String(v || '')); });
             Module.mcGameRules.define('keepJoinedPlayers', true, "The world keeps joined players' inventory, armour, food, experience and spot for when they come back");
             Module.mcGameRules.define('allowNicknames', true, "Signed-in players may play under the in-game name they picked (off: everyone is their account's name)");
             Module.mcGameRules.define('edgeAssist', true, 'Touch players walking with the stick are softly held at drops (they can still walk off)');
@@ -7088,7 +7093,8 @@
             function usable(files) {
                 return Object.keys(files).some(function (k) {
                     return /^(images\/|textures\/(blocks?|items?)\/|sounds\/|lang\/|blocks\/|items\/|recipes\/|worldgen\/|biomes\/|worldtypes\/|enchantments\/|loot_tables?\/|models\/|mobs?\/|rules\/|scripts\/.+\.js$|modpe\/.+\.js$|dimensions\/)/i.test(k)
-                        || /\.class$/i.test(k);
+                        || /\.class$/i.test(k)
+                        || /(^|\/)shaders\/.*\.(fsh|vsh|gsh)$/i.test(k);
                 });
             }
             function manifestOf(files, fallbackName) {
@@ -7477,7 +7483,7 @@
                 if (keys.some(function (k) { return /[.]class$/i.test(k); })) return false;
                 var changesGame = /^(blocks|items|recipes|worldgen|biomes|worldtypes|enchantments|dimensions|mobs?|rules|loot_tables?|scripts|modpe)[/]|^data[/][^/]+[/]loot_tables?[/]/i;
                 if (keys.some(function (k) { return changesGame.test(k); })) return false;
-                return keys.some(function (k) { return /^(textures[/]|images[/]|sounds[/]|lang[/]|(assets[/][^/]+[/])?models[/])/i.test(k); });
+                return keys.some(function (k) { return /^(textures[/]|images[/]|sounds[/]|lang[/]|(assets[/][^/]+[/])?models[/])/i.test(k) || /(^|[/])shaders[/].+[.](fsh|vsh|gsh)$/i.test(k); });
             }
             function contentsOf(files) {
                 files = forPlatform(files);
@@ -7504,6 +7510,8 @@
                 say(count(/^(textures[/]|images[/]).+[.]png$/i), 'picture', 'pictures');
                 say(count(/^sounds[/].+[.](ogg|mp3|wav)$/i), 'sound', 'sounds');
                 if (count(/^lang[/]/i)) parts.push('text');
+                var fsh = count(/(^|[/])shaders[/].+[.]fsh$/i);
+                if (fsh) parts.unshift('a shader pack' + (fsh > 1 ? ' (' + fsh + ' programs)' : ''));
                 return parts.join(', ');
             }
             var loading = Promise.resolve();
@@ -7636,7 +7644,7 @@
                 var modpeFiles = [];
                 var schems = [];
                 var newTex = { blocks: {}, items: {}, anim: {} };
-                mobFiles = {}; texFiles = {};
+                mobFiles = {}; texFiles = {}; shaderFiles = {};
                 var javaOwnTex = {};
                 Object.keys(picUrls).forEach(function (k) { URL.revokeObjectURL(picUrls[k]); });
                 guiFiles = {}; picUrls = {};
@@ -7824,6 +7832,8 @@
                                 content.push({ mod: id, kind: 'loot', name: m[1].toLowerCase() + ':' + m[2].toLowerCase(), data: data, file: path });
                             } else if (/^sdcard[/].+/i.test(path) && path.indexOf('..') < 0 && !/[/]$/.test(path)) {
                                 sdFiles[id + ':' + path.toLowerCase()] = { path: path, data: data };
+                            } else if (/(^|[/])shaders[/].*[.](fsh|vsh|gsh|properties|settings|txt|lang|png)$/i.test(path) && path.indexOf('..') < 0) {
+                                (shaderFiles[id] || (shaderFiles[id] = {}))[path] = data;
                             } else if (/^modpe[/].+[.]js$/i.test(path)) {
                                 modpeFiles.push({ mod: id, file: path.slice(6), code: new TextDecoder().decode(data), session: !own });
                             } else if (/^scripts\/.+\.js$/i.test(path)) {
@@ -7880,7 +7890,16 @@
                         FS.writeFile('/data/images/web_mods/changed_cells.txt',
                             'blocks:' + Object.keys(changed.blocks).join(',') + '\nitems:' + Object.keys(changed.items).join(',') + '\n');
                     } catch (e) { }
-                    return unknown;
+                    if (!Module.mcShaders) return unknown;
+                    return Module.mcShaders.settingsFor().then(function (byMod) {
+                        Object.keys(byMod).forEach(function (mid) {
+                            settingDecls[mid] = (settingDecls[mid] || []).filter(function (d) {
+                                return !byMod[mid].some(function (n) { return n.id === d.id; });
+                            }).concat(byMod[mid]);
+                        });
+                        Module.mcShaders.apply();
+                        return unknown;
+                    }, function () { return unknown; });
                 });
             }
 
@@ -7914,6 +7933,7 @@
             var scriptList = [];
             var guiFiles = {}, picUrls = {};
             var sdFiles = {};
+            var shaderFiles = {};
             api.modFile = function (mod, path) {
                 var k = mod + ':' + String(path || '').toLowerCase().replace(/^[./]+/, '');
                 return guiFiles[k] || texFiles[k] || sdFiles[k] || null;
@@ -10743,6 +10763,7 @@
                 all[modId] = values;
                 writeSettings(all);
                 if (Module.mcScripts && Module.mcScripts.settingsChanged) Module.mcScripts.settingsChanged(modId, api.settingsOf(modId));
+                if (changed && Module.mcShaders && Module.mcShaders.settingsChanged) Module.mcShaders.settingsChanged(modId);
                 if (changed && Module.mcJava && Module.mcJava.saveSettings(modId, api.settingsOf(modId)) && !Module.mcJava.running()) reapply(true);
             }
             api.savedSettings = function (modId) { return readSettings()[modId] || {}; };
@@ -10794,7 +10815,11 @@
                         if (d.type === 'toggle') items.push({ t: 'toggle', id: f, label: d.name, value: !!v, force: force });
                         else if (d.type === 'slider') items.push({ t: 'slider', id: f, label: d.name, min: d.min, max: d.max, step: d.step || 0, value: v, force: force });
                         else if (d.type === 'key') { keys[f] = v || ''; items.push({ t: 'key', id: f, label: d.name, shown: keyLabel(v) }); }
-                        else if (d.type === 'choice') items.push({ t: 'choice', id: f, label: d.name, options: d.options, value: v, force: force });
+                        else if (d.type === 'choice') {
+                            var shown = d.labels && d.labels.length === d.options.length ? d.labels : d.options;
+                            var at = d.options.indexOf(String(v));
+                            items.push({ t: 'choice', id: f, label: d.name, options: shown, value: shown[at >= 0 ? at : 0], force: force });
+                        }
                         else {
                             items.push({ t: 'text', align: 'left', text: d.name });
                             items.push({ t: 'input', id: f, value: v == null ? '' : String(v), max: 200, filter: d.type === 'number' ? 'number' : '', wide: true, force: force });
@@ -10808,6 +10833,10 @@
                     var out = {};
                     decl.forEach(function (d, i) {
                         var f = 's' + i, raw = d.type === 'key' ? keys[f] : d.type === 'toggle' ? v[f] === '1' : v[f];
+                        if (d.type === 'choice' && d.labels && d.labels.length === d.options.length) {
+                            var li = d.labels.indexOf(String(raw));
+                            if (li >= 0) raw = d.options[li];
+                        }
                         out[d.id] = settingValue(d, raw);
                     });
                     return out;
@@ -10975,7 +11004,8 @@
                         FS.writeFile(LIB + '/' + m.id + '.zip', bytes);
                         if (i >= 0) mods.splice(i, 1);
                         mods.forEach(function (x) { x.justAdded = false; });
-                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m), justAdded: true, onAt: Date.now() });
+                        mods.unshift({ id: m.id, file: LIB + '/' + m.id + '.zip', bundled: false, enabled: true, m: m, err: '', icon: iconOf(m.id, files, m),
+                                       contents: contentsOf(files), clientOnly: clientOnlyOf(files), justAdded: true, onAt: Date.now() });
                         writeState(); bump((i >= 0 ? 'Updated ' : 'Added ') + m.name + (m.notes.length ? ' (' + m.notes.join(', ') + ')' : ''));
                         return Promise.resolve(reapply(true)).then(function () { return true; });
                         });
@@ -11023,6 +11053,13 @@
             }
             api.scripts = function (joined) { return scriptList.filter(function (s) { return !!s.session === !!joined; }); };
             api.nameTables = function () { return { VANILLA: VANILLA, MODERN: MODERN, contentKeys: contentKeys }; };
+            api.shaderPacks = function () {
+                return mods.filter(function (x) { return x.enabled && !x.err && shaderFiles[cid(x)]; })
+                    .map(function (x) {
+                        return { id: cid(x), name: x.m.name || cid(x), author: x.m.author || '', files: shaderFiles[cid(x)] };
+                    });
+            };
+            api.note = function (text) { bump(String(text || '')); };
             api.refOf = function (name, mod) {
                 if (typeof name === 'number') return 'id:' + (name | 0);
                 var p = String(name || '').trim().toLowerCase().split(':');
@@ -11988,6 +12025,13 @@
                             openUrl: function (url) { return cask('openurl', [String(url)], mod).then(function (r) { return !!r.ok; }); },
                             displayCapture: function (id, on) { post({ t: 'dcap', mod: mod, id: String(id), on: on !== false }); },
                             openControls: function () { post({ t: 'controls', mod: mod }); },
+                            shaders: {
+                                list: function () { return cask('shlist', [], mod).then(function (r) { return r.packs || []; }); },
+                                current: function () { return cask('shcur', [], mod).then(function (r) { return r.pack || null; }); },
+                                use: function (id) { return cask('shuse', [id === false || id == null ? '' : String(id)], mod).then(function (r) { return r.error || ''; }); },
+                                options: function (id) { return cask('shopts', [String(id || '')], mod).then(function (r) { return r.options || {}; }); },
+                                setOption: function (id, name, value) { return cask('shset', [String(id || ''), String(name), value], mod).then(function (r) { return !!r.ok; }); }
+                            },
                             sound: function (name, v, p) { post({ t: 'csound', name: String(name), v: v == null ? 1 : +v, p: p == null ? 1 : +p }); },
                             soundStyle: function () { return cask('soundstyle').then(function (r) { return r.style; }); },
                             setSoundStyle: function (s) { post({ t: 'csoundstyle', style: String(s).toLowerCase() === 'new' || s === 1 ? 1 : 0 }); },
@@ -12241,6 +12285,7 @@
                 if (k === 'setgamerule') {
                     if (fromGuid && !isOp(byGuid(fromGuid))) return;
                     if (!Module.mcGameRules.set(String(a[1]), a[2]) && W() && W().problem) W().problem(mod, 'scripts', 'world.setGameRule: no game rule "' + a[1] + '"', 'script');
+                    if (String(a[1]) === 'shadersAllowed' && Module.mcShaders) Module.mcShaders.apply();
                     if (Module.mcSky) Module.mcSky.apply();
                     return;
                 }
@@ -12386,6 +12431,36 @@
                     else if (d.what === 'herobrine') {
                         try { ans.ok = !!Module.ccall('mcSpookForce', 'number', ['string'], [String((d.args && d.args[0]) || '')]); }
                         catch (e) { ans.ok = false; }
+                    }
+                    else if (d.what === 'shlist') {
+                        var SH = Module.mcShaders;
+                        ans.packs = !SH ? [] : SH.packs().map(function (p) {
+                            return { id: p.id, name: p.name, author: p.author || '',
+                                     programs: Object.keys(p.files).filter(function (k) { return /[.]fsh$/i.test(k); }).length,
+                                     on: p.id === SH.current() };
+                        });
+                    } else if (d.what === 'shcur') {
+                        var SC = Module.mcShaders, cur = SC ? SC.current() : '';
+                        var cp = cur && SC ? SC.packs().filter(function (p) { return p.id === cur; })[0] : null;
+                        ans.pack = cp ? { id: cp.id, name: cp.name, author: cp.author || '', on: true } : null;
+                    } else if (d.what === 'shuse') {
+                        if (!Module.mcShaders) { ans.error = 'this build has no shader packs'; }
+                        else {
+                            Module.mcShaders.use(String(ca[0] || '')).then(function (err) {
+                                toWorker({ t: 'reply', req: d.req, error: err || '' });
+                            }, function (e) { toWorker({ t: 'reply', req: d.req, error: String(e && e.message || e) }); });
+                            break;
+                        }
+                    } else if (d.what === 'shopts') {
+                        ans.options = Module.mcShaders ? Module.mcShaders.options(String(ca[0] || '')) : {};
+                    } else if (d.what === 'shset') {
+                        if (!Module.mcShaders) { ans.ok = false; }
+                        else {
+                            Module.mcShaders.setOption(String(ca[0] || ''), String(ca[1] || ''), ca[2]).then(function () {
+                                toWorker({ t: 'reply', req: d.req, ok: true });
+                            }, function () { toWorker({ t: 'reply', req: d.req, ok: false }); });
+                            break;
+                        }
                     }
                     else if (d.what === 'items') {
                         try { ans.items = JSON.parse(UTF8ToString(Module._mcItemCatalog())).filter(Boolean); } catch (x) { ans.items = []; }
@@ -12656,6 +12731,7 @@
                 if (worker) { try { worker.terminate(); } catch (x) { } }
                 worker = null; side = ''; actions = []; known = {}; wants = {}; swants = {}; remoteReq = {}; ops = null;
                 if (Module.mcGameRules) Module.mcGameRules.reset();
+                if (Module.mcShaders) Module.mcShaders.apply();
                 if (Module.mcOverrides) Module.mcOverrides.reset();
                 if (Module.mcSky) { Module.mcSky.script = -1; Module.mcSky.apply(); }
                 closeGui(true);
@@ -12743,6 +12819,9 @@
                 return true;
             };
             api.settingsChanged = function (mod, values) { if (worker) worker.postMessage({ t: 'settings', mod: mod, values: values }); };
+            api.shadersChanged = function (info) {
+                if (worker) worker.postMessage({ t: 'shaders', client: true, pack: (info && info.pack) || '', name: (info && info.name) || '', on: !!(info && info.on), error: (info && info.error) || '' });
+            };
             var achWorld = null, achData = null;
             function achFile() {
                 var w = null;
@@ -17515,6 +17594,7 @@
         }
     </script>
     <script src="saves.js"></script>
+    <script src="shaderlib.js"></script>
     <template id="mcre-game-script">{{{ SCRIPT }}}</template>
     <script type='text/javascript'>
         (function () {

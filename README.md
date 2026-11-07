@@ -65,6 +65,8 @@ Mods load through **Rube**, the mod loader built into the game. It takes:
   running right in the browser.
 - **ModPE scripts** from old Pocket Edition.
 - **Resource packs.**
+- **Shader packs.** OptiFine and Iris packs: drop one in and switch it on, and its own options are
+  in its settings.
 - **Structure files** (`.schematic`, `.schem` and `.nbt`).
 
 There's a list of mods you can add with one click right in the Mods screen, and Minecraft Is Too Easy is
