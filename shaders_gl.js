@@ -499,6 +499,18 @@
 		return { mv: mv, pr: pr };
 	}
 
+	function snapShadow(mv, dist) {
+		if (!P.shadow || !P.shadow.res) return;
+		var cam = fv('cameraPosition');
+		if (!cam) return;
+		var q = 2 * (dist > 0 ? dist : 80) / P.shadow.res;
+		if (!(q > 0)) return;
+		var cx = mv[0] * cam[0] + mv[4] * cam[1] + mv[8] * cam[2];
+		var cy = mv[1] * cam[0] + mv[5] * cam[1] + mv[9] * cam[2];
+		mv[12] += cx - Math.round(cx / q) * q;
+		mv[13] += cy - Math.round(cy / q) * q;
+	}
+
 	function captureMatrices() {
 		var M = P.mats || (P.mats = {});
 		if (typeof GLImmediate === 'undefined' || !GLImmediate.matrix) return;
@@ -523,6 +535,7 @@
 		var k = P.built.consts;
 		var sm = shadowMatrices(isSun ? sunW : [-sunW[0], -sunW[1], -sunW[2]],
 			k.shadowDistance || 80, k.sunPathRotation || 0);
+		snapShadow(sm.mv, k.shadowDistance || 80);
 		M.shadowModelView = sm.mv;
 		M.shadowProjection = sm.pr;
 		M.shadowModelViewInverse = inv4(sm.mv);
