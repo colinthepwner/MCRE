@@ -188,19 +188,35 @@
 		} catch (e) { }
 		var on = packs().filter(function (p) { return wantsOn(p.id) && !failed[p.id]; });
 		if (!on.length) return '';
-		var pref = read(KEY_PACK);
+		var fresh = newcomers(on);
+		var pref = fresh.length ? fresh[fresh.length - 1] : read(KEY_PACK);
 		var win = on.filter(function (p) { return p.id === pref; })[0] || on[0];
-		if (on.length > 1 && Module.mcMods && Module.mcMods.setSetting) {
+		if (pref !== win.id || read(KEY_PACK) !== win.id) store(KEY_PACK, win.id);
+		if (Module.mcMods && Module.mcMods.setSetting) {
 			quiet = true;
 			try {
-				on.forEach(function (p) { if (p.id !== win.id) Module.mcMods.setSetting(p.id, ON, false); });
-				if (Module.mcMods.note) Module.mcMods.note('Only one shader pack can run at a time - using ' + win.name);
+				packs().forEach(function (p) {
+					if (p.id !== win.id) { if (wantsOn(p.id)) Module.mcMods.setSetting(p.id, ON, false); }
+					else if (!wantsOn(p.id)) Module.mcMods.setSetting(p.id, ON, true);
+				});
+				if (on.length > 1 && Module.mcMods.note) Module.mcMods.note('Only one shader pack can run at a time - using ' + win.name);
 			} finally { quiet = false; }
 		}
 		return win.id;
 	}
 	var quiet = false;
 	var failed = {};
+
+	var KEY_SEEN = 'mcre.shaders.seen';
+	function newcomers(list) {
+		var seen = {};
+		try { seen = JSON.parse(read(KEY_SEEN) || '{}') || {}; } catch (e) { seen = {}; }
+		var out = [], add = false;
+		list.forEach(function (p) { if (!seen[p.id]) { out.push(p.id); seen[p.id] = 1; add = true; } });
+		packs().forEach(function (p) { if (!seen[p.id]) { seen[p.id] = 1; add = true; } });
+		if (add) store(KEY_SEEN, JSON.stringify(seen));
+		return out;
+	}
 
 	api.apply = function () {
 		var id = choose();

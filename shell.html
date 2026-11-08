@@ -7869,7 +7869,15 @@
                         modpeInfo.scripts = modpeFiles.filter(function (s) { return !s.session; });
                         if (schems.length) ML.step(1, 'Structures');
                         return Promise.resolve(ML.pass()).then(function () { return decodeSchematics(schems); });
-                    }).then(ML.pass).then(function (sch) { ML.step(2, 'Blocks, items and recipes'); return buildContent(content, newTex, sheets, lang, sch, schems); });
+                    }).then(ML.pass).then(function (sch) {
+                        shaderOnly = {};
+                        Object.keys(shaderFiles).forEach(function (id) { shaderOnly[id] = true; });
+                        content.forEach(function (c) { delete shaderOnly[c.mod]; });
+                        scripts.forEach(function (c) { delete shaderOnly[c.mod]; });
+                        modpeFiles.forEach(function (c) { delete shaderOnly[c.mod]; });
+                        schems.forEach(function (c) { delete shaderOnly[c.mod]; });
+                        rememberPacks(Object.keys(shaderOnly));
+                        ML.step(2, 'Blocks, items and recipes'); return buildContent(content, newTex, sheets, lang, sch, schems); });
                 }).then(ML.pass).then(function (warn) {
                     unknown += warn || 0;
                     var fps = Object.keys(sheets);
@@ -7934,6 +7942,20 @@
             var guiFiles = {}, picUrls = {};
             var sdFiles = {};
             var shaderFiles = {};
+            var shaderOnly = {};
+            var PACK_IDS = 'mcre.mods.shaderonly';
+            function knownPacks() {
+                try { return JSON.parse(localStorage.getItem(PACK_IDS) || '{}') || {}; } catch (e) { return {}; }
+            }
+            function rememberPacks(ids) {
+                if (!ids.length) return;
+                try {
+                    var k = knownPacks(), n = 0;
+                    ids.forEach(function (id) { if (!k[id]) { k[id] = 1; n++; } });
+                    if (n) localStorage.setItem(PACK_IDS, JSON.stringify(k));
+                } catch (e) { }
+            }
+            function graphicsOnly(id) { return !!shaderOnly[id] || !!knownPacks()[id]; }
             api.modFile = function (mod, path) {
                 var k = mod + ':' + String(path || '').toLowerCase().replace(/^[./]+/, '');
                 return guiFiles[k] || texFiles[k] || sdFiles[k] || null;
@@ -10471,7 +10493,7 @@
             function modsOn() {
                 if (!listed) return null;
                 if (guestNow()) return [];
-                return mods.filter(function (x) { return x.enabled && !x.err; })
+                return mods.filter(function (x) { return x.enabled && !x.err && !graphicsOnly(cid(x)); })
                     .map(function (x) { return { id: cid(x), name: String(x.m.name || cid(x)).replace(/[\t\r\n]/g, ' ') }; })
                     .sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
             }
@@ -10479,7 +10501,8 @@
                 try {
                     var t = FS.readFile(folder + '/mods.list', { encoding: 'utf8' }).split('\n');
                     if (!/^mcre-mods /.test(t[0])) return null;
-                    return t.slice(1).filter(Boolean).map(function (l) { var p = l.split('\t'); return { id: p[0], name: p[1] || p[0] }; });
+                    return t.slice(1).filter(Boolean).map(function (l) { var p = l.split('\t'); return { id: p[0], name: p[1] || p[0] }; })
+                        .filter(function (m) { return !graphicsOnly(m.id); });
                 } catch (e) { return null; }
             }
             function modeFilter(list, folder) {

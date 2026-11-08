@@ -325,8 +325,16 @@
 			'precision highp float;',
 			'in vec2 uv;',
 			'uniform sampler2D src;',
+			'uniform float mcDepthView;',
 			'out vec4 o;',
-			'void main(){ o = vec4(texture(src, uv).rgb, 1.0); }'].join(NL);
+			'void main(){',
+			'  vec3 c = texture(src, uv).rgb;',
+			'  if (mcDepthView > 0.5) {',
+			'    float d = c.r;',
+			'    c = vec3(clamp((d - 0.3) * 4.0, 0.0, 1.0), fract(d * 128.0), d >= 0.9995 ? 1.0 : 0.0);',
+			'  }',
+			'  o = vec4(c, 1.0);',
+			'}'].join(NL);
 		var mk = function (ty, src) { var sh = gl.createShader(ty); gl.shaderSource(sh, src); gl.compileShader(sh); return gl.getShaderParameter(sh, gl.COMPILE_STATUS) ? sh : null; };
 		var v = mk(gl.VERTEX_SHADER, vs), f = mk(gl.FRAGMENT_SHADER, fs);
 		if (!v || !f) return (P.showProg = null);
@@ -339,16 +347,18 @@
 		gl.useProgram(pr); gl.uniform1i(gl.getUniformLocation(pr, 'src'), 0); gl.useProgram(null);
 		return (P.showProg = pr);
 	}
-	function drawTextureToScreen(tex) {
+	function drawTextureToScreen(tex, depthView) {
 		var pr = showProgram();
 		if (!pr || !tex) return;
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.viewport(0, 0, P.w, P.h);
 		gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST);
 		gl.useProgram(pr);
+		gl.uniform1f(gl.getUniformLocation(pr, 'mcDepthView'), depthView ? 1 : 0);
 		gl.bindVertexArray(P.quadVao);
 		gl.activeTexture(gl.TEXTURE0);
 		var was = gl.getParameter(gl.TEXTURE_BINDING_2D);
+		gl.bindSampler(0, null);
 		gl.bindTexture(gl.TEXTURE_2D, tex);
 		gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 		gl.bindTexture(gl.TEXTURE_2D, was);
@@ -442,13 +452,6 @@
 		return out;
 	}
 
-	function mat3of(m, out) {
-		out = out || new Float32Array(9);
-		out[0] = m[0]; out[1] = m[1]; out[2] = m[2];
-		out[3] = m[4]; out[4] = m[5]; out[5] = m[6];
-		out[6] = m[8]; out[7] = m[9]; out[8] = m[10];
-		return out;
-	}
 	function normalMat(mv, out) {
 		var i = inv4(mv, new Float32Array(16));
 		out = out || new Float32Array(9);
@@ -524,6 +527,7 @@
 		M.shadowProjection = sm.pr;
 		M.shadowModelViewInverse = inv4(sm.mv);
 		M.shadowProjectionInverse = inv4(sm.pr);
+		M.shadowFromCamera = mul4(sm.mv, M.gbufferModelViewInverse, M.shadowFromCamera);
 	}
 
 	function fv(name) {
@@ -633,9 +637,14 @@
 			return out;
 		}
 		if (P.inShadow) {
-			out.mcMvMat = P.mats.shadowModelView;
-			out.mcProjMat = P.mats.shadowProjection;
-			out.mcNormalMat = mat3of(P.mats.shadowModelView, out.mcNormalMat3 || (out.mcNormalMat3 = new Float32Array(9)));
+			var SM = P.mats;
+			var cur = (typeof GLImmediate !== 'undefined' && GLImmediate.matrix) ? GLImmediate.matrix[0] : null;
+			var smv = (cur && SM.shadowFromCamera)
+				? mul4(SM.shadowFromCamera, cur, out.shadowMv || (out.shadowMv = new Float32Array(16)))
+				: SM.shadowModelView;
+			out.mcMvMat = smv;
+			out.mcProjMat = SM.shadowProjection;
+			out.mcNormalMat = normalMat(smv, out.mcNormalMat3 || (out.mcNormalMat3 = new Float32Array(9)));
 			return out;
 		}
 		if (typeof GLImmediate === 'undefined' || !GLImmediate.matrix) { out.mcMvMat = null; out.mcProjMat = null; out.mcNormalMat = null; return out; }
@@ -688,6 +697,8 @@
 			bound: false, lastProg: null
 		};
 		for (var k = 0; k < 3; k++) for (var j = 0; j < 4; j++) p.texMats[k * 16 + j * 5] = 1;
+		p.texMats[16 + 0] = p.texMats[16 + 5] = p.texMats[16 + 10] = 1 / 256;
+		p.texMats[16 + 12] = p.texMats[16 + 13] = p.texMats[16 + 14] = 8 / 256;
 
 		var names = Object.keys(built.programs);
 		var writtenByScreen = {}, readAnywhere = {};
@@ -850,6 +861,25 @@
 			'\n      tex2 ' + centrePixel(texOf(2)));
 	}
 
+	S.shadowInfo = function () {
+		if (!P) return null;
+		var k = P.built ? P.built.consts : {};
+		var M = P.mats || {};
+		return {
+			wanted: !!P.shadowWanted, res: P.shadow ? P.shadow.res : 0,
+			hasColor0: !!(P.shadow && P.shadow.color0),
+			shadowDistance: k.shadowDistance, shadowDistanceRenderMul: k.shadowDistanceRenderMul,
+			shadowMapResolution: k.shadowMapResolution, sunPathRotation: k.sunPathRotation,
+			shadowIntervalSize: k.shadowIntervalSize,
+			sunWorld: Array.from(fv('sunWorld') || []),
+			sunAngle: f1('sunAngle'), shadowAngle: f1('shadowAngle'),
+			shadowLightIsSun: i1('shadowLightIsSun'),
+			shadowModelView: M.shadowModelView ? Array.from(M.shadowModelView) : null,
+			shadowProjection: M.shadowProjection ? Array.from(M.shadowProjection) : null,
+			gbufferModelView: M.gbufferModelView ? Array.from(M.gbufferModelView) : null
+		};
+	};
+
 	S.probeTargets = function () {
 		if (!P) return null;
 		var out = {}, px = new Uint8Array(4);
@@ -882,8 +912,33 @@
 		return P.wants[what] ? 1 : 0;
 	};
 
+	S.shadowRange = function () {
+		if (!P || !P.shadow) return 0;
+		var k = P.built.consts;
+		var d = k.shadowDistance > 0 ? k.shadowDistance : 80;
+		if (k.shadowDistanceRenderMul > 0) d *= k.shadowDistanceRenderMul;
+		return Math.round(Math.max(16, Math.min(512, d)));
+	};
+
 	S.selectionSeq = function () { return seq; };
 	S.notes = function () { return notes.slice(0); };
+
+	var traceDraws = false, traced = {};
+	S.traceDraws = function (on) {
+		if (on) { traceDraws = true; traced = {}; return null; }
+		traceDraws = false;
+		return traced;
+	};
+
+	S.debugGl = function () {
+		if (!gl) return null;
+		return {
+			blend: gl.isEnabled(gl.BLEND),
+			blendSrc: gl.getParameter(gl.BLEND_SRC_RGB), blendDst: gl.getParameter(gl.BLEND_DST_RGB),
+			depthTest: gl.isEnabled(gl.DEPTH_TEST), depthMask: gl.getParameter(gl.DEPTH_WRITEMASK),
+			cull: gl.isEnabled(gl.CULL_FACE), pass: P ? P.curName : ''
+		};
+	};
 
 	S.debugPrograms = function () {
 		if (!P) return null;
@@ -1012,6 +1067,11 @@
 		P.cur = P.progs[name] || null;
 		var b = P.built.blend[name];
 		if (b !== undefined) {
+			if (!P.blendSaved) P.blendSaved = {
+				on: gl.isEnabled(gl.BLEND),
+				sc: gl.getParameter(gl.BLEND_SRC_RGB), dc: gl.getParameter(gl.BLEND_DST_RGB),
+				sa: gl.getParameter(gl.BLEND_SRC_ALPHA), da: gl.getParameter(gl.BLEND_DST_ALPHA)
+			};
 			if (/^off$/i.test(b)) gl.disable(gl.BLEND);
 			else {
 				gl.enable(gl.BLEND);
@@ -1019,9 +1079,16 @@
 				if (f.length >= 4) gl.blendFuncSeparate(f[0], f[1], f[2], f[3]);
 				else if (f.length >= 2) gl.blendFunc(f[0], f[1]);
 			}
-		}
+		} else restoreBlend();
 		return P.cur ? 1 : 0;
 	};
+	function restoreBlend() {
+		if (!P || !P.blendSaved) return;
+		var s = P.blendSaved;
+		P.blendSaved = null;
+		if (s.on) gl.enable(gl.BLEND); else gl.disable(gl.BLEND);
+		gl.blendFuncSeparate(s.sc, s.dc, s.sa, s.da);
+	}
 	function blendFactor(n) {
 		var g = gl, T = {
 			ZERO: g.ZERO, ONE: g.ONE, SRC_COLOR: g.SRC_COLOR, ONE_MINUS_SRC_COLOR: g.ONE_MINUS_SRC_COLOR,
@@ -1084,6 +1151,17 @@
 		bump('endWorld');
 		if (P.curName) mark('after ' + P.curName);
 		mark('world done');
+		restoreBlend();
+
+		if (showBuffer === 8) {
+			drawTextureToScreen(P.shadow ? P.shadow.depth : null, true);
+			gl.enable(gl.DEPTH_TEST);
+			gl.depthMask(true);
+			gl.enable(gl.CULL_FACE);
+			P.bound = false;
+			if (traceFrames) traceFrames--;
+			return 1;
+		}
 
 		if (showBuffer >= 0 && showBuffer < 8 && showBuffer === showRaw) {
 			drawTextureToScreen(texOf(showBuffer));
@@ -1361,6 +1439,12 @@
 		if (!P || !P.cur || count <= 0) { if (P) bump('ff:nopass'); return 0; }
 		var Pg = P.cur;
 		bump('ff:' + P.curName);
+		if (traceDraws) {
+			traced[P.curName] = {
+				flags: flags, light: [lb, ls], count: count,
+				blend: gl.isEnabled(gl.BLEND), writes: Pg.drawBuffers || [0], prog: Pg.name
+			};
+		}
 		try {
 			gl.useProgram(Pg.prog);
 			if (typeof GLImmediate !== 'undefined') GLImmediate.fixedFunctionProgram = 0;
