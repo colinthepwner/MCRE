@@ -253,6 +253,24 @@
             }
             var REPORT_URL = 'https://authrelay-vercel.vercel.app/crash';
             var reported = false;
+            var startedAt = Date.now();
+            var lastSeen = { world: 0, frames: 0, mods: '' };
+            var modsVersion = -1;
+            setInterval(function () {
+                try {
+                    lastSeen.world = Module.mcInWorld === 1 ? 1 : 0;
+                    if (typeof Module.mcFrameCount === 'number') lastSeen.frames = Module.mcFrameCount;
+                    var v = Module.mcMods && Module.mcMods.version ? Module.mcMods.version() : -1;
+                    if (v >= 0 && v !== modsVersion && Module.mcMods.list) {
+                        modsVersion = v;
+                        var on = String(Module.mcMods.list() || '').split('\n').filter(Boolean)
+                            .map(function (r) { return r.split('\t'); })
+                            .filter(function (f) { return f[5] === '1'; })
+                            .map(function (f) { return f[1] || f[0]; });
+                        lastSeen.mods = on.length ? on.slice(0, 12).join(', ') + (on.length > 12 ? ' +' + (on.length - 12) : '') : 'none';
+                    }
+                } catch (e) { }
+            }, 3000);
             function reportFatal(text) {
                 if (reported || !REPORT_URL) return;
                 reported = true;
@@ -278,6 +296,10 @@
                             err: String(text).slice(0, 1400),
                             build: build,
                             where: where + (Module.mcThreaded ? ' (threaded build)' : ''),
+                            doing: (lastSeen.world ? 'in a world' : 'in the menus')
+                                + ', ' + Math.round((Date.now() - startedAt) / 1000) + ' s in'
+                                + ', ' + lastSeen.frames + ' frames',
+                            mods: String(lastSeen.mods || 'not known yet').slice(0, 400),
                             ua: String(navigator.userAgent).slice(0, 160)
                         }),
                         keepalive: true
