@@ -2994,10 +2994,42 @@
             var net = Module.mcNet = { state: 'idle', code: '', error: '', events: [], cur: null };
             var peer = null, conns = new Map(), nextId = 2, server = null, joinTimer = 0;
             function ev(e) { net.events.push(e); }
+            var CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVXYZ', CODE_DIGITS = '123456789';
+            var codeRhyme = null;
+            function randInt(n) {
+                var lim = Math.floor(4294967296 / n) * n, u = new Uint32Array(1);
+                do { crypto.getRandomValues(u); } while (u[0] >= lim);
+                return u[0] % n;
+            }
+            function buildRhyme() {
+                var triples = [], pairs = [];
+                ['BCDEGPTVZ', 'AHJK', 'FLMNSX', 'QU'].forEach(function (g) {
+                    g = g.split('');
+                    g.forEach(function (a) { g.forEach(function (b) { g.forEach(function (c) { triples.push(a + b + c); }); }); });
+                });
+                CODE_DIGITS.split('').forEach(function (d) {
+                    for (var t = 2; t <= 9; t++) pairs.push([d, t + d]);
+                    if (d === '7') pairs.push(['7', '11']);
+                });
+                return { triples: triples, pairs: pairs };
+            }
             function newCode() {
-                var s = '';
-                for (var i = 0; i < 5; i++) s += ALPHABET[(Math.random() * ALPHABET.length) | 0];
-                return s;
+                var s = '', k;
+                try {
+                    if (randInt(100) >= 15) {
+                        for (k = 0; k < 3; k++) s += CODE_LETTERS[randInt(CODE_LETTERS.length)];
+                        for (k = 0; k < 3; k++) s += CODE_DIGITS[randInt(CODE_DIGITS.length)];
+                        return s;
+                    }
+                    var r = codeRhyme || (codeRhyme = buildRhyme());
+                    var l = r.triples[randInt(r.triples.length)], p = r.pairs[randInt(r.pairs.length)];
+                    return randInt(2) ? l[0] + p[0] + l[1] + p[1] + l[2] : l[0] + p[1] + l[1] + p[0] + l[2];
+                } catch (e) {
+                    s = '';
+                    for (k = 0; k < 3; k++) s += CODE_LETTERS[(Math.random() * CODE_LETTERS.length) | 0];
+                    for (k = 0; k < 3; k++) s += CODE_DIGITS[(Math.random() * CODE_DIGITS.length) | 0];
+                    return s;
+                }
             }
             function bytes(d) {
                 if (d instanceof ArrayBuffer) return new Uint8Array(d);
@@ -4013,7 +4045,7 @@
                         if (got) { if (c._near) c._near(m || {}); return; }
                         if (!m || m.t !== 'info') return;
                         got = { slot: slot, open: !!m.open, name: clean(m.name) || 'A friend', world: clean(m.world, 40), players: +m.players || 0,
-                                code: /^[A-Z0-9]{5}$/.test(String(m.code || '')) ? String(m.code) : '', v: clean(m.v, 40),
+                                code: /^[A-Z0-9]{5,6}$/.test(String(m.code || '')) ? String(m.code) : '', v: clean(m.v, 40),
                                 match: m.match === 'both' || m.match === 'one' ? m.match : '' };
                         if (keep && got.match) got.conn = c;
                         if ((got.open && got.code) || got.match) found.push(got);
@@ -4090,7 +4122,7 @@
                         status(d, w.match === 'one' ? 'Asking ' + w.name + '...' : 'Opening ' + w.name + "'s world...");
                         w.conn._near = function (m) {
                             if (finished) return;
-                            if (m.t === 'code' && /^[A-Z0-9]{5}$/.test(String(m.code || ''))) go(d, String(m.code));
+                            if (m.t === 'code' && /^[A-Z0-9]{5,6}$/.test(String(m.code || ''))) go(d, String(m.code));
                             else if (m.t === 'no') {
                                 snooze[w.name] = Date.now() + 60000;
                                 status(d, m.why === 'open' ? "Couldn't open " + w.name + "'s world - try again." : w.name + " didn't let you in this time.", 'ff7070');
@@ -4145,7 +4177,7 @@
                     });
                 })();
             };
-            N.codeFor = function (action) { var m = /^row:near([A-Z0-9]{5})$/.exec(String(action || '')); return m ? m[1] : ''; };
+            N.codeFor = function (action) { var m = /^row:near([A-Z0-9]{5,6})$/.exec(String(action || '')); return m ? m[1] : ''; };
             N.scan = scan;
             N.beaconInfo = function () { return beacon ? { key: beacon.key, slot: beacon.slot, ready: beacon.ready } : null; };
             N.key = netKey;
@@ -4600,7 +4632,7 @@
                         var raw = String(v.code || '').trim();
                         var server = /[.:]/.test(raw) || /^localhost$/i.test(raw);
                         var c = server ? raw : raw.replace(/[\s_-]+/g, '').toUpperCase();
-                        if (!server && !/^[A-Z0-9]{5}$/.test(c) && !/^[A-Z0-9]{6,16}$/.test(c)) { d.spec.items[ERR].text = 'Codes are 5 letters and numbers, or 6-16 for a picked code (or type a server address)'; d.update(); return; }
+                        if (!server && !/^[A-Z0-9]{5}$/.test(c) && !/^[A-Z0-9]{6,16}$/.test(c)) { d.spec.items[ERR].text = 'Codes look like XQZ273, or 5 letters and numbers, or 6-16 for a picked code (or type a server address)'; d.update(); return; }
                         d.close();
                         dlg = null;
                         waiting = false;
